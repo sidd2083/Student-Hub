@@ -3,20 +3,34 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Student Hub API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: users
+    description: User management
+  - name: notes
+    description: Notes management
+  - name: mcqs
+    description: MCQ management
+  - name: pyqs
+    description: Previous year questions
+  - name: tasks
+    description: To-do tasks
+  - name: scores
+    description: Scores and leaderboard
+  - name: ai
+    description: Nep AI assistant
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +38,542 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users (admin)
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create or update user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserBody"
+      responses:
+        "200":
+          description: User created/updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{uid}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get user by Firebase UID
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: User not found
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user (role change, etc)
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBody"
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete user (admin)
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResult"
+
+  /users/stats/summary:
+    get:
+      operationId: getUserStats
+      tags: [users]
+      summary: Admin dashboard user stats
+      responses:
+        "200":
+          description: User stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStats"
+
+  /notes:
+    get:
+      operationId: listNotes
+      tags: [notes]
+      summary: List notes with optional filters
+      parameters:
+        - name: grade
+          in: query
+          schema:
+            type: integer
+        - name: subject
+          in: query
+          schema:
+            type: string
+        - name: chapter
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of notes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Note"
+    post:
+      operationId: createNote
+      tags: [notes]
+      summary: Create a note (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNoteBody"
+      responses:
+        "201":
+          description: Note created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+
+  /notes/{id}:
+    get:
+      operationId: getNote
+      tags: [notes]
+      summary: Get a note by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Note found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+    patch:
+      operationId: updateNote
+      tags: [notes]
+      summary: Update a note (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNoteBody"
+      responses:
+        "200":
+          description: Note updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+    delete:
+      operationId: deleteNote
+      tags: [notes]
+      summary: Delete a note (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Note deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResult"
+
+  /notes/subjects:
+    get:
+      operationId: listNoteSubjects
+      tags: [notes]
+      summary: List distinct subjects for a grade
+      parameters:
+        - name: grade
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Subjects list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /mcqs:
+    get:
+      operationId: listMcqs
+      tags: [mcqs]
+      summary: List MCQs with filters
+      parameters:
+        - name: grade
+          in: query
+          schema:
+            type: integer
+        - name: subject
+          in: query
+          schema:
+            type: string
+        - name: chapter
+          in: query
+          schema:
+            type: string
+        - name: difficulty
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of MCQs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Mcq"
+    post:
+      operationId: createMcq
+      tags: [mcqs]
+      summary: Create MCQ (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMcqBody"
+      responses:
+        "201":
+          description: MCQ created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mcq"
+
+  /mcqs/{id}:
+    patch:
+      operationId: updateMcq
+      tags: [mcqs]
+      summary: Update MCQ (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMcqBody"
+      responses:
+        "200":
+          description: MCQ updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mcq"
+    delete:
+      operationId: deleteMcq
+      tags: [mcqs]
+      summary: Delete MCQ (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: MCQ deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResult"
+
+  /pyqs:
+    get:
+      operationId: listPyqs
+      tags: [pyqs]
+      summary: List previous year questions
+      parameters:
+        - name: grade
+          in: query
+          schema:
+            type: integer
+        - name: subject
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of PYQs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Pyq"
+    post:
+      operationId: createPyq
+      tags: [pyqs]
+      summary: Create PYQ (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePyqBody"
+      responses:
+        "201":
+          description: PYQ created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pyq"
+
+  /pyqs/{id}:
+    delete:
+      operationId: deletePyq
+      tags: [pyqs]
+      summary: Delete PYQ (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PYQ deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResult"
+
+  /tasks:
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      summary: List tasks for a user
+      parameters:
+        - name: uid
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+    post:
+      operationId: createTask
+      tags: [tasks]
+      summary: Create a task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskBody"
+      responses:
+        "201":
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /tasks/{id}:
+    patch:
+      operationId: updateTask
+      tags: [tasks]
+      summary: Update a task (complete/edit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTaskBody"
+      responses:
+        "200":
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+    delete:
+      operationId: deleteTask
+      tags: [tasks]
+      summary: Delete a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Task deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResult"
+
+  /scores:
+    get:
+      operationId: listScores
+      tags: [scores]
+      summary: Leaderboard scores
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [daily, alltime]
+      responses:
+        "200":
+          description: Leaderboard
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScoreEntry"
+    post:
+      operationId: submitScore
+      tags: [scores]
+      summary: Submit a quiz score
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitScoreBody"
+      responses:
+        "201":
+          description: Score submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoreEntry"
+
+  /scores/reset:
+    post:
+      operationId: resetScores
+      tags: [scores]
+      summary: Reset all daily scores (admin)
+      responses:
+        "200":
+          description: Scores reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResult"
+
+  /ai/chat:
+    post:
+      operationId: nepAiChat
+      tags: [ai]
+      summary: Send a message to Nep AI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiChatBody"
+      responses:
+        "200":
+          description: AI response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiChatResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +581,343 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    DeleteResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required: [success]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        uid:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        grade:
+          type: integer
+        role:
+          type: string
+          enum: [user, admin]
+        createdAt:
+          type: string
+      required: [id, uid, name, email, grade, role, createdAt]
+
+    CreateUserBody:
+      type: object
+      properties:
+        uid:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        grade:
+          type: integer
+        role:
+          type: string
+          enum: [user, admin]
+      required: [uid, name, email, grade]
+
+    UpdateUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        grade:
+          type: integer
+        role:
+          type: string
+          enum: [user, admin]
+
+    UserStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        byGrade:
+          type: object
+          additionalProperties:
+            type: integer
+        admins:
+          type: integer
+        newToday:
+          type: integer
+      required: [total, byGrade, admins, newToday]
+
+    Note:
+      type: object
+      properties:
+        id:
+          type: integer
+        grade:
+          type: integer
+        subject:
+          type: string
+        chapter:
+          type: string
+        title:
+          type: string
+        contentType:
+          type: string
+          enum: [text, pdf, image]
+        content:
+          type: string
+        createdAt:
+          type: string
+      required: [id, grade, subject, chapter, title, contentType, content, createdAt]
+
+    CreateNoteBody:
+      type: object
+      properties:
+        grade:
+          type: integer
+        subject:
+          type: string
+        chapter:
+          type: string
+        title:
+          type: string
+        contentType:
+          type: string
+          enum: [text, pdf, image]
+        content:
+          type: string
+      required: [grade, subject, chapter, title, contentType, content]
+
+    UpdateNoteBody:
+      type: object
+      properties:
+        grade:
+          type: integer
+        subject:
+          type: string
+        chapter:
+          type: string
+        title:
+          type: string
+        contentType:
+          type: string
+          enum: [text, pdf, image]
+        content:
+          type: string
+
+    Mcq:
+      type: object
+      properties:
+        id:
+          type: integer
+        grade:
+          type: integer
+        subject:
+          type: string
+        chapter:
+          type: string
+        question:
+          type: string
+        optionA:
+          type: string
+        optionB:
+          type: string
+        optionC:
+          type: string
+        optionD:
+          type: string
+        correctAnswer:
+          type: string
+          enum: [A, B, C, D]
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+        createdAt:
+          type: string
+      required: [id, grade, subject, chapter, question, optionA, optionB, optionC, optionD, correctAnswer, difficulty, createdAt]
+
+    CreateMcqBody:
+      type: object
+      properties:
+        grade:
+          type: integer
+        subject:
+          type: string
+        chapter:
+          type: string
+        question:
+          type: string
+        optionA:
+          type: string
+        optionB:
+          type: string
+        optionC:
+          type: string
+        optionD:
+          type: string
+        correctAnswer:
+          type: string
+          enum: [A, B, C, D]
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+      required: [grade, subject, chapter, question, optionA, optionB, optionC, optionD, correctAnswer, difficulty]
+
+    UpdateMcqBody:
+      type: object
+      properties:
+        grade:
+          type: integer
+        subject:
+          type: string
+        chapter:
+          type: string
+        question:
+          type: string
+        optionA:
+          type: string
+        optionB:
+          type: string
+        optionC:
+          type: string
+        optionD:
+          type: string
+        correctAnswer:
+          type: string
+          enum: [A, B, C, D]
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+
+    Pyq:
+      type: object
+      properties:
+        id:
+          type: integer
+        grade:
+          type: integer
+        subject:
+          type: string
+        title:
+          type: string
+        year:
+          type: integer
+        pdfUrl:
+          type: string
+        createdAt:
+          type: string
+      required: [id, grade, subject, title, year, pdfUrl, createdAt]
+
+    CreatePyqBody:
+      type: object
+      properties:
+        grade:
+          type: integer
+        subject:
+          type: string
+        title:
+          type: string
+        year:
+          type: integer
+        pdfUrl:
+          type: string
+      required: [grade, subject, title, year, pdfUrl]
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+        uid:
+          type: string
+        text:
+          type: string
+        completed:
+          type: boolean
+        createdAt:
+          type: string
+      required: [id, uid, text, completed, createdAt]
+
+    CreateTaskBody:
+      type: object
+      properties:
+        uid:
+          type: string
+        text:
+          type: string
+      required: [uid, text]
+
+    UpdateTaskBody:
+      type: object
+      properties:
+        text:
+          type: string
+        completed:
+          type: boolean
+
+    ScoreEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        uid:
+          type: string
+        userName:
+          type: string
+        grade:
+          type: integer
+        score:
+          type: integer
+        totalQuestions:
+          type: integer
+        subject:
+          type: string
+        createdAt:
+          type: string
+      required: [id, uid, userName, grade, score, totalQuestions, subject, createdAt]
+
+    SubmitScoreBody:
+      type: object
+      properties:
+        uid:
+          type: string
+        userName:
+          type: string
+        grade:
+          type: integer
+        score:
+          type: integer
+        totalQuestions:
+          type: integer
+        subject:
+          type: string
+      required: [uid, userName, grade, score, totalQuestions, subject]
+
+    AiChatBody:
+      type: object
+      properties:
+        message:
+          type: string
+        history:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+                enum: [user, assistant]
+              content:
+                type: string
+            required: [role, content]
+      required: [message]
+
+    AiChatResponse:
+      type: object
+      properties:
+        reply:
+          type: string
+      required: [reply]
