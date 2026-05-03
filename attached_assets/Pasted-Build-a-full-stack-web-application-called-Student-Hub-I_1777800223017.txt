@@ -1,0 +1,262 @@
+Build a full-stack web application called “Student Hub”.
+
+IMPORTANT DESIGN RULE:
+- UI must be clean, white, minimal, smooth like Instagram
+- No futuristic AI glowing effects
+- Use soft shadows, rounded cards, simple typography
+- Focus on usability, not flashy design
+
+TECH STACK:
+- React / Next.js
+- Tailwind CSS
+- Firebase (Auth + Firestore)
+
+---
+
+# 🔐 AUTH SYSTEM
+
+Use Google Sign-In (Firebase Authentication)
+
+After login:
+- ask user:
+  - Full Name
+  - Grade (9, 10, 11, 12)
+
+Store user data:
+{
+  name,
+  grade,
+  role: "user" or "admin"
+}
+
+---
+
+# 🏠 MAIN DASHBOARD (GRADE BASED)
+
+After login, show dashboard based on grade.
+
+Top section:
+- Greeting (Hi, Siddhant)
+- Today’s quick actions
+
+Main sections:
+
+1. Notes
+2. MCQ Practice
+3. Previous Questions
+4. To-Do List
+5. Pomodoro Timer
+6. Nep AI (assistant)
+
+---
+
+# 📚 NOTES SYSTEM
+
+Structure:
+Grade → Subject → Chapter
+
+Admin can add notes in 3 formats:
+1. Text (rich content inside app)
+2. PDF upload
+3. Image upload
+
+User view:
+- clean reading UI
+- subject filter
+- chapter list
+
+---
+
+# ❓ MCQ SYSTEM
+
+User can:
+- choose subject
+- choose chapter
+- choose difficulty
+- choose number of questions
+
+Quiz mode:
+- one question at a time
+- show result at end
+- show score
+
+Leaderboard:
+- daily ranking
+- based on MCQ scores
+
+---
+
+# 📄 PREVIOUS YEAR QUESTIONS
+
+- organized by grade → subject
+- PDF based
+- simple viewer
+
+---
+
+# 📋 TO-DO SYSTEM
+
+- add tasks
+- mark complete
+- delete
+- stored per user
+
+---
+
+# ⏱ POMODORO TIMER
+
+- 25 min / 50 min options
+- simple UI
+- shows active task
+
+---
+
+# 🤖 NEP AI (ASSISTANT)
+
+Name: “Nep AI”
+
+Purpose:
+- solve study questions
+- explain concepts simply
+- generate answers
+
+UI:
+- simple chat UI (clean, not chatbot heavy)
+- minimal design
+
+---
+
+# 🧠 ADMIN DASHBOARD (VERY IMPORTANT)
+
+Create a separate admin panel at:
+
+/admin
+
+---
+
+## 🔐 ADMIN LOGIN
+
+- email/password login OR role-based access
+- only users with role = "admin" can access
+
+---
+
+## 📊 ADMIN DASHBOARD UI
+
+Clean panel with sidebar:
+
+Sections:
+1. Dashboard (stats)
+2. Manage Notes
+3. Manage MCQs
+4. Manage PYQs
+5. Manage Users
+6. Leaderboard Control
+
+---
+
+## 📚 MANAGE NOTES
+
+Admin can:
+- add note
+- edit note
+- delete note
+
+Fields:
+- Grade
+- Subject
+- Chapter
+- Content (text OR PDF OR image)
+
+---
+
+## ❓ MANAGE MCQ
+
+Admin can:
+- add questions
+- set options
+- set correct answer
+- set difficulty
+- assign to chapter
+
+---
+
+## 📄 MANAGE PYQ
+
+- upload PDF
+- assign grade + subject
+
+---
+
+## 👤 MANAGE USERS
+
+- view users
+- delete user
+- change role (user/admin)
+
+---
+
+## 🏆 LEADERBOARD CONTROL
+
+- reset scores
+- view rankings
+
+---
+
+# 🧠 DATABASE STRUCTURE
+
+Collections:
+
+users/
+notes/
+mcqs/
+pyqs/
+tasks/
+scores/
+
+---
+
+# 🔒 SECURITY RULES
+
+- normal users cannot access /admin
+- check role before rendering admin pages
+- protect all write operations
+
+---
+
+# 🎨 UI DETAILS
+
+- white background
+- light gray sections
+- rounded cards
+- smooth transitions
+- mobile responsive
+- clean fonts
+- no clutter
+
+---
+
+# ⚡ PERFORMANCE
+
+- fast loading
+- simple components
+- optimized queries
+
+---
+
+# 💣 FINAL GOAL
+
+This should feel like:
+- a real student platform
+- daily usable
+- clean and simple
+- powerful admin-controlled system
+
+NOT:
+- flashy AI demo
+- messy dashboard
+- overdesigned UI
+
+---
+
+END
