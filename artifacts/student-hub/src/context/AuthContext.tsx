@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import {
   User as FirebaseUser,
   onAuthStateChanged,
@@ -34,11 +34,8 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  // Stay in loading until redirect result AND auth state are both resolved
   const [loading, setLoading] = useState(true);
-  const [location, setLocation] = useLocation();
-  const locationRef = useRef(location);
-  locationRef.current = location;
+  const [, setLocation] = useLocation();
 
   const fetchProfile = async (uid: string): Promise<UserProfile | null> => {
     try {
@@ -61,18 +58,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let mounted = true;
 
     const initialize = async () => {
-      // Process Google redirect result first — this must complete before
-      // we attach the auth listener so we see the correct user state.
       try {
         await getRedirectResult(auth);
       } catch {
-        // Ignore domain / cancelled redirect errors
       }
 
       if (!mounted) return;
 
-      // Now attach auth state listener — it fires synchronously with the
-      // current user (or null) that Firebase already has in memory.
       unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
         if (!mounted) return;
 
@@ -82,16 +74,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (!mounted) return;
           setProfile(p);
           setLoading(false);
-
-          // Route: new user → onboarding, returning user on "/" → dashboard
-          if (!p) {
-            setLocation("/onboarding");
-          } else {
-            const currentPath = locationRef.current;
-            if (currentPath === "/" || currentPath === "") {
-              setLocation("/dashboard");
-            }
-          }
+          if (p) setLocation("/dashboard");
+          else setLocation("/onboarding");
         } else {
           setUser(null);
           setProfile(null);
