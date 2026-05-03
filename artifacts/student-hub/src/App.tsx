@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
-import { ProtectedRoute, AdminRoute } from "@/components/ProtectedRoute";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
 import Onboarding from "@/pages/Onboarding";
@@ -16,6 +16,7 @@ import Pomodoro from "@/pages/Pomodoro";
 import NepAi from "@/pages/NepAi";
 import Leaderboard from "@/pages/Leaderboard";
 import Admin from "@/pages/Admin";
+import Settings from "@/pages/Settings";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,7 +31,7 @@ function RootGate() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
         <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-gray-400 text-sm">Loading user session...</p>
+        <p className="text-gray-400 text-sm">Loading your session…</p>
       </div>
     );
   }
@@ -70,8 +71,11 @@ function Router() {
       <Route path="/leaderboard">
         <ProtectedRoute><Leaderboard /></ProtectedRoute>
       </Route>
+      <Route path="/settings">
+        <ProtectedRoute><Settings /></ProtectedRoute>
+      </Route>
       <Route path="/admin">
-        <AdminRoute><Admin /></AdminRoute>
+        <ProtectedRoute><Admin /></ProtectedRoute>
       </Route>
       <Route component={NotFound} />
     </Switch>

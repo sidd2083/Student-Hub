@@ -1,24 +1,28 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import {
-  BookOpen, Brain, FileText, CheckSquare, Timer, MessageCircle,
-  Trophy, LayoutDashboard, LogOut, Shield
+  BookOpen, Brain, FileText, CheckSquare, Timer,
+  MessageCircle, Trophy, LayoutDashboard, LogOut,
+  Shield, Settings
 } from "lucide-react";
 
 const navItems = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/notes", icon: BookOpen, label: "Notes" },
-  { href: "/mcq", icon: Brain, label: "MCQ Practice" },
-  { href: "/pyqs", icon: FileText, label: "Previous Questions" },
-  { href: "/todo", icon: CheckSquare, label: "To-Do" },
-  { href: "/pomodoro", icon: Timer, label: "Pomodoro" },
-  { href: "/ai", icon: MessageCircle, label: "Nep AI" },
-  { href: "/leaderboard", icon: Trophy, label: "Leaderboard" },
+  { href: "/dashboard",   icon: LayoutDashboard, label: "Dashboard"          },
+  { href: "/notes",       icon: BookOpen,         label: "Notes"              },
+  { href: "/mcq",         icon: Brain,            label: "MCQ Practice"       },
+  { href: "/pyqs",        icon: FileText,         label: "Previous Questions" },
+  { href: "/todo",        icon: CheckSquare,      label: "To-Do"              },
+  { href: "/pomodoro",    icon: Timer,            label: "Pomodoro"           },
+  { href: "/ai",          icon: MessageCircle,    label: "Nep AI"             },
+  { href: "/leaderboard", icon: Trophy,           label: "Leaderboard"        },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { profile, signOut } = useAuth();
+
+  const isActive = (href: string) =>
+    location === href || (href !== "/dashboard" && location.startsWith(href));
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -31,25 +35,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <span className="text-lg font-semibold text-gray-900">Student Hub</span>
           </div>
         </div>
+
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {navItems.map(({ href, icon: Icon, label }) => {
-            const active = location === href || (href !== "/dashboard" && location.startsWith(href));
-            return (
-              <Link key={href} href={href}>
-                <a
-                  data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                    active
-                      ? "bg-blue-50 text-blue-600"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  }`}
-                >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
-                  {label}
-                </a>
-              </Link>
-            );
-          })}
+          {navItems.map(({ href, icon: Icon, label }) => (
+            <Link key={href} href={href}>
+              <a
+                data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  isActive(href)
+                    ? "bg-blue-50 text-blue-600"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                }`}
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                {label}
+              </a>
+            </Link>
+          ))}
+
           {profile?.role === "admin" && (
             <Link href="/admin">
               <a
@@ -66,16 +69,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Link>
           )}
         </nav>
+
         <div className="p-4 border-t border-gray-100">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm">
-              {profile?.name?.charAt(0)?.toUpperCase() || "?"}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">{profile?.name}</p>
-              <p className="text-xs text-gray-500">Grade {profile?.grade}</p>
-            </div>
-          </div>
+          <Link href="/settings">
+            <a className="flex items-center gap-3 mb-2 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-all cursor-pointer group">
+              {profile?.photoURL ? (
+                <img
+                  src={profile?.photoURL as string}
+                  className="w-9 h-9 rounded-full ring-2 ring-gray-100"
+                  alt=""
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm flex-shrink-0">
+                  {profile?.name?.charAt(0)?.toUpperCase() || "?"}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{profile?.name}</p>
+                <p className="text-xs text-gray-500">Grade {profile?.grade}</p>
+              </div>
+              <Settings className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-600 flex-shrink-0" />
+            </a>
+          </Link>
           <button
             data-testid="btn-signout"
             onClick={signOut}
@@ -86,9 +101,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       </aside>
-      <main className="flex-1 overflow-y-auto">
-        {children}
-      </main>
+
+      <main className="flex-1 overflow-y-auto">{children}</main>
     </div>
   );
 }
