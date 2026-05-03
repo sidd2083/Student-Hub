@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,7 +16,6 @@ import Pomodoro from "@/pages/Pomodoro";
 import NepAi from "@/pages/NepAi";
 import Leaderboard from "@/pages/Leaderboard";
 import Admin from "@/pages/Admin";
-import { useEffect } from "react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,15 +23,19 @@ const queryClient = new QueryClient({
   },
 });
 
-function AuthRedirect() {
-  const { user, profile, loading } = useAuth();
-  const [, setLocation] = useLocation();
+function RedirectHandler() {
+  const { loading, redirectLoading } = useAuth();
 
-  useEffect(() => {
-    if (!loading && user && profile) {
-      setLocation("/dashboard");
-    }
-  }, [user, profile, loading]);
+  if (loading || redirectLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-500 text-sm">Signing you in...</p>
+        </div>
+      </div>
+    );
+  }
 
   return <Login />;
 }
@@ -40,7 +43,7 @@ function AuthRedirect() {
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={AuthRedirect} />
+      <Route path="/" component={RedirectHandler} />
       <Route path="/onboarding" component={Onboarding} />
       <Route path="/dashboard">
         <ProtectedRoute><Dashboard /></ProtectedRoute>

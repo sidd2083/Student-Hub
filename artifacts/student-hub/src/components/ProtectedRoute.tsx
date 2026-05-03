@@ -3,19 +3,19 @@ import { useLocation } from "wouter";
 import { useEffect } from "react";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, redirectLoading } = useAuth();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading && !redirectLoading) {
       if (!user) setLocation("/");
       else if (!profile) setLocation("/onboarding");
     }
-  }, [user, profile, loading]);
+  }, [user, profile, loading, redirectLoading]);
 
-  if (loading) {
+  if (loading || redirectLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -26,17 +26,17 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, redirectLoading } = useAuth();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading && !redirectLoading) {
       if (!user) setLocation("/");
       else if (!profile) setLocation("/onboarding");
       else if (profile.role !== "admin") setLocation("/dashboard");
     }
-  }, [user, profile, loading]);
+  }, [user, profile, loading, redirectLoading]);
 
-  if (loading || !user || !profile) return null;
+  if (loading || redirectLoading || !user || !profile) return null;
   return <>{children}</>;
 }
