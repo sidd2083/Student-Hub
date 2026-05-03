@@ -37,28 +37,38 @@ function isAtRootPath() {
   return path === base || path === base + "/" || path === "/";
 }
 
+async function fetchProfileFromFirestore(uid: string): Promise<UserProfile | null> {
+  try {
+    const docSnap = await getDoc(doc(db, "users", uid));
+    if (!docSnap.exists()) return null;
+    const data = docSnap.data();
+    return {
+      id: 0,
+      uid: data.uid ?? uid,
+      name: data.name ?? "",
+      email: data.email ?? "",
+      grade: data.grade ?? 0,
+      role: (data.role === "admin" ? "admin" : "user") as "user" | "admin",
+      createdAt:
+        typeof data.createdAt === "string"
+          ? data.createdAt
+          : new Date().toISOString(),
+    };
+  } catch (err) {
+    console.error("Failed to fetch profile from Firestore:", err);
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [, setLocation] = useLocation();
 
-  const fetchProfile = async (uid: string): Promise<UserProfile | null> => {
-    try {
-      const res = await fetch(`/api/users/${uid}`);
-      if (!res.ok) return null;
-      return await res.json();
-    } catch (err) {
-      console.error("Failed to fetch profile:", err);
-      return null;
-    }
-  };
-
   const refreshProfile = async () => {
     if (!user) return;
-    const docSnap = await getDoc(doc(db, "users", user.uid));
-    const hasProfile = docSnap.exists();
-    const p = hasProfile ? await fetchProfile(user.uid) : null;
+    const p = await fetchProfileFromFirestore(user.uid);
     setProfile(p);
   };
 
@@ -70,24 +80,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (firebaseUser) {
         setUser(firebaseUser);
-
         try {
-          const docSnap = await getDoc(doc(db, "users", firebaseUser.uid));
+          const p = await fetchProfileFromFirestore(firebaseUser.uid);
           if (!mounted) return;
-          const hasProfile = docSnap.exists();
-
-          const p = hasProfile ? await fetchProfile(firebaseUser.uid) : null;
-          if (!mounted) return;
-
           setProfile(p);
           setLoading(false);
 
           if (isAtRootPath()) {
-            if (hasProfile) setLocation("/dashboard");
-            else setLocation("/setup-profile");
+            setLocation(p ? "/dashboard" : "/setup-profile");
           }
         } catch (err) {
-          console.error("Error checking user profile:", err);
+          console.error("Error loading user profile:", err);
           if (!mounted) return;
           setLoading(false);
         }
@@ -110,7 +113,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err: unknown) {
       console.error("Google sign-in error:", err);
       const code = (err as { code?: string })?.code;
-      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+      if (
+        code === "auth/popup-closed-by-user" ||
+        code === "auth/cancelled-popup-request"
+      ) {
         return;
       }
       throw err;
@@ -125,7 +131,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signInWithGoogle, signOut, refreshProfile, setProfile }}>
+    <AuthContext.Provider
+      value={{ user, profile, loading, signInWithGoogle, signOut, refreshProfile, setProfile }}
+    >
       {children}
     </AuthContext.Provider>
   );

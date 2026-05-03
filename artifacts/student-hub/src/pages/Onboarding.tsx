@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
-import { flushSync } from "react-dom";
-import { useAuth } from "@/context/AuthContext";
-import { useCreateUser } from "@workspace/api-client-react";
+import { useAuth, UserProfile } from "@/context/AuthContext";
 import { useLocation } from "wouter";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -13,7 +11,7 @@ export default function Onboarding() {
   const [grade, setGrade] = useState<number | "">("");
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
-  const createUser = useCreateUser();
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!user) setLocation("/");
@@ -28,35 +26,38 @@ export default function Onboarding() {
     if (!name.trim()) return setError("Please enter your name.");
     if (!grade) return setError("Please select your grade.");
     if (!agreed) return setError("Please accept the Terms & Conditions to continue.");
-    if (!user) return;
+    if (!user) return setError("You must be signed in. Please refresh and try again.");
+
+    setSaving(true);
     setError("");
 
-    createUser.mutate(
-      { data: { uid: user.uid, name: name.trim(), email: user.email || "", grade: Number(grade) } },
-      {
-        onSuccess: async (p) => {
-          try {
-            await setDoc(doc(db, "users", user.uid), {
-              uid: user.uid,
-              name: name.trim(),
-              email: user.email || "",
-              grade: Number(grade),
-              createdAt: new Date().toISOString(),
-            });
-          } catch (err) {
-            console.error("Failed to write profile to Firestore:", err);
-          }
-          flushSync(() => {
-            setProfile(p as ReturnType<typeof setProfile> extends (p: infer T) => void ? T : never);
-          });
-          setLocation("/dashboard");
-        },
-        onError: (err) => {
-          console.error("Create user error:", err);
-          setError("Something went wrong. Please try again.");
-        },
-      }
-    );
+    try {
+      const now = new Date().toISOString();
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        name: name.trim(),
+        email: user.email ?? "",
+        grade: Number(grade),
+        role: "user",
+        createdAt: now,
+      });
+
+      const newProfile: UserProfile = {
+        id: 0,
+        uid: user.uid,
+        name: name.trim(),
+        email: user.email ?? "",
+        grade: Number(grade),
+        role: "user",
+        createdAt: now,
+      };
+
+      setProfile(newProfile);
+    } catch (err) {
+      console.error("Failed to save profile:", err);
+      setError("Something went wrong saving your profile. Please try again.");
+      setSaving(false);
+    }
   };
 
   return (
@@ -72,12 +73,10 @@ export default function Onboarding() {
         .anim-up-3 { animation: fadeSlideUp 0.45s ease 0.15s both; }
       `}</style>
 
-      {/* Background blobs */}
       <div className="absolute top-[-60px] right-[-60px] w-64 h-64 rounded-full bg-blue-50 blur-3xl opacity-70 pointer-events-none" />
       <div className="absolute bottom-[-60px] left-[-60px] w-64 h-64 rounded-full bg-indigo-50 blur-3xl opacity-60 pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10">
-        {/* Header */}
         <div className="text-center mb-8 anim-up">
           <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-200">
             <span className="text-3xl">🎓</span>
@@ -86,7 +85,6 @@ export default function Onboarding() {
           <p className="text-gray-500 text-sm">Just a few details to personalise your experience</p>
         </div>
 
-        {/* Progress dots */}
         <div className="flex items-center justify-center gap-2 mb-8 anim-up-1">
           <div className="h-1.5 w-8 rounded-full bg-green-400" />
           <div className="h-1.5 w-8 rounded-full bg-blue-500" />
@@ -94,14 +92,13 @@ export default function Onboarding() {
         </div>
 
         <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-100 p-8 anim-up-2">
-          {/* Google account chip */}
           {user && (
             <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-100 rounded-2xl mb-6">
               {user.photoURL ? (
                 <img src={user.photoURL} className="w-9 h-9 rounded-full ring-2 ring-green-200" alt="" />
               ) : (
                 <div className="w-9 h-9 rounded-full bg-green-200 flex items-center justify-center text-green-700 font-bold text-sm">
-                  {user.displayName?.charAt(0)?.toUpperCase() || "?"}
+                  {user.displayName?.charAt(0)?.toUpperCase() ?? "?"}
                 </div>
               )}
               <div className="flex-1 min-w-0">
@@ -112,7 +109,6 @@ export default function Onboarding() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Name */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Full Name <span className="text-red-400">*</span>
@@ -123,11 +119,11 @@ export default function Onboarding() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Alex Sharma"
-                className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base"
+                disabled={saving}
+                className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base disabled:opacity-60"
               />
             </div>
 
-            {/* Grade */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-3">
                 Select Your Grade <span className="text-red-400">*</span>
@@ -138,8 +134,9 @@ export default function Onboarding() {
                     key={g}
                     type="button"
                     data-testid={`grade-btn-${g}`}
+                    disabled={saving}
                     onClick={() => setGrade(g)}
-                    className={`py-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-0.5 ${
+                    className={`py-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-0.5 disabled:opacity-60 ${
                       grade === g
                         ? "border-blue-500 bg-blue-50 text-blue-600 shadow-sm"
                         : "border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50/50"
@@ -152,7 +149,6 @@ export default function Onboarding() {
               </div>
             </div>
 
-            {/* Terms & Conditions */}
             <div className="pt-1">
               <label className="flex items-start gap-3 cursor-pointer group">
                 <div className="relative mt-0.5 flex-shrink-0">
@@ -164,11 +160,9 @@ export default function Onboarding() {
                     className="sr-only"
                   />
                   <div
-                    onClick={() => setAgreed(a => !a)}
+                    onClick={() => !saving && setAgreed(a => !a)}
                     className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                      agreed
-                        ? "bg-blue-500 border-blue-500"
-                        : "border-gray-300 group-hover:border-blue-400"
+                      agreed ? "bg-blue-500 border-blue-500" : "border-gray-300 group-hover:border-blue-400"
                     }`}
                   >
                     {agreed && (
@@ -180,19 +174,14 @@ export default function Onboarding() {
                 </div>
                 <span className="text-sm text-gray-600 leading-relaxed">
                   I agree to the{" "}
-                  <span className="text-blue-500 font-medium cursor-pointer hover:underline">
-                    Terms & Conditions
-                  </span>{" "}
-                  and{" "}
-                  <span className="text-blue-500 font-medium cursor-pointer hover:underline">
-                    Privacy Policy
-                  </span>
+                  <span className="text-blue-500 font-medium cursor-pointer hover:underline">Terms & Conditions</span>
+                  {" "}and{" "}
+                  <span className="text-blue-500 font-medium cursor-pointer hover:underline">Privacy Policy</span>
                   <span className="text-gray-400 text-xs block mt-0.5">(Full document coming soon)</span>
                 </span>
               </label>
             </div>
 
-            {/* Error */}
             {error && (
               <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-100 rounded-xl">
                 <span className="text-base">⚠️</span>
@@ -200,17 +189,16 @@ export default function Onboarding() {
               </div>
             )}
 
-            {/* Submit */}
             <button
               data-testid="btn-continue"
               type="submit"
-              disabled={createUser.isPending}
+              disabled={saving}
               className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-2xl hover:from-blue-600 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-200"
             >
-              {createUser.isPending ? (
+              {saving ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Creating your account…
+                  Saving your profile…
                 </span>
               ) : (
                 "Let's Go! 🚀"
