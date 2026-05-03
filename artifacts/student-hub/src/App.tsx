@@ -23,16 +23,14 @@ const queryClient = new QueryClient({
   },
 });
 
-function RedirectHandler() {
-  const { loading, redirectLoading } = useAuth();
+function LoginGate() {
+  const { loading } = useAuth();
 
-  if (loading || redirectLoading) {
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center">
-          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-500 text-sm">Signing you in...</p>
-        </div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
+        <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-400 text-sm">Signing you in...</p>
       </div>
     );
   }
@@ -43,7 +41,7 @@ function RedirectHandler() {
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={RedirectHandler} />
+      <Route path="/" component={LoginGate} />
       <Route path="/onboarding" component={Onboarding} />
       <Route path="/dashboard">
         <ProtectedRoute><Dashboard /></ProtectedRoute>

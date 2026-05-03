@@ -8,8 +8,8 @@ export default function Onboarding() {
   const [, setLocation] = useLocation();
   const [name, setName] = useState(user?.displayName || "");
   const [grade, setGrade] = useState<number | "">("");
+  const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
-  const [step, setStep] = useState<1 | 2>(1);
   const createUser = useCreateUser();
 
   useEffect(() => {
@@ -18,8 +18,9 @@ export default function Onboarding() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return setError("Please enter your name");
-    if (!grade) return setError("Please select your grade");
+    if (!name.trim()) return setError("Please enter your name.");
+    if (!grade) return setError("Please select your grade.");
+    if (!agreed) return setError("Please accept the Terms & Conditions to continue.");
     if (!user) return;
     setError("");
     createUser.mutate(
@@ -34,8 +35,6 @@ export default function Onboarding() {
     );
   };
 
-  const GRADES = [9, 10, 11, 12];
-
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-6 relative overflow-hidden">
       <style>{`
@@ -44,101 +43,150 @@ export default function Onboarding() {
           to { opacity: 1; transform: translateY(0); }
         }
         .anim-up { animation: fadeSlideUp 0.45s ease forwards; }
+        .anim-up-1 { animation: fadeSlideUp 0.45s ease 0.05s both; }
+        .anim-up-2 { animation: fadeSlideUp 0.45s ease 0.1s both; }
+        .anim-up-3 { animation: fadeSlideUp 0.45s ease 0.15s both; }
       `}</style>
 
-      <div className="absolute top-[-60px] right-[-60px] w-64 h-64 rounded-full bg-blue-50 blur-3xl opacity-60 pointer-events-none" />
-      <div className="absolute bottom-[-60px] left-[-60px] w-64 h-64 rounded-full bg-indigo-50 blur-3xl opacity-50 pointer-events-none" />
+      {/* Background blobs */}
+      <div className="absolute top-[-60px] right-[-60px] w-64 h-64 rounded-full bg-blue-50 blur-3xl opacity-70 pointer-events-none" />
+      <div className="absolute bottom-[-60px] left-[-60px] w-64 h-64 rounded-full bg-indigo-50 blur-3xl opacity-60 pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10">
         {/* Header */}
         <div className="text-center mb-8 anim-up">
           <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-200">
-            <span className="text-2xl">🎓</span>
+            <span className="text-3xl">🎓</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Set up your profile</h1>
-          <p className="text-gray-500 text-sm">Just two quick details to get started</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Complete your profile</h1>
+          <p className="text-gray-500 text-sm">Just a few details to personalise your experience</p>
         </div>
 
-        {/* Steps indicator */}
-        <div className="flex items-center gap-2 mb-8 justify-center anim-up" style={{ animationDelay: "0.05s" }}>
-          <div className={`h-1.5 w-16 rounded-full transition-all ${step >= 1 ? "bg-blue-500" : "bg-gray-200"}`} />
-          <div className={`h-1.5 w-16 rounded-full transition-all ${step >= 2 ? "bg-blue-500" : "bg-gray-200"}`} />
+        {/* Progress dots */}
+        <div className="flex items-center justify-center gap-2 mb-8 anim-up-1">
+          <div className="h-1.5 w-8 rounded-full bg-green-400" />
+          <div className="h-1.5 w-8 rounded-full bg-blue-500" />
+          <div className={`h-1.5 w-8 rounded-full transition-all ${grade ? "bg-blue-500" : "bg-gray-200"}`} />
         </div>
 
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-100 p-8 anim-up" style={{ animationDelay: "0.1s" }}>
-          {/* Google account info */}
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-100 p-8 anim-up-2">
+          {/* Google account chip */}
           {user && (
             <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-100 rounded-2xl mb-6">
               {user.photoURL ? (
-                <img src={user.photoURL} className="w-9 h-9 rounded-full" alt="" />
+                <img src={user.photoURL} className="w-9 h-9 rounded-full ring-2 ring-green-200" alt="" />
               ) : (
                 <div className="w-9 h-9 rounded-full bg-green-200 flex items-center justify-center text-green-700 font-bold text-sm">
                   {user.displayName?.charAt(0)?.toUpperCase() || "?"}
                 </div>
               )}
-              <div>
-                <p className="text-sm font-medium text-green-800">✓ Google account connected</p>
-                <p className="text-xs text-green-600">{user.email}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-green-800">✓ Google account connected</p>
+                <p className="text-xs text-green-600 truncate">{user.email}</p>
               </div>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Name */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Your Full Name
+                Full Name <span className="text-red-400">*</span>
               </label>
               <input
                 data-testid="input-name"
                 type="text"
                 value={name}
-                onChange={(e) => { setName(e.target.value); setStep(1); }}
-                onFocus={() => setStep(1)}
-                placeholder="Enter your full name"
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Alex Sharma"
                 className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base"
               />
             </div>
 
+            {/* Grade */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Which grade are you in?
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
+                Select Your Grade <span className="text-red-400">*</span>
               </label>
               <div className="grid grid-cols-4 gap-2">
-                {GRADES.map((g) => (
+                {[9, 10, 11, 12].map((g) => (
                   <button
                     key={g}
                     type="button"
                     data-testid={`grade-btn-${g}`}
-                    onClick={() => { setGrade(g); setStep(2); }}
-                    className={`py-3 rounded-2xl text-sm font-semibold border-2 transition-all ${
+                    onClick={() => setGrade(g)}
+                    className={`py-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-0.5 ${
                       grade === g
-                        ? "border-blue-500 bg-blue-50 text-blue-600"
-                        : "border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50"
+                        ? "border-blue-500 bg-blue-50 text-blue-600 shadow-sm"
+                        : "border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50/50"
                     }`}
                   >
-                    {g}
-                    <span className="block text-xs font-normal opacity-70">Grade</span>
+                    <span className="text-xl font-bold leading-none">{g}</span>
+                    <span className="text-[10px] font-normal text-gray-400">Grade</span>
                   </button>
                 ))}
               </div>
             </div>
 
+            {/* Terms & Conditions */}
+            <div className="pt-1">
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <div className="relative mt-0.5 flex-shrink-0">
+                  <input
+                    data-testid="checkbox-terms"
+                    type="checkbox"
+                    checked={agreed}
+                    onChange={(e) => setAgreed(e.target.checked)}
+                    className="sr-only"
+                  />
+                  <div
+                    onClick={() => setAgreed(a => !a)}
+                    className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                      agreed
+                        ? "bg-blue-500 border-blue-500"
+                        : "border-gray-300 group-hover:border-blue-400"
+                    }`}
+                  >
+                    {agreed && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+                <span className="text-sm text-gray-600 leading-relaxed">
+                  I agree to the{" "}
+                  <span className="text-blue-500 font-medium cursor-pointer hover:underline">
+                    Terms & Conditions
+                  </span>{" "}
+                  and{" "}
+                  <span className="text-blue-500 font-medium cursor-pointer hover:underline">
+                    Privacy Policy
+                  </span>
+                  <span className="text-gray-400 text-xs block mt-0.5">(Full document coming soon)</span>
+                </span>
+              </label>
+            </div>
+
+            {/* Error */}
             {error && (
-              <p className="text-red-500 text-sm flex items-center gap-1.5">
-                <span>⚠️</span> {error}
-              </p>
+              <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-100 rounded-xl">
+                <span className="text-base">⚠️</span>
+                <p className="text-red-600 text-sm">{error}</p>
+              </div>
             )}
 
+            {/* Submit */}
             <button
               data-testid="btn-continue"
               type="submit"
-              disabled={createUser.isPending || !name.trim() || !grade}
-              className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-2xl hover:from-blue-600 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-200 mt-2"
+              disabled={createUser.isPending}
+              className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-2xl hover:from-blue-600 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-200"
             >
               {createUser.isPending ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Setting up...
+                  Creating your account…
                 </span>
               ) : (
                 "Let's Go! 🚀"
@@ -146,6 +194,10 @@ export default function Onboarding() {
             </button>
           </form>
         </div>
+
+        <p className="text-center text-xs text-gray-400 mt-5">
+          Student Hub · Grades 9–12 · Secure & private
+        </p>
       </div>
     </div>
   );
