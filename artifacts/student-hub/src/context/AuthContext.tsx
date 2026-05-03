@@ -6,7 +6,8 @@ import {
   getRedirectResult,
   signOut as firebaseSignOut,
 } from "firebase/auth";
-import { auth, googleProvider } from "@/lib/firebase";
+import { getDoc, doc } from "firebase/firestore";
+import { auth, googleProvider, db } from "@/lib/firebase";
 import { useLocation } from "wouter";
 
 export interface UserProfile {
@@ -31,6 +32,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+function isAtRootPath() {
+  const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+  const path = window.location.pathname;
+  return path === base || path === base + "/" || path === "/";
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -49,11 +56,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = async () => {
     if (!user) return;
-    const p = await fetchProfile(user.uid);
+    const docSnap = await getDoc(doc(db, "users", user.uid));
+    const hasProfile = docSnap.exists();
+    const p = hasProfile ? await fetchProfile(user.uid) : null;
     setProfile(p);
-    if (p && window.location.pathname === "/") {
-      setLocation("/dashboard");
-    }
   };
 
   useEffect(() => {
@@ -73,12 +79,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (firebaseUser) {
           setUser(firebaseUser);
-          const p = await fetchProfile(firebaseUser.uid);
+
+          const docSnap = await getDoc(doc(db, "users", firebaseUser.uid));
           if (!mounted) return;
+          const hasProfile = docSnap.exists();
+
+          const p = hasProfile ? await fetchProfile(firebaseUser.uid) : null;
+          if (!mounted) return;
+
           setProfile(p);
           setLoading(false);
-          if (p) setLocation("/dashboard");
-          else setLocation("/onboarding");
+
+          if (isAtRootPath()) {
+            if (hasProfile) setLocation("/dashboard");
+            else setLocation("/setup-profile");
+          }
         } else {
           setUser(null);
           setProfile(null);
