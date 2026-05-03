@@ -9,11 +9,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!loading) {
       if (!user) setLocation("/");
-      else if (!profile) setLocation("/onboarding");
+      else if (!profile) setLocation("/setup-profile");
     }
   }, [user, profile, loading]);
 
-  if (loading) {
+  if (loading || (user && !profile)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -32,7 +32,7 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!loading) {
       if (!user) setLocation("/");
-      else if (!profile) setLocation("/onboarding");
+      else if (!profile) setLocation("/setup-profile");
       else if (profile.role !== "admin") setLocation("/dashboard");
     }
   }, [user, profile, loading]);

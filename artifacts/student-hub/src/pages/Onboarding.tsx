@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { flushSync } from "react-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useCreateUser } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
@@ -15,6 +16,10 @@ export default function Onboarding() {
   const createUser = useCreateUser();
 
   useEffect(() => {
+    if (!user) setLocation("/");
+  }, [user]);
+
+  useEffect(() => {
     if (profile) setLocation("/dashboard");
   }, [profile]);
 
@@ -25,6 +30,7 @@ export default function Onboarding() {
     if (!agreed) return setError("Please accept the Terms & Conditions to continue.");
     if (!user) return;
     setError("");
+
     createUser.mutate(
       { data: { uid: user.uid, name: name.trim(), email: user.email || "", grade: Number(grade) } },
       {
@@ -40,10 +46,15 @@ export default function Onboarding() {
           } catch (err) {
             console.error("Failed to write profile to Firestore:", err);
           }
-          setProfile(p as typeof profile);
+          flushSync(() => {
+            setProfile(p as ReturnType<typeof setProfile> extends (p: infer T) => void ? T : never);
+          });
           setLocation("/dashboard");
         },
-        onError: () => setError("Something went wrong. Please try again."),
+        onError: (err) => {
+          console.error("Create user error:", err);
+          setError("Something went wrong. Please try again.");
+        },
       }
     );
   };
