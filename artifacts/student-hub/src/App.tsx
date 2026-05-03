@@ -23,8 +23,8 @@ const queryClient = new QueryClient({
   },
 });
 
-function LoginGate() {
-  const { loading } = useAuth();
+function RootGate() {
+  const { loading, user, profile } = useAuth();
 
   if (loading) {
     return (
@@ -35,13 +35,15 @@ function LoginGate() {
     );
   }
 
+  if (user && profile) return <Dashboard />;
+  if (user && !profile) return <Onboarding />;
   return <Login />;
 }
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={LoginGate} />
+      <Route path="/" component={RootGate} />
       <Route path="/onboarding" component={Onboarding} />
       <Route path="/dashboard">
         <ProtectedRoute><Dashboard /></ProtectedRoute>

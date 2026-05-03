@@ -51,6 +51,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     const p = await fetchProfile(user.uid);
     setProfile(p);
+    if (p && window.location.pathname === "/") {
+      setLocation("/dashboard");
+    }
   };
 
   useEffect(() => {
