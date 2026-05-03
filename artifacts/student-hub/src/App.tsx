@@ -30,7 +30,7 @@ function RootGate() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
         <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-gray-400 text-sm">Signing you in...</p>
+        <p className="text-gray-400 text-sm">Loading user session...</p>
       </div>
     );
   }
@@ -44,6 +44,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={RootGate} />
+      <Route path="/setup-profile" component={Onboarding} />
       <Route path="/onboarding" component={Onboarding} />
       <Route path="/dashboard">
         <ProtectedRoute><Dashboard /></ProtectedRoute>

@@ -1,0 +1,74 @@
+Fix the authentication system in my full-stack React + Firebase application called "Student Hub".
+
+CONTEXT OF THIS PROJECT:
+This is a student learning platform where:
+- Users sign in using Google (Firebase Authentication)
+- After login, users must enter their Name and Grade (9–12)
+- Based on grade, they see a personalized dashboard (notes, MCQs, PYQs, tasks, AI helper)
+- There is also an admin system (role-based access)
+
+CURRENT PROBLEM:
+Google Sign-In is NOT working properly anymore.
+Previously it worked until "signing you in", but now even that is broken and nothing happens or it gets stuck.
+
+Also previously there was a redirect issue after login, but now authentication itself is unstable.
+
+EXPECTED BEHAVIOR:
+
+1. When user clicks "Sign in with Google":
+   - Firebase Google authentication popup must open
+   - User must be able to select Google account
+   - After success, authentication must complete properly
+
+2. After successful login:
+   - Check if user exists in Firestore (collection: "users", document = user.uid)
+
+3. Routing logic:
+   - If user profile does NOT exist → redirect to /setup-profile
+   - If user profile exists → redirect to /dashboard
+
+CURRENT POSSIBLE ISSUES TO FIX:
+- Firebase Google Auth provider may not be configured correctly
+- Missing or incorrect Firebase initialization
+- Missing auth domain setup
+- Button click handler not triggering signInWithPopup properly
+- Auth state listener not implemented correctly
+- Routing interfering with authentication flow
+- App may be crashing silently after button click
+
+REQUIRED FIXES:
+
+1. Recheck Firebase setup:
+   - Ensure GoogleAuthProvider is correctly initialized
+   - Ensure signInWithPopup(auth, provider) is correctly implemented
+
+2. Fix Google Sign-In button:
+   - Ensure onClick properly calls async login function
+   - Ensure no form submit reload is breaking it
+
+3. Ensure Firebase Auth is correctly initialized once:
+   - No duplicate auth instances
+
+4. Add proper error handling:
+   - console.log errors during sign-in
+   - show error message if login fails
+
+5. Fix auth flow stability:
+   - use onAuthStateChanged(auth, callback)
+   - ensure persistence is enabled (local/session)
+
+6. After login success:
+   - DO NOT redirect immediately
+   - first check Firestore user document
+
+IMPORTANT:
+- DO NOT remove existing UI design
+- DO NOT change overall structure
+- ONLY fix authentication system and sign-in flow
+- Make Google Sign-In fully functional again
+
+FINAL RESULT REQUIRED:
+- Google Sign-In button works properly
+- User can log in with Google
+- After login system correctly routes user based on profile existence
+- No freezing, no silent failure, no broken click events

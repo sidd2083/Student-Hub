@@ -28,12 +28,16 @@ export default function Login() {
   const { signInWithGoogle } = useAuth();
   const [tab, setTab] = useState<Tab>("login");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   const handleGoogle = async () => {
     setBusy(true);
+    setError("");
     try {
       await signInWithGoogle();
-    } catch {
+    } catch (err: unknown) {
+      console.error("Sign-in failed:", err);
+      setError("Sign-in failed. Please try again.");
       setBusy(false);
     }
   };
@@ -87,7 +91,7 @@ export default function Login() {
             {(["login", "register"] as Tab[]).map((t) => (
               <button
                 key={t}
-                onClick={() => setTab(t)}
+                onClick={() => { setTab(t); setError(""); }}
                 className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                   tab === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
                 }`}
@@ -97,12 +101,21 @@ export default function Login() {
             ))}
           </div>
 
+          {/* Error message */}
+          {error && (
+            <div className="flex items-center gap-2 px-4 py-3 mb-4 bg-red-50 border border-red-100 rounded-xl">
+              <span className="text-base">⚠️</span>
+              <p className="text-red-600 text-sm">{error}</p>
+            </div>
+          )}
+
           {tab === "login" ? (
             <div className="anim-up">
               <h2 className="text-xl font-bold text-gray-900 mb-1">Welcome back! 👋</h2>
               <p className="text-gray-500 text-sm mb-6">Sign in with your Google account to continue</p>
               <button
                 data-testid="btn-google-signin"
+                type="button"
                 onClick={handleGoogle}
                 disabled={busy}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3.5 border border-gray-200 rounded-2xl text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-60 shadow-sm"
@@ -112,7 +125,7 @@ export default function Login() {
                 ) : (
                   <GoogleLogo />
                 )}
-                <span>{busy ? "Redirecting to Google…" : "Continue with Google"}</span>
+                <span>{busy ? "Opening Google Sign-In…" : "Continue with Google"}</span>
               </button>
               <p className="text-center text-xs text-gray-400 mt-5">
                 Don't have an account?{" "}
@@ -139,6 +152,7 @@ export default function Login() {
               </div>
               <button
                 data-testid="btn-google-register"
+                type="button"
                 onClick={handleGoogle}
                 disabled={busy}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-2xl hover:from-blue-600 hover:to-indigo-700 transition-all disabled:opacity-60 shadow-lg shadow-blue-200"
@@ -148,7 +162,7 @@ export default function Login() {
                 ) : (
                   <GoogleLogo white />
                 )}
-                <span>{busy ? "Redirecting to Google…" : "Sign up with Google"}</span>
+                <span>{busy ? "Opening Google Sign-In…" : "Sign up with Google"}</span>
               </button>
               <p className="text-center text-xs text-gray-400 mt-5">
                 Already have an account?{" "}

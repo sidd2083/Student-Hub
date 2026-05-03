@@ -2,8 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import {
   User as FirebaseUser,
   onAuthStateChanged,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   signOut as firebaseSignOut,
 } from "firebase/auth";
 import { getDoc, doc } from "firebase/firestore";
@@ -49,7 +48,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch(`/api/users/${uid}`);
       if (!res.ok) return null;
       return await res.json();
-    } catch {
+    } catch (err) {
+      console.error("Failed to fetch profile:", err);
       return null;
     }
   };
@@ -63,23 +63,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    let unsubAuth: (() => void) | undefined;
     let mounted = true;
 
-    const initialize = async () => {
-      try {
-        await getRedirectResult(auth);
-      } catch {
-      }
-
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!mounted) return;
 
-      unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-        if (!mounted) return;
+      if (firebaseUser) {
+        setUser(firebaseUser);
 
-        if (firebaseUser) {
-          setUser(firebaseUser);
-
+        try {
           const docSnap = await getDoc(doc(db, "users", firebaseUser.uid));
           if (!mounted) return;
           const hasProfile = docSnap.exists();
@@ -94,24 +86,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (hasProfile) setLocation("/dashboard");
             else setLocation("/setup-profile");
           }
-        } else {
-          setUser(null);
-          setProfile(null);
+        } catch (err) {
+          console.error("Error checking user profile:", err);
+          if (!mounted) return;
           setLoading(false);
         }
-      });
-    };
-
-    initialize();
+      } else {
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+      }
+    });
 
     return () => {
       mounted = false;
-      unsubAuth?.();
+      unsub();
     };
   }, []);
 
   const signInWithGoogle = async () => {
-    await signInWithRedirect(auth, googleProvider);
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (err: unknown) {
+      console.error("Google sign-in error:", err);
+      const code = (err as { code?: string })?.code;
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+        return;
+      }
+      throw err;
+    }
   };
 
   const signOut = async () => {

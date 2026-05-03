@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useCreateUser } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function Onboarding() {
   const { user, profile, setProfile } = useAuth();
@@ -26,7 +28,18 @@ export default function Onboarding() {
     createUser.mutate(
       { data: { uid: user.uid, name: name.trim(), email: user.email || "", grade: Number(grade) } },
       {
-        onSuccess: (p) => {
+        onSuccess: async (p) => {
+          try {
+            await setDoc(doc(db, "users", user.uid), {
+              uid: user.uid,
+              name: name.trim(),
+              email: user.email || "",
+              grade: Number(grade),
+              createdAt: new Date().toISOString(),
+            });
+          } catch (err) {
+            console.error("Failed to write profile to Firestore:", err);
+          }
           setProfile(p as typeof profile);
           setLocation("/dashboard");
         },
