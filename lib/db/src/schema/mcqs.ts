@@ -14,6 +14,7 @@ export const mcqsTable = pgTable("mcqs", {
   optionD: text("option_d").notNull(),
   correctAnswer: text("correct_answer", { enum: ["A", "B", "C", "D"] }).notNull(),
   difficulty: text("difficulty", { enum: ["easy", "medium", "hard"] }).notNull().default("medium"),
+  explanation: text("explanation"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

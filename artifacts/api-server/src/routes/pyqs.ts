@@ -5,6 +5,17 @@ import { eq, and } from "drizzle-orm";
 
 const router = Router();
 
+const toPyq = (p: typeof pyqsTable.$inferSelect) => ({
+  id: p.id,
+  grade: p.grade,
+  subject: p.subject,
+  title: p.title,
+  year: p.year,
+  pdfUrl: p.pdfUrl,
+  fileType: p.fileType ?? "pdf",
+  createdAt: p.createdAt.toISOString(),
+});
+
 router.get("/pyqs", async (req, res) => {
   try {
     const { grade, subject } = req.query;
@@ -14,10 +25,7 @@ router.get("/pyqs", async (req, res) => {
     const pyqs = conditions.length > 0
       ? await db.select().from(pyqsTable).where(and(...conditions)).orderBy(pyqsTable.year)
       : await db.select().from(pyqsTable).orderBy(pyqsTable.year);
-    res.json(pyqs.map(p => ({
-      id: p.id, grade: p.grade, subject: p.subject, title: p.title,
-      year: p.year, pdfUrl: p.pdfUrl, createdAt: p.createdAt.toISOString(),
-    })));
+    res.json(pyqs.map(toPyq));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -26,13 +34,15 @@ router.get("/pyqs", async (req, res) => {
 
 router.post("/pyqs", async (req, res) => {
   try {
-    const { grade, subject, title, year, pdfUrl } = req.body;
+    const { grade, subject, title, year, pdfUrl, fileType } = req.body;
     if (!grade || !subject || !title || !year || !pdfUrl) {
       return res.status(400).json({ error: "Missing required fields" });
     }
-    const inserted = await db.insert(pyqsTable).values({ grade, subject, title, year, pdfUrl }).returning();
-    const p = inserted[0];
-    res.status(201).json({ id: p.id, grade: p.grade, subject: p.subject, title: p.title, year: p.year, pdfUrl: p.pdfUrl, createdAt: p.createdAt.toISOString() });
+    const inserted = await db.insert(pyqsTable).values({
+      grade, subject, title, year, pdfUrl,
+      fileType: fileType || "pdf",
+    }).returning();
+    res.status(201).json(toPyq(inserted[0]));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

@@ -155,6 +155,7 @@ export interface Mcq {
   optionD: string;
   correctAnswer: McqCorrectAnswer;
   difficulty: McqDifficulty;
+  explanation?: string | null;
   createdAt: string;
 }
 
@@ -188,6 +189,7 @@ export interface CreateMcqBody {
   optionD: string;
   correctAnswer: CreateMcqBodyCorrectAnswer;
   difficulty: CreateMcqBodyDifficulty;
+  explanation?: string | null;
 }
 
 export type UpdateMcqBodyCorrectAnswer =
@@ -220,6 +222,7 @@ export interface UpdateMcqBody {
   optionD?: string;
   correctAnswer?: UpdateMcqBodyCorrectAnswer;
   difficulty?: UpdateMcqBodyDifficulty;
+  explanation?: string | null;
 }
 
 export interface Pyq {
@@ -229,6 +232,7 @@ export interface Pyq {
   title: string;
   year: number;
   pdfUrl: string;
+  fileType?: string | null;
   createdAt: string;
 }
 
@@ -238,6 +242,7 @@ export interface CreatePyqBody {
   title: string;
   year: number;
   pdfUrl: string;
+  fileType?: string | null;
 }
 
 export interface Task {

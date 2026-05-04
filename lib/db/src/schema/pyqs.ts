@@ -9,6 +9,7 @@ export const pyqsTable = pgTable("pyqs", {
   title: text("title").notNull(),
   year: integer("year").notNull(),
   pdfUrl: text("pdf_url").notNull(),
+  fileType: text("file_type").notNull().default("pdf"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

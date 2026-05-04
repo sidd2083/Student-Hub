@@ -1,0 +1,199 @@
+Fix and upgrade my "Student Hub" React + Firebase app with focus on:
+
+1) AUTH ROUTING (CRITICAL)
+2) NOTES SYSTEM (PDF/IMAGE/TEXT)
+3) PYQ SYSTEM (ADVANCED VIEW)
+4) MCQ CONTROL IMPROVEMENT
+5) BACK BUTTON
+6) FORCE LOGIN PAGE DEFAULT
+
+---
+
+# 🔴 PART 1 — FIX AUTH DEFAULT PAGE (VERY IMPORTANT)
+
+CURRENT BUG:
+App opens /setup-profile directly → WRONG
+
+REQUIRED:
+
+1. Default route ("/") MUST behave like this:
+
+IF user NOT logged in:
+   → go to /login
+
+IF user logged in:
+   check Firestore profile
+
+   IF profile exists:
+      → go to /dashboard
+
+   IF profile NOT exists:
+      → go to /setup-profile
+
+2. NEVER show /setup-profile for logged-out users
+
+3. Add HARD redirect:
+
+- If !user → force /login
+- If user && profile → force /dashboard
+
+---
+
+# 🔙 PART 2 — BACK BUTTON (FIX PROPERLY)
+
+Add global top navbar:
+
+- Left corner: ← arrow icon
+- On click:
+   navigate(-1)
+
+- Show on all pages except /login
+
+---
+
+# 📚 PART 3 — NOTES SYSTEM (ADVANCED)
+
+Admin side:
+
+When adding note:
+Content type options:
+- Text
+- PDF
+- Image
+
+Behavior:
+
+IF Text:
+   → show rich text editor
+
+IF PDF:
+   → upload PDF file
+
+IF Image:
+   → upload image file
+
+Store file URLs in Firestore
+
+---
+
+User side:
+
+Render properly:
+
+IF Text:
+   → show formatted content
+
+IF PDF:
+   → show PDF viewer (embed iframe)
+
+IF Image:
+   → show image cleanly (responsive)
+
+UI must be clean and readable
+
+---
+
+# 📄 PART 4 — PYQ SYSTEM (VERY IMPORTANT)
+
+Admin:
+
+Add PYQ with:
+
+- Grade
+- Subject
+- Title (example: "Bagmati Pradesh 2080")
+- Year
+- File type:
+   → PDF OR Image
+
+Upload using:
+- drag & drop file upload
+
+---
+
+User side:
+
+PYQ page:
+
+Features:
+
+- Filter by:
+   - Grade
+   - Subject
+   - Year
+   - Title search
+
+Display list like:
+
+[Title] — Year
+
+Click → open viewer:
+
+IF PDF:
+   → open in PDF viewer
+
+IF Image:
+   → show image properly
+
+UI:
+- clean cards
+- clickable
+- smooth
+
+---
+
+# ❓ PART 5 — MCQ SYSTEM (UPGRADE CONTROL)
+
+Admin should control:
+
+- Question
+- 4 options
+- correct answer
+- difficulty
+- chapter
+- explanation (NEW)
+
+User:
+
+- show explanation after answer
+- show score
+- better quiz UI
+
+---
+
+# ⚡ PART 6 — PERFORMANCE FIX
+
+- Cache user profile in state
+- Avoid repeated Firestore calls
+- Add loading screen while checking auth
+- Prevent infinite re-render
+
+---
+
+# 🧠 PART 7 — DEBUG AUTH (MANDATORY)
+
+Add logs:
+
+console.log("User:", user)
+console.log("Profile:", profile)
+
+---
+
+# 🎯 FINAL RESULT REQUIRED
+
+- Opening site → goes to LOGIN page (if not logged in)
+- Logged user → goes to DASHBOARD (not setup)
+- Setup only for new users
+- Back button works everywhere
+- Notes support TEXT / PDF / IMAGE properly
+- PYQ supports drag-drop + filters + viewer
+- MCQ fully controlled by admin
+
+---
+
+IMPORTANT:
+- DO NOT change UI style
+- ONLY improve functionality
+- FIX routing first, then content system
+
+END
