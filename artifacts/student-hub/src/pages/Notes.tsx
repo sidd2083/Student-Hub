@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Layout } from "@/components/Layout";
 import { useListNotes, useListNoteSubjects, getListNotesQueryKey } from "@workspace/api-client-react";
-import { BookOpen, ChevronRight, FileText, Image, Type, X, ExternalLink } from "lucide-react";
+import { BookOpen, ChevronRight, FileText, Image, Type, X, ExternalLink, ZoomIn } from "lucide-react";
 
 type NoteView = {
   id: number;
@@ -15,9 +15,9 @@ type NoteView = {
 
 function ContentTypeBadge({ type }: { type: string }) {
   const map: Record<string, { icon: typeof FileText; label: string; cls: string }> = {
-    pdf:   { icon: FileText, label: "PDF",   cls: "bg-red-50 text-red-600"    },
+    pdf:   { icon: FileText, label: "PDF",   cls: "bg-red-50 text-red-600"       },
     image: { icon: Image,    label: "Image", cls: "bg-purple-50 text-purple-600" },
-    text:  { icon: Type,     label: "Text",  cls: "bg-blue-50 text-blue-600"  },
+    text:  { icon: Type,     label: "Text",  cls: "bg-blue-50 text-blue-600"     },
   };
   const m = map[type] ?? map.text;
   const Icon = m.icon;
@@ -31,12 +31,31 @@ function ContentTypeBadge({ type }: { type: string }) {
 
 function NoteViewer({ note, onClose }: { note: NoteView; onClose: () => void }) {
   const [imgZoomed, setImgZoomed] = useState(false);
+  const [scrollPct, setScrollPct] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const pct = el.scrollHeight <= el.clientHeight
+      ? 100
+      : Math.round((el.scrollTop / (el.scrollHeight - el.clientHeight)) * 100);
+    setScrollPct(pct);
+  }, []);
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+        {/* Scroll progress bar */}
+        <div className="h-0.5 bg-gray-100 flex-shrink-0">
+          <div
+            className="h-full bg-blue-500 transition-all duration-150"
+            style={{ width: `${scrollPct}%` }}
+          />
+        </div>
+
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-gray-100 flex-shrink-0">
+        <div className="flex items-start justify-between px-6 py-5 border-b border-gray-100 flex-shrink-0">
           <div className="flex-1 min-w-0 mr-4">
             <div className="flex items-center gap-2 mb-1">
               <ContentTypeBadge type={note.contentType} />
@@ -53,16 +72,22 @@ function NoteViewer({ note, onClose }: { note: NoteView; onClose: () => void }) 
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-6">
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-auto"
+        >
           {note.contentType === "text" && (
-            <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap leading-relaxed">
-              {note.content}
+            <div className="max-w-2xl mx-auto px-8 py-10">
+              <article className="text-gray-800 text-[16px] leading-[1.85] space-y-4 whitespace-pre-wrap font-[system-ui]">
+                {note.content}
+              </article>
             </div>
           )}
 
           {note.contentType === "pdf" && (
-            <div className="flex flex-col gap-3 h-full min-h-[500px]">
-              <div className="flex items-center justify-between">
+            <div className="flex flex-col h-full min-h-[540px] p-6 gap-3">
+              <div className="flex items-center justify-between flex-shrink-0">
                 <p className="text-sm text-gray-500">PDF Document</p>
                 <a
                   href={note.content}
@@ -76,22 +101,28 @@ function NoteViewer({ note, onClose }: { note: NoteView; onClose: () => void }) 
               </div>
               <iframe
                 src={`https://docs.google.com/viewer?url=${encodeURIComponent(note.content)}&embedded=true`}
-                className="flex-1 w-full rounded-2xl border border-gray-100 min-h-[480px]"
+                className="flex-1 w-full rounded-2xl border border-gray-100 min-h-[500px]"
                 title={note.title}
               />
             </div>
           )}
 
           {note.contentType === "image" && (
-            <div className="flex flex-col items-center gap-3">
-              <img
-                src={note.content}
-                alt={note.title}
-                onClick={() => setImgZoomed(true)}
-                className="max-w-full rounded-2xl shadow-sm cursor-zoom-in hover:opacity-95 transition-opacity"
-                style={{ maxHeight: "70vh", objectFit: "contain" }}
-              />
-              <p className="text-xs text-gray-400">Click image to zoom</p>
+            <div className="flex flex-col items-center gap-4 p-8">
+              <div className="relative group cursor-zoom-in" onClick={() => setImgZoomed(true)}>
+                <img
+                  src={note.content}
+                  alt={note.title}
+                  className="max-w-full rounded-2xl shadow-sm hover:shadow-md transition-shadow"
+                  style={{ maxHeight: "68vh", objectFit: "contain" }}
+                />
+                <div className="absolute inset-0 rounded-2xl bg-black/0 group-hover:bg-black/10 transition-all flex items-center justify-center">
+                  <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 flex items-center gap-1">
+                <ZoomIn className="w-3 h-3" /> Click image to zoom
+              </p>
 
               {imgZoomed && (
                 <div
@@ -101,8 +132,14 @@ function NoteViewer({ note, onClose }: { note: NoteView; onClose: () => void }) 
                   <img
                     src={note.content}
                     alt={note.title}
-                    className="max-w-full max-h-full object-contain p-4"
+                    className="max-w-full max-h-full object-contain p-6"
                   />
+                  <button
+                    className="absolute top-4 right-4 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-all"
+                    onClick={() => setImgZoomed(false)}
+                  >
+                    <X className="w-4 h-4 text-white" />
+                  </button>
                 </div>
               )}
             </div>
@@ -177,7 +214,9 @@ export default function Notes() {
         {/* Note list */}
         {loadingNotes ? (
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => <div key={i} className="h-20 bg-gray-100 rounded-2xl animate-pulse" />)}
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-20 bg-gray-100 rounded-2xl animate-pulse" />
+            ))}
           </div>
         ) : (notes || []).length === 0 ? (
           <div className="text-center py-16 text-gray-400">
@@ -198,9 +237,9 @@ export default function Notes() {
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
                     note.contentType === "pdf" ? "bg-red-50" : note.contentType === "image" ? "bg-purple-50" : "bg-blue-50"
                   }`}>
-                    {note.contentType === "pdf" && <FileText className="w-5 h-5 text-red-500" />}
-                    {note.contentType === "image" && <Image className="w-5 h-5 text-purple-500" />}
-                    {note.contentType === "text" && <Type className="w-5 h-5 text-blue-500" />}
+                    {note.contentType === "pdf"   && <FileText className="w-5 h-5 text-red-500"    />}
+                    {note.contentType === "image" && <Image    className="w-5 h-5 text-purple-500" />}
+                    {note.contentType === "text"  && <Type     className="w-5 h-5 text-blue-500"   />}
                   </div>
                   <div className="min-w-0">
                     <p className="font-medium text-gray-900 truncate">{note.title}</p>

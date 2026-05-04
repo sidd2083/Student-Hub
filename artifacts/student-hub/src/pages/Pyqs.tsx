@@ -14,6 +14,26 @@ type Pyq = {
   fileType?: string | null;
 };
 
+/** Highlight matched keyword in title text */
+function HighlightedText({ text, query }: { text: string; query: string }) {
+  if (!query.trim()) return <>{text}</>;
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+  const parts = text.split(regex);
+  return (
+    <>
+      {parts.map((part, i) =>
+        regex.test(part) ? (
+          <mark key={i} className="bg-yellow-200 text-yellow-900 rounded px-0.5 not-italic">
+            {part}
+          </mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
 function PyqViewer({ pyq, onClose }: { pyq: Pyq; onClose: () => void }) {
   const isImage = pyq.fileType === "image";
   const [imgZoomed, setImgZoomed] = useState(false);
@@ -77,6 +97,12 @@ function PyqViewer({ pyq, onClose }: { pyq: Pyq; onClose: () => void }) {
                     alt={pyq.title}
                     className="max-w-full max-h-full object-contain p-4"
                   />
+                  <button
+                    className="absolute top-4 right-4 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-all"
+                    onClick={() => setImgZoomed(false)}
+                  >
+                    <X className="w-4 h-4 text-white" />
+                  </button>
                 </div>
               )}
             </div>
@@ -115,7 +141,10 @@ export default function Pyqs() {
   );
 
   const subjects = useMemo(() => [...new Set((pyqs || []).map(p => p.subject))].sort(), [pyqs]);
-  const years = useMemo(() => [...new Set((pyqs || []).map(p => String(p.year)))].sort((a, b) => Number(b) - Number(a)), [pyqs]);
+  const years = useMemo(
+    () => [...new Set((pyqs || []).map(p => String(p.year)))].sort((a, b) => Number(b) - Number(a)),
+    [pyqs]
+  );
 
   const filtered = useMemo(() => {
     return (pyqs || []).filter(p => {
@@ -136,7 +165,7 @@ export default function Pyqs() {
         </div>
 
         {/* Filters row */}
-        <div className="flex flex-wrap gap-3 mb-6">
+        <div className="flex flex-wrap gap-3 mb-5">
           {/* Grade */}
           <select
             data-testid="select-grade-pyq"
@@ -157,8 +186,8 @@ export default function Pyqs() {
             {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
 
-          {/* Title search */}
-          <div className="relative flex-1 min-w-[180px] max-w-xs">
+          {/* Real-time search */}
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             <input
               type="text"
@@ -168,7 +197,10 @@ export default function Pyqs() {
               className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {search && (
-              <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
@@ -176,7 +208,7 @@ export default function Pyqs() {
         </div>
 
         {/* Subject chips */}
-        <div className="flex flex-wrap gap-2 mb-6">
+        <div className="flex flex-wrap gap-2 mb-5">
           <button
             onClick={() => setSubject("")}
             className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${!subject ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
@@ -199,19 +231,26 @@ export default function Pyqs() {
           <p className="text-xs text-gray-400 mb-4 flex items-center gap-1">
             <Filter className="w-3 h-3" />
             {filtered.length} paper{filtered.length !== 1 ? "s" : ""} found
+            {search && (
+              <span className="ml-1 text-blue-500 font-medium">for "{search}"</span>
+            )}
           </p>
         )}
 
         {/* Cards */}
         {isLoading ? (
           <div className="space-y-3">
-            {[1, 2, 3].map(i => <div key={i} className="h-[76px] bg-gray-100 rounded-2xl animate-pulse" />)}
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="h-[76px] bg-gray-100 rounded-2xl animate-pulse" />
+            ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p className="font-medium">No papers found</p>
-            <p className="text-sm mt-1">Try adjusting your filters</p>
+            <p className="text-sm mt-1">
+              {search ? `No results for "${search}"` : "Try adjusting your filters"}
+            </p>
           </div>
         ) : (
           <div className="grid gap-3">
@@ -229,12 +268,14 @@ export default function Pyqs() {
                       isImage ? "bg-purple-50" : "bg-orange-50"
                     }`}>
                       {isImage
-                        ? <Image className="w-5 h-5 text-purple-500" />
+                        ? <Image    className="w-5 h-5 text-purple-500" />
                         : <FileText className="w-5 h-5 text-orange-500" />
                       }
                     </div>
                     <div className="min-w-0">
-                      <p className="font-semibold text-gray-900 truncate">{pyq.title}</p>
+                      <p className="font-semibold text-gray-900 truncate">
+                        <HighlightedText text={pyq.title} query={search} />
+                      </p>
                       <p className="text-sm text-gray-500 mt-0.5">{pyq.subject} · {pyq.year}</p>
                     </div>
                   </div>

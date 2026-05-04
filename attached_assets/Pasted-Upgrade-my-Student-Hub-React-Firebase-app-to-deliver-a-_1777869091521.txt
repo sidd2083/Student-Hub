@@ -1,0 +1,226 @@
+Upgrade my "Student Hub" React + Firebase app to deliver a PREMIUM student experience.
+
+IMPORTANT:
+- Clean white UI (Instagram-like)
+- Smooth, fast, responsive
+- Mobile-first but great on desktop
+- No lag, no delay
+
+---
+
+# 📚 1. NOTES EXPERIENCE (PREMIUM)
+
+- Clean reading layout
+- Large readable text
+- Proper spacing (line-height, margins)
+
+## Content types:
+
+TEXT:
+- Styled like article (headings, bullets)
+
+PDF:
+- Embedded viewer (full width, zoom enabled)
+
+IMAGE:
+- Responsive display
+- Click to zoom (lightbox)
+
+## UX:
+- Sticky header (title + back button)
+- Scroll progress bar
+- Sidebar (desktop) / collapsible (mobile)
+
+---
+
+# 📄 2. PYQ EXPERIENCE (CORE FEATURE)
+
+## UI:
+- Card layout:
+   Title
+   Year
+   Subject
+   Grade
+
+---
+
+## 🔍 SEARCH (IMPORTANT)
+
+- Real-time search
+- Highlight matched keyword in title
+
+Example:
+Search: Bagmati  
+→ "**Bagmati** Pradesh 2080"
+
+- Show only matching results
+- Show “No results found” if empty
+
+---
+
+## 🎯 FILTERS:
+- Grade
+- Subject
+- Year
+
+---
+
+## 📂 VIEWER:
+
+PDF:
+- Open inside app (not download)
+- Smooth scroll + zoom
+
+IMAGE:
+- Full screen preview
+- Swipe support (mobile)
+
+---
+
+# ❓ 3. MCQ UX
+
+- One question per screen
+- Clean option buttons
+
+After answer:
+- Show correct answer
+- Show explanation
+
+Add:
+- Next button
+- Progress indicator (e.g. 4/10)
+
+---
+
+# ⏱ 4. POMODORO (UPGRADE)
+
+Add:
+
+- Presets:
+   25 min
+   50 min
+   Custom time input
+
+- Controls:
+   Start / Pause / Reset
+
+- UI:
+   Minimal focus mode screen
+
+---
+
+# ⚙️ 5. SETTINGS (CRITICAL FIX)
+
+## 🟡 GRADE SWITCH FIX:
+
+CURRENT PROBLEM:
+- Grade switching is slow / delayed
+
+FIX:
+
+- Update grade instantly in Firestore:
+   await updateDoc(doc(db, "users", user.uid), { grade })
+
+- ALSO update local state immediately:
+   setUserData(prev => ({ ...prev, grade }))
+
+- DO NOT reload page
+- DO NOT refetch everything
+
+RESULT:
+→ instant UI update (no lag)
+
+---
+
+## 🌙 DARK MODE (ADD PROPERLY)
+
+Add full dark mode system:
+
+- Toggle in settings:
+   Light / Dark
+
+- Save preference in:
+   Firestore + localStorage
+
+- Apply using CSS classes:
+   body.dark
+
+- Colors:
+   Background: dark gray
+   Text: white
+   Cards: slightly lighter dark
+
+- Must switch instantly (no reload)
+
+---
+
+# 🤖 6. NEP AI IDENTITY
+
+If user asks:
+"Who built you?"
+
+AI must reply:
+"I was built by Siddhant Lamichhane."
+
+---
+
+# 🔙 7. GLOBAL UX
+
+- Add back button (←) on all pages except login
+- navigate(-1)
+
+- Add smooth page transitions
+- Add loading skeletons (not blank screens)
+
+---
+
+# 📱 MOBILE UX
+
+- Fully responsive
+- Touch-friendly UI
+- No overflow bugs
+- Smooth scrolling
+
+---
+
+# 💻 DESKTOP UX
+
+- Sidebar navigation
+- Wider content layout
+- Better spacing
+
+---
+
+# ⚡ PERFORMANCE (IMPORTANT)
+
+- Cache user data in state
+- Avoid repeated Firestore calls
+- No unnecessary re-renders
+- Instant UI updates
+
+---
+
+# 🎯 FINAL RESULT
+
+App should feel:
+
+✔ Fast  
+✔ Smooth  
+✔ Clean  
+✔ Premium  
+✔ Easy to use daily  
+
+Especially:
+- Notes reading = smooth
+- PYQ browsing = powerful
+- Settings = instant (no lag)
+- Dark mode = working perfectly
+
+NOT:
+
+❌ slow  
+❌ laggy  
+❌ delayed updates  
+❌ broken UI  
+
+END

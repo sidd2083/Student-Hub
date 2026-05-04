@@ -3,24 +3,48 @@ import { useAuth } from "@/context/AuthContext";
 import { Layout } from "@/components/Layout";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { User, Sun, Moon, Shield } from "lucide-react";
+import { User, Sun, Moon, Shield, Check } from "lucide-react";
 
 export default function Settings() {
   const { profile, setProfile, user } = useAuth();
   const [name, setName] = useState(profile?.name || "");
   const [grade, setGrade] = useState<number>(profile?.grade || 10);
   const [saving, setSaving] = useState(false);
+  const [gradeSaving, setGradeSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [darkMode, setDarkMode] = useState(
     typeof window !== "undefined" && localStorage.getItem("theme") === "dark"
   );
 
-  const toggleTheme = () => {
+  const toggleTheme = async () => {
     const next = !darkMode;
     setDarkMode(next);
     localStorage.setItem("theme", next ? "dark" : "light");
     document.documentElement.classList.toggle("dark", next);
+    // Persist to Firestore silently
+    if (user) {
+      try {
+        await updateDoc(doc(db, "users", user.uid), { darkMode: next });
+      } catch {
+        // non-critical
+      }
+    }
+  };
+
+  const handleGradeSwitch = async (g: number) => {
+    if (g === grade || !user) return;
+    setGrade(g);
+    // Instant local update
+    setProfile({ ...profile!, grade: g });
+    setGradeSaving(true);
+    try {
+      await updateDoc(doc(db, "users", user.uid), { grade: g });
+    } catch (err) {
+      console.error("Grade update failed:", err);
+    } finally {
+      setGradeSaving(false);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -31,15 +55,12 @@ export default function Settings() {
     setError("");
     setSuccess(false);
     try {
-      await updateDoc(doc(db, "users", user.uid), {
-        name: name.trim(),
-        grade,
-      });
-      setProfile({ ...profile!, name: name.trim(), grade });
+      await updateDoc(doc(db, "users", user.uid), { name: name.trim() });
+      setProfile({ ...profile!, name: name.trim() });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
-      console.error("Failed to update profile:", err);
+      console.error("Profile update failed:", err);
       setError("Failed to save. Please try again.");
     } finally {
       setSaving(false);
@@ -51,9 +72,10 @@ export default function Settings() {
       <div className="p-8 max-w-2xl mx-auto">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Settings</h1>
-          <p className="text-gray-500">Manage your account and preferences</p>
+          <p className="text-gray-500 text-sm">Manage your account and preferences</p>
         </div>
 
+        {/* Profile card */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-4">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center">
@@ -61,7 +83,9 @@ export default function Settings() {
             </div>
             <h2 className="text-lg font-semibold text-gray-900">Profile</h2>
           </div>
+
           <form onSubmit={handleSave} className="space-y-5">
+            {/* Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
               <input
@@ -73,15 +97,27 @@ export default function Settings() {
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition-all disabled:opacity-60"
               />
             </div>
+
+            {/* Grade — instant save */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">Grade</label>
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-medium text-gray-700">Grade</label>
+                {gradeSaving && (
+                  <span className="text-xs text-blue-500 animate-pulse">Saving…</span>
+                )}
+                {!gradeSaving && grade !== (profile?.grade || 10) && (
+                  <span className="text-xs text-green-600 flex items-center gap-0.5">
+                    <Check className="w-3 h-3" /> Saved
+                  </span>
+                )}
+              </div>
               <div className="grid grid-cols-4 gap-2">
                 {[9, 10, 11, 12].map((g) => (
                   <button
                     key={g}
                     type="button"
                     disabled={saving}
-                    onClick={() => setGrade(g)}
+                    onClick={() => handleGradeSwitch(g)}
                     className={`py-3 rounded-xl border-2 text-sm font-semibold transition-all disabled:opacity-60 ${
                       grade === g
                         ? "border-blue-500 bg-blue-50 text-blue-600"
@@ -92,6 +128,7 @@ export default function Settings() {
                   </button>
                 ))}
               </div>
+              <p className="text-xs text-gray-400 mt-2">Grade updates instantly — no save needed.</p>
             </div>
 
             {error && (
@@ -100,20 +137,22 @@ export default function Settings() {
               </div>
             )}
             {success && (
-              <div className="px-4 py-3 bg-green-50 border border-green-100 rounded-xl text-green-700 text-sm font-medium">
-                ✓ Profile saved successfully!
+              <div className="px-4 py-3 bg-green-50 border border-green-100 rounded-xl text-green-700 text-sm font-medium flex items-center gap-2">
+                <Check className="w-4 h-4" /> Name saved successfully!
               </div>
             )}
+
             <button
               type="submit"
               disabled={saving}
               className="px-6 py-3 bg-blue-500 text-white font-semibold rounded-xl hover:bg-blue-600 transition-all disabled:opacity-50 text-sm"
             >
-              {saving ? "Saving…" : "Save Changes"}
+              {saving ? "Saving…" : "Save Name"}
             </button>
           </form>
         </div>
 
+        {/* Appearance */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-4">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center">
@@ -121,6 +160,7 @@ export default function Settings() {
             </div>
             <h2 className="text-lg font-semibold text-gray-900">Appearance</h2>
           </div>
+
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-900">Dark Mode</p>
@@ -131,6 +171,7 @@ export default function Settings() {
               className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
                 darkMode ? "bg-blue-500" : "bg-gray-200"
               }`}
+              aria-label="Toggle dark mode"
             >
               <span
                 className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${
@@ -139,8 +180,30 @@ export default function Settings() {
               />
             </button>
           </div>
+
+          {/* Light / Dark selector */}
+          <div className="flex gap-3 mt-5">
+            {[
+              { label: "Light", value: false, icon: Sun },
+              { label: "Dark",  value: true,  icon: Moon },
+            ].map(({ label, value, icon: Icon }) => (
+              <button
+                key={label}
+                onClick={() => { if (darkMode !== value) toggleTheme(); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
+                  darkMode === value
+                    ? "border-blue-500 bg-blue-50 text-blue-600"
+                    : "border-gray-200 text-gray-500 hover:border-gray-300"
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
+        {/* Account info */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <div className="flex items-center gap-3 mb-5">
             <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center">
@@ -155,11 +218,7 @@ export default function Settings() {
             </div>
             <div className="flex justify-between py-2 border-b border-gray-50">
               <span className="text-gray-500">Role</span>
-              <span
-                className={`font-medium capitalize ${
-                  profile?.role === "admin" ? "text-purple-600" : "text-gray-900"
-                }`}
-              >
+              <span className={`font-medium capitalize ${profile?.role === "admin" ? "text-purple-600" : "text-gray-900"}`}>
                 {profile?.role}
               </span>
             </div>
@@ -167,10 +226,7 @@ export default function Settings() {
               <span className="text-gray-500">Member since</span>
               <span className="text-gray-900 font-medium">
                 {profile?.createdAt
-                  ? new Date(profile.createdAt).toLocaleDateString("en-US", {
-                      month: "long",
-                      year: "numeric",
-                    })
+                  ? new Date(profile.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })
                   : "—"}
               </span>
             </div>
