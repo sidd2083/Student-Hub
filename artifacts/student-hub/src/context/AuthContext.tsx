@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import {
   User as FirebaseUser,
   onAuthStateChanged,
@@ -18,6 +18,11 @@ export interface UserProfile {
   createdAt: string;
 }
 
+type ProfileResult =
+  | { status: "found"; profile: UserProfile }
+  | { status: "not_found" }
+  | { status: "error" };
+
 interface AuthContextType {
   user: FirebaseUser | null;
   profile: UserProfile | null;
@@ -30,12 +35,15 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-async function fetchProfileFromFirestore(uid: string): Promise<UserProfile | null> {
+async function fetchProfile(uid: string): Promise<ProfileResult> {
   try {
     const snap = await getDoc(doc(db, "users", uid));
-    if (!snap.exists()) return null;
+    if (!snap.exists()) {
+      console.log("[Auth] Profile: not found in Firestore");
+      return { status: "not_found" };
+    }
     const d = snap.data();
-    return {
+    const profile: UserProfile = {
       id: 0,
       uid: d.uid ?? uid,
       name: d.name ?? "",
@@ -44,8 +52,12 @@ async function fetchProfileFromFirestore(uid: string): Promise<UserProfile | nul
       role: d.role === "admin" ? "admin" : "user",
       createdAt: typeof d.createdAt === "string" ? d.createdAt : new Date().toISOString(),
     };
-  } catch {
-    return null;
+    console.log("[Auth] Profile found:", profile.name, "| grade:", profile.grade, "| role:", profile.role);
+    return { status: "found", profile };
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code ?? "unknown";
+    console.error("[Auth] Firestore error:", code, err);
+    return { status: "error" };
   }
 }
 
@@ -54,40 +66,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfileState] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Track whether this is the very first auth state event.
-  // Firebase fires onAuthStateChanged once immediately with the persisted user
-  // (or null). We must not show the login page until that first event resolves.
-  const initializedRef = useRef(false);
-
   useEffect(() => {
     let mounted = true;
+    console.log("[Auth] Initialising auth listener…");
 
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!mounted) return;
+      console.log("[Auth] USER:", firebaseUser?.email ?? null);
 
-      if (firebaseUser) {
-        // User is signed in — fetch their Firestore profile
-        const p = await fetchProfileFromFirestore(firebaseUser.uid);
-        if (!mounted) return;
-        setUser(firebaseUser);
-        setProfileState(p);
+      if (!firebaseUser) {
+        setUser(null);
+        setProfileState(null);
         setLoading(false);
-        initializedRef.current = true;
+        console.log("[Auth] → no user, routing to /");
+        // Navigate to login only if we're not already there
+        if (!window.location.pathname.match(/^\/?$/)) {
+          window.location.replace("/");
+        }
+        return;
+      }
+
+      // User is signed in — fetch Firestore profile
+      const result = await fetchProfile(firebaseUser.uid);
+      if (!mounted) return;
+
+      setUser(firebaseUser);
+      console.log("[Auth] PROFILE:", result.status);
+
+      if (result.status === "found") {
+        setProfileState(result.profile);
+        setLoading(false);
+        // Only navigate away from auth pages
+        const path = window.location.pathname;
+        if (path === "/" || path === "/login" || path === "/setup-profile" || path === "/onboarding") {
+          console.log("[Auth] → existing user, routing to /dashboard");
+          window.location.replace("/dashboard");
+        }
+      } else if (result.status === "not_found") {
+        // Genuinely new user — send to setup
+        setProfileState(null);
+        setLoading(false);
+        const path = window.location.pathname;
+        if (path !== "/setup-profile" && path !== "/onboarding") {
+          console.log("[Auth] → new user, routing to /setup-profile");
+          window.location.replace("/setup-profile");
+        }
       } else {
-        // No user — but only set loading=false after the FIRST event.
-        // This prevents a flash of the login page while Firebase is
-        // still resolving the persisted session on startup.
-        if (initializedRef.current) {
-          // Subsequent null events = user signed out
-          setUser(null);
-          setProfileState(null);
-          setLoading(false);
-        } else {
-          // First event is null — no persisted user
-          initializedRef.current = true;
-          setUser(null);
-          setProfileState(null);
-          setLoading(false);
+        // Firestore error (e.g. permission denied, network) —
+        // Do NOT send to setup-profile. Build a minimal profile from Firebase Auth
+        // so the user can still access the app.
+        console.warn("[Auth] Firestore read failed — using fallback profile from Firebase Auth");
+        const fallback: UserProfile = {
+          id: 0,
+          uid: firebaseUser.uid,
+          name: firebaseUser.displayName ?? "Student",
+          email: firebaseUser.email ?? "",
+          grade: 10,
+          role: "user",
+          createdAt: new Date().toISOString(),
+        };
+        setProfileState(fallback);
+        setLoading(false);
+        const path = window.location.pathname;
+        if (path === "/" || path === "/login") {
+          console.log("[Auth] → fallback profile, routing to /dashboard");
+          window.location.replace("/dashboard");
         }
       }
     });
@@ -101,8 +144,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshProfile = useCallback(async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
-    const p = await fetchProfileFromFirestore(currentUser.uid);
-    setProfileState(p);
+    const result = await fetchProfile(currentUser.uid);
+    if (result.status === "found") setProfileState(result.profile);
   }, []);
 
   const setProfile = useCallback((p: UserProfile | null) => {
@@ -113,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       await signInWithPopup(auth, googleProvider);
-      // onAuthStateChanged will handle setting user + profile + loading=false
+      // onAuthStateChanged handles everything from here
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
       setLoading(false);
@@ -130,6 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setProfileState(null);
     setLoading(false);
+    window.location.replace("/");
   };
 
   return (

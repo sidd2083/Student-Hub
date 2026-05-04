@@ -1,11 +1,9 @@
-import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
+import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import {
-  PublicRoute,
-  SetupRoute,
   PrivateRoute,
   AdminDashboardRoute,
   LoadingScreen,
@@ -33,40 +31,27 @@ const queryClient = new QueryClient({
 });
 
 /**
- * Root "/" — waits for auth then dispatches:
- *   user + profile  → /dashboard
- *   user + no prof  → /setup-profile
- *   no user         → render Login (no redirect flash)
+ * Root "/" — shows spinner while auth initialises, then login.
+ * Navigation away from "/" is handled by onAuthStateChanged in AuthContext.
  */
 function RootGate() {
-  const { user, profile, loading } = useAuth();
-
+  const { loading } = useAuth();
   if (loading) return <LoadingScreen />;
-  if (user && profile) return <Redirect to="/dashboard" />;
-  if (user && !profile) return <Redirect to="/setup-profile" />;
   return <Login />;
 }
 
 function Router() {
   return (
     <Switch>
-      {/* Root — smart dispatch */}
+      {/* Root — spinner → login (auth listener redirects signed-in users away) */}
       <Route path="/" component={RootGate} />
+      <Route path="/login" component={RootGate} />
 
-      {/* Public — logged-in users get redirected away */}
-      <Route path="/login">
-        <PublicRoute><Login /></PublicRoute>
-      </Route>
+      {/* Setup — no auth guard needed, auth listener controls who gets here */}
+      <Route path="/setup-profile" component={Onboarding} />
+      <Route path="/onboarding" component={Onboarding} />
 
-      {/* Setup — only for user without profile */}
-      <Route path="/setup-profile">
-        <SetupRoute><Onboarding /></SetupRoute>
-      </Route>
-      <Route path="/onboarding">
-        <SetupRoute><Onboarding /></SetupRoute>
-      </Route>
-
-      {/* Private — require user + profile */}
+      {/* Private pages */}
       <Route path="/dashboard">
         <PrivateRoute><Dashboard /></PrivateRoute>
       </Route>
@@ -95,10 +80,8 @@ function Router() {
         <PrivateRoute><Settings /></PrivateRoute>
       </Route>
 
-      {/* Admin login — standalone, no auth required */}
+      {/* Admin */}
       <Route path="/admin" component={AdminLogin} />
-
-      {/* Admin dashboard — requires admin session or admin role */}
       <Route path="/admin/dashboard">
         <AdminDashboardRoute><Admin /></AdminDashboardRoute>
       </Route>
