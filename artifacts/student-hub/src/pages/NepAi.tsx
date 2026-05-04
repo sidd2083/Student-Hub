@@ -81,116 +81,91 @@ export default function NepAi() {
         <meta name="description" content="Ask Nep AI any academic question. Get instant answers for Grade 9–12 subjects in Nepal." />
         <meta property="og:title" content="Nep AI — Student Hub" />
       </Helmet>
-    <Layout>
-      <div className="flex flex-col h-full">
-        {/* Header */}
-        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-white flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-indigo-100 rounded-xl flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-indigo-600" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold text-gray-900">Nep AI</h1>
-              <p className="text-xs text-gray-500">Your study assistant · Grades 9–12</p>
+      <Layout>
+        <div className="flex flex-col h-full">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-white flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-indigo-100 rounded-xl flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-indigo-600" />
+              </div>
+              <div>
+                <h1 className="text-lg font-semibold text-gray-900">Nep AI</h1>
+                <p className="text-xs text-gray-500">Your study assistant · Grades 9–12</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {messages.length === 0 && (
-            <div className="text-center py-14">
-              <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <MessageCircle className="w-7 h-7 text-indigo-400" />
-              </div>
-              <h3 className="font-semibold text-gray-700 mb-1">Ask me anything</h3>
-              <p className="text-sm text-gray-400 max-w-sm mx-auto mb-6">
-                I can explain concepts, solve problems, and answer your study questions
-              </p>
-              <div className="flex flex-wrap gap-2 justify-center">
-                {[
-                  "Explain Newton's laws",
-                  "Solve x² - 5x + 6 = 0",
-                  "What is photosynthesis?",
-                  "Who built you?",
-                ].map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => handleSuggest(q)}
-                    className="px-3 py-1.5 bg-gray-100 text-gray-600 text-sm rounded-full hover:bg-indigo-50 hover:text-indigo-600 transition-all"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {messages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              {msg.role === "assistant" && (
-                <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+          <div className="flex-1 overflow-y-auto p-6 space-y-5">
+            {messages.length === 0 && (
+              <div className="text-center py-14">
+                <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <MessageCircle className="w-7 h-7 text-indigo-400" />
                 </div>
-              )}
-              <div
-                data-testid={`msg-${msg.role}-${i}`}
-                className={`max-w-[78%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                  msg.role === "user"
-                    ? "bg-blue-500 text-white rounded-br-sm"
-                    : "bg-white border border-gray-100 text-gray-800 shadow-sm rounded-bl-sm"
-                }`}
-              >
-                {msg.content}
-              </div>
-            </div>
-          ))}
-
-          {loading && (
-            <div className="flex justify-start">
-              <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center mr-2 flex-shrink-0">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-              </div>
-              <div className="bg-white border border-gray-100 shadow-sm px-4 py-3 rounded-2xl rounded-bl-sm">
-                <div className="flex gap-1 items-center h-4">
-                  {[0, 150, 300].map((delay) => (
-                    <span
-                      key={delay}
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: `${delay}ms` }}
-                    />
+                <h3 className="font-semibold text-gray-700 mb-1">Ask me anything</h3>
+                <p className="text-sm text-gray-400 max-w-sm mx-auto mb-6">I can explain concepts, solve problems, and answer your study questions</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {["Explain Newton's laws", "Solve x² - 5x + 6 = 0", "What is photosynthesis?", "Who built you?"].map((q) => (
+                    <button key={q} onClick={() => handleSuggest(q)} className="px-3 py-1.5 bg-gray-100 text-gray-600 text-sm rounded-full hover:bg-indigo-50 hover:text-indigo-600 transition-all">
+                      {q}
+                    </button>
                   ))}
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <div ref={bottomRef} />
-        </div>
+            {messages.map((msg, i) => (
+              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                {msg.role === "assistant" && (
+                  <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                  </div>
+                )}
+                <div data-testid={`msg-${msg.role}-${i}`} className={`max-w-[78%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${msg.role === "user" ? "bg-blue-500 text-white rounded-br-sm" : "bg-white border border-gray-100 text-gray-800 shadow-sm rounded-bl-sm"}`}>
+                  {msg.content}
+                </div>
+              </div>
+            ))}
 
-        {/* Input */}
-        <div className="px-4 py-4 border-t border-gray-100 bg-white flex-shrink-0">
-          <form onSubmit={sendMessage} className="flex gap-3 max-w-4xl mx-auto">
-            <input
-              data-testid="input-ai-message"
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask Nep AI a question…"
-              className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-            />
-            <button
-              data-testid="btn-send-ai"
-              type="submit"
-              disabled={loading || !input.trim()}
-              className="w-12 h-12 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-all disabled:opacity-50 flex items-center justify-center flex-shrink-0"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </form>
+            {loading && (
+              <div className="flex justify-start">
+                <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center mr-2 flex-shrink-0">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                </div>
+                <div className="bg-white border border-gray-100 shadow-sm px-4 py-3 rounded-2xl rounded-bl-sm">
+                  <div className="flex gap-1 items-center h-4">
+                    {[0, 150, 300].map((delay) => (
+                      <span key={delay} className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: `${delay}ms` }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={bottomRef} />
+          </div>
+
+          <div className="px-4 py-4 border-t border-gray-100 bg-white flex-shrink-0">
+            <form onSubmit={sendMessage} className="flex gap-3 max-w-4xl mx-auto">
+              <input
+                data-testid="input-ai-message"
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask Nep AI a question…"
+                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+              />
+              <button
+                data-testid="btn-send-ai"
+                type="submit"
+                disabled={loading || !input.trim()}
+                className="w-12 h-12 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-all disabled:opacity-50 flex items-center justify-center flex-shrink-0"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
         </div>
-      </div>
-    </Layout>
+      </Layout>
     </>
   );
 }
