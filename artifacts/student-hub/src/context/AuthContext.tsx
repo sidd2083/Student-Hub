@@ -6,7 +6,7 @@ import {
   signOut as firebaseSignOut,
 } from "firebase/auth";
 import { getDoc, doc } from "firebase/firestore";
-import { auth, googleProvider, db } from "@/lib/firebase";
+import { auth, googleProvider, db, isConfigured } from "@/lib/firebase";
 
 export interface UserProfile {
   id: number;
@@ -156,6 +156,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signInWithGoogle = async () => {
+    if (!isConfigured) {
+      throw new Error(
+        "Firebase is not configured. Please set the VITE_FIREBASE_* environment variables."
+      );
+    }
     setLoading(true);
     try {
       await signInWithPopup(auth, googleProvider);

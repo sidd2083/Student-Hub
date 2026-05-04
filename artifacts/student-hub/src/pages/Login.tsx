@@ -37,8 +37,11 @@ export default function Login() {
     try {
       await signInWithGoogle();
     } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Sign-in failed. Please try again.";
+      const isConfig = msg.toLowerCase().includes("firebase") || msg.toLowerCase().includes("configured");
+      setError(isConfig ? "Login is not set up yet — Firebase credentials are missing. Please contact the site admin." : "Sign-in failed. Please try again.");
       console.error("Sign-in failed:", err);
-      setError("Sign-in failed. Please try again.");
+    } finally {
       setBusy(false);
     }
   };
