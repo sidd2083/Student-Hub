@@ -2,13 +2,14 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { AuthProvider } from "@/context/AuthContext";
 import {
   PrivateRoute,
   AdminDashboardRoute,
   LoadingScreen,
 } from "@/components/ProtectedRoute";
 
+import Home from "@/pages/Home";
 import Login from "@/pages/Login";
 import Onboarding from "@/pages/Onboarding";
 import Dashboard from "@/pages/Dashboard";
@@ -34,51 +35,35 @@ const queryClient = new QueryClient({
   },
 });
 
-function RootGate() {
-  const { loading } = useAuth();
-  if (loading) return <LoadingScreen />;
-  return <Login />;
-}
-
 function Router() {
   return (
     <Switch>
-      {/* Root — spinner → login */}
-      <Route path="/" component={RootGate} />
-      <Route path="/login" component={RootGate} />
+      {/* Public home — no login required */}
+      <Route path="/" component={Home} />
+      <Route path="/login" component={Login} />
 
       {/* Setup */}
       <Route path="/setup-profile" component={Onboarding} />
       <Route path="/onboarding" component={Onboarding} />
 
-      {/* Public pages — no login required */}
+      {/* Fully public — SEO pages */}
       <Route path="/notes/:id" component={NotePage} />
       <Route path="/pyq/:id" component={PyqPage} />
+      <Route path="/notes" component={Notes} />
+      <Route path="/pyqs" component={Pyqs} />
       <Route path="/about" component={About} />
       <Route path="/contact" component={Contact} />
 
-      {/* Semi-public: notes & pyqs list — accessible without login */}
-      <Route path="/notes" component={Notes} />
-      <Route path="/pyqs" component={Pyqs} />
+      {/* Soft-gated pages — browsable by all, features locked behind login */}
+      <Route path="/ai" component={NepAi} />
+      <Route path="/mcq" component={McqPractice} />
+      <Route path="/todo" component={Todo} />
+      <Route path="/pomodoro" component={Pomodoro} />
+      <Route path="/leaderboard" component={Leaderboard} />
 
-      {/* Private pages */}
+      {/* Private pages — require login */}
       <Route path="/dashboard">
         <PrivateRoute><Dashboard /></PrivateRoute>
-      </Route>
-      <Route path="/mcq">
-        <PrivateRoute><McqPractice /></PrivateRoute>
-      </Route>
-      <Route path="/todo">
-        <PrivateRoute><Todo /></PrivateRoute>
-      </Route>
-      <Route path="/pomodoro">
-        <PrivateRoute><Pomodoro /></PrivateRoute>
-      </Route>
-      <Route path="/ai">
-        <PrivateRoute><NepAi /></PrivateRoute>
-      </Route>
-      <Route path="/leaderboard">
-        <PrivateRoute><Leaderboard /></PrivateRoute>
       </Route>
       <Route path="/settings">
         <PrivateRoute><Settings /></PrivateRoute>

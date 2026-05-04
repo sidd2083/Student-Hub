@@ -61,6 +61,11 @@ async function fetchProfile(uid: string): Promise<ProfileResult> {
   }
 }
 
+// Paths that unauthenticated users can access without being redirected to /
+// Includes: home, login, public content, soft-gated tools (they see blur overlay)
+const PUBLIC_PATH_REGEX =
+  /^\/?$|^\/login|^\/notes|^\/pyqs|^\/pyq|^\/about|^\/contact|^\/ai|^\/mcq|^\/todo|^\/pomodoro|^\/leaderboard/;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfileState] = useState<UserProfile | null>(null);
@@ -78,14 +83,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         setProfileState(null);
         setLoading(false);
-        // Allow public routes without login
-        const publicPaths = /^\/?$|^\/login|^\/notes|^\/pyqs|^\/pyq|^\/about|^\/contact/;
         const path = window.location.pathname;
-        if (!publicPaths.test(path)) {
-          console.log("[Auth] → no user, routing to /");
+        if (!PUBLIC_PATH_REGEX.test(path)) {
+          console.log("[Auth] → no user, not a public path, routing to /");
           window.location.replace("/");
         } else {
-          console.log("[Auth] → no user, public route, staying at", path);
+          console.log("[Auth] → no user, public/soft-gate route, staying at", path);
         }
         return;
       }
@@ -100,14 +103,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result.status === "found") {
         setProfileState(result.profile);
         setLoading(false);
-        // Only navigate away from auth pages
         const path = window.location.pathname;
-        if (path === "/" || path === "/login" || path === "/setup-profile" || path === "/onboarding") {
+        if (path === "/" || path === "/login") {
           console.log("[Auth] → existing user, routing to /dashboard");
           window.location.replace("/dashboard");
         }
       } else if (result.status === "not_found") {
-        // Genuinely new user — send to setup
         setProfileState(null);
         setLoading(false);
         const path = window.location.pathname;
@@ -116,9 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           window.location.replace("/setup-profile");
         }
       } else {
-        // Firestore error (e.g. permission denied, network) —
-        // Do NOT send to setup-profile. Build a minimal profile from Firebase Auth
-        // so the user can still access the app.
+        // Firestore error — build fallback profile from Firebase Auth
         console.warn("[Auth] Firestore read failed — using fallback profile from Firebase Auth");
         const fallback: UserProfile = {
           id: 0,
