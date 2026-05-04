@@ -736,6 +736,9 @@ components:
         difficulty:
           type: string
           enum: [easy, medium, hard]
+        explanation:
+          type: string
+          nullable: true
         createdAt:
           type: string
       required: [id, grade, subject, chapter, question, optionA, optionB, optionC, optionD, correctAnswer, difficulty, createdAt]
@@ -765,6 +768,9 @@ components:
         difficulty:
           type: string
           enum: [easy, medium, hard]
+        explanation:
+          type: string
+          nullable: true
       required: [grade, subject, chapter, question, optionA, optionB, optionC, optionD, correctAnswer, difficulty]
 
     UpdateMcqBody:
@@ -808,6 +814,10 @@ components:
           type: integer
         pdfUrl:
           type: string
+        fileType:
+          type: string
+          enum: [pdf, image]
+          nullable: true
         createdAt:
           type: string
       required: [id, grade, subject, title, year, pdfUrl, createdAt]
@@ -825,6 +835,10 @@ components:
           type: integer
         pdfUrl:
           type: string
+        fileType:
+          type: string
+          enum: [pdf, image]
+          nullable: true
       required: [grade, subject, title, year, pdfUrl]
 
     Task:

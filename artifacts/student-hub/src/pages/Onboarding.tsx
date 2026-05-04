@@ -2,16 +2,11 @@ import { useState } from "react";
 import { useAuth, UserProfile } from "@/context/AuthContext";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useLocation } from "wouter";
 
-/**
- * Onboarding — shown at /setup-profile via SetupRoute.
- *
- * After saving the profile to Firestore, we call setProfile() and
- * DO NOT navigate imperatively. SetupRoute detects profile becoming
- * non-null and redirects to /dashboard automatically.
- */
 export default function Onboarding() {
   const { user, setProfile } = useAuth();
+  const [, setLocation] = useLocation();
   const [name, setName] = useState(user?.displayName || "");
   const [grade, setGrade] = useState<number | "">("");
   const [agreed, setAgreed] = useState(false);
@@ -40,11 +35,11 @@ export default function Onboarding() {
       };
 
       await setDoc(doc(db, "users", user.uid), data);
-      console.log("[Auth] Profile saved to Firestore. Letting SetupRoute redirect...");
 
       const newProfile: UserProfile = { id: 0, ...data };
-      // Update context — SetupRoute will redirect to /dashboard on next render
+      // Set profile in context first, then navigate immediately
       setProfile(newProfile);
+      setLocation("/dashboard");
     } catch (err) {
       console.error("[Auth] Failed to save profile:", err);
       setError("Something went wrong. Please try again.");

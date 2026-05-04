@@ -222,8 +222,14 @@ export interface UpdateMcqBody {
   optionD?: string;
   correctAnswer?: UpdateMcqBodyCorrectAnswer;
   difficulty?: UpdateMcqBodyDifficulty;
-  explanation?: string | null;
 }
+
+export type PyqFileType = (typeof PyqFileType)[keyof typeof PyqFileType] | null;
+
+export const PyqFileType = {
+  pdf: "pdf",
+  image: "image",
+} as const;
 
 export interface Pyq {
   id: number;
@@ -232,9 +238,18 @@ export interface Pyq {
   title: string;
   year: number;
   pdfUrl: string;
-  fileType?: string | null;
+  fileType?: PyqFileType;
   createdAt: string;
 }
+
+export type CreatePyqBodyFileType =
+  | (typeof CreatePyqBodyFileType)[keyof typeof CreatePyqBodyFileType]
+  | null;
+
+export const CreatePyqBodyFileType = {
+  pdf: "pdf",
+  image: "image",
+} as const;
 
 export interface CreatePyqBody {
   grade: number;
@@ -242,7 +257,7 @@ export interface CreatePyqBody {
   title: string;
   year: number;
   pdfUrl: string;
-  fileType?: string | null;
+  fileType?: CreatePyqBodyFileType;
 }
 
 export interface Task {
