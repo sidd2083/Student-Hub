@@ -1,0 +1,116 @@
+Rewrite the authentication and routing system in my React + Firebase app "Student Hub" to fix incorrect redirects and enforce proper route guarding.
+
+CRITICAL BUG:
+The app always redirects to /setup-profile even when the user is already logged in and has a profile.
+
+ROOT ISSUE:
+Routing is happening before Firebase auth state and Firestore profile are fully loaded.
+
+---
+
+# REQUIRED ARCHITECTURE (DO NOT IGNORE)
+
+## 1. CREATE GLOBAL AUTH CONTEXT
+
+Create an AuthContext that stores:
+- user (Firebase user)
+- profile (Firestore user data)
+- loading (boolean)
+
+Use onAuthStateChanged(auth, async (user) => {
+   if (user) {
+      fetch Firestore doc: users/{user.uid}
+      set profile if exists
+   }
+   set loading = false
+})
+
+IMPORTANT:
+App must WAIT until loading = false before rendering anything.
+
+---
+
+## 2. CREATE PROTECTED ROUTE SYSTEM
+
+Create 3 route types:
+
+### PublicRoute
+- Only for non-logged users
+- If user exists → redirect to /dashboard
+
+### SetupRoute
+- Only for users WITHOUT profile
+- If profile exists → redirect to /dashboard
+
+### PrivateRoute
+- Only for users WITH profile
+- If no user → redirect to /login
+- If no profile → redirect to /setup-profile
+
+---
+
+## 3. ROUTING RULES
+
+/login → PublicRoute  
+/setup-profile → SetupRoute  
+/dashboard → PrivateRoute  
+
+REMOVE any direct navigation logic from components.
+
+ALL routing must depend on AuthContext.
+
+---
+
+## 4. FIX CURRENT BUG
+
+Ensure:
+
+IF user exists AND profile exists:
+→ ALWAYS go to /dashboard
+
+IF user exists AND NO profile:
+→ ONLY go to /setup-profile
+
+RIGHT NOW THIS IS BROKEN — FIX IT.
+
+---
+
+## 5. ADD GLOBAL BACK BUTTON
+
+Create a top navbar component:
+
+- Left side: ← arrow button
+- On click: navigate(-1)
+
+Show on all pages except login.
+
+---
+
+## 6. PERFORMANCE FIX
+
+- Do NOT call Firestore multiple times
+- Store profile in context
+- Avoid re-renders using proper useEffect dependencies
+- Show loading screen while checking auth
+
+---
+
+## 7. DEBUG (IMPORTANT)
+
+Add console logs:
+- "Auth loading..."
+- "User found"
+- "Profile found / not found"
+- "Redirecting to ..."
+
+---
+
+# FINAL RESULT REQUIRED
+
+- Returning user → directly /dashboard  
+- New user → /setup-profile once only  
+- No forced redirect loop  
+- Back button works  
+- Fast load (no flicker)
+
+DO NOT PATCH. RESTRUCTURE ROUTING PROPERLY.

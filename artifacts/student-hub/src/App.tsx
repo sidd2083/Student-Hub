@@ -1,10 +1,15 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
-import NotFound from "@/pages/not-found";
+import {
+  PublicRoute,
+  SetupRoute,
+  PrivateRoute,
+  AdminRoute,
+} from "@/components/ProtectedRoute";
+
 import Login from "@/pages/Login";
 import Onboarding from "@/pages/Onboarding";
 import Dashboard from "@/pages/Dashboard";
@@ -17,6 +22,7 @@ import NepAi from "@/pages/NepAi";
 import Leaderboard from "@/pages/Leaderboard";
 import Admin from "@/pages/Admin";
 import Settings from "@/pages/Settings";
+import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,8 +30,13 @@ const queryClient = new QueryClient({
   },
 });
 
+/**
+ * Root path "/" — smart gate:
+ * Waits for loading, then dispatches based on auth state.
+ */
 function RootGate() {
   const { loading, user, profile } = useAuth();
+  const [, setLocation] = useLocation();
 
   if (loading) {
     return (
@@ -36,8 +47,19 @@ function RootGate() {
     );
   }
 
-  if (user && profile) return <Dashboard />;
-  if (user && !profile) return <Onboarding />;
+  if (user && profile) {
+    console.log("[Route] RootGate → /dashboard");
+    setLocation("/dashboard");
+    return null;
+  }
+
+  if (user && !profile) {
+    console.log("[Route] RootGate → /setup-profile");
+    setLocation("/setup-profile");
+    return null;
+  }
+
+  // No user — render login inline to avoid a redirect flash
   return <Login />;
 }
 
@@ -45,38 +67,54 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={RootGate} />
-      <Route path="/setup-profile" component={Onboarding} />
-      <Route path="/onboarding" component={Onboarding} />
+
+      {/* Public — redirect logged-in users away */}
+      <Route path="/login">
+        <PublicRoute><Login /></PublicRoute>
+      </Route>
+
+      {/* Setup — only for users without a profile */}
+      <Route path="/setup-profile">
+        <SetupRoute><Onboarding /></SetupRoute>
+      </Route>
+      <Route path="/onboarding">
+        <SetupRoute><Onboarding /></SetupRoute>
+      </Route>
+
+      {/* Private — require user + profile */}
       <Route path="/dashboard">
-        <ProtectedRoute><Dashboard /></ProtectedRoute>
+        <PrivateRoute><Dashboard /></PrivateRoute>
       </Route>
       <Route path="/notes">
-        <ProtectedRoute><Notes /></ProtectedRoute>
+        <PrivateRoute><Notes /></PrivateRoute>
       </Route>
       <Route path="/mcq">
-        <ProtectedRoute><McqPractice /></ProtectedRoute>
+        <PrivateRoute><McqPractice /></PrivateRoute>
       </Route>
       <Route path="/pyqs">
-        <ProtectedRoute><Pyqs /></ProtectedRoute>
+        <PrivateRoute><Pyqs /></PrivateRoute>
       </Route>
       <Route path="/todo">
-        <ProtectedRoute><Todo /></ProtectedRoute>
+        <PrivateRoute><Todo /></PrivateRoute>
       </Route>
       <Route path="/pomodoro">
-        <ProtectedRoute><Pomodoro /></ProtectedRoute>
+        <PrivateRoute><Pomodoro /></PrivateRoute>
       </Route>
       <Route path="/ai">
-        <ProtectedRoute><NepAi /></ProtectedRoute>
+        <PrivateRoute><NepAi /></PrivateRoute>
       </Route>
       <Route path="/leaderboard">
-        <ProtectedRoute><Leaderboard /></ProtectedRoute>
+        <PrivateRoute><Leaderboard /></PrivateRoute>
       </Route>
       <Route path="/settings">
-        <ProtectedRoute><Settings /></ProtectedRoute>
+        <PrivateRoute><Settings /></PrivateRoute>
       </Route>
+
+      {/* Admin — requires user; Admin page handles role/hardcoded login internally */}
       <Route path="/admin">
-        <ProtectedRoute><Admin /></ProtectedRoute>
+        <AdminRoute><Admin /></AdminRoute>
       </Route>
+
       <Route component={NotFound} />
     </Switch>
   );

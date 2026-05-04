@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   User as FirebaseUser,
   onAuthStateChanged,
@@ -7,7 +13,6 @@ import {
 } from "firebase/auth";
 import { getDoc, doc } from "firebase/firestore";
 import { auth, googleProvider, db } from "@/lib/firebase";
-import { useLocation } from "wouter";
 
 export interface UserProfile {
   id: number;
@@ -17,6 +22,7 @@ export interface UserProfile {
   grade: number;
   role: "user" | "admin";
   createdAt: string;
+  photoURL?: string;
 }
 
 interface AuthContextType {
@@ -31,31 +37,30 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-function isAtRootPath() {
-  const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-  const path = window.location.pathname;
-  return path === base || path === base + "/" || path === "/";
-}
-
-async function fetchProfileFromFirestore(uid: string): Promise<UserProfile | null> {
+async function fetchProfileOnce(uid: string): Promise<UserProfile | null> {
+  console.log("[Auth] Fetching Firestore profile for uid:", uid);
   try {
-    const docSnap = await getDoc(doc(db, "users", uid));
-    if (!docSnap.exists()) return null;
-    const data = docSnap.data();
-    return {
+    const snap = await getDoc(doc(db, "users", uid));
+    if (!snap.exists()) {
+      console.log("[Auth] Profile not found in Firestore");
+      return null;
+    }
+    const d = snap.data();
+    const profile: UserProfile = {
       id: 0,
-      uid: data.uid ?? uid,
-      name: data.name ?? "",
-      email: data.email ?? "",
-      grade: data.grade ?? 0,
-      role: (data.role === "admin" ? "admin" : "user") as "user" | "admin",
+      uid: d.uid ?? uid,
+      name: d.name ?? "",
+      email: d.email ?? "",
+      grade: d.grade ?? 0,
+      role: d.role === "admin" ? "admin" : "user",
       createdAt:
-        typeof data.createdAt === "string"
-          ? data.createdAt
-          : new Date().toISOString(),
+        typeof d.createdAt === "string" ? d.createdAt : new Date().toISOString(),
+      photoURL: d.photoURL,
     };
+    console.log("[Auth] Profile found:", profile.name, "| role:", profile.role);
+    return profile;
   } catch (err) {
-    console.error("Failed to fetch profile from Firestore:", err);
+    console.error("[Auth] Firestore fetch error:", err);
     return null;
   }
 }
@@ -64,37 +69,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [, setLocation] = useLocation();
-
-  const refreshProfile = async () => {
-    if (!user) return;
-    const p = await fetchProfileFromFirestore(user.uid);
-    setProfile(p);
-  };
+  const fetchingRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
+    console.log("[Auth] Auth loading...");
 
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!mounted) return;
+      if (fetchingRef.current) return;
 
       if (firebaseUser) {
+        console.log("[Auth] User found:", firebaseUser.email);
+        fetchingRef.current = true;
         setUser(firebaseUser);
-        try {
-          const p = await fetchProfileFromFirestore(firebaseUser.uid);
-          if (!mounted) return;
-          setProfile(p);
-          setLoading(false);
 
-          if (isAtRootPath()) {
-            setLocation(p ? "/dashboard" : "/setup-profile");
-          }
-        } catch (err) {
-          console.error("Error loading user profile:", err);
-          if (!mounted) return;
-          setLoading(false);
+        const p = await fetchProfileOnce(firebaseUser.uid);
+        if (!mounted) return;
+
+        setProfile(p);
+        setLoading(false);
+        fetchingRef.current = false;
+
+        if (p) {
+          console.log("[Auth] → Profile exists. Ready for /dashboard.");
+        } else {
+          console.log("[Auth] → No profile. Redirecting to /setup-profile.");
         }
       } else {
+        console.log("[Auth] No user. Redirecting to /login.");
         setUser(null);
         setProfile(null);
         setLoading(false);
@@ -107,11 +110,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const refreshProfile = async () => {
+    if (!user) return;
+    const p = await fetchProfileOnce(user.uid);
+    setProfile(p);
+  };
+
   const signInWithGoogle = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (err: unknown) {
-      console.error("Google sign-in error:", err);
       const code = (err as { code?: string })?.code;
       if (
         code === "auth/popup-closed-by-user" ||
@@ -127,12 +135,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await firebaseSignOut(auth);
     setUser(null);
     setProfile(null);
-    setLocation("/");
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, profile, loading, signInWithGoogle, signOut, refreshProfile, setProfile }}
+      value={{
+        user,
+        profile,
+        loading,
+        signInWithGoogle,
+        signOut,
+        refreshProfile,
+        setProfile,
+      }}
     >
       {children}
     </AuthContext.Provider>

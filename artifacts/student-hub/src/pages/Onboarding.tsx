@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth, UserProfile } from "@/context/AuthContext";
 import { useLocation } from "wouter";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 export default function Onboarding() {
-  const { user, profile, setProfile } = useAuth();
+  const { user, setProfile } = useAuth();
   const [, setLocation] = useLocation();
   const [name, setName] = useState(user?.displayName || "");
   const [grade, setGrade] = useState<number | "">("");
@@ -13,37 +13,19 @@ export default function Onboarding() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!user) setLocation("/");
-  }, [user]);
-
-  useEffect(() => {
-    if (profile) setLocation("/dashboard");
-  }, [profile]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return setError("Please enter your name.");
     if (!grade) return setError("Please select your grade.");
     if (!agreed) return setError("Please accept the Terms & Conditions to continue.");
-    if (!user) return setError("You must be signed in. Please refresh and try again.");
+    if (!user) return setError("No user session. Please refresh and try again.");
 
     setSaving(true);
     setError("");
 
     try {
       const now = new Date().toISOString();
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
-        name: name.trim(),
-        email: user.email ?? "",
-        grade: Number(grade),
-        role: "user",
-        createdAt: now,
-      });
-
-      const newProfile: UserProfile = {
-        id: 0,
+      const data = {
         uid: user.uid,
         name: name.trim(),
         email: user.email ?? "",
@@ -52,10 +34,15 @@ export default function Onboarding() {
         createdAt: now,
       };
 
+      await setDoc(doc(db, "users", user.uid), data);
+
+      const newProfile: UserProfile = { id: 0, ...data, role: "user" };
+      console.log("[Auth] Profile created, setting context + navigating to /dashboard");
       setProfile(newProfile);
+      setLocation("/dashboard");
     } catch (err) {
-      console.error("Failed to save profile:", err);
-      setError("Something went wrong saving your profile. Please try again.");
+      console.error("[Auth] Failed to save profile:", err);
+      setError("Something went wrong. Please try again.");
       setSaving(false);
     }
   };
@@ -63,21 +50,18 @@ export default function Onboarding() {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-6 relative overflow-hidden">
       <style>{`
-        @keyframes fadeSlideUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .anim-up { animation: fadeSlideUp 0.45s ease forwards; }
-        .anim-up-1 { animation: fadeSlideUp 0.45s ease 0.05s both; }
-        .anim-up-2 { animation: fadeSlideUp 0.45s ease 0.1s both; }
-        .anim-up-3 { animation: fadeSlideUp 0.45s ease 0.15s both; }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+        .anim { animation: fadeUp 0.4s ease both; }
+        .anim-1 { animation-delay: 0.05s; }
+        .anim-2 { animation-delay: 0.1s; }
+        .anim-3 { animation-delay: 0.15s; }
       `}</style>
 
       <div className="absolute top-[-60px] right-[-60px] w-64 h-64 rounded-full bg-blue-50 blur-3xl opacity-70 pointer-events-none" />
       <div className="absolute bottom-[-60px] left-[-60px] w-64 h-64 rounded-full bg-indigo-50 blur-3xl opacity-60 pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10">
-        <div className="text-center mb-8 anim-up">
+        <div className="text-center mb-8 anim">
           <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-200">
             <span className="text-3xl">🎓</span>
           </div>
@@ -85,13 +69,13 @@ export default function Onboarding() {
           <p className="text-gray-500 text-sm">Just a few details to personalise your experience</p>
         </div>
 
-        <div className="flex items-center justify-center gap-2 mb-8 anim-up-1">
+        <div className="flex items-center justify-center gap-2 mb-8 anim anim-1">
           <div className="h-1.5 w-8 rounded-full bg-green-400" />
           <div className="h-1.5 w-8 rounded-full bg-blue-500" />
           <div className={`h-1.5 w-8 rounded-full transition-all ${grade ? "bg-blue-500" : "bg-gray-200"}`} />
         </div>
 
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-100 p-8 anim-up-2">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-100 p-8 anim anim-2">
           {user && (
             <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-100 rounded-2xl mb-6">
               {user.photoURL ? (
@@ -152,16 +136,9 @@ export default function Onboarding() {
             <div className="pt-1">
               <label className="flex items-start gap-3 cursor-pointer group">
                 <div className="relative mt-0.5 flex-shrink-0">
-                  <input
-                    data-testid="checkbox-terms"
-                    type="checkbox"
-                    checked={agreed}
-                    onChange={(e) => setAgreed(e.target.checked)}
-                    className="sr-only"
-                  />
                   <div
-                    onClick={() => !saving && setAgreed(a => !a)}
-                    className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                    onClick={() => !saving && setAgreed((a) => !a)}
+                    className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer ${
                       agreed ? "bg-blue-500 border-blue-500" : "border-gray-300 group-hover:border-blue-400"
                     }`}
                   >
@@ -174,9 +151,9 @@ export default function Onboarding() {
                 </div>
                 <span className="text-sm text-gray-600 leading-relaxed">
                   I agree to the{" "}
-                  <span className="text-blue-500 font-medium cursor-pointer hover:underline">Terms & Conditions</span>
+                  <span className="text-blue-500 font-medium">Terms & Conditions</span>
                   {" "}and{" "}
-                  <span className="text-blue-500 font-medium cursor-pointer hover:underline">Privacy Policy</span>
+                  <span className="text-blue-500 font-medium">Privacy Policy</span>
                   <span className="text-gray-400 text-xs block mt-0.5">(Full document coming soon)</span>
                 </span>
               </label>
@@ -184,7 +161,7 @@ export default function Onboarding() {
 
             {error && (
               <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-100 rounded-xl">
-                <span className="text-base">⚠️</span>
+                <span>⚠️</span>
                 <p className="text-red-600 text-sm">{error}</p>
               </div>
             )}

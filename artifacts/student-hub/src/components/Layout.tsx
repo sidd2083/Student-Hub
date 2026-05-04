@@ -3,7 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   BookOpen, Brain, FileText, CheckSquare, Timer,
   MessageCircle, Trophy, LayoutDashboard, LogOut,
-  Shield, Settings
+  Shield, Settings, ArrowLeft,
 } from "lucide-react";
 
 const navItems = [
@@ -17,16 +17,29 @@ const navItems = [
   { href: "/leaderboard", icon: Trophy,           label: "Leaderboard"        },
 ];
 
-export function Layout({ children }: { children: React.ReactNode }) {
+interface LayoutProps {
+  children: React.ReactNode;
+  /** If true, hides the ← back button in the top bar (default: false) */
+  hideBack?: boolean;
+}
+
+export function Layout({ children, hideBack = false }: LayoutProps) {
   const [location] = useLocation();
   const { profile, signOut } = useAuth();
 
   const isActive = (href: string) =>
     location === href || (href !== "/dashboard" && location.startsWith(href));
 
+  const handleBack = () => {
+    window.history.back();
+  };
+
+  const showBack = !hideBack && location !== "/dashboard";
+
   return (
     <div className="flex h-screen bg-gray-50">
-      <aside className="w-64 bg-white border-r border-gray-100 flex flex-col shadow-sm">
+      {/* ── Sidebar ── */}
+      <aside className="w-64 bg-white border-r border-gray-100 flex flex-col shadow-sm flex-shrink-0">
         <div className="p-6 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -73,17 +86,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="p-4 border-t border-gray-100">
           <Link href="/settings">
             <a className="flex items-center gap-3 mb-2 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-all cursor-pointer group">
-              {profile?.photoURL ? (
-                <img
-                  src={profile?.photoURL as string}
-                  className="w-9 h-9 rounded-full ring-2 ring-gray-100"
-                  alt=""
-                />
-              ) : (
-                <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm flex-shrink-0">
-                  {profile?.name?.charAt(0)?.toUpperCase() || "?"}
-                </div>
-              )}
+              <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm flex-shrink-0">
+                {profile?.name?.charAt(0)?.toUpperCase() || "?"}
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{profile?.name}</p>
                 <p className="text-xs text-gray-500">Grade {profile?.grade}</p>
@@ -102,7 +107,27 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto">{children}</main>
+      {/* ── Main content ── */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top bar with back button */}
+        <header className="h-12 bg-white border-b border-gray-100 flex items-center px-6 flex-shrink-0">
+          {showBack ? (
+            <button
+              onClick={handleBack}
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors group"
+            >
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+              <span>Back</span>
+            </button>
+          ) : (
+            <span className="text-sm font-medium text-gray-400">
+              {navItems.find((n) => isActive(n.href))?.label ?? "Student Hub"}
+            </span>
+          )}
+        </header>
+
+        <main className="flex-1 overflow-y-auto">{children}</main>
+      </div>
     </div>
   );
 }
