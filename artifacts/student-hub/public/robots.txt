@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+Allow: /notes
+Allow: /notes/
+Allow: /pyqs
+Allow: /pyqs/
+Allow: /about
+Allow: /contact
+
+Disallow: /dashboard
+Disallow: /mcq
+Disallow: /todo
+Disallow: /pomodoro
+Disallow: /ai
+Disallow: /leaderboard
+Disallow: /settings
+Disallow: /admin
+
+Sitemap: https://studenthub.np/sitemap.xml

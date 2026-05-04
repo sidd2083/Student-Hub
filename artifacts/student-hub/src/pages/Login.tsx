@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 
 type Tab = "login" | "register";
@@ -43,6 +44,13 @@ export default function Login() {
   };
 
   return (
+    <>
+      <Helmet>
+        <title>Login — Student Hub | Free Study Platform for Nepal Students</title>
+        <meta name="description" content="Sign in to Student Hub — access notes, past papers, MCQ practice, and an AI study assistant. Free for Grade 9–12 students in Nepal." />
+        <meta property="og:title" content="Student Hub — Free Study Platform" />
+        <meta property="og:description" content="Notes, PYQs, MCQ practice, and AI tools for Grade 9–12 students in Nepal." />
+      </Helmet>
     <div className="min-h-screen bg-white flex items-center justify-center relative overflow-hidden">
       <style>{`
         @keyframes float {
@@ -179,6 +187,7 @@ export default function Login() {
         </p>
       </div>
     </div>
+    </>
   );
 }
 

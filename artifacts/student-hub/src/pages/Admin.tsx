@@ -25,7 +25,7 @@ import {
 import { db, storage } from "@/lib/firebase";
 
 const ADMIN_SESSION = "admin_session_v1";
-type Section = "dashboard" | "notes" | "mcqs" | "pyqs" | "announcements" | "users" | "leaderboard";
+type Section = "dashboard" | "notes" | "mcqs" | "pyqs" | "announcements" | "users" | "leaderboard" | "seo";
 
 // ─── File Upload Component ──────────────────────────────────────────────────
 
@@ -634,6 +634,120 @@ function LeaderboardControl() {
   );
 }
 
+// ─── SEO Panel ─────────────────────────────────────────────────────────────
+
+function SeoPanel() {
+  const { data: notes } = useListNotes({}, { query: { queryKey: getListNotesQueryKey({}) } });
+  const { data: pyqs } = useListPyqs({}, { query: { queryKey: getListPyqsQueryKey({}) } });
+
+  const baseUrl = "https://studenthub.np";
+
+  const noteUrls = (notes || []).map(n => ({
+    url: `${baseUrl}/notes/${n.id}`,
+    label: n.title,
+    kind: "Note",
+  }));
+  const pyqUrls = (pyqs || []).map(p => ({
+    url: `${baseUrl}/pyq/${p.id}`,
+    label: p.title,
+    kind: "PYQ",
+  }));
+
+  const staticUrls = [
+    { url: `${baseUrl}/`, label: "Homepage / Login", kind: "Static" },
+    { url: `${baseUrl}/notes`, label: "Notes List", kind: "Static" },
+    { url: `${baseUrl}/pyqs`, label: "PYQs List", kind: "Static" },
+    { url: `${baseUrl}/about`, label: "About", kind: "Static" },
+    { url: `${baseUrl}/contact`, label: "Contact", kind: "Static" },
+  ];
+
+  const allUrls = [...staticUrls, ...noteUrls, ...pyqUrls];
+
+  const generateSitemap = () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${allUrls.map(u => `  <url>
+    <loc>${u.url}</loc>
+    <changefreq>weekly</changefreq>
+    <priority>${u.kind === "Static" ? "0.9" : "0.7"}</priority>
+  </url>`).join("\n")}
+</urlset>`;
+    const blob = new Blob([xml], { type: "application/xml" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "sitemap.xml";
+    link.click();
+  };
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">SEO Panel</h2>
+          <p className="text-sm text-gray-500 mt-0.5">All public indexable URLs for Student Hub</p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <a
+            href={`${baseUrl}/robots.txt`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-all"
+          >
+            robots.txt ↗
+          </a>
+          <button
+            onClick={generateSitemap}
+            className="px-4 py-2 bg-purple-500 text-white rounded-xl text-sm font-medium hover:bg-purple-600 transition-all"
+          >
+            Download sitemap.xml
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        {[
+          { label: "Static Pages", count: staticUrls.length, color: "bg-blue-50 text-blue-600" },
+          { label: "Note Pages", count: noteUrls.length, color: "bg-green-50 text-green-600" },
+          { label: "PYQ Pages", count: pyqUrls.length, color: "bg-orange-50 text-orange-600" },
+        ].map(({ label, count, color }) => (
+          <div key={label} className={`${color.split(" ")[0]} rounded-2xl p-4 border border-gray-100`}>
+            <p className={`text-2xl font-bold ${color.split(" ")[1]}`}>{count}</p>
+            <p className="text-sm text-gray-500 mt-0.5">{label}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+          <p className="text-sm font-medium text-gray-700">{allUrls.length} total indexable URLs</p>
+        </div>
+        <div className="divide-y divide-gray-50 max-h-[480px] overflow-y-auto">
+          {allUrls.map((u, i) => (
+            <div key={i} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-all">
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
+                u.kind === "Static"  ? "bg-blue-50 text-blue-600"
+                : u.kind === "Note" ? "bg-green-50 text-green-600"
+                :                     "bg-orange-50 text-orange-600"
+              }`}>
+                {u.kind}
+              </span>
+              <p className="text-sm text-gray-700 truncate flex-1">{u.label}</p>
+              <a
+                href={u.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-500 hover:underline flex-shrink-0"
+              >
+                Open ↗
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Admin Shell ───────────────────────────────────────────────────────────
 
 export default function Admin() {
@@ -655,6 +769,7 @@ export default function Admin() {
     { key: "announcements", icon: Megaphone,       label: "Announcements" },
     { key: "users",         icon: Users,           label: "Manage Users"  },
     { key: "leaderboard",   icon: Trophy,          label: "Leaderboard"   },
+    { key: "seo",           icon: Shield,          label: "SEO Panel"     },
   ];
 
   return (
@@ -706,6 +821,7 @@ export default function Admin() {
         {section === "announcements" && <ManageAnnouncements />}
         {section === "users"         && <ManageUsers />}
         {section === "leaderboard"   && <LeaderboardControl />}
+        {section === "seo"           && <SeoPanel />}
       </main>
     </div>
   );

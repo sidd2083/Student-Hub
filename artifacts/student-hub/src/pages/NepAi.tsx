@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { Helmet } from "react-helmet-async";
 import { Layout } from "@/components/Layout";
 import { Send, MessageCircle, Sparkles } from "lucide-react";
 
@@ -74,10 +75,16 @@ export default function NepAi() {
   const handleSuggest = (q: string) => setInput(q);
 
   return (
+    <>
+      <Helmet>
+        <title>Nep AI — AI Study Assistant | Student Hub</title>
+        <meta name="description" content="Ask Nep AI any academic question. Get instant answers for Grade 9–12 subjects in Nepal." />
+        <meta property="og:title" content="Nep AI — Student Hub" />
+      </Helmet>
     <Layout>
       <div className="flex flex-col h-full">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 bg-white flex-shrink-0">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-white flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-indigo-100 rounded-xl flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-indigo-600" />
@@ -163,7 +170,7 @@ export default function NepAi() {
 
         {/* Input */}
         <div className="px-4 py-4 border-t border-gray-100 bg-white flex-shrink-0">
-          <form onSubmit={sendMessage} className="flex gap-3">
+          <form onSubmit={sendMessage} className="flex gap-3 max-w-4xl mx-auto">
             <input
               data-testid="input-ai-message"
               type="text"
@@ -176,7 +183,7 @@ export default function NepAi() {
               data-testid="btn-send-ai"
               type="submit"
               disabled={loading || !input.trim()}
-              className="px-4 py-3 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-all disabled:opacity-50"
+              className="w-12 h-12 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-all disabled:opacity-50 flex items-center justify-center flex-shrink-0"
             >
               <Send className="w-4 h-4" />
             </button>
@@ -184,5 +191,6 @@ export default function NepAi() {
         </div>
       </div>
     </Layout>
+    </>
   );
 }

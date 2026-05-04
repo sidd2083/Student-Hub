@@ -78,10 +78,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         setProfileState(null);
         setLoading(false);
-        console.log("[Auth] → no user, routing to /");
-        // Navigate to login only if we're not already there
-        if (!window.location.pathname.match(/^\/?$/)) {
+        // Allow public routes without login
+        const publicPaths = /^\/?$|^\/login|^\/notes|^\/pyqs|^\/pyq|^\/about|^\/contact/;
+        const path = window.location.pathname;
+        if (!publicPaths.test(path)) {
+          console.log("[Auth] → no user, routing to /");
           window.location.replace("/");
+        } else {
+          console.log("[Auth] → no user, public route, staying at", path);
         }
         return;
       }

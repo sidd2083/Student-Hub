@@ -3,7 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   BookOpen, Brain, FileText, CheckSquare, Timer,
   MessageCircle, Trophy, LayoutDashboard, LogOut,
-  Shield, Settings, ArrowLeft,
+  Shield, Settings, ArrowLeft, User,
 } from "lucide-react";
 
 const navItems = [
@@ -17,9 +17,16 @@ const navItems = [
   { href: "/leaderboard", icon: Trophy,           label: "Leaderboard"        },
 ];
 
+const bottomNavItems = [
+  { href: "/dashboard", icon: LayoutDashboard, label: "Home"    },
+  { href: "/notes",     icon: BookOpen,         label: "Notes"  },
+  { href: "/pyqs",      icon: FileText,         label: "PYQs"   },
+  { href: "/mcq",       icon: Brain,            label: "MCQ"    },
+  { href: "/settings",  icon: User,             label: "Profile"},
+];
+
 interface LayoutProps {
   children: React.ReactNode;
-  /** If true, hides the ← back button in the top bar (default: false) */
   hideBack?: boolean;
 }
 
@@ -30,16 +37,14 @@ export function Layout({ children, hideBack = false }: LayoutProps) {
   const isActive = (href: string) =>
     location === href || (href !== "/dashboard" && location.startsWith(href));
 
-  const handleBack = () => {
-    window.history.back();
-  };
+  const handleBack = () => window.history.back();
 
   const showBack = !hideBack && location !== "/dashboard";
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* ── Sidebar ── */}
-      <aside className="w-64 bg-white border-r border-gray-100 flex flex-col shadow-sm flex-shrink-0">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {/* ── Sidebar (desktop only) ── */}
+      <aside className="hidden md:flex w-64 bg-white border-r border-gray-100 flex-col shadow-sm flex-shrink-0">
         <div className="p-6 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -108,9 +113,9 @@ export function Layout({ children, hideBack = false }: LayoutProps) {
       </aside>
 
       {/* ── Main content ── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top bar with back button */}
-        <header className="h-12 bg-white border-b border-gray-100 flex items-center px-6 flex-shrink-0">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Top bar */}
+        <header className="h-12 bg-white border-b border-gray-100 flex items-center px-4 md:px-6 flex-shrink-0">
           {showBack ? (
             <button
               onClick={handleBack}
@@ -124,10 +129,44 @@ export function Layout({ children, hideBack = false }: LayoutProps) {
               {navItems.find((n) => isActive(n.href))?.label ?? "Student Hub"}
             </span>
           )}
+
+          {/* Mobile: show user avatar on top right */}
+          <div className="ml-auto md:hidden">
+            <Link href="/settings">
+              <a className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm">
+                {profile?.name?.charAt(0)?.toUpperCase() || "?"}
+              </a>
+            </Link>
+          </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        {/* Page content — with bottom padding on mobile for the nav */}
+        <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
+          {children}
+        </main>
       </div>
+
+      {/* ── Mobile Bottom Navigation ── */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-lg z-40 safe-area-inset-bottom">
+        <div className="flex items-center justify-around h-16 px-2">
+          {bottomNavItems.map(({ href, icon: Icon, label }) => {
+            const active = isActive(href);
+            return (
+              <Link key={href} href={href}>
+                <a className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all min-w-[56px] ${
+                  active ? "text-blue-600" : "text-gray-400"
+                }`}>
+                  <Icon className={`w-5 h-5 transition-transform ${active ? "scale-110" : ""}`} />
+                  <span className="text-[10px] font-medium leading-tight">{label}</span>
+                  {active && (
+                    <span className="w-1 h-1 bg-blue-500 rounded-full mt-0.5" />
+                  )}
+                </a>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

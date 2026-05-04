@@ -13,8 +13,10 @@ import Login from "@/pages/Login";
 import Onboarding from "@/pages/Onboarding";
 import Dashboard from "@/pages/Dashboard";
 import Notes from "@/pages/Notes";
+import NotePage from "@/pages/NotePage";
 import McqPractice from "@/pages/McqPractice";
 import Pyqs from "@/pages/Pyqs";
+import PyqPage from "@/pages/PyqPage";
 import Todo from "@/pages/Todo";
 import Pomodoro from "@/pages/Pomodoro";
 import NepAi from "@/pages/NepAi";
@@ -22,6 +24,8 @@ import Leaderboard from "@/pages/Leaderboard";
 import Settings from "@/pages/Settings";
 import AdminLogin from "@/pages/AdminLogin";
 import Admin from "@/pages/Admin";
+import About from "@/pages/About";
+import Contact from "@/pages/Contact";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -30,10 +34,6 @@ const queryClient = new QueryClient({
   },
 });
 
-/**
- * Root "/" — shows spinner while auth initialises, then login.
- * Navigation away from "/" is handled by onAuthStateChanged in AuthContext.
- */
 function RootGate() {
   const { loading } = useAuth();
   if (loading) return <LoadingScreen />;
@@ -43,26 +43,30 @@ function RootGate() {
 function Router() {
   return (
     <Switch>
-      {/* Root — spinner → login (auth listener redirects signed-in users away) */}
+      {/* Root — spinner → login */}
       <Route path="/" component={RootGate} />
       <Route path="/login" component={RootGate} />
 
-      {/* Setup — no auth guard needed, auth listener controls who gets here */}
+      {/* Setup */}
       <Route path="/setup-profile" component={Onboarding} />
       <Route path="/onboarding" component={Onboarding} />
+
+      {/* Public pages — no login required */}
+      <Route path="/notes/:id" component={NotePage} />
+      <Route path="/pyq/:id" component={PyqPage} />
+      <Route path="/about" component={About} />
+      <Route path="/contact" component={Contact} />
+
+      {/* Semi-public: notes & pyqs list — accessible without login */}
+      <Route path="/notes" component={Notes} />
+      <Route path="/pyqs" component={Pyqs} />
 
       {/* Private pages */}
       <Route path="/dashboard">
         <PrivateRoute><Dashboard /></PrivateRoute>
       </Route>
-      <Route path="/notes">
-        <PrivateRoute><Notes /></PrivateRoute>
-      </Route>
       <Route path="/mcq">
         <PrivateRoute><McqPractice /></PrivateRoute>
-      </Route>
-      <Route path="/pyqs">
-        <PrivateRoute><Pyqs /></PrivateRoute>
       </Route>
       <Route path="/todo">
         <PrivateRoute><Todo /></PrivateRoute>

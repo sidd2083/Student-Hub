@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { Layout } from "@/components/Layout";
 import { useListScores, getListScoresQueryKey } from "@workspace/api-client-react";
@@ -28,8 +29,13 @@ export default function Leaderboard() {
   };
 
   return (
+    <>
+      <Helmet>
+        <title>Leaderboard — Student Hub</title>
+        <meta name="description" content="Top MCQ scorers on Student Hub. Daily and all-time leaderboard for Grade 9–12 students." />
+      </Helmet>
     <Layout>
-      <div className="p-8 max-w-2xl mx-auto">
+      <div className="p-4 sm:p-8 max-w-2xl mx-auto">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Leaderboard</h1>
           <p className="text-gray-500">Top scorers in MCQ practice</p>
@@ -83,5 +89,6 @@ export default function Leaderboard() {
         )}
       </div>
     </Layout>
+    </>
   );
 }
