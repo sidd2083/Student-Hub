@@ -1,12 +1,17 @@
 import { useState } from "react";
 import { useAuth, UserProfile } from "@/context/AuthContext";
-import { useLocation } from "wouter";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+/**
+ * Onboarding — shown at /setup-profile via SetupRoute.
+ *
+ * After saving the profile to Firestore, we call setProfile() and
+ * DO NOT navigate imperatively. SetupRoute detects profile becoming
+ * non-null and redirects to /dashboard automatically.
+ */
 export default function Onboarding() {
   const { user, setProfile } = useAuth();
-  const [, setLocation] = useLocation();
   const [name, setName] = useState(user?.displayName || "");
   const [grade, setGrade] = useState<number | "">("");
   const [agreed, setAgreed] = useState(false);
@@ -17,8 +22,8 @@ export default function Onboarding() {
     e.preventDefault();
     if (!name.trim()) return setError("Please enter your name.");
     if (!grade) return setError("Please select your grade.");
-    if (!agreed) return setError("Please accept the Terms & Conditions to continue.");
-    if (!user) return setError("No user session. Please refresh and try again.");
+    if (!agreed) return setError("Please accept the Terms & Conditions.");
+    if (!user) return setError("No session. Please refresh and try again.");
 
     setSaving(true);
     setError("");
@@ -30,16 +35,16 @@ export default function Onboarding() {
         name: name.trim(),
         email: user.email ?? "",
         grade: Number(grade),
-        role: "user",
+        role: "user" as const,
         createdAt: now,
       };
 
       await setDoc(doc(db, "users", user.uid), data);
+      console.log("[Auth] Profile saved to Firestore. Letting SetupRoute redirect...");
 
-      const newProfile: UserProfile = { id: 0, ...data, role: "user" };
-      console.log("[Auth] Profile created, setting context + navigating to /dashboard");
+      const newProfile: UserProfile = { id: 0, ...data };
+      // Update context — SetupRoute will redirect to /dashboard on next render
       setProfile(newProfile);
-      setLocation("/dashboard");
     } catch (err) {
       console.error("[Auth] Failed to save profile:", err);
       setError("Something went wrong. Please try again.");
@@ -54,7 +59,6 @@ export default function Onboarding() {
         .anim { animation: fadeUp 0.4s ease both; }
         .anim-1 { animation-delay: 0.05s; }
         .anim-2 { animation-delay: 0.1s; }
-        .anim-3 { animation-delay: 0.15s; }
       `}</style>
 
       <div className="absolute top-[-60px] right-[-60px] w-64 h-64 rounded-full bg-blue-50 blur-3xl opacity-70 pointer-events-none" />
@@ -75,7 +79,7 @@ export default function Onboarding() {
           <div className={`h-1.5 w-8 rounded-full transition-all ${grade ? "bg-blue-500" : "bg-gray-200"}`} />
         </div>
 
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-100 p-8 anim anim-2">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-8 anim anim-2">
           {user && (
             <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-100 rounded-2xl mb-6">
               {user.photoURL ? (
@@ -104,7 +108,7 @@ export default function Onboarding() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Alex Sharma"
                 disabled={saving}
-                className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base disabled:opacity-60"
+                className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-60"
               />
             </div>
 
@@ -127,37 +131,33 @@ export default function Onboarding() {
                     }`}
                   >
                     <span className="text-xl font-bold leading-none">{g}</span>
-                    <span className="text-[10px] font-normal text-gray-400">Grade</span>
+                    <span className="text-[10px] text-gray-400">Grade</span>
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="pt-1">
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <div className="relative mt-0.5 flex-shrink-0">
-                  <div
-                    onClick={() => !saving && setAgreed((a) => !a)}
-                    className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer ${
-                      agreed ? "bg-blue-500 border-blue-500" : "border-gray-300 group-hover:border-blue-400"
-                    }`}
-                  >
-                    {agreed && (
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </div>
-                </div>
-                <span className="text-sm text-gray-600 leading-relaxed">
-                  I agree to the{" "}
-                  <span className="text-blue-500 font-medium">Terms & Conditions</span>
-                  {" "}and{" "}
-                  <span className="text-blue-500 font-medium">Privacy Policy</span>
-                  <span className="text-gray-400 text-xs block mt-0.5">(Full document coming soon)</span>
-                </span>
-              </label>
-            </div>
+            <label className="flex items-start gap-3 cursor-pointer pt-1">
+              <div
+                onClick={() => !saving && setAgreed((a) => !a)}
+                className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 cursor-pointer transition-all ${
+                  agreed ? "bg-blue-500 border-blue-500" : "border-gray-300 hover:border-blue-400"
+                }`}
+              >
+                {agreed && (
+                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+              <span className="text-sm text-gray-600 leading-relaxed">
+                I agree to the{" "}
+                <span className="text-blue-500 font-medium">Terms & Conditions</span>
+                {" "}and{" "}
+                <span className="text-blue-500 font-medium">Privacy Policy</span>
+                <span className="text-gray-400 text-xs block mt-0.5">(Full document coming soon)</span>
+              </span>
+            </label>
 
             {error && (
               <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-100 rounded-xl">
@@ -170,7 +170,7 @@ export default function Onboarding() {
               data-testid="btn-continue"
               type="submit"
               disabled={saving}
-              className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-2xl hover:from-blue-600 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-200"
+              className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-2xl hover:from-blue-600 hover:to-indigo-700 transition-all disabled:opacity-50 shadow-lg shadow-blue-200"
             >
               {saving ? (
                 <span className="flex items-center justify-center gap-2">

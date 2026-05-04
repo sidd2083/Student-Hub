@@ -1,0 +1,194 @@
+Completely FIX and RESTRUCTURE the authentication, routing, and admin access system in my React + Firebase app "Student Hub".
+
+CRITICAL PROBLEMS (MUST FIX ALL):
+
+1. App ALWAYS redirects to /setup-profile (WRONG)
+2. Logged-in users are NOT going to /dashboard
+3. Returning users are not recognized properly
+4. App does NOT remember login correctly
+5. /admin route does NOT open admin login page
+6. No proper route protection system exists
+
+---
+
+# 🔴 DO NOT PATCH — REBUILD AUTH FLOW PROPERLY
+
+---
+
+# ✅ STEP 1: GLOBAL AUTH CONTEXT (MANDATORY)
+
+Create AuthContext with:
+
+- user (Firebase user)
+- profile (Firestore user document)
+- loading (true/false)
+
+Use:
+
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    const docRef = doc(db, "users", user.uid)
+    const snap = await getDoc(docRef)
+
+    if (snap.exists()) {
+      setProfile(snap.data())
+    } else {
+      setProfile(null)
+    }
+  } else {
+    setProfile(null)
+  }
+
+  setUser(user)
+  setLoading(false)
+})
+
+IMPORTANT:
+- App MUST NOT render routes until loading = false
+
+---
+
+# ✅ STEP 2: STRICT ROUTE GUARDS (VERY IMPORTANT)
+
+Create 3 route types:
+
+## PublicRoute (for /login)
+- If user exists → redirect to /dashboard
+
+## SetupRoute (for /setup-profile)
+- Allow ONLY if:
+   user exists AND profile == null
+- Otherwise → redirect to /dashboard
+
+## PrivateRoute (for /dashboard)
+- Allow ONLY if:
+   user exists AND profile exists
+- If no user → redirect to /login
+- If no profile → redirect to /setup-profile
+
+---
+
+# ✅ STEP 3: ROUTING STRUCTURE
+
+/login → PublicRoute  
+/setup-profile → SetupRoute  
+/dashboard → PrivateRoute  
+
+REMOVE ALL manual redirects from components.
+
+ROUTING MUST DEPEND ONLY ON AUTH CONTEXT.
+
+---
+
+# ✅ STEP 4: FIX CURRENT MAIN BUG
+
+Ensure this exact logic:
+
+IF user && profile:
+   → ALWAYS go to /dashboard
+
+IF user && !profile:
+   → ONLY go to /setup-profile
+
+IF !user:
+   → ALWAYS go to /login
+
+RIGHT NOW THIS IS BROKEN — FIX IT PROPERLY.
+
+---
+
+# ✅ STEP 5: ENABLE LOGIN PERSISTENCE
+
+Use Firebase persistence:
+
+setPersistence(auth, browserLocalPersistence)
+
+So user stays logged in after refresh.
+
+---
+
+# ✅ STEP 6: ADMIN ROUTE FIX (/admin)
+
+Create separate route:
+
+/admin
+
+When visiting /admin:
+
+Show admin login page (NOT normal login)
+
+Admin login credentials:
+
+username: siddhant  
+password: siddhant2078  
+
+After login:
+→ redirect to /admin/dashboard
+
+---
+
+# ✅ STEP 7: ADMIN PROTECTION
+
+- Only admin can access /admin/dashboard
+- Others → redirect to /login
+
+---
+
+# ✅ STEP 8: ADD GLOBAL BACK BUTTON
+
+Top navbar:
+
+- Left side: ← arrow
+- On click: navigate(-1)
+
+Show on all pages except login
+
+---
+
+# ✅ STEP 9: PERFORMANCE FIX
+
+- Do NOT call Firestore multiple times
+- Cache profile in context
+- Add loading screen while auth loads
+- Prevent re-render loops
+
+---
+
+# ✅ STEP 10: DEBUG LOGGING
+
+Add logs:
+
+console.log("Auth loading...")
+console.log("User:", user)
+console.log("Profile:", profile)
+
+---
+
+# 🎯 FINAL EXPECTED RESULT
+
+NEW USER:
+Login → /setup-profile → /dashboard
+
+RETURNING USER:
+Open site → directly /dashboard
+
+NOT LOGGED IN:
+→ /login
+
+ADMIN:
+Visit /admin → admin login page → admin dashboard
+
+NO MORE:
+❌ forced /setup-profile  
+❌ wrong redirects  
+❌ login not remembered  
+❌ admin page not opening  
+
+---
+
+IMPORTANT:
+- Do NOT change UI design
+- ONLY fix auth, routing, admin access, and performance
+- Rebuild routing logic cleanly
+
+END

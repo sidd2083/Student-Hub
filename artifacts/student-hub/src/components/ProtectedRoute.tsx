@@ -1,8 +1,19 @@
-import { useEffect } from "react";
-import { useLocation } from "wouter";
+/**
+ * Route guards for Student Hub.
+ *
+ * Uses declarative <Redirect> (not useEffect) so redirects happen
+ * synchronously on render — no intermediate flicker or race conditions.
+ *
+ * PublicRoute   — /login           — redirect to /dashboard if already authenticated
+ * SetupRoute    — /setup-profile   — only allow user-without-profile; else /dashboard
+ * PrivateRoute  — all app pages    — require user + profile; else /login or /setup-profile
+ * AdminDashboardRoute — /admin/dashboard — require admin session or admin role
+ */
+
+import { Redirect } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 
-function LoadingScreen() {
+export function LoadingScreen() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
       <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -11,100 +22,70 @@ function LoadingScreen() {
   );
 }
 
-/**
- * PublicRoute — for unauthenticated pages (login).
- * If user + profile exist → /dashboard
- * If user but no profile → /setup-profile
- */
+/** /login — redirect logged-in users away */
 export function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
-  const [, setLocation] = useLocation();
-
-  useEffect(() => {
-    if (loading) return;
-    if (user && profile) {
-      console.log("[Route] PublicRoute → redirecting to /dashboard");
-      setLocation("/dashboard");
-    } else if (user && !profile) {
-      console.log("[Route] PublicRoute → redirecting to /setup-profile");
-      setLocation("/setup-profile");
-    }
-  }, [user, profile, loading]);
 
   if (loading) return <LoadingScreen />;
-  if (user) return null; // redirecting, show nothing
+  if (user && profile) {
+    console.log("[Route] PublicRoute → /dashboard");
+    return <Redirect to="/dashboard" />;
+  }
+  if (user && !profile) {
+    console.log("[Route] PublicRoute → /setup-profile");
+    return <Redirect to="/setup-profile" />;
+  }
   return <>{children}</>;
 }
 
-/**
- * SetupRoute — for /setup-profile.
- * If no user → /
- * If profile exists → /dashboard
- */
+/** /setup-profile — only for user with no profile */
 export function SetupRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
-  const [, setLocation] = useLocation();
-
-  useEffect(() => {
-    if (loading) return;
-    if (!user) {
-      console.log("[Route] SetupRoute → no user, redirecting to /");
-      setLocation("/");
-    } else if (profile) {
-      console.log("[Route] SetupRoute → profile exists, redirecting to /dashboard");
-      setLocation("/dashboard");
-    }
-  }, [user, profile, loading]);
 
   if (loading) return <LoadingScreen />;
-  if (!user || profile) return null; // redirecting
+  if (!user) {
+    console.log("[Route] SetupRoute → no user, /");
+    return <Redirect to="/" />;
+  }
+  if (profile) {
+    console.log("[Route] SetupRoute → profile exists, /dashboard");
+    return <Redirect to="/dashboard" />;
+  }
   return <>{children}</>;
 }
 
-/**
- * PrivateRoute — for all authenticated pages.
- * If no user → /
- * If no profile → /setup-profile
- */
+/** All private pages — require user + profile */
 export function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
-  const [, setLocation] = useLocation();
-
-  useEffect(() => {
-    if (loading) return;
-    if (!user) {
-      console.log("[Route] PrivateRoute → no user, redirecting to /");
-      setLocation("/");
-    } else if (!profile) {
-      console.log("[Route] PrivateRoute → no profile, redirecting to /setup-profile");
-      setLocation("/setup-profile");
-    }
-  }, [user, profile, loading]);
 
   if (loading) return <LoadingScreen />;
-  if (!user) return null;
-  if (!profile) return <LoadingScreen />;
+  if (!user) {
+    console.log("[Route] PrivateRoute → no user, /");
+    return <Redirect to="/" />;
+  }
+  if (!profile) {
+    console.log("[Route] PrivateRoute → no profile, /setup-profile");
+    return <Redirect to="/setup-profile" />;
+  }
   return <>{children}</>;
 }
 
-/**
- * AdminRoute — like PrivateRoute but also requires admin role.
- * Non-admins get the Admin component which shows its own login form.
- */
-export function AdminRoute({ children }: { children: React.ReactNode }) {
+const ADMIN_SESSION = "admin_session_v1";
+
+/** /admin/dashboard — admin role OR hardcoded session */
+export function AdminDashboardRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
-  const [, setLocation] = useLocation();
+  const hasSession = sessionStorage.getItem(ADMIN_SESSION) === "1";
 
-  useEffect(() => {
-    if (loading) return;
-    if (!user) {
-      console.log("[Route] AdminRoute → no user, redirecting to /");
-      setLocation("/");
-    }
-  }, [user, loading]);
+  if (loading && !hasSession) return <LoadingScreen />;
 
-  if (loading) return <LoadingScreen />;
-  if (!user) return null;
-  if (!profile) return <LoadingScreen />;
+  const isAdmin =
+    hasSession ||
+    (user && profile?.role === "admin");
+
+  if (!isAdmin) {
+    console.log("[Route] AdminDashboardRoute → no access, /admin");
+    return <Redirect to="/admin" />;
+  }
   return <>{children}</>;
 }

@@ -1,8 +1,8 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
-  useRef,
   useState,
 } from "react";
 import {
@@ -22,27 +22,27 @@ export interface UserProfile {
   grade: number;
   role: "user" | "admin";
   createdAt: string;
-  photoURL?: string;
 }
 
-interface AuthContextType {
+interface AuthState {
   user: FirebaseUser | null;
   profile: UserProfile | null;
   loading: boolean;
+}
+
+interface AuthContextType extends AuthState {
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
   setProfile: (p: UserProfile | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-async function fetchProfileOnce(uid: string): Promise<UserProfile | null> {
-  console.log("[Auth] Fetching Firestore profile for uid:", uid);
+async function fetchProfile(uid: string): Promise<UserProfile | null> {
   try {
     const snap = await getDoc(doc(db, "users", uid));
     if (!snap.exists()) {
-      console.log("[Auth] Profile not found in Firestore");
+      console.log("[Auth] Profile: not found in Firestore");
       return null;
     }
     const d = snap.data();
@@ -54,22 +54,26 @@ async function fetchProfileOnce(uid: string): Promise<UserProfile | null> {
       grade: d.grade ?? 0,
       role: d.role === "admin" ? "admin" : "user",
       createdAt:
-        typeof d.createdAt === "string" ? d.createdAt : new Date().toISOString(),
-      photoURL: d.photoURL,
+        typeof d.createdAt === "string"
+          ? d.createdAt
+          : new Date().toISOString(),
     };
     console.log("[Auth] Profile found:", profile.name, "| role:", profile.role);
     return profile;
   } catch (err) {
-    console.error("[Auth] Firestore fetch error:", err);
+    console.error("[Auth] Firestore error:", err);
     return null;
   }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const fetchingRef = useRef(false);
+  // Single atomic state — prevents any intermediate render where
+  // e.g. user=X but loading=false and profile=null simultaneously
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    profile: null,
+    loading: true,
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -77,30 +81,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!mounted) return;
-      if (fetchingRef.current) return;
 
       if (firebaseUser) {
-        console.log("[Auth] User found:", firebaseUser.email);
-        fetchingRef.current = true;
-        setUser(firebaseUser);
-
-        const p = await fetchProfileOnce(firebaseUser.uid);
+        console.log("[Auth] User:", firebaseUser.email);
+        const p = await fetchProfile(firebaseUser.uid);
         if (!mounted) return;
-
-        setProfile(p);
-        setLoading(false);
-        fetchingRef.current = false;
-
-        if (p) {
-          console.log("[Auth] → Profile exists. Ready for /dashboard.");
-        } else {
-          console.log("[Auth] → No profile. Redirecting to /setup-profile.");
-        }
+        console.log("[Auth] Profile:", p ? p.name : "null");
+        // One render — all three values land together
+        setState({ user: firebaseUser, profile: p, loading: false });
       } else {
-        console.log("[Auth] No user. Redirecting to /login.");
-        setUser(null);
-        setProfile(null);
-        setLoading(false);
+        console.log("[Auth] No user signed in");
+        setState({ user: null, profile: null, loading: false });
       }
     });
 
@@ -110,11 +101,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const refreshProfile = async () => {
-    if (!user) return;
-    const p = await fetchProfileOnce(user.uid);
-    setProfile(p);
-  };
+  // Used by Onboarding after saving to Firestore
+  const setProfile = useCallback((p: UserProfile | null) => {
+    setState((prev) => ({ ...prev, profile: p }));
+  }, []);
 
   const signInWithGoogle = async () => {
     try {
@@ -124,30 +114,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (
         code === "auth/popup-closed-by-user" ||
         code === "auth/cancelled-popup-request"
-      ) {
+      )
         return;
-      }
       throw err;
     }
   };
 
   const signOut = async () => {
     await firebaseSignOut(auth);
-    setUser(null);
-    setProfile(null);
+    setState({ user: null, profile: null, loading: false });
   };
 
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        profile,
-        loading,
-        signInWithGoogle,
-        signOut,
-        refreshProfile,
-        setProfile,
-      }}
+      value={{ ...state, signInWithGoogle, signOut, setProfile }}
     >
       {children}
     </AuthContext.Provider>
