@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
-import { Layout } from "@/components/Layout";
 import { SoftGate } from "@/components/SoftGate";
 import { Send, MessageCircle, Sparkles } from "lucide-react";
 
@@ -162,11 +161,9 @@ export default function NepAi() {
         <meta name="description" content="Ask Nep AI any academic question. Get instant answers for Grade 9–12 subjects in Nepal." />
         <meta property="og:title" content="Nep AI — Student Hub" />
       </Helmet>
-      <Layout>
-        <SoftGate feature="Nep AI">
-          <NepAiContent />
-        </SoftGate>
-      </Layout>
+      <SoftGate feature="Nep AI">
+        <NepAiContent />
+      </SoftGate>
     </>
   );
 }

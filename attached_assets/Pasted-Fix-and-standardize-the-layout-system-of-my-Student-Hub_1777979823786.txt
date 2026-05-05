@@ -1,0 +1,146 @@
+Fix and standardize the layout system of my "Student Hub" React + Firebase app.
+
+THIS IS A LAYOUT ARCHITECTURE RESET.
+
+---
+
+# 🌐 1. PUBLIC LAYOUT (BEFORE LOGIN/REGISTER)
+
+ONLY public pages should use HEADER.
+
+Public pages:
+- "/"
+- "/notes/*"
+- "/pyq/*"
+- "/about"
+- "/contact"
+
+HEADER MUST INCLUDE:
+- Home
+- Notes
+- PYQ
+- About
+- Contact
+- Register button (NOT login anywhere)
+
+---
+
+# 🔐 2. AFTER REGISTER → SWITCH LAYOUT SYSTEM
+
+After user registers/logs in:
+
+❌ REMOVE HEADER COMPLETELY
+❌ DO NOT show public navigation
+
+Switch to DASHBOARD LAYOUT.
+
+---
+
+# 💻 3. DESKTOP DASHBOARD LAYOUT (IMPORTANT)
+
+On desktop ONLY:
+
+Use LEFT SIDEBAR layout:
+
+Sidebar includes:
+- Dashboard
+- Notes
+- PYQ
+- Nep AI
+- Pomodoro
+- To-do
+- MCQ
+- Leaderboard
+
+This sidebar must be:
+- persistent
+- always visible
+- main navigation system
+
+---
+
+# 📱 4. MOBILE DASHBOARD LAYOUT (IMPORTANT)
+
+On mobile ONLY:
+
+Replace sidebar with BOTTOM NAVIGATION:
+
+Tabs:
+- Home
+- Notes
+- PYQ
+- Tools
+- Profile
+
+Must be:
+- fixed bottom
+- smooth transitions
+- app-like experience
+
+---
+
+# 🏠 5. DASHBOARD HOME (AFTER LOGIN)
+
+Landing page after login/register must be:
+
+Dashboard showing:
+- Welcome message with user name
+- Streak system
+- Quick access cards
+- Recent activity
+
+---
+
+# 🔄 6. LAYOUT SWITCH RULE (CRITICAL)
+
+System must follow:
+
+IF user NOT logged in:
+→ PUBLIC HEADER layout
+
+IF user logged in:
+→ DASHBOARD LAYOUT ONLY
+→ NO HEADER ANYWHERE
+
+---
+
+# 🚫 7. DO NOT ALLOW MIXING
+
+DO NOT:
+- show header inside dashboard
+- show sidebar on public pages
+- mix layouts between states
+- keep login UI after login
+
+---
+
+# 🔴 8. /ADMIN FIX (KEEP SEPARATE)
+
+- /admin must NOT use either layout
+- It must be completely independent system
+
+Routes:
+
+/admin → admin login  
+/admin/dashboard → admin panel  
+
+---
+
+# 🎯 FINAL RESULT
+
+SYSTEM BEHAVIOR:
+
+PUBLIC:
+→ header navigation
+
+LOGGED IN:
+→ sidebar (desktop)
+→ bottom nav (mobile)
+→ no header at all
+
+ADMIN:
+→ separate system
+
+---
+
+END

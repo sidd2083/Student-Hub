@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { Layout } from "@/components/Layout";
 import { SoftGate } from "@/components/SoftGate";
 import { useListScores, getListScoresQueryKey } from "@workspace/api-client-react";
 import { Trophy } from "lucide-react";
@@ -86,11 +85,9 @@ export default function Leaderboard() {
         <title>Leaderboard — Student Hub</title>
         <meta name="description" content="Top MCQ scorers on Student Hub. Daily and all-time leaderboard for Grade 9–12 students." />
       </Helmet>
-      <Layout>
-        <SoftGate feature="the leaderboard">
-          <LeaderboardContent />
-        </SoftGate>
-      </Layout>
+      <SoftGate feature="the leaderboard">
+        <LeaderboardContent />
+      </SoftGate>
     </>
   );
 }

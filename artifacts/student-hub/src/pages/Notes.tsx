@@ -2,8 +2,6 @@ import { useState, useRef, useCallback } from "react";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { Layout } from "@/components/Layout";
-import { PublicLayout } from "@/components/PublicLayout";
 import { useListNotes, useListNoteSubjects, getListNotesQueryKey } from "@workspace/api-client-react";
 import { BookOpen, ChevronRight, FileText, Image, Type, X, ExternalLink, ZoomIn, LogIn } from "lucide-react";
 
@@ -246,37 +244,18 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
 }
 
 export default function Notes() {
-  const { user, loading } = useAuth();
-
-  const meta = (
-    <Helmet>
-      <title>Study Notes — Grade 9, 10, 11, 12 | Student Hub</title>
-      <meta name="description" content="Free study notes for Nepal students in Grades 9–12. Browse by subject and chapter. PDF, image, and text notes available." />
-      <meta name="keywords" content="grade 10 notes nepal, SEE notes, NEB notes, science notes, maths notes, class 10 notes" />
-      <meta property="og:title" content="Study Notes — Student Hub" />
-      <meta property="og:description" content="Free study notes for Grade 9–12 students in Nepal." />
-    </Helmet>
-  );
-
-  if (loading) return null;
-
-  if (!user) {
-    return (
-      <>
-        {meta}
-        <PublicLayout>
-          <NotesContent isLoggedIn={false} />
-        </PublicLayout>
-      </>
-    );
-  }
+  const { user } = useAuth();
 
   return (
     <>
-      {meta}
-      <Layout>
-        <NotesContent isLoggedIn={true} />
-      </Layout>
+      <Helmet>
+        <title>Study Notes — Grade 9, 10, 11, 12 | Student Hub</title>
+        <meta name="description" content="Free study notes for Nepal students in Grades 9–12. Browse by subject and chapter. PDF, image, and text notes available." />
+        <meta name="keywords" content="grade 10 notes nepal, SEE notes, NEB notes, science notes, maths notes, class 10 notes" />
+        <meta property="og:title" content="Study Notes — Student Hub" />
+        <meta property="og:description" content="Free study notes for Grade 9–12 students in Nepal." />
+      </Helmet>
+      <NotesContent isLoggedIn={!!user} />
     </>
   );
 }

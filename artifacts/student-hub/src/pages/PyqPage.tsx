@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useListPyqs } from "@workspace/api-client-react";
-import { PublicLayout } from "@/components/PublicLayout";
 import { ArrowLeft, FileText, Image, ExternalLink, X, BookOpen } from "lucide-react";
 
 function toSlug(str: string) {
@@ -39,7 +38,7 @@ export default function PyqPage() {
         </Helmet>
       )}
 
-      <PublicLayout>
+      <>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
           {/* Breadcrumb */}
           <nav className="flex items-center gap-2 text-sm text-gray-400 mb-6 flex-wrap">
@@ -167,7 +166,7 @@ export default function PyqPage() {
             </>
           )}
         </div>
-      </PublicLayout>
+      </>
     </>
   );
 }

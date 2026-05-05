@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { Layout } from "@/components/Layout";
 import { SoftGate } from "@/components/SoftGate";
 import { useListMcqs, useListNoteSubjects, useSubmitScore, getListMcqsQueryKey } from "@workspace/api-client-react";
 import { Brain, CheckCircle, XCircle, Lightbulb } from "lucide-react";
@@ -215,11 +214,9 @@ export default function McqPractice() {
         <title>MCQ Practice — Student Hub</title>
         <meta name="description" content="Practice multiple-choice questions by grade and subject. Improve your SEE and NEB exam scores." />
       </Helmet>
-      <Layout>
-        <SoftGate feature="MCQ Practice">
-          <McqContent />
-        </SoftGate>
-      </Layout>
+      <SoftGate feature="MCQ Practice">
+        <McqContent />
+      </SoftGate>
     </>
   );
 }

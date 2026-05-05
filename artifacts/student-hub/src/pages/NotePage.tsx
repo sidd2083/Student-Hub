@@ -2,7 +2,6 @@ import { useRef, useCallback, useState } from "react";
 import { useParams, Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useGetNote } from "@workspace/api-client-react";
-import { PublicLayout } from "@/components/PublicLayout";
 import { ArrowLeft, FileText, Image, Type, ExternalLink, ZoomIn, X, BookOpen } from "lucide-react";
 
 function toSlug(str: string) {
@@ -47,7 +46,7 @@ export default function NotePage() {
         </Helmet>
       )}
 
-      <PublicLayout>
+      <>
         {/* Scroll progress */}
         <div className="h-1 bg-gray-100 fixed top-14 left-0 right-0 z-20">
           <div className="h-full bg-blue-500 transition-all duration-150" style={{ width: `${scrollPct}%` }} />
@@ -203,7 +202,7 @@ export default function NotePage() {
             </div>
           )}
         </div>
-      </PublicLayout>
+      </>
     </>
   );
 }

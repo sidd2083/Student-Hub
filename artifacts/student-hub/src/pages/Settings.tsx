@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { Layout } from "@/components/Layout";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { User, Sun, Moon, Shield, Check } from "lucide-react";
@@ -70,8 +69,7 @@ export default function Settings() {
         <title>Settings — Student Hub</title>
         <meta name="description" content="Manage your Student Hub profile, grade, and appearance settings." />
       </Helmet>
-      <Layout>
-        <div className="p-4 sm:p-8 max-w-2xl mx-auto">
+      <div className="p-4 sm:p-8 max-w-2xl mx-auto">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Settings</h1>
             <p className="text-gray-500 text-sm">Manage your account and preferences</p>
@@ -167,7 +165,6 @@ export default function Settings() {
             </div>
           </div>
         </div>
-      </Layout>
     </>
   );
 }

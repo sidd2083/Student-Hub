@@ -2,8 +2,6 @@ import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { Layout } from "@/components/Layout";
-import { PublicLayout } from "@/components/PublicLayout";
 import { useListPyqs, getListPyqsQueryKey } from "@workspace/api-client-react";
 import { FileText, Image, Search, X, ExternalLink, Filter, LogIn } from "lucide-react";
 
@@ -249,37 +247,18 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
 }
 
 export default function Pyqs() {
-  const { user, loading } = useAuth();
-
-  const meta = (
-    <Helmet>
-      <title>Previous Year Questions (PYQ) — Grade 9, 10, 11, 12 | Student Hub</title>
-      <meta name="description" content="Free previous year exam papers for Nepal students in Grades 9–12. Browse by grade, subject, and year. PDF and image formats available." />
-      <meta name="keywords" content="PYQ nepal, previous year questions, SEE question paper, NEB past paper, grade 10 exam paper" />
-      <meta property="og:title" content="Previous Year Questions — Student Hub" />
-      <meta property="og:description" content="Free PYQs for Grade 9–12 students in Nepal. Browse by grade, subject, and year." />
-    </Helmet>
-  );
-
-  if (loading) return null;
-
-  if (!user) {
-    return (
-      <>
-        {meta}
-        <PublicLayout>
-          <PyqsContent isLoggedIn={false} />
-        </PublicLayout>
-      </>
-    );
-  }
+  const { user } = useAuth();
 
   return (
     <>
-      {meta}
-      <Layout>
-        <PyqsContent isLoggedIn={true} />
-      </Layout>
+      <Helmet>
+        <title>Previous Year Questions (PYQ) — Grade 9, 10, 11, 12 | Student Hub</title>
+        <meta name="description" content="Free previous year exam papers for Nepal students in Grades 9–12. Browse by grade, subject, and year. PDF and image formats available." />
+        <meta name="keywords" content="PYQ nepal, previous year questions, SEE question paper, NEB past paper, grade 10 exam paper" />
+        <meta property="og:title" content="Previous Year Questions — Student Hub" />
+        <meta property="og:description" content="Free PYQs for Grade 9–12 students in Nepal. Browse by grade, subject, and year." />
+      </Helmet>
+      <PyqsContent isLoggedIn={!!user} />
     </>
   );
 }

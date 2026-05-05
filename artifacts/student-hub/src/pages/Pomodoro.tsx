@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { Layout } from "@/components/Layout";
 import { SoftGate } from "@/components/SoftGate";
 import { useListTasks, getListTasksQueryKey } from "@workspace/api-client-react";
 import { Play, Pause, RotateCcw, Timer, CheckSquare } from "lucide-react";
@@ -147,11 +146,9 @@ export default function Pomodoro() {
         <title>Pomodoro Timer — Student Hub</title>
         <meta name="description" content="Focus timer for study sessions. 25 or 50 minute sessions for Grade 9–12 students." />
       </Helmet>
-      <Layout>
-        <SoftGate feature="the Pomodoro timer">
-          <PomodoroContent />
-        </SoftGate>
-      </Layout>
+      <SoftGate feature="the Pomodoro timer">
+        <PomodoroContent />
+      </SoftGate>
     </>
   );
 }

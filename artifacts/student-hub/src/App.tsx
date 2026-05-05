@@ -6,8 +6,8 @@ import { AuthProvider } from "@/context/AuthContext";
 import {
   PrivateRoute,
   AdminDashboardRoute,
-  LoadingScreen,
 } from "@/components/ProtectedRoute";
+import { AppShell } from "@/components/AppShell";
 
 import Home from "@/pages/Home";
 import Login from "@/pages/Login";
@@ -38,44 +38,47 @@ const queryClient = new QueryClient({
 function Router() {
   return (
     <Switch>
-      {/* Public home — no login required */}
-      <Route path="/" component={Home} />
-      <Route path="/login" component={Login} />
-
-      {/* Setup */}
-      <Route path="/setup-profile" component={Onboarding} />
-      <Route path="/onboarding" component={Onboarding} />
-
-      {/* Fully public — SEO pages */}
-      <Route path="/notes/:id" component={NotePage} />
-      <Route path="/pyq/:id" component={PyqPage} />
-      <Route path="/notes" component={Notes} />
-      <Route path="/pyqs" component={Pyqs} />
-      <Route path="/about" component={About} />
-      <Route path="/contact" component={Contact} />
-
-      {/* Soft-gated pages — browsable by all, features locked behind login */}
-      <Route path="/ai" component={NepAi} />
-      <Route path="/mcq" component={McqPractice} />
-      <Route path="/todo" component={Todo} />
-      <Route path="/pomodoro" component={Pomodoro} />
-      <Route path="/leaderboard" component={Leaderboard} />
-
-      {/* Private pages — require login */}
-      <Route path="/dashboard">
-        <PrivateRoute><Dashboard /></PrivateRoute>
-      </Route>
-      <Route path="/settings">
-        <PrivateRoute><Settings /></PrivateRoute>
-      </Route>
-
-      {/* Admin */}
+      {/* ── Admin — completely independent, no layout ── */}
       <Route path="/admin" component={AdminLogin} />
       <Route path="/admin/dashboard">
         <AdminDashboardRoute><Admin /></AdminDashboardRoute>
       </Route>
 
-      <Route component={NotFound} />
+      {/* ── Standalone pages — no layout shell ── */}
+      <Route path="/login" component={Login} />
+      <Route path="/setup-profile" component={Onboarding} />
+      <Route path="/onboarding" component={Onboarding} />
+
+      {/* ── All other routes — AppShell selects layout based on auth ── */}
+      <Route>
+        <AppShell>
+          <Switch>
+            <Route path="/" component={Home} />
+
+            <Route path="/notes/:id" component={NotePage} />
+            <Route path="/pyq/:id" component={PyqPage} />
+            <Route path="/notes" component={Notes} />
+            <Route path="/pyqs" component={Pyqs} />
+            <Route path="/about" component={About} />
+            <Route path="/contact" component={Contact} />
+
+            <Route path="/ai" component={NepAi} />
+            <Route path="/mcq" component={McqPractice} />
+            <Route path="/todo" component={Todo} />
+            <Route path="/pomodoro" component={Pomodoro} />
+            <Route path="/leaderboard" component={Leaderboard} />
+
+            <Route path="/dashboard">
+              <PrivateRoute><Dashboard /></PrivateRoute>
+            </Route>
+            <Route path="/settings">
+              <PrivateRoute><Settings /></PrivateRoute>
+            </Route>
+
+            <Route component={NotFound} />
+          </Switch>
+        </AppShell>
+      </Route>
     </Switch>
   );
 }

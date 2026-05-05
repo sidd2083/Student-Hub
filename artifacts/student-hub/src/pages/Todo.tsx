@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { Layout } from "@/components/Layout";
 import { SoftGate } from "@/components/SoftGate";
 import {
   useListTasks, useCreateTask, useUpdateTask, useDeleteTask,
@@ -135,11 +134,9 @@ export default function Todo() {
         <title>To-Do — Student Hub</title>
         <meta name="description" content="Track your study tasks with Student Hub's built-in to-do list." />
       </Helmet>
-      <Layout>
-        <SoftGate feature="the To-Do list">
-          <TodoContent />
-        </SoftGate>
-      </Layout>
+      <SoftGate feature="the To-Do list">
+        <TodoContent />
+      </SoftGate>
     </>
   );
 }

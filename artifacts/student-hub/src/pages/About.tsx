@@ -1,6 +1,5 @@
 import { Helmet } from "react-helmet-async";
-import { Link } from "wouter";
-import { BookOpen, ArrowLeft, Users, Target, Mail } from "lucide-react";
+import { BookOpen, Users, Target, Mail } from "lucide-react";
 
 export default function About() {
   return (
@@ -13,24 +12,6 @@ export default function About() {
       </Helmet>
 
       <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-100 sticky top-0 z-30">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2 group">
-              <ArrowLeft className="w-4 h-4 text-gray-400 group-hover:text-gray-700 transition-colors" />
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-blue-500 rounded-lg flex items-center justify-center">
-                  <BookOpen className="w-3.5 h-3.5 text-white" />
-                </div>
-                <span className="text-base font-semibold text-gray-900">Student Hub</span>
-              </div>
-            </Link>
-            <Link href="/login" className="px-4 py-1.5 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-all">
-              Login
-            </Link>
-          </div>
-        </header>
-
         <main className="max-w-4xl mx-auto px-4 sm:px-6 py-12">
           <div className="text-center mb-12">
             <div className="w-16 h-16 bg-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -107,3 +88,4 @@ export default function About() {
     </>
   );
 }
+
