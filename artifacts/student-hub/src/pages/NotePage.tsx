@@ -1,8 +1,17 @@
-import { useRef, useCallback, useState } from "react";
+import { useRef, useCallback, useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useGetNote } from "@workspace/api-client-react";
 import { ArrowLeft, FileText, Image, Type, ExternalLink, ZoomIn, X, BookOpen } from "lucide-react";
+import { db } from "@/lib/firebase";
+import { getDoc, doc } from "firebase/firestore";
+
+interface SeoMeta {
+  seoTitle: string;
+  description: string;
+  keywords: string;
+  noIndex: boolean;
+}
 
 function toSlug(str: string) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -13,12 +22,20 @@ export default function NotePage() {
   const id = Number(params.id);
   const [imgZoomed, setImgZoomed] = useState(false);
   const [scrollPct, setScrollPct] = useState(0);
+  const [seoMeta, setSeoMeta] = useState<SeoMeta | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: note, isLoading, isError } = useGetNote(
     id,
     { query: { enabled: !isNaN(id) && id > 0 } }
   );
+
+  useEffect(() => {
+    if (!id || isNaN(id)) return;
+    getDoc(doc(db, "seo_meta", `note_${id}`))
+      .then(snap => { if (snap.exists()) setSeoMeta(snap.data() as SeoMeta); })
+      .catch(() => {});
+  }, [id]);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -33,18 +50,27 @@ export default function NotePage() {
     ? `grade-${note.grade}-${toSlug(note.subject)}-${toSlug(note.title)}`
     : "";
 
+  const metaTitle = seoMeta?.seoTitle || (note
+    ? `${note.title} — Grade ${note.grade} ${note.subject} Notes | Student Hub`
+    : "Note | Student Hub");
+  const metaDesc = seoMeta?.description || (note
+    ? `Study notes for ${note.subject}, Grade ${note.grade} — ${note.chapter}. ${note.contentType === "text" ? note.content.slice(0, 120) + "…" : "Download or view the PDF/image."}`
+    : "");
+  const metaKeywords = seoMeta?.keywords || (note
+    ? `${note.subject} notes, grade ${note.grade} notes, ${note.chapter}, Nepal SEE NEB notes`
+    : "");
+
   return (
     <>
-      {note && (
-        <Helmet>
-          <title>{note.title} — Grade {note.grade} {note.subject} Notes | Student Hub</title>
-          <meta name="description" content={`Study notes for ${note.subject}, Grade ${note.grade} — ${note.chapter}. ${note.contentType === "text" ? note.content.slice(0, 120) + "…" : "Download or view the PDF/image."}`} />
-          <meta name="keywords" content={`${note.subject} notes, grade ${note.grade} notes, ${note.chapter}, Nepal SEE NEB notes`} />
-          <meta property="og:title" content={`${note.title} — Student Hub`} />
-          <meta property="og:description" content={`${note.subject} | Grade ${note.grade} | ${note.chapter}`} />
-          <link rel="canonical" href={`https://studenthub.np/notes/${id}-${canonicalSlug}`} />
-        </Helmet>
-      )}
+      <Helmet>
+        <title>{metaTitle}</title>
+        {metaDesc && <meta name="description" content={metaDesc} />}
+        {metaKeywords && <meta name="keywords" content={metaKeywords} />}
+        {seoMeta?.noIndex && <meta name="robots" content="noindex,nofollow" />}
+        {note && <meta property="og:title" content={seoMeta?.seoTitle || `${note.title} — Student Hub`} />}
+        {metaDesc && <meta property="og:description" content={metaDesc} />}
+        {note && <link rel="canonical" href={`https://studenthub.np/notes/${id}-${canonicalSlug}`} />}
+      </Helmet>
 
       <>
         {/* Scroll progress */}
@@ -112,6 +138,24 @@ export default function NotePage() {
                     <h1 className="text-lg sm:text-xl font-bold text-gray-900 leading-snug">{note.title}</h1>
                   </div>
                 </div>
+              </div>
+
+              {/* Back / See other notes bar */}
+              <div className="flex items-center gap-4 mb-4">
+                <Link
+                  href="/notes"
+                  className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 transition-colors"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Back to Notes
+                </Link>
+                <span className="text-gray-200">|</span>
+                <Link
+                  href="/notes"
+                  className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 transition-colors"
+                >
+                  See other {note.subject} notes
+                </Link>
               </div>
 
               {/* Content */}

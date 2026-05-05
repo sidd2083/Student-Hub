@@ -2,18 +2,18 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import {
-  useGetUserStats,
   useListNotes, useCreateNote, useDeleteNote,
   useListMcqs, useCreateMcq, useDeleteMcq,
   useListPyqs, useCreatePyq, useDeletePyq,
   useListScores, useResetScores,
   getListNotesQueryKey, getListMcqsQueryKey,
-  getListPyqsQueryKey, getListScoresQueryKey, getGetUserStatsQueryKey,
+  getListPyqsQueryKey, getListScoresQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard, BookOpen, Brain, FileText, Users, Trophy,
   Shield, Plus, Trash2, LogOut, Megaphone, Upload, X, Image,
+  CheckCircle, AlertCircle,
 } from "lucide-react";
 import {
   collection, addDoc, getDocs, deleteDoc,
@@ -130,28 +130,59 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 
 // ─── Admin Overview ────────────────────────────────────────────────────────
 
+interface FSUserSummary { uid: string; grade: number; role: string; createdAt: string }
+
 function AdminOverview() {
-  const { data: stats } = useGetUserStats({ query: { queryKey: getGetUserStatsQueryKey() } });
+  const { data: noteStats } = useListNotes({}, { query: { queryKey: getListNotesQueryKey({}) } });
+  const { data: mcqStats }  = useListMcqs({},  { query: { queryKey: getListMcqsQueryKey({})  } });
+  const { data: pyqStats }  = useListPyqs({},  { query: { queryKey: getListPyqsQueryKey({})  } });
+  const [users, setUsers]   = useState<FSUserSummary[]>([]);
+
+  useEffect(() => {
+    getDocs(collection(db, "users"))
+      .then(snap => setUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() } as FSUserSummary))))
+      .catch(console.error);
+  }, []);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const admins   = users.filter(u => u.role === "admin").length;
+  const newToday = users.filter(u => u.createdAt?.slice(0, 10) === today).length;
+  const byGrade  = users.reduce<Record<number, number>>((acc, u) => {
+    if (u.grade) acc[u.grade] = (acc[u.grade] || 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <div>
       <h2 className="text-xl font-bold text-gray-900 mb-6">Overview</h2>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total Users" value={stats?.total || 0} />
-        <StatCard label="Admins" value={stats?.admins || 0} />
-        <StatCard label="New Today" value={stats?.newToday || 0} />
-        <StatCard label="Grades" value={Object.keys(stats?.byGrade || {}).length} />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <StatCard label="Total Users"  value={users.length} />
+        <StatCard label="Admins"       value={admins}       />
+        <StatCard label="New Today"    value={newToday}     />
+        <StatCard label="Notes in DB"  value={noteStats?.length || 0} />
       </div>
-      {stats?.byGrade && (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatCard label="MCQs in DB"   value={mcqStats?.length || 0} />
+        <StatCard label="PYQs in DB"   value={pyqStats?.length || 0} />
+        <StatCard label="Grades Active" value={Object.keys(byGrade).length} />
+        <StatCard label="Non-Admin Users" value={users.length - admins} />
+      </div>
+      {Object.keys(byGrade).length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h3 className="font-medium text-gray-700 mb-4">Users by Grade</h3>
-          <div className="flex gap-4">
-            {Object.entries(stats.byGrade).map(([g, c]) => (
-              <div key={g} className="flex-1 text-center p-3 bg-blue-50 rounded-xl">
-                <p className="text-2xl font-bold text-blue-600">{c as number}</p>
+          <h3 className="font-medium text-gray-700 mb-4">Users by Grade (Firestore)</h3>
+          <div className="flex gap-4 flex-wrap">
+            {Object.entries(byGrade).sort(([a], [b]) => Number(a) - Number(b)).map(([g, c]) => (
+              <div key={g} className="flex-1 min-w-[80px] text-center p-3 bg-blue-50 rounded-xl">
+                <p className="text-2xl font-bold text-blue-600">{c}</p>
                 <p className="text-xs text-gray-500 mt-1">Grade {g}</p>
               </div>
             ))}
           </div>
+        </div>
+      )}
+      {users.length === 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 text-center text-gray-400 text-sm">
+          No users yet — they appear here after signing in with Google.
         </div>
       )}
     </div>
@@ -166,13 +197,15 @@ function ManageNotes() {
   const createNote = useCreateNote();
   const deleteNote = useDeleteNote();
   const [show, setShow] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
+  const [saveMsg, setSaveMsg] = useState("");
   const [form, setForm] = useState({
     grade: 10, subject: "", chapter: "", title: "",
     contentType: "text" as "text" | "pdf" | "image",
     content: "",
   });
   const inv = () => qc.invalidateQueries({ queryKey: getListNotesQueryKey({}) });
-  const reset = () => { setShow(false); setForm({ grade: 10, subject: "", chapter: "", title: "", contentType: "text", content: "" }); };
+  const reset = () => { setShow(false); setForm({ grade: 10, subject: "", chapter: "", title: "", contentType: "text", content: "" }); setSaveStatus("idle"); };
 
   return (
     <div>
@@ -240,11 +273,38 @@ function ManageNotes() {
             </div>
           )}
 
+          {saveStatus === "success" && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm mb-2">
+              <CheckCircle className="w-4 h-4 flex-shrink-0" /> {saveMsg}
+            </div>
+          )}
+          {saveStatus === "error" && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm mb-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" /> {saveMsg}
+            </div>
+          )}
           <div className="flex gap-2">
             <button
               onClick={() => {
-                if (!form.subject || !form.chapter || !form.title || !form.content) return;
-                createNote.mutate({ data: { ...form, content: form.content } }, { onSuccess: () => { reset(); inv(); } });
+                if (!form.subject || !form.chapter || !form.title || !form.content) {
+                  setSaveStatus("error"); setSaveMsg("Please fill in all required fields."); return;
+                }
+                setSaveStatus("idle");
+                createNote.mutate(
+                  { data: { ...form, content: form.content } },
+                  {
+                    onSuccess: () => {
+                      setSaveStatus("success");
+                      setSaveMsg(`Note "${form.title}" saved successfully!`);
+                      inv();
+                      setTimeout(() => reset(), 1800);
+                    },
+                    onError: (err: Error) => {
+                      setSaveStatus("error");
+                      setSaveMsg(err?.message || "Failed to save note. Please try again.");
+                    },
+                  }
+                );
               }}
               disabled={createNote.isPending || !form.content}
               className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50"

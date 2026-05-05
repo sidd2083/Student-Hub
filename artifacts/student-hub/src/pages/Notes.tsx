@@ -62,10 +62,33 @@ function NoteViewer({ note, onClose }: { note: NoteView; onClose: () => void }) 
             </div>
             <h2 className="text-lg sm:text-xl font-bold text-gray-900 leading-snug">{note.title}</h2>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-all flex-shrink-0">
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Link
+              href={`/notes/${note.id}`}
+              onClick={onClose}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition-all"
+            >
+              <ExternalLink className="w-3 h-3" />
+              View Full Note
+            </Link>
+            <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-all">
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
         </div>
+        {/* Mobile "View Full Note" bar */}
+        <div className="sm:hidden flex items-center justify-between px-4 py-2 bg-blue-50 border-b border-blue-100 flex-shrink-0">
+          <span className="text-xs text-blue-700">Reading preview</span>
+          <Link
+            href={`/notes/${note.id}`}
+            onClick={onClose}
+            className="flex items-center gap-1 text-xs font-semibold text-blue-600"
+          >
+            <ExternalLink className="w-3 h-3" />
+            View Full Note
+          </Link>
+        </div>
+
         <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto">
           {note.contentType === "text" && (
             <div className="max-w-2xl mx-auto px-4 sm:px-8 py-8 sm:py-10">

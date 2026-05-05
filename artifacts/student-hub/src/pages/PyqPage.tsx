@@ -29,7 +29,7 @@ export default function PyqPage() {
     <>
       {pyq && (
         <Helmet>
-          <title>{pyq.title} — Grade {pyq.grade} {pyq.subject} PYQ {pyq.year} | Student Hub</title>
+          <title>{`${pyq.title} — Grade ${pyq.grade} ${pyq.subject} PYQ ${pyq.year} | Student Hub`}</title>
           <meta name="description" content={`Previous year question paper: ${pyq.subject}, Grade ${pyq.grade}, ${pyq.year}. ${pyq.title}. Free to view and download.`} />
           <meta name="keywords" content={`${pyq.subject} PYQ, grade ${pyq.grade} past paper, ${pyq.year} exam paper, Nepal SEE NEB question paper`} />
           <meta property="og:title" content={`${pyq.title} — Student Hub`} />
