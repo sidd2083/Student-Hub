@@ -1,6 +1,14 @@
-import { Link } from "wouter";
-import { BookOpen, Menu, X, UserPlus } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { BookOpen, Menu, X, UserPlus, Home, FileText, Wrench, User, ArrowLeft } from "lucide-react";
 import { useState } from "react";
+
+const mobileBottomNav = [
+  { href: "/",      icon: Home,      label: "Home"    },
+  { href: "/notes", icon: BookOpen,  label: "Notes"   },
+  { href: "/pyqs",  icon: FileText,  label: "PYQ"     },
+  { href: "/mcq",   icon: Wrench,    label: "Tools"   },
+  { href: "/login", icon: User,      label: "Profile" },
+];
 
 interface PublicLayoutProps {
   children: React.ReactNode;
@@ -8,23 +16,43 @@ interface PublicLayoutProps {
 
 export function PublicLayout({ children }: PublicLayoutProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [location] = useLocation();
+
+  const isHome = location === "/" || location === "";
+  const isActive = (href: string) =>
+    href === "/" ? location === "/" || location === "" : location.startsWith(href);
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* ── Desktop + Mobile Header ── */}
       <header className="bg-white border-b border-gray-100 sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-blue-500 rounded-lg flex items-center justify-center">
-              <BookOpen className="w-3.5 h-3.5 text-white" />
-            </div>
-            <span className="text-base font-semibold text-gray-900">Student Hub</span>
-          </Link>
+          {/* Left: logo or back button on mobile */}
+          <div className="flex items-center gap-3">
+            {/* Mobile back button (all pages except home) */}
+            {!isHome && (
+              <button
+                onClick={() => window.history.back()}
+                className="md:hidden flex items-center justify-center w-8 h-8 rounded-xl hover:bg-gray-100 transition-all"
+                aria-label="Go back"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+            )}
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-blue-500 rounded-lg flex items-center justify-center">
+                <BookOpen className="w-3.5 h-3.5 text-white" />
+              </div>
+              <span className="text-base font-semibold text-gray-900">Student Hub</span>
+            </Link>
+          </div>
 
+          {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
-            <Link href="/" className="hover:text-blue-600 transition-colors">Home</Link>
-            <Link href="/notes" className="hover:text-blue-600 transition-colors">Notes</Link>
-            <Link href="/pyqs" className="hover:text-blue-600 transition-colors">PYQ</Link>
-            <Link href="/about" className="hover:text-blue-600 transition-colors">About</Link>
+            <Link href="/"        className="hover:text-blue-600 transition-colors">Home</Link>
+            <Link href="/notes"   className="hover:text-blue-600 transition-colors">Notes</Link>
+            <Link href="/pyqs"    className="hover:text-blue-600 transition-colors">PYQ</Link>
+            <Link href="/about"   className="hover:text-blue-600 transition-colors">About</Link>
             <Link href="/contact" className="hover:text-blue-600 transition-colors">Contact</Link>
           </nav>
 
@@ -45,14 +73,15 @@ export function PublicLayout({ children }: PublicLayoutProps) {
           </div>
         </div>
 
+        {/* Mobile dropdown menu */}
         {menuOpen && (
           <div className="md:hidden bg-white border-t border-gray-100 px-4 py-3 space-y-1">
             {[
-              { href: "/",        label: "Home"                   },
-              { href: "/notes",   label: "Notes"                  },
-              { href: "/pyqs",    label: "PYQ"                    },
-              { href: "/about",   label: "About"                  },
-              { href: "/contact", label: "Contact"                },
+              { href: "/",        label: "Home"    },
+              { href: "/notes",   label: "Notes"   },
+              { href: "/pyqs",    label: "PYQ"     },
+              { href: "/about",   label: "About"   },
+              { href: "/contact", label: "Contact" },
             ].map(({ href, label }) => (
               <Link
                 key={href}
@@ -75,9 +104,11 @@ export function PublicLayout({ children }: PublicLayoutProps) {
         )}
       </header>
 
-      <main>{children}</main>
+      {/* Page content — pb-20 on mobile to clear bottom nav */}
+      <main className="pb-20 md:pb-0">{children}</main>
 
-      <div className="bg-blue-600 py-10 mt-16">
+      {/* Desktop CTA + footer */}
+      <div className="hidden md:block bg-blue-600 py-10 mt-16">
         <div className="max-w-2xl mx-auto px-4 text-center">
           <h2 className="text-xl font-bold text-white mb-2">Get Full Access — Free</h2>
           <p className="text-blue-100 text-sm mb-5">
@@ -93,7 +124,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
         </div>
       </div>
 
-      <footer className="bg-gray-900 py-8">
+      <footer className="hidden md:block bg-gray-900 py-8">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 bg-blue-500 rounded-md flex items-center justify-center">
@@ -111,6 +142,26 @@ export function PublicLayout({ children }: PublicLayoutProps) {
           <p className="text-xs text-gray-500">© {new Date().getFullYear()} Student Hub. Built by Siddhant Lamichhane.</p>
         </div>
       </footer>
+
+      {/* ── Mobile Bottom Navigation (fixed, all public pages) ── */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-lg z-40">
+        <div className="flex items-center justify-around h-16 px-2">
+          {mobileBottomNav.map(({ href, icon: Icon, label }) => {
+            const active = isActive(href);
+            return (
+              <Link key={href} href={href}>
+                <div className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all min-w-[52px] cursor-pointer ${
+                  active ? "text-blue-600" : "text-gray-400"
+                }`}>
+                  <Icon className={`w-5 h-5 transition-transform ${active ? "scale-110" : ""}`} />
+                  <span className="text-[10px] font-medium leading-tight">{label}</span>
+                  {active && <span className="w-1 h-1 bg-blue-500 rounded-full mt-0.5" />}
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

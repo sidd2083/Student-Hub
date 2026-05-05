@@ -64,7 +64,7 @@ async function fetchProfile(uid: string): Promise<ProfileResult> {
 // Paths that unauthenticated users can access without being redirected to /
 // Includes: home, login, public content, soft-gated tools (they see blur overlay)
 const PUBLIC_PATH_REGEX =
-  /^\/?$|^\/login|^\/notes|^\/pyqs|^\/pyq|^\/about|^\/contact|^\/ai|^\/mcq|^\/todo|^\/pomodoro|^\/leaderboard/;
+  /^\/?$|^\/login|^\/notes|^\/pyqs|^\/pyq|^\/about|^\/contact|^\/ai|^\/mcq|^\/todo|^\/pomodoro|^\/leaderboard|^\/admin/;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);

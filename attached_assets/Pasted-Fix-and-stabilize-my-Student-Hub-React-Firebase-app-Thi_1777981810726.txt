@@ -1,0 +1,197 @@
+Fix and stabilize my "Student Hub" React + Firebase app.
+
+This is a CRITICAL FIX request. Do NOT partially implement.
+
+---
+
+# 🔴 1. FIREBASE CONFIG FIX (NO CRASH)
+
+Current issue:
+- App crashes or throws error when Firebase env not set
+
+---
+
+## REQUIRED:
+
+1. Detect missing env variables:
+
+- VITE_FIREBASE_API_KEY
+- VITE_FIREBASE_AUTH_DOMAIN
+- VITE_FIREBASE_PROJECT_ID
+- VITE_FIREBASE_STORAGE_BUCKET
+- VITE_FIREBASE_MESSAGING_SENDER_ID
+- VITE_FIREBASE_APP_ID
+
+---
+
+2. If missing:
+
+- DO NOT throw error
+- DO NOT crash app
+
+Instead:
+
+- Show UI message:
+  "Firebase not configured. Please add credentials in Replit Secrets."
+
+- Disable login/register buttons
+
+- Log in console:
+  "Firebase config missing"
+
+---
+
+3. Once env is added:
+
+- App should work automatically without code change
+
+---
+
+# 🔴 2. /ADMIN ROUTE FIX (CRITICAL BUG)
+
+Current issue:
+- /admin redirects to home
+- admin login also redirects to home
+
+---
+
+## REQUIRED FIX:
+
+### RULE 1:
+- /admin MUST be completely independent
+
+### RULE 2:
+Routes:
+
+/admin → admin login page  
+/admin/dashboard → admin panel  
+
+---
+
+### RULE 3:
+REMOVE:
+
+- any navigate("/") affecting /admin
+- any global auth redirect
+- any useEffect redirect running on /admin
+
+---
+
+### RULE 4:
+Auth guard ONLY for:
+
+- /dashboard
+- user routes
+
+NOT for /admin
+
+---
+
+### RULE 5:
+After admin login:
+
+→ redirect ONLY to:
+/admin/dashboard
+
+---
+
+# 📱 3. MOBILE APP-LIKE EXPERIENCE (TOP PRIORITY)
+
+This is VERY IMPORTANT.
+
+Mobile users must feel like they are using an app.
+
+---
+
+## 🔻 BOTTOM NAVIGATION (MANDATORY)
+
+Add BOTTOM MENU on ALL pages (mobile only):
+
+Tabs:
+
+- Home
+- Notes
+- PYQ
+- Tools
+- Profile
+
+---
+
+### Rules:
+
+- position: fixed
+- bottom: 0
+- full width
+- visible on EVERY page
+- smooth transitions
+
+---
+
+## 🔝 BACK BUTTON (MANDATORY)
+
+On ALL pages (except home):
+
+Add top-left:
+
+← Back button
+
+Function:
+→ navigate(-1)
+
+---
+
+## 📱 MOBILE RULES:
+
+- NO horizontal scroll
+- Full-width layout
+- Padding: 16px
+- Font readable (16px+)
+- Touch-friendly buttons
+
+---
+
+## EXPERIENCE GOAL:
+
+User should feel:
+"This is a mobile app, not a website"
+
+---
+
+# 💻 4. DESKTOP (DO NOT BREAK)
+
+- Keep sidebar for dashboard
+- Clean layout
+- No mobile UI conflict
+
+---
+
+# ⚡ 5. GLOBAL BUG FIX
+
+Fix all:
+
+- redirect loops
+- broken navigation
+- slow transitions
+- layout shifting
+
+---
+
+# 🎯 FINAL RESULT
+
+1. App does NOT crash if Firebase missing  
+2. /admin works independently (no redirect)  
+3. Mobile has bottom nav on ALL pages  
+4. Back button works everywhere  
+5. App feels like real mobile app  
+
+---
+
+# 🚫 DO NOT
+
+- DO NOT break desktop UI
+- DO NOT remove existing features
+- DO NOT partially implement
+
+---
+
+END

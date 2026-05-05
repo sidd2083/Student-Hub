@@ -3,7 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   BookOpen, Brain, FileText, CheckSquare, Timer,
   MessageCircle, Trophy, LayoutDashboard, LogOut,
-  Shield, Settings, User, Home, Wrench,
+  Shield, Settings, User, Home, Wrench, ArrowLeft,
 } from "lucide-react";
 
 const sidebarNav = [
@@ -35,6 +35,9 @@ export function Layout({ children }: LayoutProps) {
 
   const isActive = (href: string) =>
     location === href || (href !== "/dashboard" && location.startsWith(href));
+
+  const isHome = location === "/dashboard";
+  const showBack = !isHome;
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -111,16 +114,28 @@ export function Layout({ children }: LayoutProps) {
 
       {/* ── Main content ── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Mobile: top bar with avatar */}
+        {/* Mobile top bar */}
         <header className="md:hidden h-12 bg-white border-b border-gray-100 flex items-center justify-between px-4 flex-shrink-0">
-          <Link href="/dashboard">
-            <div className="flex items-center gap-2 cursor-pointer">
-              <div className="w-6 h-6 bg-blue-500 rounded-md flex items-center justify-center">
-                <BookOpen className="w-3 h-3 text-white" />
-              </div>
-              <span className="text-sm font-semibold text-gray-900">Student Hub</span>
-            </div>
-          </Link>
+          <div className="flex items-center gap-2">
+            {showBack ? (
+              <button
+                onClick={() => window.history.back()}
+                className="flex items-center justify-center w-8 h-8 rounded-xl hover:bg-gray-100 transition-all"
+                aria-label="Go back"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+            ) : (
+              <Link href="/dashboard">
+                <div className="flex items-center gap-2 cursor-pointer">
+                  <div className="w-6 h-6 bg-blue-500 rounded-md flex items-center justify-center">
+                    <BookOpen className="w-3 h-3 text-white" />
+                  </div>
+                  <span className="text-sm font-semibold text-gray-900">Student Hub</span>
+                </div>
+              </Link>
+            )}
+          </div>
           <Link href="/settings">
             <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm cursor-pointer">
               {profile?.name?.charAt(0)?.toUpperCase() || "?"}
@@ -128,7 +143,7 @@ export function Layout({ children }: LayoutProps) {
           </Link>
         </header>
 
-        {/* Page content — with bottom padding on mobile for the nav */}
+        {/* Page content */}
         <main className="flex-1 overflow-y-auto pb-20 md:pb-0 flex flex-col">
           {children}
         </main>
@@ -141,7 +156,7 @@ export function Layout({ children }: LayoutProps) {
             const active = location === href || (href !== "/dashboard" && href !== "/settings" && location.startsWith(href));
             return (
               <Link key={href} href={href}>
-                <div className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all min-w-[56px] cursor-pointer ${
+                <div className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all min-w-[52px] cursor-pointer ${
                   active ? "text-blue-600" : "text-gray-400"
                 }`}>
                   <Icon className={`w-5 h-5 transition-transform ${active ? "scale-110" : ""}`} />

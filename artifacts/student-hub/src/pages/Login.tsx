@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
+import { isConfigured } from "@/lib/firebase";
 
 type Tab = "login" | "register";
 
@@ -30,6 +31,8 @@ export default function Login() {
   const [tab, setTab] = useState<Tab>("login");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const firebaseReady = isConfigured;
 
   const handleGoogle = async () => {
     setBusy(true);
@@ -112,6 +115,19 @@ export default function Login() {
             ))}
           </div>
 
+          {/* Firebase not configured banner */}
+          {!firebaseReady && (
+            <div className="flex items-start gap-3 px-4 py-3 mb-5 bg-amber-50 border border-amber-200 rounded-xl">
+              <span className="text-lg mt-0.5">🔧</span>
+              <div>
+                <p className="text-amber-800 text-sm font-semibold">Firebase not configured</p>
+                <p className="text-amber-700 text-xs mt-0.5">
+                  Add your Firebase credentials in Replit Secrets to enable login.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Error message */}
           {error && (
             <div className="flex items-center gap-2 px-4 py-3 mb-4 bg-red-50 border border-red-100 rounded-xl">
@@ -128,15 +144,15 @@ export default function Login() {
                 data-testid="btn-google-signin"
                 type="button"
                 onClick={handleGoogle}
-                disabled={busy}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3.5 border border-gray-200 rounded-2xl text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-60 shadow-sm"
+                disabled={busy || !firebaseReady}
+                className="w-full flex items-center justify-center gap-3 px-4 py-3.5 border border-gray-200 rounded-2xl text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
               >
                 {busy ? (
                   <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <GoogleLogo />
                 )}
-                <span>{busy ? "Opening Google Sign-In…" : "Continue with Google"}</span>
+                <span>{busy ? "Opening Google Sign-In…" : firebaseReady ? "Continue with Google" : "Login unavailable"}</span>
               </button>
               <p className="text-center text-xs text-gray-400 mt-5">
                 Don't have an account?{" "}
@@ -151,7 +167,7 @@ export default function Login() {
               <p className="text-gray-500 text-sm mb-5">Connect your Google account — we'll collect a few details after</p>
               <div className="space-y-3 mb-6">
                 {[
-                  { emoji: "📚", color: "bg-blue-50 text-blue-700",   text: "Access notes by grade & subject" },
+                  { emoji: "📚", color: "bg-blue-50 text-blue-700",     text: "Access notes by grade & subject" },
                   { emoji: "🧠", color: "bg-purple-50 text-purple-700", text: "Practice MCQs and track your scores" },
                   { emoji: "🤖", color: "bg-indigo-50 text-indigo-700", text: "Get help from Nep AI study assistant" },
                 ].map(({ emoji, color, text }) => (
@@ -165,15 +181,15 @@ export default function Login() {
                 data-testid="btn-google-register"
                 type="button"
                 onClick={handleGoogle}
-                disabled={busy}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-2xl hover:from-blue-600 hover:to-indigo-700 transition-all disabled:opacity-60 shadow-lg shadow-blue-200"
+                disabled={busy || !firebaseReady}
+                className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-2xl hover:from-blue-600 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-200"
               >
                 {busy ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <GoogleLogo white />
                 )}
-                <span>{busy ? "Opening Google Sign-In…" : "Sign up with Google"}</span>
+                <span>{busy ? "Opening Google Sign-In…" : firebaseReady ? "Sign up with Google" : "Signup unavailable"}</span>
               </button>
               <p className="text-center text-xs text-gray-400 mt-5">
                 Already have an account?{" "}
