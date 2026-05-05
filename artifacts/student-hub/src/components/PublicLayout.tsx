@@ -1,13 +1,21 @@
 import { Link, useLocation } from "wouter";
-import { BookOpen, Menu, X, UserPlus, Home, FileText, Wrench, User, ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { BookOpen, Menu, X, UserPlus, Home, FileText, Wrench, User, ArrowLeft, Brain, Timer, CheckSquare, Trophy, MessageCircle } from "lucide-react";
+import { useState, useEffect } from "react";
 
-const mobileBottomNav = [
-  { href: "/",      icon: Home,      label: "Home"    },
-  { href: "/notes", icon: BookOpen,  label: "Notes"   },
-  { href: "/pyqs",  icon: FileText,  label: "PYQ"     },
-  { href: "/mcq",   icon: Wrench,    label: "Tools"   },
-  { href: "/login", icon: User,      label: "Profile" },
+const toolsMenu = [
+  { href: "/ai",          icon: MessageCircle, label: "Nep AI",      color: "text-indigo-600 bg-indigo-50" },
+  { href: "/pomodoro",    icon: Timer,         label: "Pomodoro",    color: "text-orange-600 bg-orange-50" },
+  { href: "/todo",        icon: CheckSquare,   label: "To-do",       color: "text-green-600  bg-green-50"  },
+  { href: "/mcq",         icon: Brain,         label: "MCQ Practice",color: "text-purple-600 bg-purple-50" },
+  { href: "/leaderboard", icon: Trophy,        label: "Leaderboard", color: "text-yellow-600 bg-yellow-50" },
+];
+
+const mobileBottomNavBase = [
+  { href: "/",      icon: Home,      label: "Home",    isTools: false },
+  { href: "/notes", icon: BookOpen,  label: "Notes",   isTools: false },
+  { href: "/pyqs",  icon: FileText,  label: "PYQ",     isTools: false },
+  { href: "",       icon: Wrench,    label: "Tools",   isTools: true  },
+  { href: "/login", icon: User,      label: "Profile", isTools: false },
 ];
 
 interface PublicLayoutProps {
@@ -16,11 +24,15 @@ interface PublicLayoutProps {
 
 export function PublicLayout({ children }: PublicLayoutProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [location] = useLocation();
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [location, setLocation] = useLocation();
 
   const isHome = location === "/" || location === "";
   const isActive = (href: string) =>
     href === "/" ? location === "/" || location === "" : location.startsWith(href);
+
+  // Close tools sheet on route change
+  useEffect(() => { setToolsOpen(false); setMenuOpen(false); }, [location]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -29,7 +41,6 @@ export function PublicLayout({ children }: PublicLayoutProps) {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           {/* Left: logo or back button on mobile */}
           <div className="flex items-center gap-3">
-            {/* Mobile back button (all pages except home) */}
             {!isHome && (
               <button
                 onClick={() => window.history.back()}
@@ -143,21 +154,72 @@ export function PublicLayout({ children }: PublicLayoutProps) {
         </div>
       </footer>
 
-      {/* ── Mobile Bottom Navigation (fixed, all public pages) ── */}
+      {/* ── Tools Bottom Sheet ── */}
+      {toolsOpen && (
+        <>
+          <div
+            className="md:hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-sm"
+            onClick={() => setToolsOpen(false)}
+          />
+          <div className="md:hidden fixed bottom-16 left-0 right-0 z-50 px-3 pb-2">
+            <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden"
+              style={{ animation: "slideUp 0.25s cubic-bezier(0.34,1.56,0.64,1) both" }}>
+              <style>{`@keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }`}</style>
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+                <p className="text-sm font-semibold text-gray-900">Tools</p>
+                <button onClick={() => setToolsOpen(false)} className="p-1 rounded-lg hover:bg-gray-100 transition-all">
+                  <X className="w-4 h-4 text-gray-500" />
+                </button>
+              </div>
+              <div className="p-3 grid grid-cols-1 gap-1">
+                {toolsMenu.map(({ href, icon: Icon, label, color }) => {
+                  const [textCls, bgCls] = color.split(" ");
+                  return (
+                    <button
+                      key={href}
+                      onClick={() => { setLocation(href); setToolsOpen(false); }}
+                      className="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-gray-50 transition-all text-left w-full"
+                    >
+                      <div className={`w-9 h-9 rounded-xl ${bgCls} flex items-center justify-center flex-shrink-0`}>
+                        <Icon className={`w-4 h-4 ${textCls}`} />
+                      </div>
+                      <span className="text-sm font-medium text-gray-800">{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="px-5 py-3 border-t border-gray-50">
+                <Link href="/login" onClick={() => setToolsOpen(false)} className="flex items-center justify-center gap-2 w-full py-2.5 bg-blue-500 text-white text-sm font-medium rounded-2xl hover:bg-blue-600 transition-all">
+                  <UserPlus className="w-4 h-4" /> Register to unlock all tools — Free
+                </Link>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Mobile Bottom Navigation ── */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-lg z-40">
         <div className="flex items-center justify-around h-16 px-2">
-          {mobileBottomNav.map(({ href, icon: Icon, label }) => {
-            const active = isActive(href);
+          {mobileBottomNavBase.map(({ href, icon: Icon, label, isTools }) => {
+            const active = isTools
+              ? toolsOpen
+              : isActive(href);
             return (
-              <Link key={href} href={href}>
-                <div className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all min-w-[52px] cursor-pointer ${
+              <button
+                key={label}
+                onClick={() => {
+                  if (isTools) { setToolsOpen(o => !o); }
+                  else { setLocation(href); setToolsOpen(false); }
+                }}
+                className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all min-w-[52px] ${
                   active ? "text-blue-600" : "text-gray-400"
-                }`}>
-                  <Icon className={`w-5 h-5 transition-transform ${active ? "scale-110" : ""}`} />
-                  <span className="text-[10px] font-medium leading-tight">{label}</span>
-                  {active && <span className="w-1 h-1 bg-blue-500 rounded-full mt-0.5" />}
-                </div>
-              </Link>
+                }`}
+              >
+                <Icon className={`w-5 h-5 transition-transform ${active ? "scale-110" : ""}`} />
+                <span className="text-[10px] font-medium leading-tight">{label}</span>
+                {active && <span className="w-1 h-1 bg-blue-500 rounded-full mt-0.5" />}
+              </button>
             );
           })}
         </div>

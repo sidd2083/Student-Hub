@@ -1,0 +1,271 @@
+Fix and finalize my "Student Hub" app. Focus on broken logic, data flow, and syncing. Do NOT redesign UI, only fix functionality properly.
+
+---
+
+# 🔴 1. GOOGLE SIGNUP FLOW FIX (CRITICAL)
+
+Current problem:
+New users are NOT redirected to setup page.
+
+---
+
+## REQUIRED:
+
+After Google login:
+
+IF user is NEW:
+→ redirect to:
+/setup-profile
+
+On that page:
+- user enters:
+   - name
+   - grade
+
+After clicking "Continue":
+
+- Save to Firestore:
+
+users/{uid}:
+- name
+- email
+- grade
+- createdAt
+
+Then:
+→ redirect to /dashboard
+
+---
+
+## IMPORTANT:
+
+IF user already exists:
+→ skip setup
+→ go directly to /dashboard
+
+---
+
+# 📱 2. MOBILE TOOLS MENU FIX
+
+Current problem:
+"Tools" opens Quiz directly
+
+---
+
+## REQUIRED:
+
+When clicking "Tools" in bottom nav:
+
+- DO NOT open a page directly
+
+Instead:
+
+→ Open a dropdown / bottom sheet menu
+
+Options:
+
+- Nep AI
+- Pomodoro
+- To-do
+- MCQ
+- Leaderboard
+
+---
+
+## BEHAVIOR:
+
+- smooth animation
+- closes on outside click
+- works on all mobile pages
+
+---
+
+# ⚙️ 3. ADMIN PANEL NOT WORKING (CRITICAL)
+
+Current problems:
+- users not showing
+- notes not saving
+- no connection with site
+
+---
+
+## REQUIRED FIX:
+
+### USERS:
+
+Fetch from Firestore:
+
+collection: "users"
+
+Display:
+- total users
+- list of users
+- name, email, grade
+
+---
+
+### NOTES SAVE FIX:
+
+When clicking "Save Note":
+
+- must write to Firestore:
+
+collection: "notes"
+
+Fields:
+- title
+- content
+- grade
+- subject
+- createdAt
+
+---
+
+### DEBUG:
+
+If save fails:
+- log error in console
+- show error message
+
+---
+
+### SYNC:
+
+After saving:
+- note MUST appear in:
+   - public notes page
+   - filtered by grade
+
+---
+
+# 🔍 4. ADVANCED SEO SYSTEM (UPGRADE)
+
+Current: basic → NOT enough
+
+---
+
+## REQUIRED:
+
+Create 2 separate admin pages:
+
+### 1. Notes SEO Page
+
+- list all notes
+- searchable
+- click → edit SEO
+
+Fields:
+- SEO title
+- meta description
+- keywords
+- slug
+- index toggle
+
+---
+
+### 2. PYQ SEO Page
+
+Same as notes
+
+---
+
+## GLOBAL SEO:
+
+- site title
+- default meta
+- OG image
+
+---
+
+## FRONTEND:
+
+Each note/PYQ page must:
+
+- apply dynamic meta tags
+- use SEO title
+- use description
+
+---
+
+# 👤 5. PROFILE SETTINGS FIX
+
+Current problem:
+Changes do NOTHING
+
+---
+
+## REQUIRED:
+
+When user updates:
+
+- name
+- grade
+- theme (dark/light)
+
+---
+
+### SAVE TO FIRESTORE:
+
+users/{uid}
+
+---
+
+### AFTER SAVE:
+
+- update UI instantly
+- persist after refresh
+
+---
+
+## THEME:
+
+- store theme in localStorage or Firestore
+- apply immediately
+
+---
+
+# 🔄 6. REAL-TIME SYNC (IMPORTANT)
+
+Ensure:
+
+- admin changes reflect on site
+- no manual refresh needed
+- use Firestore listeners if possible
+
+---
+
+# ⚡ 7. FINAL BUG FIXING
+
+Fix:
+
+- buttons not working
+- save actions failing silently
+- missing data rendering
+- broken navigation
+
+---
+
+# 🎯 FINAL RESULT
+
+1. New user → setup → dashboard works  
+2. Tools menu → dropdown (not direct page)  
+3. Admin:
+   - users visible
+   - notes save properly
+   - sync with site  
+4. SEO:
+   - fully editable per note/PYQ  
+5. Profile:
+   - saves and updates instantly  
+
+---
+
+# 🚫 DO NOT
+
+- DO NOT ignore Firestore errors
+- DO NOT fake UI without backend connection
+- DO NOT partially implement
+
+---
+
+END

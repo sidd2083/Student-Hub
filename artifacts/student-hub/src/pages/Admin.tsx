@@ -2,12 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import {
-  useGetUserStats, useListUsers, useUpdateUser, useDeleteUser,
+  useGetUserStats,
   useListNotes, useCreateNote, useDeleteNote,
   useListMcqs, useCreateMcq, useDeleteMcq,
   useListPyqs, useCreatePyq, useDeletePyq,
   useListScores, useResetScores,
-  getListUsersQueryKey, getListNotesQueryKey, getListMcqsQueryKey,
+  getListNotesQueryKey, getListMcqsQueryKey,
   getListPyqsQueryKey, getListScoresQueryKey, getGetUserStatsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import {
   collection, addDoc, getDocs, deleteDoc,
-  doc, query, orderBy,
+  doc, query, orderBy, setDoc, getDoc,
 } from "firebase/firestore";
 import {
   ref, uploadBytesResumable, getDownloadURL,
@@ -557,41 +557,90 @@ function ManageAnnouncements() {
   );
 }
 
-// ─── Manage Users ──────────────────────────────────────────────────────────
+// ─── Manage Users (Firestore) ──────────────────────────────────────────────
+
+interface FSUser { uid: string; name: string; email: string; grade: number; role: string; createdAt: string }
 
 function ManageUsers() {
-  const qc = useQueryClient();
-  const { data: users, isLoading } = useListUsers({ query: { queryKey: getListUsersQueryKey() } });
-  const updateUser = useUpdateUser();
-  const deleteUser = useDeleteUser();
-  const inv = () => qc.invalidateQueries({ queryKey: getListUsersQueryKey() });
+  const [users, setUsers] = useState<FSUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updatingUid, setUpdatingUid] = useState<string | null>(null);
+
+  const loadUsers = async () => {
+    setLoading(true);
+    try {
+      const snap = await getDocs(collection(db, "users"));
+      const list = snap.docs.map(d => ({ uid: d.id, ...d.data() } as FSUser));
+      list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+      setUsers(list);
+    } catch (e) { console.error("[Admin] Failed to load users:", e); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { loadUsers(); }, []);
+
+  const handleRoleChange = async (uid: string, role: string) => {
+    setUpdatingUid(uid);
+    try {
+      const { updateDoc } = await import("firebase/firestore");
+      await updateDoc(doc(db, "users", uid), { role });
+      setUsers(prev => prev.map(u => u.uid === uid ? { ...u, role } : u));
+    } catch (e) { console.error("[Admin] Role update failed:", e); }
+    finally { setUpdatingUid(null); }
+  };
+
+  const handleDelete = async (uid: string) => {
+    if (!window.confirm("Delete this user's profile? They can still log in but will need to redo setup.")) return;
+    try {
+      await deleteDoc(doc(db, "users", uid));
+      setUsers(prev => prev.filter(u => u.uid !== uid));
+    } catch (e) { console.error("[Admin] Delete failed:", e); }
+  };
 
   return (
     <div>
-      <h2 className="text-xl font-bold text-gray-900 mb-6">Manage Users</h2>
-      {isLoading
-        ? <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
-        : (users || []).map(u => (
-          <div key={u.id} className="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3 mb-2">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Manage Users</h2>
+          <p className="text-sm text-gray-500 mt-0.5">{users.length} registered users</p>
+        </div>
+        <button onClick={loadUsers} className="px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all">
+          Refresh
+        </button>
+      </div>
+      {loading ? (
+        <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+      ) : users.length === 0 ? (
+        <p className="text-center text-gray-400 py-12">No users found. Users appear here after signing up with Google.</p>
+      ) : (
+        users.map(u => (
+          <div key={u.uid} className="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3 mb-2">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-sm font-semibold">{u.name.charAt(0).toUpperCase()}</div>
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-sm font-semibold">
+                {(u.name || u.email || "?").charAt(0).toUpperCase()}
+              </div>
               <div>
-                <p className="font-medium text-gray-900 text-sm">{u.name}</p>
+                <p className="font-medium text-gray-900 text-sm">{u.name || "(no name)"}</p>
                 <p className="text-xs text-gray-500">{u.email} · Grade {u.grade}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <select value={u.role} onChange={e => updateUser.mutate({ uid: u.uid, data: { role: e.target.value as "user" | "admin" } }, { onSuccess: inv })} className="px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white">
+              <select
+                value={u.role || "user"}
+                disabled={updatingUid === u.uid}
+                onChange={e => handleRoleChange(u.uid, e.target.value)}
+                className="px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white disabled:opacity-50"
+              >
                 <option value="user">User</option>
                 <option value="admin">Admin</option>
               </select>
-              <button onClick={() => deleteUser.mutate({ uid: u.uid }, { onSuccess: inv })} className="p-1.5 text-gray-400 hover:text-red-500">
+              <button onClick={() => handleDelete(u.uid)} className="p-1.5 text-gray-400 hover:text-red-500">
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
           </div>
         ))
-      }
+      )}
     </div>
   );
 }
@@ -636,42 +685,141 @@ function LeaderboardControl() {
 
 // ─── SEO Panel ─────────────────────────────────────────────────────────────
 
+interface SeoMeta { seoTitle: string; description: string; keywords: string; slug: string; noIndex: boolean }
+const emptySeo = (): SeoMeta => ({ seoTitle: "", description: "", keywords: "", slug: "", noIndex: false });
+
+type SeoKind = "note" | "pyq";
+interface SeoEditTarget { id: number; defaultTitle: string; kind: SeoKind }
+
+function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => void }) {
+  const docId = `${target.kind}_${target.id}`;
+  const [form, setForm] = useState<SeoMeta>(emptySeo());
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const snap = await getDoc(doc(db, "seo_meta", docId));
+        if (snap.exists()) setForm(snap.data() as SeoMeta);
+        else setForm({ ...emptySeo(), seoTitle: target.defaultTitle });
+      } catch (e) { console.error("SEO load failed:", e); }
+      finally { setLoading(false); }
+    };
+    load();
+  }, [docId, target.defaultTitle]);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setSaved(false);
+    try {
+      await setDoc(doc(db, "seo_meta", docId), { ...form, updatedAt: new Date().toISOString() });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      console.error("SEO save failed:", err);
+      alert("Save failed — check console.");
+    } finally { setSaving(false); }
+  };
+
+  const f = (k: keyof SeoMeta) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm(p => ({ ...p, [k]: e.target.value }));
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{target.kind.toUpperCase()} SEO</p>
+            <h3 className="text-base font-bold text-gray-900 truncate">{target.defaultTitle}</h3>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-all">
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+        {loading ? (
+          <div className="p-8 space-y-3">{[1,2,3,4].map(i => <div key={i} className="h-10 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+        ) : (
+          <form onSubmit={handleSave} className="p-6 space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">SEO Title</label>
+              <input value={form.seoTitle} onChange={f("seoTitle")} placeholder={target.defaultTitle}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+              <p className="text-xs text-gray-400 mt-1">{form.seoTitle.length}/60 chars recommended</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Meta Description</label>
+              <textarea value={form.description} onChange={f("description")} rows={3} placeholder="Brief description for search engines…"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-400" />
+              <p className="text-xs text-gray-400 mt-1">{form.description.length}/160 chars recommended</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Keywords</label>
+              <input value={form.keywords} onChange={f("keywords")} placeholder="keyword1, keyword2, keyword3"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">URL Slug</label>
+              <input value={form.slug} onChange={f("slug")} placeholder="auto-generated-from-title"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+            </div>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div
+                onClick={() => setForm(p => ({ ...p, noIndex: !p.noIndex }))}
+                className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer ${form.noIndex ? "bg-red-500 border-red-500" : "border-gray-300 hover:border-red-400"}`}
+              >
+                {form.noIndex && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-700">No Index</p>
+                <p className="text-xs text-gray-400">Exclude this page from search engines</p>
+              </div>
+            </label>
+            <div className="flex gap-3 pt-2">
+              <button type="submit" disabled={saving}
+                className="flex-1 py-2.5 bg-purple-500 text-white font-semibold rounded-xl hover:bg-purple-600 disabled:opacity-50 transition-all text-sm">
+                {saving ? "Saving…" : saved ? "✓ Saved!" : "Save SEO"}
+              </button>
+              <button type="button" onClick={onClose} className="px-4 py-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-all text-sm">
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SeoPanel() {
   const { data: notes } = useListNotes({}, { query: { queryKey: getListNotesQueryKey({}) } });
   const { data: pyqs } = useListPyqs({}, { query: { queryKey: getListPyqsQueryKey({}) } });
+  const [editing, setEditing] = useState<SeoEditTarget | null>(null);
+  const [search, setSearch] = useState("");
 
   const baseUrl = "https://studenthub.np";
 
-  const noteUrls = (notes || []).map(n => ({
-    url: `${baseUrl}/notes/${n.id}`,
-    label: n.title,
-    kind: "Note",
-  }));
-  const pyqUrls = (pyqs || []).map(p => ({
-    url: `${baseUrl}/pyq/${p.id}`,
-    label: p.title,
-    kind: "PYQ",
-  }));
+  const noteItems = (notes || []).map(n => ({ id: n.id, title: n.title, kind: "note" as SeoKind, url: `${baseUrl}/notes/${n.id}` }));
+  const pyqItems  = (pyqs  || []).map(p => ({ id: p.id, title: p.title, kind: "pyq"  as SeoKind, url: `${baseUrl}/pyq/${p.id}`   }));
 
   const staticUrls = [
-    { url: `${baseUrl}/`, label: "Homepage / Login", kind: "Static" },
+    { url: `${baseUrl}/`, label: "Homepage", kind: "Static" },
     { url: `${baseUrl}/notes`, label: "Notes List", kind: "Static" },
     { url: `${baseUrl}/pyqs`, label: "PYQs List", kind: "Static" },
     { url: `${baseUrl}/about`, label: "About", kind: "Static" },
     { url: `${baseUrl}/contact`, label: "Contact", kind: "Static" },
   ];
 
-  const allUrls = [...staticUrls, ...noteUrls, ...pyqUrls];
+  const allItems = [
+    ...noteItems.map(i => ({ ...i, kindLabel: "Note" })),
+    ...pyqItems.map(i => ({ ...i, kindLabel: "PYQ" })),
+  ].filter(i => !search || i.title.toLowerCase().includes(search.toLowerCase()));
 
   const generateSitemap = () => {
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${allUrls.map(u => `  <url>
-    <loc>${u.url}</loc>
-    <changefreq>weekly</changefreq>
-    <priority>${u.kind === "Static" ? "0.9" : "0.7"}</priority>
-  </url>`).join("\n")}
-</urlset>`;
+    const all = [...staticUrls, ...noteItems.map(n => ({ url: n.url, label: n.title, kind: "Note" })), ...pyqItems.map(p => ({ url: p.url, label: p.title, kind: "PYQ" }))];
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${all.map(u => `  <url>\n    <loc>${u.url}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>${u.kind === "Static" ? "0.9" : "0.7"}</priority>\n  </url>`).join("\n")}\n</urlset>`;
     const blob = new Blob([xml], { type: "application/xml" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -681,34 +829,23 @@ ${allUrls.map(u => `  <url>
 
   return (
     <div>
+      {editing && <SeoEditor target={editing} onClose={() => setEditing(null)} />}
+
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
           <h2 className="text-xl font-bold text-gray-900">SEO Panel</h2>
-          <p className="text-sm text-gray-500 mt-0.5">All public indexable URLs for Student Hub</p>
+          <p className="text-sm text-gray-500 mt-0.5">Edit per-page SEO metadata · stored in Firestore</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <a
-            href={`${baseUrl}/robots.txt`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-all"
-          >
-            robots.txt ↗
-          </a>
-          <button
-            onClick={generateSitemap}
-            className="px-4 py-2 bg-purple-500 text-white rounded-xl text-sm font-medium hover:bg-purple-600 transition-all"
-          >
-            Download sitemap.xml
-          </button>
-        </div>
+        <button onClick={generateSitemap} className="px-4 py-2 bg-purple-500 text-white rounded-xl text-sm font-medium hover:bg-purple-600 transition-all">
+          Download sitemap.xml
+        </button>
       </div>
 
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
-          { label: "Static Pages", count: staticUrls.length, color: "bg-blue-50 text-blue-600" },
-          { label: "Note Pages", count: noteUrls.length, color: "bg-green-50 text-green-600" },
-          { label: "PYQ Pages", count: pyqUrls.length, color: "bg-orange-50 text-orange-600" },
+          { label: "Static Pages", count: staticUrls.length,  color: "bg-blue-50 text-blue-600"   },
+          { label: "Note Pages",   count: noteItems.length,   color: "bg-green-50 text-green-600"  },
+          { label: "PYQ Pages",    count: pyqItems.length,    color: "bg-orange-50 text-orange-600"},
         ].map(({ label, count, color }) => (
           <div key={label} className={`${color.split(" ")[0]} rounded-2xl p-4 border border-gray-100`}>
             <p className={`text-2xl font-bold ${color.split(" ")[1]}`}>{count}</p>
@@ -717,29 +854,49 @@ ${allUrls.map(u => `  <url>
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-          <p className="text-sm font-medium text-gray-700">{allUrls.length} total indexable URLs</p>
+      {/* Notes + PYQs with Edit SEO button */}
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-4">
+        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center gap-3">
+          <p className="text-sm font-medium text-gray-700 flex-1">Notes &amp; PYQs SEO</p>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…"
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 w-40" />
         </div>
-        <div className="divide-y divide-gray-50 max-h-[480px] overflow-y-auto">
-          {allUrls.map((u, i) => (
-            <div key={i} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-all">
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
-                u.kind === "Static"  ? "bg-blue-50 text-blue-600"
-                : u.kind === "Note" ? "bg-green-50 text-green-600"
-                :                     "bg-orange-50 text-orange-600"
-              }`}>
-                {u.kind}
-              </span>
+        {allItems.length === 0 ? (
+          <p className="text-center text-gray-400 py-8 text-sm">No notes or PYQs added yet.</p>
+        ) : (
+          <div className="divide-y divide-gray-50 max-h-[460px] overflow-y-auto">
+            {allItems.map((item) => (
+              <div key={`${item.kind}-${item.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-all">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${item.kindLabel === "Note" ? "bg-green-50 text-green-600" : "bg-orange-50 text-orange-600"}`}>
+                  {item.kindLabel}
+                </span>
+                <p className="text-sm text-gray-700 truncate flex-1">{item.title}</p>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline">Open ↗</a>
+                  <button
+                    onClick={() => setEditing({ id: item.id, defaultTitle: item.title, kind: item.kind })}
+                    className="px-3 py-1 bg-purple-50 text-purple-600 text-xs font-medium rounded-lg hover:bg-purple-100 transition-all"
+                  >
+                    Edit SEO
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Static pages list */}
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+          <p className="text-sm font-medium text-gray-700">Static Pages</p>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {staticUrls.map((u) => (
+            <div key={u.url} className="flex items-center gap-3 px-5 py-3">
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 bg-blue-50 text-blue-600">Static</span>
               <p className="text-sm text-gray-700 truncate flex-1">{u.label}</p>
-              <a
-                href={u.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-blue-500 hover:underline flex-shrink-0"
-              >
-                Open ↗
-              </a>
+              <a href={u.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex-shrink-0">Open ↗</a>
             </div>
           ))}
         </div>
@@ -802,10 +959,11 @@ export default function Admin() {
         </nav>
 
         <div className="p-4 border-t border-gray-100">
-          <Link href="/dashboard">
-            <a className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-all mb-1 w-full">
-              ← Back to App
-            </a>
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-all mb-1 w-full"
+          >
+            ← Back to App
           </Link>
           <button onClick={handleSignOut} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all w-full">
             <LogOut className="w-4 h-4" /> Sign out
