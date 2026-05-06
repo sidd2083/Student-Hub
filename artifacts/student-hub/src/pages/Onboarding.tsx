@@ -3,6 +3,24 @@ import { useAuth, UserProfile } from "@/context/AuthContext";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+// Key used in sessionStorage to survive the page reload after window.location.replace
+const PENDING_PROFILE_KEY = "sh_pending_profile";
+
+export function getPendingProfile(uid: string): UserProfile | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_PROFILE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as UserProfile & { uid: string };
+    return data.uid === uid ? (data as UserProfile) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingProfile() {
+  sessionStorage.removeItem(PENDING_PROFILE_KEY);
+}
+
 export default function Onboarding() {
   const { user, setProfile } = useAuth();
   const [name, setName] = useState(user?.displayName || "");
@@ -16,38 +34,50 @@ export default function Onboarding() {
     if (!name.trim()) return setError("Please enter your name.");
     if (!grade) return setError("Please select your grade.");
     if (!agreed) return setError("Please accept the Terms & Conditions.");
-    if (!user) return setError("No session. Please refresh and try again.");
+    if (!user) return setError("No session — please refresh and try again.");
 
     setSaving(true);
     setError("");
 
-    try {
-      const now = new Date().toISOString();
-      const data = {
-        uid: user.uid,
-        name: name.trim(),
-        email: user.email ?? "",
-        grade: Number(grade),
-        role: "user" as const,
-        createdAt: now,
-        streak: 0,
-        totalStudyTime: 0,
-        todayStudyTime: 0,
-        lastActiveDate: null,
-      };
+    const now = new Date().toISOString();
+    const data = {
+      uid: user.uid,
+      name: name.trim(),
+      email: user.email ?? "",
+      grade: Number(grade),
+      role: "user" as const,
+      createdAt: now,
+      streak: 0,
+      totalStudyTime: 0,
+      todayStudyTime: 0,
+      lastActiveDate: null,
+    };
 
-      console.log("[Auth] Saving user profile to Firestore:", user.uid);
-      await setDoc(doc(db, "users", user.uid), data);
-      console.log("[Auth] User saved:", user.uid, "name:", data.name, "grade:", data.grade);
+    console.log("[Onboarding] Saving profile for uid:", user.uid, "name:", data.name, "grade:", data.grade);
 
-      const newProfile: UserProfile = { id: 0, ...data };
-      setProfile(newProfile);
-      window.location.replace("/dashboard");
-    } catch (err) {
-      console.error("[Auth] Failed to save profile:", err);
-      setError("Something went wrong. Please try again.");
-      setSaving(false);
-    }
+    // 1️⃣ Store profile in sessionStorage so AuthContext survives the page reload
+    //    without redirecting back to /setup-profile before Firestore write completes.
+    const profileForStorage: UserProfile = { id: 0, ...data };
+    sessionStorage.setItem(PENDING_PROFILE_KEY, JSON.stringify(profileForStorage));
+
+    // 2️⃣ Update local auth state immediately (no wait)
+    setProfile(profileForStorage);
+
+    // 3️⃣ Navigate to dashboard right now — don't wait for server
+    console.log("[Onboarding] Navigating to /dashboard immediately");
+    window.location.replace("/dashboard");
+
+    // 4️⃣ Write to Firestore in background (offline cache makes this instant locally;
+    //    it will sync to Firebase servers even after the page navigates away)
+    setDoc(doc(db, "users", user.uid), data)
+      .then(() => {
+        console.log("[Onboarding] Firestore write confirmed for uid:", user.uid);
+        clearPendingProfile();
+      })
+      .catch((err) => {
+        console.error("[Onboarding] Firestore write failed:", err);
+        // Don't clear pending — AuthContext will keep using sessionStorage profile
+      });
   };
 
   return (
@@ -173,7 +203,7 @@ export default function Onboarding() {
               {saving ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Saving your profile…
+                  Setting up…
                 </span>
               ) : (
                 "Let's Go! 🚀"

@@ -35,14 +35,11 @@ if (isConfigured) {
   storage = getStorage(app);
   console.log("[Firebase] ✅ Auth, Firestore, Storage initialised");
 } else {
-  console.error(
-    "[Firebase] ❌ NOT CONFIGURED — missing env vars:",
-    {
-      apiKey:     !!firebaseConfig.apiKey,
-      projectId:  !!firebaseConfig.projectId,
-      authDomain: !!firebaseConfig.authDomain,
-    }
-  );
+  console.error("[Firebase] ❌ NOT CONFIGURED — missing env vars:", {
+    apiKey:     !!firebaseConfig.apiKey,
+    projectId:  !!firebaseConfig.projectId,
+    authDomain: !!firebaseConfig.authDomain,
+  });
   app = {} as FirebaseApp;
   auth = {
     onAuthStateChanged: (_cb: (u: null) => void) => { _cb(null); return () => {}; },
