@@ -128,16 +128,17 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 
 // ─── Admin Overview ────────────────────────────────────────────────────────
 
-interface FSUserSummary { uid: string; grade: number; role: string; createdAt: string }
+interface ApiUser { id: number; uid: string; name: string; email: string; grade: number; role: string; createdAt: string }
 
 function AdminOverview() {
   const { data: noteStats } = useListNotes({}, { query: { queryKey: getListNotesQueryKey({}) } });
   const { data: pyqStats }  = useListPyqs({},  { query: { queryKey: getListPyqsQueryKey({})  } });
-  const [users, setUsers]   = useState<FSUserSummary[]>([]);
+  const [users, setUsers]   = useState<ApiUser[]>([]);
 
   useEffect(() => {
-    getDocs(collection(db, "users"))
-      .then(snap => setUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() } as FSUserSummary))))
+    fetch("/api/users")
+      .then(r => r.json())
+      .then(setUsers)
       .catch(console.error);
   }, []);
 
@@ -165,7 +166,7 @@ function AdminOverview() {
       </div>
       {Object.keys(byGrade).length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h3 className="font-medium text-gray-700 mb-4">Users by Grade (Firestore)</h3>
+          <h3 className="font-medium text-gray-700 mb-4">Users by Grade</h3>
           <div className="flex gap-4 flex-wrap">
             {Object.entries(byGrade).sort(([a], [b]) => Number(a) - Number(b)).map(([g, c]) => (
               <div key={g} className="flex-1 min-w-[80px] text-center p-3 bg-blue-50 rounded-xl">
@@ -178,7 +179,7 @@ function AdminOverview() {
       )}
       {users.length === 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 text-center text-gray-400 text-sm">
-          No users yet — they appear here after signing in with Google.
+          No users yet — they appear here after signing up.
         </div>
       )}
     </div>
@@ -620,39 +621,35 @@ function ManageAnnouncements() {
   );
 }
 
-// ─── Manage Users (Firestore) ──────────────────────────────────────────────
-
-interface FSUser { uid: string; name: string; email: string; grade: number; role: string; createdAt: string; streak?: number; totalStudyTime?: number; todayStudyTime?: number }
+// ─── Manage Users (Backend API / PostgreSQL) ───────────────────────────────
 
 function ManageUsers() {
-  const [users, setUsers] = useState<FSUser[]>([]);
+  const [users, setUsers] = useState<ApiUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingUid, setUpdatingUid] = useState<string | null>(null);
 
-  useEffect(() => {
-    console.log("[Admin] Subscribing to users collection (real-time)…");
-    const unsub = onSnapshot(
-      collection(db, "users"),
-      (snap) => {
-        const list = snap.docs.map(d => ({ uid: d.id, ...d.data() } as FSUser));
+  const loadUsers = () => {
+    setLoading(true);
+    fetch("/api/users")
+      .then(r => r.json())
+      .then((list: ApiUser[]) => {
         list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-        console.log("[Admin] Users updated:", list.length);
         setUsers(list);
-        setLoading(false);
-      },
-      (err) => {
-        console.error("[Admin] Users listener error:", err);
-        setLoading(false);
-      }
-    );
-    return () => unsub();
-  }, []);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { loadUsers(); }, []);
 
   const handleRoleChange = async (uid: string, role: string) => {
     setUpdatingUid(uid);
     try {
-      const { updateDoc } = await import("firebase/firestore");
-      await updateDoc(doc(db, "users", uid), { role });
+      await fetch(`/api/users/${uid}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
       setUsers(prev => prev.map(u => u.uid === uid ? { ...u, role } : u));
     } catch (e) { console.error("[Admin] Role update failed:", e); }
     finally { setUpdatingUid(null); }
@@ -661,7 +658,7 @@ function ManageUsers() {
   const handleDelete = async (uid: string) => {
     if (!window.confirm("Delete this user's profile? They can still log in but will need to redo setup.")) return;
     try {
-      await deleteDoc(doc(db, "users", uid));
+      await fetch(`/api/users/${uid}`, { method: "DELETE" });
       setUsers(prev => prev.filter(u => u.uid !== uid));
     } catch (e) { console.error("[Admin] Delete failed:", e); }
   };
@@ -671,17 +668,16 @@ function ManageUsers() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Manage Users</h2>
-          <p className="text-sm text-gray-500 mt-0.5">{users.length} registered users · live</p>
+          <p className="text-sm text-gray-500 mt-0.5">{users.length} registered users</p>
         </div>
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 border border-green-200 text-green-700 text-xs font-medium">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-          Real-time
-        </span>
+        <button onClick={loadUsers} className="px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">
+          Refresh
+        </button>
       </div>
       {loading ? (
         <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
       ) : users.length === 0 ? (
-        <p className="text-center text-gray-400 py-12">No users found. Users appear here after signing up with Google.</p>
+        <p className="text-center text-gray-400 py-12">No users found. Users appear here after completing setup.</p>
       ) : (
         users.map(u => (
           <div key={u.uid} className="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3 mb-2">
@@ -692,22 +688,7 @@ function ManageUsers() {
               <div className="min-w-0">
                 <p className="font-medium text-gray-900 text-sm truncate">{u.name || "(no name)"}</p>
                 <p className="text-xs text-gray-500 truncate">{u.email} · Grade {u.grade}</p>
-                <div className="flex items-center gap-3 mt-0.5">
-                  <span className="inline-flex items-center gap-1 text-[10px] text-blue-600">
-                    <Clock className="w-2.5 h-2.5" />
-                    {(() => { const m = u.totalStudyTime ?? 0; return m >= 60 ? `${Math.floor(m/60)}h ${m%60}m` : `${m}m`; })()}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[10px] text-orange-500">
-                    <Flame className="w-2.5 h-2.5" />
-                    {u.streak ?? 0}d
-                  </span>
-                  {(u.todayStudyTime ?? 0) > 0 && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-green-600">
-                      <BarChart2 className="w-2.5 h-2.5" />
-                      {u.todayStudyTime}m today
-                    </span>
-                  )}
-                </div>
+                <p className="text-xs text-gray-400">Joined {new Date(u.createdAt).toLocaleDateString()}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">

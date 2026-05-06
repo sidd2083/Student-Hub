@@ -1,12 +1,10 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useAuth, UserProfile } from "@/context/AuthContext";
-import { doc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-
-const PENDING_PROFILE_KEY = "pendingProfile_v1";
 
 export default function Onboarding() {
   const { user, setProfile } = useAuth();
+  const [, setLocation] = useLocation();
   const [name, setName] = useState(user?.displayName || "");
   const [grade, setGrade] = useState<number | "">("");
   const [agreed, setAgreed] = useState(false);
@@ -31,60 +29,47 @@ export default function Onboarding() {
       grade: Number(grade),
       role: "user" as const,
       createdAt: now,
-      streak: 0,
-      totalStudyTime: 0,
-      todayStudyTime: 0,
-      lastActiveDate: null,
     };
 
     console.log("[Onboarding] Saving profile:", data.name, "grade:", data.grade);
 
-    // ── Step 1: Store in sessionStorage immediately (survives page reload) ───
-    // AuthContext reads this on reload if Firestore hasn't saved yet
-    sessionStorage.setItem(
-      PENDING_PROFILE_KEY,
-      JSON.stringify({ ...data, _savedAt: Date.now() })
-    );
-
-    // ── Step 2: Update local React state ────────────────────────────────────
-    const profileForState: UserProfile = { id: 0, ...data };
-    setProfile(profileForState);
-
-    // ── Step 3: Try to write to Firestore (race against 5s timeout) ─────────
-    // We navigate regardless, but prefer to have the write done first
-    const firestorePromise = setDoc(doc(db, "users", user.uid), data);
-    const timeoutPromise = new Promise<void>((_, reject) =>
-      setTimeout(() => reject(new Error("timeout")), 5000)
-    );
-
     try {
-      await Promise.race([firestorePromise, timeoutPromise]);
-      console.log("[Onboarding] Firestore write ✅ complete before navigation");
-      // Clear sessionStorage since Firestore now has the data
-      sessionStorage.removeItem(PENDING_PROFILE_KEY);
-    } catch {
-      console.warn("[Onboarding] Firestore write still in flight — navigating anyway. sessionStorage will serve as fallback.");
-      // Keep sessionStorage so AuthContext can use it on reload
+      // Save to backend (PostgreSQL) — this is the source of truth
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Server error ${res.status}`);
+      }
+
+      const saved = await res.json();
+      console.log("[Onboarding] Backend save ✅ id:", saved.id);
+
+      // Set profile in React state (no page reload — client-side nav)
+      const profileForState: UserProfile = {
+        id: saved.id ?? 0,
+        uid: saved.uid ?? data.uid,
+        name: saved.name ?? data.name,
+        email: saved.email ?? data.email,
+        grade: saved.grade ?? data.grade,
+        role: saved.role ?? "user",
+        createdAt: saved.createdAt ?? now,
+      };
+      setProfile(profileForState);
+
+      // Client-side navigation — no page reload, profile stays in React state
+      console.log("[Onboarding] Navigating to /dashboard (client-side)");
+      setLocation("/dashboard");
+
+    } catch (err) {
+      console.error("[Onboarding] Save failed:", err);
+      setError(err instanceof Error ? err.message : "Failed to save your profile. Please try again.");
+      setSaving(false);
     }
-
-    // ── Step 4: Sync to backend (non-critical, fire & forget) ───────────────
-    fetch("/api/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        uid: data.uid,
-        name: data.name,
-        email: data.email,
-        grade: data.grade,
-        role: data.role,
-      }),
-    }).catch((err) =>
-      console.warn("[Onboarding] Backend sync failed (non-critical):", err)
-    );
-
-    // ── Step 5: Navigate ─────────────────────────────────────────────────────
-    console.log("[Onboarding] Navigating to /dashboard");
-    window.location.replace("/dashboard");
   };
 
   return (
