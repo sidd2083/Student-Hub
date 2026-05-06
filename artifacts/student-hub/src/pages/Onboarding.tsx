@@ -41,14 +41,29 @@ export default function Onboarding() {
       lastActiveDate: null,
     };
 
-    console.log("[Onboarding] Saving profile for uid:", user.uid, "name:", data.name, "grade:", data.grade);
+    console.log("[Onboarding] Saving profile:", data.name, "grade:", data.grade);
 
-    try {
-      await setDoc(doc(db, "users", user.uid), data);
-      console.log("User saved successfully");
+    // ── 1. Update local state immediately ────────────────────────────────────
+    const profileForState: UserProfile = { id: 0, ...data };
+    setProfile(profileForState);
 
-      try {
-        await fetch("/api/users", {
+    // ── 2. Navigate right away — don't block the user on the network ─────────
+    window.location.replace("/dashboard");
+
+    // ── 3. Save to Firestore in the background (with 10s timeout) ───────────
+    const withTimeout = (promise: Promise<unknown>, ms: number) =>
+      Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Firestore write timed out")), ms)
+        ),
+      ]);
+
+    withTimeout(setDoc(doc(db, "users", user.uid), data), 10_000)
+      .then(() => {
+        console.log("[Onboarding] Firestore save ✅");
+        // Also sync to PostgreSQL backend (non-critical)
+        return fetch("/api/users", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -58,21 +73,19 @@ export default function Onboarding() {
             grade: data.grade,
             role: data.role,
           }),
-        });
-      } catch (apiErr) {
-        console.warn("[Onboarding] Backend sync failed (non-critical):", apiErr);
-      }
-
-      const profileForState: UserProfile = { id: 0, ...data };
-      setProfile(profileForState);
-
-      console.log("[Onboarding] Navigating to /dashboard");
-      window.location.replace("/dashboard");
-    } catch (err) {
-      console.error("[Onboarding] Firestore write failed:", err);
-      setError("Failed to save your profile. Please check your connection and try again.");
-      setSaving(false);
-    }
+        }).catch((err) =>
+          console.warn("[Onboarding] Backend sync failed (non-critical):", err)
+        );
+      })
+      .catch((err) => {
+        console.error("[Onboarding] Firestore save failed:", err);
+        // Retry once after 3 seconds
+        setTimeout(() => {
+          setDoc(doc(db, "users", user.uid), data)
+            .then(() => console.log("[Onboarding] Firestore save ✅ (retry)"))
+            .catch((e) => console.error("[Onboarding] Firestore save failed (retry):", e));
+        }, 3000);
+      });
   };
 
   return (
@@ -198,7 +211,7 @@ export default function Onboarding() {
               {saving ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Saving…
+                  Setting up…
                 </span>
               ) : (
                 "Let's Go! 🚀"
