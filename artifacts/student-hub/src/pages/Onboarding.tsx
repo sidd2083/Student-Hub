@@ -3,23 +3,11 @@ import { useAuth, UserProfile } from "@/context/AuthContext";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-// Key used in sessionStorage to survive the page reload after window.location.replace
-const PENDING_PROFILE_KEY = "sh_pending_profile";
-
-export function getPendingProfile(uid: string): UserProfile | null {
-  try {
-    const raw = sessionStorage.getItem(PENDING_PROFILE_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw) as UserProfile & { uid: string };
-    return data.uid === uid ? (data as UserProfile) : null;
-  } catch {
-    return null;
-  }
+export function getPendingProfile(_uid: string): UserProfile | null {
+  return null;
 }
 
-export function clearPendingProfile() {
-  sessionStorage.removeItem(PENDING_PROFILE_KEY);
-}
+export function clearPendingProfile() {}
 
 export default function Onboarding() {
   const { user, setProfile } = useAuth();
@@ -55,29 +43,36 @@ export default function Onboarding() {
 
     console.log("[Onboarding] Saving profile for uid:", user.uid, "name:", data.name, "grade:", data.grade);
 
-    // 1️⃣ Store profile in sessionStorage so AuthContext survives the page reload
-    //    without redirecting back to /setup-profile before Firestore write completes.
-    const profileForStorage: UserProfile = { id: 0, ...data };
-    sessionStorage.setItem(PENDING_PROFILE_KEY, JSON.stringify(profileForStorage));
+    try {
+      await setDoc(doc(db, "users", user.uid), data);
+      console.log("User saved successfully");
 
-    // 2️⃣ Update local auth state immediately (no wait)
-    setProfile(profileForStorage);
+      try {
+        await fetch("/api/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            uid: data.uid,
+            name: data.name,
+            email: data.email,
+            grade: data.grade,
+            role: data.role,
+          }),
+        });
+      } catch (apiErr) {
+        console.warn("[Onboarding] Backend sync failed (non-critical):", apiErr);
+      }
 
-    // 3️⃣ Navigate to dashboard right now — don't wait for server
-    console.log("[Onboarding] Navigating to /dashboard immediately");
-    window.location.replace("/dashboard");
+      const profileForState: UserProfile = { id: 0, ...data };
+      setProfile(profileForState);
 
-    // 4️⃣ Write to Firestore in background (offline cache makes this instant locally;
-    //    it will sync to Firebase servers even after the page navigates away)
-    setDoc(doc(db, "users", user.uid), data)
-      .then(() => {
-        console.log("[Onboarding] Firestore write confirmed for uid:", user.uid);
-        clearPendingProfile();
-      })
-      .catch((err) => {
-        console.error("[Onboarding] Firestore write failed:", err);
-        // Don't clear pending — AuthContext will keep using sessionStorage profile
-      });
+      console.log("[Onboarding] Navigating to /dashboard");
+      window.location.replace("/dashboard");
+    } catch (err) {
+      console.error("[Onboarding] Firestore write failed:", err);
+      setError("Failed to save your profile. Please check your connection and try again.");
+      setSaving(false);
+    }
   };
 
   return (
@@ -203,7 +198,7 @@ export default function Onboarding() {
               {saving ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Setting up…
+                  Saving…
                 </span>
               ) : (
                 "Let's Go! 🚀"

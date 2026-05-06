@@ -11,7 +11,6 @@ import {
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, googleProvider, db, isConfigured } from "@/lib/firebase";
-import { getPendingProfile, clearPendingProfile } from "@/pages/Onboarding";
 
 export interface UserProfile {
   id: number;
@@ -73,7 +72,6 @@ async function fetchProfile(uid: string): Promise<ProfileResult> {
 
 // ─── Routing helper ───────────────────────────────────────────────────────────
 
-// Paths unauthenticated users may visit (SoftGate overlay handles them)
 const PUBLIC_PATH_REGEX =
   /^\/?$|^\/login|^\/notes|^\/pyqs|^\/pyq|^\/about|^\/contact|^\/ai|^\/report|^\/todo|^\/pomodoro|^\/leaderboard|^\/admin/;
 
@@ -130,21 +128,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("[Auth] AUTH STATE: uid=" + firebaseUser.uid);
       setUser(firebaseUser);
 
-      // Check sessionStorage for a profile that was saved optimistically
-      // (written by Onboarding before the Firestore round-trip completed)
-      const pending = getPendingProfile(firebaseUser.uid);
-      if (pending) {
-        console.log("[Auth] Using pending profile from sessionStorage — name:", pending.name);
-        setProfileState(pending);
-        setLoading(false);
-        const path = window.location.pathname;
-        if (path === "/" || path === "/login" || path === "/setup-profile" || path === "/onboarding") {
-          console.log("[Auth] ROUTE: pending profile → /dashboard");
-          window.location.replace("/dashboard");
-        }
-        return;
-      }
-
       // Fetch from Firestore
       const result = await fetchProfile(firebaseUser.uid);
       if (!mounted) return;
@@ -153,8 +136,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const path = window.location.pathname;
 
       if (result.status === "found") {
-        // Clear any stale pending profile (Firestore write confirmed)
-        clearPendingProfile();
         setProfileState(result.profile);
         setLoading(false);
         console.log("[Auth] ROUTE:", path, "→ profile found");
@@ -196,7 +177,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log("[Auth] refreshProfile uid:", currentUser.uid);
     const result = await fetchProfile(currentUser.uid);
     if (result.status === "found") {
-      clearPendingProfile();
       setProfileState(result.profile);
     }
   }, []);
@@ -216,6 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const cred = await signInWithPopup(auth, googleProvider);
       const isNewUser = getAdditionalUserInfo(cred)?.isNewUser ?? false;
+      console.log("Login success:", cred.user.uid);
       console.log("[Auth] LOGIN RESULT:", cred.user.email, "uid:", cred.user.uid, "isNewUser:", isNewUser);
       // onAuthStateChanged handles navigation from here
       return { outcome: "success", isNewUser };
@@ -227,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("[Auth] Popup blocked — falling back to redirect…");
         try {
           await signInWithRedirect(auth, googleProvider);
-          return { outcome: "redirect", isNewUser: false }; // page navigates away
+          return { outcome: "redirect", isNewUser: false };
         } catch (rErr: unknown) {
           console.error("[Auth] Redirect also failed:", (rErr as { code?: string })?.code, rErr);
         }
@@ -245,7 +226,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     console.log("[Auth] Signing out…");
-    clearPendingProfile();
     await firebaseSignOut(auth);
     setUser(null);
     setProfileState(null);

@@ -1,0 +1,191 @@
+Fix ONLY the signup/login flow. Do NOT touch UI. Do NOT add features.
+
+---
+
+# 🔴 GOAL
+
+Make login and signup:
+
+- FAST
+- CORRECT
+- CONSISTENT
+- DATA SAVED
+
+---
+
+# 🔴 1. GOOGLE LOGIN MUST BE INSTANT
+
+When user clicks "Continue with Google":
+
+Use:
+
+signInWithPopup()
+
+---
+
+## FIX:
+
+- Wait for login to COMPLETE
+- DO NOT redirect before auth finishes
+
+---
+
+Add log:
+console.log("Login success:", user.uid)
+
+---
+
+# 🔴 2. AFTER LOGIN → CHECK FIRESTORE (MOST IMPORTANT)
+
+Immediately after login:
+
+Check:
+
+users/{uid}
+
+---
+
+## LOGIC:
+
+IF document EXISTS:
+→ redirect to /dashboard
+
+IF document DOES NOT exist:
+→ redirect to /setup-profile
+
+---
+
+🚫 NEVER send existing user to setup-profile  
+🚫 NEVER send new user to dashboard  
+
+---
+
+# 🔴 3. SETUP PROFILE SAVE (CRITICAL)
+
+When user clicks "Let's Go":
+
+SAVE to Firestore:
+
+collection: users  
+doc id: user.uid  
+
+fields:
+- uid
+- name
+- email
+- grade
+- createdAt
+
+---
+
+## IMPORTANT:
+
+WAIT for save to complete before redirect
+
+---
+
+Then:
+→ redirect to /dashboard
+
+---
+
+Add log:
+console.log("User saved successfully")
+
+---
+
+# 🔴 4. FIX SLOWNESS
+
+Problems:
+- delay after login
+- delay after setup
+
+---
+
+## FIX:
+
+- Use async/await properly
+- remove unnecessary delays
+- remove multiple redirects
+
+---
+
+# 🔴 5. RETURNING USER FLOW
+
+When user opens website:
+
+Use:
+
+onAuthStateChanged()
+
+---
+
+## LOGIC:
+
+IF user exists:
+→ go directly to /dashboard
+
+IF not:
+→ stay on login page
+
+---
+
+# 🔴 6. FIX WRONG REDIRECT TO SETUP
+
+Problem:
+Existing users go to setup again
+
+---
+
+## FIX:
+
+Before redirecting to setup:
+
+ALWAYS check Firestore
+
+---
+
+# 🔴 7. VERIFY DATA IS SAVED
+
+After signup:
+
+Check Firestore manually:
+
+users collection should contain:
+- name
+- grade
+- email
+
+---
+
+If not:
+→ FIX write function
+
+---
+
+# 🔴 8. REMOVE ALL FAKE STATE
+
+Use ONLY:
+
+firebaseUser
+
+---
+
+Do NOT use:
+- local login flags
+- manual booleans
+
+---
+
+# 🎯 FINAL RESULT
+
+- Click Google → instant login
+- New user → setup page
+- Fill details → saved → dashboard
+- Existing user → direct dashboard
+- Admin can see users
+- No delay
+
+---
+
+END
