@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { isConfigured } from "@/lib/firebase";
 
 type Tab = "login" | "register";
+type BusyState = false | "signing-in" | "redirecting" | "exists";
 
 const ICONS = [
   { emoji: "📚", label: "Notes",   x: "8%",  y: "15%", delay: "0s",   size: "text-3xl" },
@@ -29,22 +30,50 @@ function FloatingIcon({ emoji, x, y, delay, size }: { emoji: string; label: stri
 export default function Login() {
   const { signInWithGoogle } = useAuth();
   const [tab, setTab] = useState<Tab>("login");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<BusyState>(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
 
   const firebaseReady = isConfigured;
 
   const handleGoogle = async () => {
-    setBusy(true);
+    setBusy("signing-in");
     setError("");
+    setInfo("");
     try {
-      await signInWithGoogle();
+      const { outcome, isNewUser } = await signInWithGoogle();
+
+      if (outcome === "cancelled") {
+        // User closed the popup — reset
+        setBusy(false);
+        return;
+      }
+
+      if (outcome === "redirect") {
+        // Page is navigating away via redirect flow
+        setBusy("redirecting");
+        return;
+      }
+
+      // outcome === "success"
+      if (tab === "register" && !isNewUser) {
+        // Returning user on the "Create Account" tab — show friendly message
+        setBusy("exists");
+        setInfo("This Google account already has a Student Hub profile. Taking you to your dashboard…");
+        // AuthContext will navigate to /dashboard shortly
+        return;
+      }
+
+      // New user or login tab — stay busy; AuthContext navigates to /setup-profile or /dashboard
+      setBusy("redirecting");
+
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Sign-in failed. Please try again.";
       const isConfig = msg.toLowerCase().includes("firebase") || msg.toLowerCase().includes("configured");
-      setError(isConfig ? "Login is not set up yet — Firebase credentials are missing. Please contact the site admin." : "Sign-in failed. Please try again.");
+      setError(isConfig
+        ? "Login is not set up yet — Firebase credentials are missing. Please contact the site admin."
+        : "Sign-in failed. Please try again.");
       console.error("Sign-in failed:", err);
-    } finally {
       setBusy(false);
     }
   };
@@ -136,6 +165,14 @@ export default function Login() {
             </div>
           )}
 
+          {/* Info message (e.g. "account already exists") */}
+          {info && (
+            <div className="flex items-center gap-2 px-4 py-3 mb-4 bg-blue-50 border border-blue-100 rounded-xl">
+              <span className="text-base">ℹ️</span>
+              <p className="text-blue-700 text-sm">{info}</p>
+            </div>
+          )}
+
           {tab === "login" ? (
             <div className="anim-up">
               <h2 className="text-xl font-bold text-gray-900 mb-1">Welcome back! 👋</h2>
@@ -144,7 +181,7 @@ export default function Login() {
                 data-testid="btn-google-signin"
                 type="button"
                 onClick={handleGoogle}
-                disabled={busy || !firebaseReady}
+                disabled={!!busy || !firebaseReady}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3.5 border border-gray-200 rounded-2xl text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
               >
                 {busy ? (
@@ -152,11 +189,16 @@ export default function Login() {
                 ) : (
                   <GoogleLogo />
                 )}
-                <span>{busy ? "Opening Google Sign-In…" : firebaseReady ? "Continue with Google" : "Login unavailable"}</span>
+                <span>
+                  {busy === "redirecting" ? "Taking you in…"
+                    : busy ? "Opening Google Sign-In…"
+                    : firebaseReady ? "Continue with Google"
+                    : "Login unavailable"}
+                </span>
               </button>
               <p className="text-center text-xs text-gray-400 mt-5">
                 Don't have an account?{" "}
-                <button onClick={() => setTab("register")} className="text-blue-500 hover:underline font-medium">
+                <button onClick={() => { setTab("register"); setError(""); setInfo(""); }} className="text-blue-500 hover:underline font-medium">
                   Create one
                 </button>
               </p>
@@ -181,7 +223,7 @@ export default function Login() {
                 data-testid="btn-google-register"
                 type="button"
                 onClick={handleGoogle}
-                disabled={busy || !firebaseReady}
+                disabled={!!busy || !firebaseReady}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-2xl hover:from-blue-600 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-200"
               >
                 {busy ? (
@@ -189,7 +231,13 @@ export default function Login() {
                 ) : (
                   <GoogleLogo white />
                 )}
-                <span>{busy ? "Opening Google Sign-In…" : firebaseReady ? "Sign up with Google" : "Signup unavailable"}</span>
+                <span>
+                  {busy === "exists" ? "Taking you to your dashboard…"
+                    : busy === "redirecting" ? "Setting up your profile…"
+                    : busy ? "Opening Google Sign-In…"
+                    : firebaseReady ? "Sign up with Google"
+                    : "Signup unavailable"}
+                </span>
               </button>
               <p className="text-center text-xs text-gray-400 mt-5">
                 Already have an account?{" "}

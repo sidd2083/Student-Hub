@@ -5,6 +5,7 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
+  getAdditionalUserInfo,
   signOut as firebaseSignOut,
   UserCredential,
 } from "firebase/auth";
@@ -27,11 +28,13 @@ type ProfileResult =
   | { status: "not_found" }
   | { status: "error"; code: string };
 
+export type SignInOutcome = "success" | "cancelled" | "redirect";
+
 interface AuthContextType {
   user: FirebaseUser | null;
   profile: UserProfile | null;
   loading: boolean;
-  signInWithGoogle: () => Promise<void>;
+  signInWithGoogle: () => Promise<{ outcome: SignInOutcome; isNewUser: boolean }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   setProfile: (p: UserProfile | null) => void;
@@ -204,32 +207,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── Google sign-in (popup with redirect fallback) ─────────────────────────
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (): Promise<{ outcome: SignInOutcome; isNewUser: boolean }> => {
     if (!isConfigured) {
       throw new Error("Firebase is not configured. Set VITE_FIREBASE_* env vars.");
     }
     setLoading(true);
     console.log("[Auth] signInWithGoogle — trying popup…");
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      console.log("[Auth] LOGIN RESULT:", result.user.email, "uid:", result.user.uid);
+      const cred = await signInWithPopup(auth, googleProvider);
+      const isNewUser = getAdditionalUserInfo(cred)?.isNewUser ?? false;
+      console.log("[Auth] LOGIN RESULT:", cred.user.email, "uid:", cred.user.uid, "isNewUser:", isNewUser);
       // onAuthStateChanged handles navigation from here
+      return { outcome: "success", isNewUser };
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code ?? "unknown";
       console.warn("[Auth] signInWithPopup:", code);
+
       if (code === "auth/popup-blocked") {
         console.log("[Auth] Popup blocked — falling back to redirect…");
         try {
           await signInWithRedirect(auth, googleProvider);
-          return; // Page navigates away
+          return { outcome: "redirect", isNewUser: false }; // page navigates away
         } catch (rErr: unknown) {
           console.error("[Auth] Redirect also failed:", (rErr as { code?: string })?.code, rErr);
         }
       }
+
       setLoading(false);
-      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
-        throw err;
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+        return { outcome: "cancelled", isNewUser: false };
       }
+      throw err;
     }
   };
 

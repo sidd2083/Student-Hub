@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import {
   collection, addDoc, getDocs, deleteDoc,
-  doc, query, orderBy, setDoc, getDoc,
+  doc, query, orderBy, setDoc, getDoc, onSnapshot,
 } from "firebase/firestore";
 import {
   ref, uploadBytesResumable, getDownloadURL,
@@ -629,19 +629,24 @@ function ManageUsers() {
   const [loading, setLoading] = useState(true);
   const [updatingUid, setUpdatingUid] = useState<string | null>(null);
 
-  const loadUsers = async () => {
-    setLoading(true);
-    try {
-      const snap = await getDocs(collection(db, "users"));
-      const list = snap.docs.map(d => ({ uid: d.id, ...d.data() } as FSUser));
-      list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-      console.log("[Admin] Users fetched:", list.length);
-      setUsers(list);
-    } catch (e) { console.error("[Admin] Failed to load users:", e); }
-    finally { setLoading(false); }
-  };
-
-  useEffect(() => { loadUsers(); }, []);
+  useEffect(() => {
+    console.log("[Admin] Subscribing to users collection (real-time)…");
+    const unsub = onSnapshot(
+      collection(db, "users"),
+      (snap) => {
+        const list = snap.docs.map(d => ({ uid: d.id, ...d.data() } as FSUser));
+        list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+        console.log("[Admin] Users updated:", list.length);
+        setUsers(list);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("[Admin] Users listener error:", err);
+        setLoading(false);
+      }
+    );
+    return () => unsub();
+  }, []);
 
   const handleRoleChange = async (uid: string, role: string) => {
     setUpdatingUid(uid);
@@ -666,11 +671,12 @@ function ManageUsers() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Manage Users</h2>
-          <p className="text-sm text-gray-500 mt-0.5">{users.length} registered users</p>
+          <p className="text-sm text-gray-500 mt-0.5">{users.length} registered users · live</p>
         </div>
-        <button onClick={loadUsers} className="px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all">
-          Refresh
-        </button>
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 border border-green-200 text-green-700 text-xs font-medium">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+          Real-time
+        </span>
       </div>
       {loading ? (
         <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
