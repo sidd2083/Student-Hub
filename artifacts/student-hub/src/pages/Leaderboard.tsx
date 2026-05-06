@@ -3,30 +3,32 @@ import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { Trophy, Flame, Clock } from "lucide-react";
+import { collection, onSnapshot } from "firebase/firestore";
+import { Trophy, Flame, Clock, Sun } from "lucide-react";
 
 interface LeaderEntry {
   uid: string;
   name: string;
   grade: number;
   streak: number;
-  studyTime: number;
+  totalStudyTime: number;
+  todayStudyTime: number;
 }
 
-type SortKey = "studyTime" | "streak";
+type SortKey = "totalStudyTime" | "streak" | "todayStudyTime";
 
 function LeaderboardContent() {
   const { user } = useAuth();
   const [entries, setEntries] = useState<LeaderEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<SortKey>("studyTime");
+  const [sortBy, setSortBy] = useState<SortKey>("totalStudyTime");
   const [gradeFilter, setGradeFilter] = useState<number | "all">("all");
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const snap = await getDocs(collection(db, "users"));
+    console.log("[Leaderboard] Starting real-time listener…");
+    const unsubscribe = onSnapshot(
+      collection(db, "users"),
+      (snap) => {
         const data: LeaderEntry[] = snap.docs
           .map(d => {
             const v = d.data();
@@ -35,18 +37,24 @@ function LeaderboardContent() {
               name: v.name ?? "Unknown",
               grade: v.grade ?? 0,
               streak: v.streak ?? 0,
-              studyTime: v.studyTime ?? 0,
+              totalStudyTime: v.totalStudyTime ?? v.studyTime ?? 0,
+              todayStudyTime: v.todayStudyTime ?? 0,
             };
           })
           .filter(e => e.name && e.grade);
+        console.log("[Leaderboard] Real-time update:", data.length, "users");
         setEntries(data);
-      } catch (err) {
-        console.error("Leaderboard load failed:", err);
-      } finally {
+        setLoading(false);
+      },
+      (err) => {
+        console.error("[Leaderboard] Snapshot failed:", err);
         setLoading(false);
       }
+    );
+    return () => {
+      console.log("[Leaderboard] Unsubscribing real-time listener");
+      unsubscribe();
     };
-    load();
   }, []);
 
   const filtered = entries
@@ -69,16 +77,23 @@ function LeaderboardContent() {
     <div className="p-4 sm:p-8 max-w-2xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Leaderboard</h1>
-        <p className="text-gray-500 text-sm">Top students ranked by study time and streak</p>
+        <p className="text-gray-500 text-sm">Updates in real-time as students study</p>
       </div>
 
+      {/* Sort tabs */}
       <div className="flex flex-wrap gap-2 mb-4">
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
-            onClick={() => setSortBy("studyTime")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${sortBy === "studyTime" ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+            onClick={() => setSortBy("totalStudyTime")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${sortBy === "totalStudyTime" ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
           >
-            <Clock className="w-3.5 h-3.5" /> Study Time
+            <Clock className="w-3.5 h-3.5" /> All Time
+          </button>
+          <button
+            onClick={() => setSortBy("todayStudyTime")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${sortBy === "todayStudyTime" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+          >
+            <Sun className="w-3.5 h-3.5" /> Today
           </button>
           <button
             onClick={() => setSortBy("streak")}
@@ -88,6 +103,7 @@ function LeaderboardContent() {
           </button>
         </div>
 
+        {/* Grade filter */}
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setGradeFilter("all")}
@@ -105,6 +121,14 @@ function LeaderboardContent() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Sort label */}
+      <div className="mb-3 text-xs text-gray-400 font-medium uppercase tracking-wide">
+        {sortBy === "totalStudyTime" && "📚 Ranked by total study time"}
+        {sortBy === "todayStudyTime" && "☀️ Ranked by today's study time"}
+        {sortBy === "streak" && "🔥 Ranked by study streak"}
+        {gradeFilter !== "all" && ` · Grade ${gradeFilter} only`}
       </div>
 
       {loading ? (
@@ -139,10 +163,19 @@ function LeaderboardContent() {
                   <div className="text-right">
                     <div className="flex items-center gap-1 text-blue-600">
                       <Clock className="w-3 h-3" />
-                      <span className="text-sm font-semibold">{fmtTime(entry.studyTime)}</span>
+                      <span className="text-sm font-semibold">{fmtTime(entry.totalStudyTime)}</span>
                     </div>
-                    <p className="text-xs text-gray-400">studied</p>
+                    <p className="text-xs text-gray-400">total</p>
                   </div>
+                  {sortBy === "todayStudyTime" && (
+                    <div className="text-right">
+                      <div className="flex items-center gap-1 text-green-600">
+                        <Sun className="w-3 h-3" />
+                        <span className="text-sm font-semibold">{fmtTime(entry.todayStudyTime)}</span>
+                      </div>
+                      <p className="text-xs text-gray-400">today</p>
+                    </div>
+                  )}
                   <div className="text-right">
                     <div className="flex items-center gap-1 text-orange-500">
                       <Flame className="w-3 h-3" />

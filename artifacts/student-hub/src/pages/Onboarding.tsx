@@ -32,12 +32,17 @@ export default function Onboarding() {
         grade: Number(grade),
         role: "user" as const,
         createdAt: now,
+        streak: 0,
+        totalStudyTime: 0,
+        todayStudyTime: 0,
+        lastActiveDate: null,
       };
 
+      console.log("[Auth] Saving user profile to Firestore:", user.uid);
       await setDoc(doc(db, "users", user.uid), data);
+      console.log("[Auth] User saved:", user.uid, "name:", data.name, "grade:", data.grade);
 
       const newProfile: UserProfile = { id: 0, ...data };
-      // Set profile in context first, then navigate immediately
       setProfile(newProfile);
       setLocation("/dashboard");
     } catch (err) {

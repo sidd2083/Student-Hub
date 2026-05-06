@@ -622,7 +622,7 @@ function ManageAnnouncements() {
 
 // ─── Manage Users (Firestore) ──────────────────────────────────────────────
 
-interface FSUser { uid: string; name: string; email: string; grade: number; role: string; createdAt: string }
+interface FSUser { uid: string; name: string; email: string; grade: number; role: string; createdAt: string; streak?: number; totalStudyTime?: number; todayStudyTime?: number }
 
 function ManageUsers() {
   const [users, setUsers] = useState<FSUser[]>([]);
@@ -678,16 +678,32 @@ function ManageUsers() {
       ) : (
         users.map(u => (
           <div key={u.uid} className="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3 mb-2">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-sm font-semibold">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-sm font-semibold flex-shrink-0">
                 {(u.name || u.email || "?").charAt(0).toUpperCase()}
               </div>
-              <div>
-                <p className="font-medium text-gray-900 text-sm">{u.name || "(no name)"}</p>
-                <p className="text-xs text-gray-500">{u.email} · Grade {u.grade}</p>
+              <div className="min-w-0">
+                <p className="font-medium text-gray-900 text-sm truncate">{u.name || "(no name)"}</p>
+                <p className="text-xs text-gray-500 truncate">{u.email} · Grade {u.grade}</p>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <span className="inline-flex items-center gap-1 text-[10px] text-blue-600">
+                    <Clock className="w-2.5 h-2.5" />
+                    {(() => { const m = u.totalStudyTime ?? 0; return m >= 60 ? `${Math.floor(m/60)}h ${m%60}m` : `${m}m`; })()}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] text-orange-500">
+                    <Flame className="w-2.5 h-2.5" />
+                    {u.streak ?? 0}d
+                  </span>
+                  {(u.todayStudyTime ?? 0) > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-green-600">
+                      <BarChart2 className="w-2.5 h-2.5" />
+                      {u.todayStudyTime}m today
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <select
                 value={u.role || "user"}
                 disabled={updatingUid === u.uid}

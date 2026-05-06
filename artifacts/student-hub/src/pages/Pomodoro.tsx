@@ -11,20 +11,93 @@ import { db } from "@/lib/firebase";
 
 type Preset = 25 | 50 | "custom";
 
+function getToday(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getYesterday(): string {
+  return new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+}
+
+async function generateDailyReport(uid: string, date: string) {
+  try {
+    const reportId = `${uid}_${date}`;
+    const reportRef = doc(db, "reports", reportId);
+    const reportSnap = await getDoc(reportRef);
+    if (reportSnap.exists()) return; // Already generated today
+
+    const userSnap = await getDoc(doc(db, "users", uid));
+    const userData = userSnap.data() ?? {};
+
+    await setDoc(reportRef, {
+      uid,
+      date,
+      totalStudyTime: userData.totalStudyTime ?? userData.studyTime ?? 0,
+      todayStudyTime: userData.todayStudyTime ?? 0,
+      streak: userData.streak ?? 0,
+      productivityScore: Math.min(100, Math.round(((userData.todayStudyTime ?? 0) / 120) * 100)),
+      generatedAt: new Date().toISOString(),
+    });
+    console.log("[Report] Daily report saved for", uid, "date:", date);
+  } catch (err) {
+    console.error("[Report] Failed to generate daily report:", err);
+  }
+}
+
 async function saveStudySession(uid: string, minutesStudied: number) {
   try {
-    const userRef = doc(db, "users", uid);
-    await updateDoc(userRef, { studyTime: increment(minutesStudied) });
+    console.log(`[Pomodoro] Saving ${minutesStudied} min for user ${uid}`);
+    const today = getToday();
+    const yesterday = getYesterday();
 
-    const today = new Date().toISOString().slice(0, 10);
+    const userRef = doc(db, "users", uid);
+    const userSnap = await getDoc(userRef);
+    const userData = userSnap.data() ?? {};
+
+    const lastActiveDate: string | null = userData.lastActiveDate ?? null;
+    const currentStreak: number = userData.streak ?? 0;
+    const currentTodayStudyTime: number = userData.todayStudyTime ?? 0;
+
+    let newStreak = currentStreak;
+    let newTodayStudyTime: number;
+
+    if (lastActiveDate === today) {
+      // Already studied today — add to today's time, keep streak
+      newStreak = currentStreak;
+      newTodayStudyTime = currentTodayStudyTime + minutesStudied;
+    } else if (lastActiveDate === yesterday) {
+      // Studied yesterday — streak continues, reset today's time
+      newStreak = currentStreak + 1;
+      newTodayStudyTime = minutesStudied;
+    } else {
+      // Haven't studied in 2+ days — reset streak to 1, reset today's time
+      newStreak = 1;
+      newTodayStudyTime = minutesStudied;
+    }
+
+    await updateDoc(userRef, {
+      totalStudyTime: increment(minutesStudied),
+      todayStudyTime: newTodayStudyTime,
+      lastActiveDate: today,
+      streak: newStreak,
+    });
+
+    console.log(`[Pomodoro] Saved: totalStudyTime+=${minutesStudied}, todayStudyTime=${newTodayStudyTime}, streak=${newStreak}, lastActiveDate=${today}`);
+
+    // Update study log subcollection
     const logRef = doc(db, "users", uid, "studyLogs", today);
-    const snap = await getDoc(logRef);
-    if (snap.exists()) {
+    const logSnap = await getDoc(logRef);
+    if (logSnap.exists()) {
       await updateDoc(logRef, { studyMinutes: increment(minutesStudied) });
     } else {
       await setDoc(logRef, { date: today, studyMinutes: minutesStudied, tasksCompleted: 0 });
     }
-    console.log(`[Pomodoro] Saved ${minutesStudied} min study time`);
+
+    // Generate daily report if it's past 10 PM
+    const hour = new Date().getHours();
+    if (hour >= 22) {
+      await generateDailyReport(uid, today);
+    }
   } catch (err) {
     console.error("[Pomodoro] Failed to save study time:", err);
   }
@@ -55,9 +128,8 @@ function PomodoroContent() {
             setRunning(false);
             setDone(true);
             clearInterval(intervalRef.current!);
-            // Save completed session to Firestore
             if (user?.uid) {
-              const minsStudied = Math.ceil(startSecondsRef.current / 60);
+              const minsStudied = Math.max(1, Math.ceil(startSecondsRef.current / 60));
               saveStudySession(user.uid, minsStudied);
             }
             return 0;
@@ -176,7 +248,7 @@ function PomodoroContent() {
 
         {done && (
           <p className="mt-4 text-xs text-green-600 font-medium">
-            ✓ Study time saved to your report card
+            ✓ Study time saved — leaderboard updated instantly!
           </p>
         )}
       </div>

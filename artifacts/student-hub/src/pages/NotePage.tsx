@@ -5,6 +5,7 @@ import { useGetNote } from "@workspace/api-client-react";
 import { ArrowLeft, FileText, Image, Type, ExternalLink, ZoomIn, X, BookOpen } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { getDoc, doc } from "firebase/firestore";
+import { useAuth } from "@/context/AuthContext";
 
 interface SeoMeta {
   seoTitle: string;
@@ -20,6 +21,7 @@ function toSlug(str: string) {
 export default function NotePage() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
+  const { user } = useAuth();
   const [imgZoomed, setImgZoomed] = useState(false);
   const [scrollPct, setScrollPct] = useState(0);
   const [seoMeta, setSeoMeta] = useState<SeoMeta | null>(null);
@@ -232,17 +234,19 @@ export default function NotePage() {
                 )}
               </div>
 
-              {/* CTA */}
-              <div className="mt-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-center">
-                <h2 className="text-lg font-bold text-white mb-1">Want more? Get full access — free.</h2>
-                <p className="text-blue-100 text-sm mb-4">Nep AI tutor, progress tracking, Report Card, and thousands more notes.</p>
-                <Link
-                  href="/login"
-                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-white text-blue-600 rounded-xl font-semibold text-sm hover:bg-blue-50 transition-all"
-                >
-                  Login / Register — It's Free
-                </Link>
-              </div>
+              {/* CTA — only shown to guests */}
+              {!user && (
+                <div className="mt-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-center">
+                  <h2 className="text-lg font-bold text-white mb-1">Want more? Get full access — free.</h2>
+                  <p className="text-blue-100 text-sm mb-4">Nep AI tutor, progress tracking, Report Card, and thousands more notes.</p>
+                  <Link
+                    href="/login"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-white text-blue-600 rounded-xl font-semibold text-sm hover:bg-blue-50 transition-all"
+                  >
+                    Login / Register — It's Free
+                  </Link>
+                </div>
+              )}
             </div>
           )}
         </div>

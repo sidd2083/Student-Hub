@@ -75,6 +75,9 @@ _None recorded yet._
 - The `PORT` and `BASE_PATH` env vars are required by the Vite config — they are set in the workflow command, not as secrets.
 - `pnpm-workspace.yaml` enforces a 1-day minimum package age for supply-chain safety — do not disable `minimumReleaseAge`.
 - Firebase is gracefully degraded when env vars are missing (warns in console, stubs auth/db) — but the real Firebase config is already set in `.replit` userenv.
+- **Firestore user fields** — canonical field names: `totalStudyTime` (all-time minutes), `todayStudyTime` (today's minutes, resets when date changes), `lastActiveDate` (YYYY-MM-DD), `streak` (days). Old docs may have `studyTime` — always read with `?? v.studyTime ?? 0` fallback.
+- **Daily report** — generated client-side in `Pomodoro.tsx → generateDailyReport()` when a session ends after 10 PM. Stored in `reports/{uid}_{YYYY-MM-DD}`.
+- `lib/api-client-react/dist/index.d.ts` not pre-built — pre-existing TS6305 errors from `tsc --noEmit` are harmless; Vite resolves workspace packages at runtime correctly.
 
 ## Pointers
 

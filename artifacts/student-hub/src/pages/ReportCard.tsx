@@ -105,7 +105,7 @@ function ReportContent() {
         const userSnap = await getDoc(doc(db, "users", user.uid));
         const userData = userSnap.data() ?? {};
         const streak = userData.streak ?? 0;
-        const totalStudyMinutes = userData.studyTime ?? 0;
+        const totalStudyMinutes = userData.totalStudyTime ?? userData.studyTime ?? 0;
 
         const logsSnap = await getDocs(
           query(
