@@ -1,0 +1,257 @@
+The Student Hub app is currently broken. Do NOT redesign. Do NOT add new UI. Do NOT rebuild from scratch.
+
+Your job is to DEBUG and FIX the EXISTING system so it actually works.
+
+Focus ONLY on fixing logic, Firestore connection, and data flow.
+
+---
+
+# 🔴 1. GOOGLE SIGNUP FLOW IS WRONG
+
+Current behavior:
+- User selects Gmail
+- stays on register page
+- then redirects to dashboard automatically
+
+This is WRONG.
+
+---
+
+## REQUIRED FIX:
+
+After Google login:
+
+1. WAIT for Firebase auth to complete
+2. THEN check Firestore:
+
+users/{uid}
+
+---
+
+### LOGIC:
+
+IF user document DOES NOT exist:
+→ redirect to /setup-profile
+
+IF user document EXISTS:
+→ redirect to /dashboard
+
+---
+
+🚫 DO NOT redirect to dashboard immediately after login  
+🚫 MUST wait for Firestore check  
+
+---
+
+# 🔴 2. SETUP PROFILE MUST WORK
+
+On /setup-profile:
+
+User enters:
+- name
+- grade
+
+---
+
+On submit:
+
+SAVE to Firestore:
+
+collection: users  
+document id: uid  
+
+fields:
+- uid
+- name
+- email
+- grade
+- createdAt
+- streak = 0
+- totalStudyTime = 0
+- todayStudyTime = 0
+
+---
+
+AFTER saving:
+→ redirect to /dashboard
+
+---
+
+# 🔴 3. USER DATA IS NOT SAVING
+
+Problem:
+Admin shows 0 users even after login.
+
+---
+
+## FIX:
+
+- Verify Firestore is connected
+- Verify write function is running
+- Ensure collection name is EXACTLY "users"
+- Ensure document id = uid
+
+---
+
+Add log:
+console.log("User saved:", uid)
+
+---
+
+If not saving:
+→ FIX Firestore write
+
+---
+
+# 🔴 4. ADMIN PANEL NOT SHOWING USERS
+
+Fix:
+
+Fetch users correctly:
+
+getDocs(collection("users"))
+
+---
+
+Display real users:
+- name
+- email
+- grade
+
+---
+
+Add log:
+console.log("Users fetched:", data.length)
+
+---
+
+If 0:
+→ data is not being saved → go back and fix save
+
+---
+
+# 🔴 5. NOTES PAGE AUTH BUG
+
+Problem:
+User is logged in but still sees "register"
+
+---
+
+## FIX:
+
+Replace all auth checks with:
+
+IF firebaseUser exists:
+→ allow access
+
+---
+
+Remove fake/local auth checks
+
+---
+
+# 🔴 6. POMODORO NOT CONNECTED
+
+Problem:
+Timer runs but nothing changes
+
+---
+
+## FIX:
+
+After Pomodoro ends:
+
+UPDATE Firestore:
+
+users/{uid}
+
+- totalStudyTime += sessionDuration
+- todayStudyTime += sessionDuration
+
+---
+
+Add log:
+console.log("Pomodoro updated")
+
+---
+
+# 🔴 7. LEADERBOARD NOT WORKING
+
+Problem:
+No update after study
+
+---
+
+## FIX:
+
+Leaderboard MUST read from Firestore:
+
+collection: users
+
+---
+
+Use real-time listener:
+
+onSnapshot(users)
+
+---
+
+Sort by:
+- totalStudyTime DESC
+
+---
+
+Leaderboard must update immediately after Pomodoro
+
+---
+
+# 🔴 8. VERIFY FIREBASE CONFIG
+
+Check:
+
+- Firebase initialized correctly
+- Firestore connected
+- Auth working
+
+---
+
+If not:
+→ ask user to enter Firebase credentials
+
+---
+
+# 🔴 9. DEBUG EVERYTHING
+
+Add logs at:
+
+- after login
+- after Firestore check
+- after user save
+- after Pomodoro update
+- after leaderboard fetch
+
+---
+
+# 🎯 FINAL EXPECTED RESULT
+
+- Google login → goes to setup-profile (for new users)
+- setup saves user to Firestore
+- admin shows real users
+- notes do not ask to register when logged in
+- Pomodoro updates study time
+- leaderboard updates instantly
+
+---
+
+# 🚫 DO NOT
+
+- DO NOT redesign UI
+- DO NOT rebuild system
+- DO NOT add new features
+- DO NOT use fake/local state
+
+---
+
+Fix the existing system properly.
+
+END

@@ -635,6 +635,7 @@ function ManageUsers() {
       const snap = await getDocs(collection(db, "users"));
       const list = snap.docs.map(d => ({ uid: d.id, ...d.data() } as FSUser));
       list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+      console.log("[Admin] Users fetched:", list.length);
       setUsers(list);
     } catch (e) { console.error("[Admin] Failed to load users:", e); }
     finally { setLoading(false); }

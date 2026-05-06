@@ -21,7 +21,7 @@ export interface UserProfile {
 type ProfileResult =
   | { status: "found"; profile: UserProfile }
   | { status: "not_found" }
-  | { status: "error" };
+  | { status: "error"; code: string };
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -37,9 +37,10 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 async function fetchProfile(uid: string): Promise<ProfileResult> {
   try {
+    console.log("[Auth] Checking Firestore for uid:", uid);
     const snap = await getDoc(doc(db, "users", uid));
     if (!snap.exists()) {
-      console.log("[Auth] Profile: not found in Firestore");
+      console.log("[Auth] Profile: not found in Firestore — new user");
       return { status: "not_found" };
     }
     const d = snap.data();
@@ -56,13 +57,12 @@ async function fetchProfile(uid: string): Promise<ProfileResult> {
     return { status: "found", profile };
   } catch (err: unknown) {
     const code = (err as { code?: string })?.code ?? "unknown";
-    console.error("[Auth] Firestore error:", code, err);
-    return { status: "error" };
+    console.error("[Auth] Firestore read error:", code, err);
+    return { status: "error", code };
   }
 }
 
 // Paths that unauthenticated users can access without being redirected to /
-// Includes: home, login, public content, soft-gated tools (they see blur overlay)
 const PUBLIC_PATH_REGEX =
   /^\/?$|^\/login|^\/notes|^\/pyqs|^\/pyq|^\/about|^\/contact|^\/ai|^\/report|^\/todo|^\/pomodoro|^\/leaderboard|^\/admin/;
 
@@ -93,47 +93,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // User is signed in — fetch Firestore profile
+      // User is signed in — check Firestore for their profile
+      setUser(firebaseUser);
       const result = await fetchProfile(firebaseUser.uid);
       if (!mounted) return;
 
-      setUser(firebaseUser);
-      console.log("[Auth] PROFILE:", result.status);
+      console.log("[Auth] PROFILE STATUS:", result.status);
+      const path = window.location.pathname;
 
       if (result.status === "found") {
+        // ✅ Existing user — go to dashboard
         setProfileState(result.profile);
         setLoading(false);
-        const path = window.location.pathname;
         if (path === "/" || path === "/login") {
           console.log("[Auth] → existing user, routing to /dashboard");
           window.location.replace("/dashboard");
         }
+
       } else if (result.status === "not_found") {
+        // 🆕 Brand-new user — must go through setup
         setProfileState(null);
         setLoading(false);
-        const path = window.location.pathname;
         if (path !== "/setup-profile" && path !== "/onboarding") {
-          console.log("[Auth] → new user, routing to /setup-profile");
+          console.log("[Auth] → new user (no Firestore doc), routing to /setup-profile");
           window.location.replace("/setup-profile");
         }
+
       } else {
-        // Firestore error — build fallback profile from Firebase Auth
-        console.warn("[Auth] Firestore read failed — using fallback profile from Firebase Auth");
-        const fallback: UserProfile = {
-          id: 0,
-          uid: firebaseUser.uid,
-          name: firebaseUser.displayName ?? "Student",
-          email: firebaseUser.email ?? "",
-          grade: 10,
-          role: "user",
-          createdAt: new Date().toISOString(),
-        };
-        setProfileState(fallback);
+        // ⚠️  Firestore read failed (permissions, network, etc.)
+        // Treat as "unknown" — route to setup-profile if on an auth page
+        // so a genuinely new user is never silently bypassed into /dashboard.
+        console.warn("[Auth] Firestore read failed (code:", result.code, ")");
+        console.warn("[Auth] Cannot confirm profile — routing to /setup-profile for safety");
+        setProfileState(null);
         setLoading(false);
-        const path = window.location.pathname;
         if (path === "/" || path === "/login") {
-          console.log("[Auth] → fallback profile, routing to /dashboard");
-          window.location.replace("/dashboard");
+          window.location.replace("/setup-profile");
+        } else if (path !== "/setup-profile" && path !== "/onboarding") {
+          // Already somewhere in the app — leave them where they are;
+          // they will see restricted content through SoftGate overlays.
+          console.log("[Auth] → Firestore error but already at", path, "— staying");
         }
       }
     });
@@ -163,8 +162,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setLoading(true);
     try {
+      console.log("[Auth] Opening Google sign-in popup…");
       await signInWithPopup(auth, googleProvider);
-      // onAuthStateChanged handles everything from here
+      // onAuthStateChanged handles redirect from here
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
       setLoading(false);
@@ -177,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    console.log("[Auth] Signing out…");
     await firebaseSignOut(auth);
     setUser(null);
     setProfileState(null);

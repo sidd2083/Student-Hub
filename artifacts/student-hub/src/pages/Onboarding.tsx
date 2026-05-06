@@ -2,11 +2,9 @@ import { useState } from "react";
 import { useAuth, UserProfile } from "@/context/AuthContext";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useLocation } from "wouter";
 
 export default function Onboarding() {
   const { user, setProfile } = useAuth();
-  const [, setLocation] = useLocation();
   const [name, setName] = useState(user?.displayName || "");
   const [grade, setGrade] = useState<number | "">("");
   const [agreed, setAgreed] = useState(false);
@@ -44,7 +42,7 @@ export default function Onboarding() {
 
       const newProfile: UserProfile = { id: 0, ...data };
       setProfile(newProfile);
-      setLocation("/dashboard");
+      window.location.replace("/dashboard");
     } catch (err) {
       console.error("[Auth] Failed to save profile:", err);
       setError("Something went wrong. Please try again.");
