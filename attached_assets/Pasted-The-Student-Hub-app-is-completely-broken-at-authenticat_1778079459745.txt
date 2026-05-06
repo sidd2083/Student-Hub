@@ -1,0 +1,206 @@
+The Student Hub app is completely broken at authentication and routing level.
+
+IMPORTANT: This is NOT a feature request. This is a CRITICAL SYSTEM DEBUG + FIX.
+
+Do NOT add new features.
+Do NOT redesign UI.
+Do NOT assume any system works.
+
+You must first VERIFY and FIX core Firebase + routing before anything else.
+
+---
+
+# 🔴 1. FIRST CHECK: FIREBASE CONFIGURATION
+
+Before doing anything:
+
+VERIFY Firebase is properly initialized.
+
+Check:
+- Firebase config exists
+- VITE_FIREBASE_API_KEY is set
+- VITE_FIREBASE_AUTH_DOMAIN is set
+- Firestore is initialized
+- Auth is initialized
+
+---
+
+## IF FIREBASE IS NOT CONFIGURED:
+
+STOP APP FLOW and show:
+
+"Firebase is not configured. Please set environment variables."
+
+DO NOT continue app execution.
+
+---
+
+# 🔴 2. FIX AUTH STATE LISTENER (CRITICAL)
+
+The app is NOT reacting after Google login.
+
+Fix this immediately:
+
+You MUST ensure this runs globally:
+
+onAuthStateChanged(auth, (user) => {
+   console.log("AUTH STATE:", user)
+})
+
+---
+
+## REQUIRED BEHAVIOR:
+
+When Google login succeeds:
+
+1. Auth state must trigger
+2. User must NOT stay on same page
+3. Routing MUST change based on Firestore check
+
+---
+
+# 🔴 3. FIX LOGIN FLOW (CORE ISSUE)
+
+After Google login:
+
+STEP 1:
+Wait for Firebase auth state
+
+STEP 2:
+Check Firestore:
+
+users/{uid}
+
+---
+
+### LOGIC:
+
+IF user == null:
+→ show login page
+
+IF user exists BUT Firestore document DOES NOT exist:
+→ redirect to /setup-profile
+
+IF user exists AND Firestore document EXISTS:
+→ redirect to /dashboard
+
+---
+
+🚫 DO NOT skip Firestore check  
+🚫 DO NOT redirect immediately after login  
+🚫 DO NOT assume login success means profile exists  
+
+---
+
+# 🔴 4. VERIFY ROUTER IS WORKING
+
+Check if app routing is broken:
+
+- /setup-profile must exist
+- /dashboard must exist
+- route transitions must work after login
+
+Add debug log:
+console.log("ROUTE CHANGE:", path)
+
+---
+
+If routing is not triggering:
+→ FIX router system first before anything else
+
+---
+
+# 🔴 5. FIREBASE LOGIN BUG (LIKELY ROOT CAUSE)
+
+If after Google login NOTHING happens:
+
+Check:
+
+- is signInWithPopup working?
+- is result being returned?
+- is auth state updating?
+
+Add logs:
+console.log("LOGIN RESULT:", result)
+
+---
+
+If login succeeds but UI does not change:
+→ problem is auth listener not working
+
+---
+
+# 🔴 6. FIRESTORE CONNECTION CHECK
+
+Verify:
+
+- Can read users collection
+- Can write users collection
+- No silent failures
+
+Add test write:
+create test document in Firestore and log result
+
+---
+
+If Firestore fails:
+→ FIX Firebase credentials immediately
+
+---
+
+# 🔴 7. CRITICAL RULE
+
+DO NOT proceed to:
+- dashboard logic
+- notes logic
+- admin logic
+
+UNTIL:
+
+✔ Firebase auth works  
+✔ Auth state listener works  
+✔ Firestore read/write works  
+✔ Routing works  
+
+---
+
+# 🔴 8. DEBUG MODE (MANDATORY)
+
+Add logs everywhere:
+
+- Firebase init success/fail
+- login success
+- auth state change
+- Firestore read
+- Firestore write
+- route changes
+
+---
+
+# 🎯 FINAL EXPECTED RESULT
+
+After fix:
+
+- Google login triggers auth state
+- user is detected immediately
+- Firestore check happens
+- correct redirect:
+  - new user → setup-profile
+  - existing → dashboard
+- routing works instantly
+- no freezing on login screen
+
+---
+
+# 🚫 DO NOT
+
+- DO NOT build features
+- DO NOT change UI
+- DO NOT assume Firebase works
+- DO NOT skip debug logs
+
+---
+
+Fix core system first.
+
+END

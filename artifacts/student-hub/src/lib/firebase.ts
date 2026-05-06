@@ -12,7 +12,7 @@ const firebaseConfig = {
   appId:             import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-const isConfigured = !!(
+export const isConfigured = !!(
   firebaseConfig.apiKey &&
   firebaseConfig.projectId &&
   firebaseConfig.authDomain
@@ -25,15 +25,23 @@ let db: Firestore;
 let storage: FirebaseStorage;
 
 if (isConfigured) {
+  console.log("[Firebase] Config found — projectId:", firebaseConfig.projectId);
   app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
   auth = getAuth(app);
   googleProvider = new GoogleAuthProvider();
+  googleProvider.addScope("email");
+  googleProvider.addScope("profile");
   db = getFirestore(app);
   storage = getStorage(app);
+  console.log("[Firebase] ✅ Auth, Firestore, Storage initialised");
 } else {
-  console.warn(
-    "[Student Hub] Firebase not configured. " +
-    "Set VITE_FIREBASE_* environment variables to enable auth & database features."
+  console.error(
+    "[Firebase] ❌ NOT CONFIGURED — missing env vars:",
+    {
+      apiKey:     !!firebaseConfig.apiKey,
+      projectId:  !!firebaseConfig.projectId,
+      authDomain: !!firebaseConfig.authDomain,
+    }
   );
   app = {} as FirebaseApp;
   auth = {
@@ -45,4 +53,4 @@ if (isConfigured) {
   storage = {} as FirebaseStorage;
 }
 
-export { app, auth, googleProvider, db, storage, isConfigured };
+export { app, auth, googleProvider, db, storage };

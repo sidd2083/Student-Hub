@@ -3,9 +3,12 @@ import {
   User as FirebaseUser,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut as firebaseSignOut,
+  UserCredential,
 } from "firebase/auth";
-import { getDoc, doc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, googleProvider, db, isConfigured } from "@/lib/firebase";
 
 export interface UserProfile {
@@ -35,12 +38,14 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// ─── Firestore profile fetch ──────────────────────────────────────────────────
+
 async function fetchProfile(uid: string): Promise<ProfileResult> {
   try {
-    console.log("[Auth] Checking Firestore for uid:", uid);
+    console.log("[Auth] Firestore READ — checking users/" + uid);
     const snap = await getDoc(doc(db, "users", uid));
     if (!snap.exists()) {
-      console.log("[Auth] Profile: not found in Firestore — new user");
+      console.log("[Auth] Firestore READ — document does NOT exist (new user)");
       return { status: "not_found" };
     }
     const d = snap.data();
@@ -53,18 +58,42 @@ async function fetchProfile(uid: string): Promise<ProfileResult> {
       role: d.role === "admin" ? "admin" : "user",
       createdAt: typeof d.createdAt === "string" ? d.createdAt : new Date().toISOString(),
     };
-    console.log("[Auth] Profile found:", profile.name, "| grade:", profile.grade, "| role:", profile.role);
+    console.log("[Auth] Firestore READ — profile found:", profile.name, "grade:", profile.grade, "role:", profile.role);
     return { status: "found", profile };
   } catch (err: unknown) {
     const code = (err as { code?: string })?.code ?? "unknown";
-    console.error("[Auth] Firestore read error:", code, err);
+    console.error("[Auth] Firestore READ ERROR — code:", code, err);
     return { status: "error", code };
   }
 }
 
-// Paths that unauthenticated users can access without being redirected to /
+// ─── Route handler ────────────────────────────────────────────────────────────
+
+function handleAuthRoute(status: "found" | "not_found" | "error") {
+  const path = window.location.pathname;
+  console.log("[Auth] ROUTE CHANGE — current path:", path, "| profile status:", status);
+
+  if (status === "found") {
+    if (path === "/" || path === "/login") {
+      console.log("[Auth] ROUTE CHANGE — existing user → /dashboard");
+      window.location.replace("/dashboard");
+    }
+  } else {
+    // not_found or error — send to setup if on an auth/root page
+    if (path !== "/setup-profile" && path !== "/onboarding") {
+      console.log("[Auth] ROUTE CHANGE — new/unknown user → /setup-profile");
+      window.location.replace("/setup-profile");
+    } else {
+      console.log("[Auth] ROUTE CHANGE — already on setup-profile, staying");
+    }
+  }
+}
+
+// Paths that unauthenticated users can access without being sent to /
 const PUBLIC_PATH_REGEX =
   /^\/?$|^\/login|^\/notes|^\/pyqs|^\/pyq|^\/about|^\/contact|^\/ai|^\/report|^\/todo|^\/pomodoro|^\/leaderboard|^\/admin/;
+
+// ─── Auth Provider ────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -73,67 +102,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+
+    if (!isConfigured) {
+      console.error("[Auth] ❌ Firebase not configured — auth disabled");
+      setLoading(false);
+      return;
+    }
+
     console.log("[Auth] Initialising auth listener…");
 
+    // ── Check for redirect-based sign-in result ──────────────────────────────
+    // If user came back from signInWithRedirect, getRedirectResult resolves first.
+    getRedirectResult(auth)
+      .then((result: UserCredential | null) => {
+        if (result?.user) {
+          console.log("[Auth] REDIRECT RESULT:", result.user.email);
+        } else {
+          console.log("[Auth] REDIRECT RESULT: no pending redirect");
+        }
+      })
+      .catch((err: unknown) => {
+        const code = (err as { code?: string })?.code ?? "unknown";
+        console.error("[Auth] REDIRECT RESULT error:", code, err);
+      });
+
+    // ── Main auth state listener ─────────────────────────────────────────────
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!mounted) return;
-      console.log("[Auth] USER:", firebaseUser?.email ?? null);
+      console.log("[Auth] AUTH STATE:", firebaseUser ? firebaseUser.email : null);
 
       if (!firebaseUser) {
         setUser(null);
         setProfileState(null);
         setLoading(false);
         const path = window.location.pathname;
+        console.log("[Auth] ROUTE CHANGE — no user, path:", path);
         if (!PUBLIC_PATH_REGEX.test(path)) {
-          console.log("[Auth] → no user, not a public path, routing to /");
+          console.log("[Auth] ROUTE CHANGE — protected path, redirecting to /");
           window.location.replace("/");
         } else {
-          console.log("[Auth] → no user, public/soft-gate route, staying at", path);
+          console.log("[Auth] ROUTE CHANGE — public path, staying at", path);
         }
         return;
       }
 
-      // User is signed in — check Firestore for their profile
+      // User is signed in
+      console.log("[Auth] AUTH STATE: signed in uid=" + firebaseUser.uid + " email=" + firebaseUser.email);
       setUser(firebaseUser);
+
+      // Check Firestore
       const result = await fetchProfile(firebaseUser.uid);
       if (!mounted) return;
 
       console.log("[Auth] PROFILE STATUS:", result.status);
-      const path = window.location.pathname;
 
       if (result.status === "found") {
-        // ✅ Existing user — go to dashboard
         setProfileState(result.profile);
         setLoading(false);
-        if (path === "/" || path === "/login") {
-          console.log("[Auth] → existing user, routing to /dashboard");
-          window.location.replace("/dashboard");
-        }
-
+        handleAuthRoute("found");
       } else if (result.status === "not_found") {
-        // 🆕 Brand-new user — must go through setup
         setProfileState(null);
         setLoading(false);
-        if (path !== "/setup-profile" && path !== "/onboarding") {
-          console.log("[Auth] → new user (no Firestore doc), routing to /setup-profile");
-          window.location.replace("/setup-profile");
-        }
-
+        handleAuthRoute("not_found");
       } else {
-        // ⚠️  Firestore read failed (permissions, network, etc.)
-        // Treat as "unknown" — route to setup-profile if on an auth page
-        // so a genuinely new user is never silently bypassed into /dashboard.
-        console.warn("[Auth] Firestore read failed (code:", result.code, ")");
-        console.warn("[Auth] Cannot confirm profile — routing to /setup-profile for safety");
+        // Firestore error — don't assume profile exists; route to setup-profile
+        console.warn("[Auth] Firestore error — code:", result.code, "— routing to setup-profile for safety");
         setProfileState(null);
         setLoading(false);
-        if (path === "/" || path === "/login") {
-          window.location.replace("/setup-profile");
-        } else if (path !== "/setup-profile" && path !== "/onboarding") {
-          // Already somewhere in the app — leave them where they are;
-          // they will see restricted content through SoftGate overlays.
-          console.log("[Auth] → Firestore error but already at", path, "— staying");
-        }
+        handleAuthRoute("error");
       }
     });
 
@@ -146,6 +182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshProfile = useCallback(async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
+    console.log("[Auth] refreshProfile — uid:", currentUser.uid);
     const result = await fetchProfile(currentUser.uid);
     if (result.status === "found") setProfileState(result.profile);
   }, []);
@@ -154,27 +191,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfileState(p);
   }, []);
 
+  // ── Sign in with Google ────────────────────────────────────────────────────
+
   const signInWithGoogle = async () => {
     if (!isConfigured) {
-      throw new Error(
-        "Firebase is not configured. Please set the VITE_FIREBASE_* environment variables."
-      );
+      throw new Error("Firebase is not configured. Set VITE_FIREBASE_* environment variables.");
     }
+
     setLoading(true);
+    console.log("[Auth] signInWithGoogle — attempting popup…");
+
     try {
-      console.log("[Auth] Opening Google sign-in popup…");
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      console.log("[Auth] LOGIN RESULT:", result.user.email, "uid:", result.user.uid);
       // onAuthStateChanged handles redirect from here
     } catch (err: unknown) {
-      const code = (err as { code?: string })?.code;
-      setLoading(false);
+      const code = (err as { code?: string })?.code ?? "unknown";
+      console.warn("[Auth] signInWithPopup error — code:", code);
+
+      // Popup was blocked or closed — fall back to redirect flow
       if (
+        code === "auth/popup-blocked" ||
         code === "auth/popup-closed-by-user" ||
         code === "auth/cancelled-popup-request"
-      ) return;
+      ) {
+        if (code === "auth/popup-blocked") {
+          console.log("[Auth] Popup was blocked — falling back to signInWithRedirect…");
+          try {
+            await signInWithRedirect(auth, googleProvider);
+            // Page will redirect away; onAuthStateChanged fires when it returns
+            return;
+          } catch (redirectErr: unknown) {
+            const rCode = (redirectErr as { code?: string })?.code ?? "unknown";
+            console.error("[Auth] signInWithRedirect also failed — code:", rCode, redirectErr);
+          }
+        }
+        setLoading(false);
+        return;
+      }
+
+      setLoading(false);
       throw err;
     }
   };
+
+  // ── Sign out ───────────────────────────────────────────────────────────────
 
   const signOut = async () => {
     console.log("[Auth] Signing out…");
@@ -182,6 +243,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setProfileState(null);
     setLoading(false);
+    console.log("[Auth] ROUTE CHANGE — signed out → /");
     window.location.replace("/");
   };
 
