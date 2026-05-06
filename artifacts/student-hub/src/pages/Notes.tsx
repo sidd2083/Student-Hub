@@ -202,7 +202,7 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
             </button>
             {loadingSubjects
               ? [1, 2, 3].map(i => <div key={i} className="h-8 w-20 bg-gray-100 rounded-full animate-pulse" />)
-              : (subjects || []).map((s) => (
+              : (Array.isArray(subjects) ? subjects : []).map((s) => (
                 <button key={s} data-testid={`filter-subject-${s}`} onClick={() => setSubject(s)}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${subject === s ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
                   {s}
@@ -217,7 +217,7 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => <div key={i} className="h-20 bg-gray-100 rounded-2xl animate-pulse" />)}
           </div>
-        ) : (notes || []).length === 0 ? (
+        ) : (Array.isArray(notes) ? notes : []).length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p className="font-medium">No notes found for this selection</p>
@@ -225,7 +225,7 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
           </div>
         ) : (
           <div className="space-y-2">
-            {(notes || []).map((note) => (
+            {(Array.isArray(notes) ? notes : []).map((note) => (
               <div key={note.id} className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 hover:shadow-sm hover:border-blue-100 transition-all group">
                 <button
                   data-testid={`note-item-${note.id}`}

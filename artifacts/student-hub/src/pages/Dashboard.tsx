@@ -41,7 +41,7 @@ export default function Dashboard() {
     { query: { enabled: !!user?.uid, queryKey: ["listTasks", user?.uid || ""] } }
   );
 
-  const pendingTasks = tasks?.filter((t) => !t.completed).length ?? 0;
+  const pendingTasks = (Array.isArray(tasks) ? tasks : []).filter((t) => !t.completed).length;
 
   useEffect(() => {
     if (!user) return;

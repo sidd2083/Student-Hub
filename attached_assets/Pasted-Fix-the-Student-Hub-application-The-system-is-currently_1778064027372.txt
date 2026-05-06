@@ -1,0 +1,232 @@
+Fix the Student Hub application. The system is currently broken with routing errors, admin panel failures, and Firestore misconfiguration.
+
+This is a CRITICAL DEBUG + STABILIZATION TASK.
+Do NOT add new features until everything works correctly.
+
+---
+
+# 🔴 1. FIREBASE CONFIG (FIRST FIX)
+
+The app is currently broken due to missing or invalid Firebase config.
+
+👉 REQUIREMENT:
+
+- Prompt me to enter Firebase credentials if missing
+- Use environment variables:
+
+VITE_FIREBASE_API_KEY  
+VITE_FIREBASE_AUTH_DOMAIN  
+VITE_FIREBASE_PROJECT_ID  
+VITE_FIREBASE_STORAGE_BUCKET  
+VITE_FIREBASE_MESSAGING_SENDER_ID  
+VITE_FIREBASE_APP_ID  
+
+---
+
+## RULE:
+
+If Firebase is NOT configured:
+→ STOP app
+→ show clear error: "Firebase not configured"
+→ DO NOT try to run app without config
+
+---
+
+# 🔴 2. FIX ALL ROUTING ERRORS (CRITICAL)
+
+Current problem:
+- clicking Notes / PYQ → error
+- admin pages → error
+
+---
+
+## FIX:
+
+- ensure all routes exist:
+  /notes
+  /notes/:id
+  /pyq
+  /admin
+  /admin/notes
+  /admin/pyq
+  /admin/users
+
+---
+
+## RULE:
+
+- NO blank page
+- NO crash
+- show fallback UI if data missing
+
+---
+
+# 🔴 3. ADMIN PANEL CRASH FIX
+
+Current problem:
+Admin pages show error and cannot load.
+
+---
+
+## FIX:
+
+- wrap all admin pages in try/catch
+- log Firestore errors
+- ensure collections exist before reading
+
+---
+
+## REQUIRED:
+
+If collection does not exist:
+→ create it OR show empty state (NOT crash)
+
+---
+
+# 🔴 4. RESET BROKEN DATA (IMPORTANT)
+
+Problem:
+Too many random notes and PYQ showing.
+
+---
+
+## FIX:
+
+- CLEAR all existing dummy/test data from:
+  - notes collection
+  - pyq collection
+
+---
+
+## AFTER RESET:
+
+- admin panel should show EMPTY state
+- no fake data
+- no duplicates
+
+---
+
+# 🔴 5. NOTES & PYQ LOAD FIX
+
+Current problem:
+Clicking "Browse Notes" → error
+
+---
+
+## FIX:
+
+- ensure Firestore fetch is correct
+- check collection name EXACTLY:
+  notes
+  pyq
+
+---
+
+## RULE:
+
+If no data:
+→ show "No content available"
+→ NOT error
+
+---
+
+# 🔴 6. FIRESTORE READ/WRITE FIX
+
+Wrap ALL database calls in:
+
+try {
+  // firestore code
+} catch (error) {
+  console.error(error)
+}
+
+---
+
+## ADD LOGGING:
+
+- fetch success
+- fetch fail
+- save success
+- save fail
+
+---
+
+# 🔴 7. ADMIN CRUD FIX (VERY IMPORTANT)
+
+Ensure admin can:
+
+### NOTES:
+- add note
+- save note (must work)
+- delete note
+
+---
+
+### PYQ:
+- upload PYQ
+- save properly
+- delete
+
+---
+
+## RULE:
+
+After save:
+→ data MUST appear instantly on frontend
+
+---
+
+# 🔴 8. AUTH SAFETY FIX
+
+Ensure:
+
+- logged-in user stays logged in
+- no random redirects
+- no forced logout
+
+---
+
+# 🔴 9. FALLBACK UI (NO MORE CRASH)
+
+For every page:
+
+If error happens:
+→ show clean message:
+"Something went wrong. Please try again."
+
+NOT white screen.
+
+---
+
+# 🔴 10. PERFORMANCE + LOADING FIX
+
+- remove infinite loading
+- show loading spinner during fetch
+- avoid blank screen
+
+---
+
+# 🎯 FINAL RESULT REQUIRED
+
+After this fix:
+
+- Firebase properly configured
+- All routes work
+- Admin panel loads correctly
+- Notes & PYQ pages do NOT crash
+- No fake/dummy data
+- Data loads properly
+- Errors handled safely
+- App is stable
+
+---
+
+# 🚫 DO NOT
+
+- DO NOT add new features yet
+- DO NOT ignore Firebase config
+- DO NOT allow crashes
+
+---
+
+END

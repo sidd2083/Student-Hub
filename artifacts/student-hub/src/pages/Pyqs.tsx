@@ -102,14 +102,15 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
     { query: { queryKey: getListPyqsQueryKey({ grade, subject }) } }
   );
 
-  const subjects = useMemo(() => [...new Set((pyqs || []).map(p => p.subject))].sort(), [pyqs]);
+  const pyqList = Array.isArray(pyqs) ? pyqs : [];
+  const subjects = useMemo(() => [...new Set(pyqList.map(p => p.subject))].sort(), [pyqList]);
   const years = useMemo(
-    () => [...new Set((pyqs || []).map(p => String(p.year)))].sort((a, b) => Number(b) - Number(a)),
-    [pyqs]
+    () => [...new Set(pyqList.map(p => String(p.year)))].sort((a, b) => Number(b) - Number(a)),
+    [pyqList]
   );
 
   const filtered = useMemo(() => {
-    return (pyqs || []).filter(p => {
+    return pyqList.filter(p => {
       if (yearFilter && String(p.year) !== yearFilter) return false;
       if (search && !p.title.toLowerCase().includes(search.toLowerCase())) return false;
       return true;

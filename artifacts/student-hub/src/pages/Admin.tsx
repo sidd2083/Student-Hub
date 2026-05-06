@@ -314,7 +314,7 @@ function ManageNotes() {
 
       {isLoading
         ? <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
-        : (notes || []).map(n => (
+        : (Array.isArray(notes) ? notes : []).map(n => (
           <div key={n.id} className="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3 mb-2">
             <div>
               <p className="font-medium text-gray-900 text-sm">{n.title}</p>
@@ -532,7 +532,7 @@ function ManagePyqs() {
 
       {isLoading
         ? <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
-        : (pyqs || []).map(p => (
+        : (Array.isArray(pyqs) ? pyqs : []).map(p => (
           <div key={p.id} className="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3 mb-2">
             <div>
               <p className="font-medium text-gray-900 text-sm">{p.title}</p>
@@ -827,8 +827,8 @@ function SeoPanel() {
 
   const baseUrl = "https://studenthub.np";
 
-  const noteItems = (notes || []).map(n => ({ id: n.id, title: n.title, kind: "note" as SeoKind, url: `${baseUrl}/notes/${n.id}` }));
-  const pyqItems  = (pyqs  || []).map(p => ({ id: p.id, title: p.title, kind: "pyq"  as SeoKind, url: `${baseUrl}/pyq/${p.id}`   }));
+  const noteItems = (Array.isArray(notes) ? notes : []).map(n => ({ id: n.id, title: n.title, kind: "note" as SeoKind, url: `${baseUrl}/notes/${n.id}` }));
+  const pyqItems  = (Array.isArray(pyqs)  ? pyqs  : []).map(p => ({ id: p.id, title: p.title, kind: "pyq"  as SeoKind, url: `${baseUrl}/pyq/${p.id}`   }));
 
   const staticUrls = [
     { url: `${baseUrl}/`, label: "Homepage", kind: "Static" },

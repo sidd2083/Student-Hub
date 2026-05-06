@@ -41,8 +41,9 @@ function TodoContent() {
     deleteTask.mutate({ id }, { onSuccess: invalidate });
   };
 
-  const pending = (tasks || []).filter(t => !t.completed);
-  const done = (tasks || []).filter(t => t.completed);
+  const taskList = Array.isArray(tasks) ? tasks : [];
+  const pending = taskList.filter(t => !t.completed);
+  const done = taskList.filter(t => t.completed);
 
   return (
     <div className="p-4 sm:p-8 max-w-2xl mx-auto">
