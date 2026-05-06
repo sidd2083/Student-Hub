@@ -9,7 +9,7 @@ import {
   signOut as firebaseSignOut,
   UserCredential,
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, googleProvider, db, isConfigured } from "@/lib/firebase";
 
 export interface UserProfile {
@@ -41,6 +41,35 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// ─── sessionStorage pending-profile bridge ────────────────────────────────────
+// Used to survive the full page reload caused by window.location.replace.
+// Onboarding writes here; AuthContext reads it as a fallback when Firestore
+// hasn't finished writing yet.
+
+const PENDING_KEY = "pendingProfile_v1";
+const PENDING_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function readPendingProfile(uid: string): UserProfile | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data.uid !== uid) return null;
+    if (Date.now() - (data._savedAt ?? 0) > PENDING_TTL_MS) {
+      sessionStorage.removeItem(PENDING_KEY);
+      return null;
+    }
+    const { _savedAt: _, ...rest } = data;
+    return { id: 0, ...rest } as UserProfile;
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingProfile() {
+  sessionStorage.removeItem(PENDING_KEY);
+}
+
 // ─── Firestore profile fetch ──────────────────────────────────────────────────
 
 async function fetchProfile(uid: string): Promise<ProfileResult> {
@@ -48,7 +77,7 @@ async function fetchProfile(uid: string): Promise<ProfileResult> {
     console.log("[Auth] Firestore READ — users/" + uid);
     const snap = await getDoc(doc(db, "users", uid));
     if (!snap.exists()) {
-      console.log("[Auth] Firestore READ — no document (new user)");
+      console.log("[Auth] Firestore READ — no document");
       return { status: "not_found" };
     }
     const d = snap.data();
@@ -95,7 +124,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log("[Auth] REDIRECT RESULT:", result.user.email);
           const isNewUser = getAdditionalUserInfo(result)?.isNewUser ?? false;
           console.log("Login success:", result.user.uid);
-          // Navigate immediately based on isNewUser
           if (isNewUser) {
             window.location.replace("/setup-profile");
           } else {
@@ -118,7 +146,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfileState(null);
         setLoading(false);
         const path = window.location.pathname;
-        // Redirect away from protected pages only
         const isProtected = /^\/dashboard|^\/settings/.test(path);
         if (isProtected) {
           console.log("[Auth] no user on protected page → /login");
@@ -131,34 +158,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(firebaseUser);
 
       const path = window.location.pathname;
-
-      // Already going somewhere meaningful — validate profile in background
-      // without blocking the current navigation
       const result = await fetchProfile(firebaseUser.uid);
       if (!mounted) return;
 
       if (result.status === "found") {
         setProfileState(result.profile);
         setLoading(false);
+        clearPendingProfile(); // Firestore has it — no longer need the bridge
 
-        // If sitting on login/home page, push them to dashboard
         if (path === "/" || path === "/login") {
           console.log("[Auth] profile found, on login → /dashboard");
           window.location.replace("/dashboard");
         }
 
       } else if (result.status === "not_found") {
-        setProfileState(null);
-        setLoading(false);
+        // ── Check sessionStorage bridge first ─────────────────────────────
+        const pending = readPendingProfile(firebaseUser.uid);
 
-        // Only redirect to setup-profile if not already there
-        if (path !== "/setup-profile" && path !== "/onboarding") {
-          console.log("[Auth] no profile found → /setup-profile");
-          window.location.replace("/setup-profile");
+        if (pending) {
+          console.log("[Auth] sessionStorage bridge hit — using pending profile:", pending.name);
+          setProfileState(pending);
+          setLoading(false);
+
+          // Write to Firestore now so subsequent reloads don't need the bridge
+          const firestoreData = {
+            uid: pending.uid,
+            name: pending.name,
+            email: pending.email,
+            grade: pending.grade,
+            role: pending.role,
+            createdAt: pending.createdAt,
+            streak: 0,
+            totalStudyTime: 0,
+            todayStudyTime: 0,
+            lastActiveDate: null,
+          };
+          setDoc(doc(db, "users", firebaseUser.uid), firestoreData)
+            .then(() => {
+              console.log("[Auth] sessionStorage bridge: Firestore write ✅");
+              clearPendingProfile();
+            })
+            .catch((err) => console.error("[Auth] sessionStorage bridge: Firestore write failed:", err));
+
+          // Also sync to backend
+          fetch("/api/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              uid: pending.uid,
+              name: pending.name,
+              email: pending.email,
+              grade: pending.grade,
+              role: pending.role,
+            }),
+          }).catch(() => {});
+
+          // Stay on dashboard — don't redirect
+        } else {
+          // Genuinely no profile — send to setup
+          setProfileState(null);
+          setLoading(false);
+
+          if (path !== "/setup-profile" && path !== "/onboarding") {
+            console.log("[Auth] no profile found → /setup-profile");
+            window.location.replace("/setup-profile");
+          }
         }
 
       } else {
-        // Firestore error — don't redirect, let user stay where they are
+        // Firestore error — don't redirect, let user stay
         console.warn("[Auth] Firestore error code:", result.code);
         setLoading(false);
       }
@@ -199,8 +267,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Login success:", cred.user.uid);
       console.log("[Auth] LOGIN:", cred.user.email, "isNewUser:", isNewUser);
 
-      // ── Navigate immediately — don't wait for onAuthStateChanged Firestore check
-      // onAuthStateChanged runs in the background and will correct if needed
       if (isNewUser) {
         window.location.replace("/setup-profile");
       } else {
@@ -235,6 +301,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     console.log("[Auth] Signing out…");
+    clearPendingProfile();
     await firebaseSignOut(auth);
     setUser(null);
     setProfileState(null);

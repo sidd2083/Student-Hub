@@ -3,11 +3,7 @@ import { useAuth, UserProfile } from "@/context/AuthContext";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-export function getPendingProfile(_uid: string): UserProfile | null {
-  return null;
-}
-
-export function clearPendingProfile() {}
+const PENDING_PROFILE_KEY = "pendingProfile_v1";
 
 export default function Onboarding() {
   const { user, setProfile } = useAuth();
@@ -43,49 +39,52 @@ export default function Onboarding() {
 
     console.log("[Onboarding] Saving profile:", data.name, "grade:", data.grade);
 
-    // ── 1. Update local state immediately ────────────────────────────────────
+    // ── Step 1: Store in sessionStorage immediately (survives page reload) ───
+    // AuthContext reads this on reload if Firestore hasn't saved yet
+    sessionStorage.setItem(
+      PENDING_PROFILE_KEY,
+      JSON.stringify({ ...data, _savedAt: Date.now() })
+    );
+
+    // ── Step 2: Update local React state ────────────────────────────────────
     const profileForState: UserProfile = { id: 0, ...data };
     setProfile(profileForState);
 
-    // ── 2. Navigate right away — don't block the user on the network ─────────
+    // ── Step 3: Try to write to Firestore (race against 5s timeout) ─────────
+    // We navigate regardless, but prefer to have the write done first
+    const firestorePromise = setDoc(doc(db, "users", user.uid), data);
+    const timeoutPromise = new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), 5000)
+    );
+
+    try {
+      await Promise.race([firestorePromise, timeoutPromise]);
+      console.log("[Onboarding] Firestore write ✅ complete before navigation");
+      // Clear sessionStorage since Firestore now has the data
+      sessionStorage.removeItem(PENDING_PROFILE_KEY);
+    } catch {
+      console.warn("[Onboarding] Firestore write still in flight — navigating anyway. sessionStorage will serve as fallback.");
+      // Keep sessionStorage so AuthContext can use it on reload
+    }
+
+    // ── Step 4: Sync to backend (non-critical, fire & forget) ───────────────
+    fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        uid: data.uid,
+        name: data.name,
+        email: data.email,
+        grade: data.grade,
+        role: data.role,
+      }),
+    }).catch((err) =>
+      console.warn("[Onboarding] Backend sync failed (non-critical):", err)
+    );
+
+    // ── Step 5: Navigate ─────────────────────────────────────────────────────
+    console.log("[Onboarding] Navigating to /dashboard");
     window.location.replace("/dashboard");
-
-    // ── 3. Save to Firestore in the background (with 10s timeout) ───────────
-    const withTimeout = (promise: Promise<unknown>, ms: number) =>
-      Promise.race([
-        promise,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Firestore write timed out")), ms)
-        ),
-      ]);
-
-    withTimeout(setDoc(doc(db, "users", user.uid), data), 10_000)
-      .then(() => {
-        console.log("[Onboarding] Firestore save ✅");
-        // Also sync to PostgreSQL backend (non-critical)
-        return fetch("/api/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            uid: data.uid,
-            name: data.name,
-            email: data.email,
-            grade: data.grade,
-            role: data.role,
-          }),
-        }).catch((err) =>
-          console.warn("[Onboarding] Backend sync failed (non-critical):", err)
-        );
-      })
-      .catch((err) => {
-        console.error("[Onboarding] Firestore save failed:", err);
-        // Retry once after 3 seconds
-        setTimeout(() => {
-          setDoc(doc(db, "users", user.uid), data)
-            .then(() => console.log("[Onboarding] Firestore save ✅ (retry)"))
-            .catch((e) => console.error("[Onboarding] Firestore save failed (retry):", e));
-        }, 3000);
-      });
   };
 
   return (
@@ -211,7 +210,7 @@ export default function Onboarding() {
               {saving ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Setting up…
+                  Saving…
                 </span>
               ) : (
                 "Let's Go! 🚀"
