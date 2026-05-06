@@ -26,7 +26,7 @@ A study platform for high-school students (grades 9–12) in Nepal, featuring no
 - **Frontend:** React 19 + Vite 7, Wouter (routing), TanStack Query, Tailwind CSS v4, Radix UI, Framer Motion
 - **Backend:** Express v5, TypeScript (ESM, bundled via esbuild)
 - **Database:** PostgreSQL via Drizzle ORM + `pg`
-- **Auth:** Firebase Auth (Google Sign-In) + Firestore for user profiles
+- **Auth:** Firebase Auth (Google Sign-In); Firestore used only for announcements/SEO meta (NOT user profiles)
 - **AI:** OpenAI SDK (`gpt-4o-mini`) via Replit AI Integrations
 - **Monorepo:** pnpm workspaces
 
@@ -34,8 +34,12 @@ A study platform for high-school students (grades 9–12) in Nepal, featuring no
 
 ```
 artifacts/api-server/   — Express backend (src/, build.mjs, dist/)
+  src/routes/study.ts   — Study session, logs, task/note tracking endpoints
+  src/routes/users.ts   — User CRUD (now includes study stats in responses)
 artifacts/student-hub/  — React frontend (src/)
 lib/db/                 — Drizzle schema + pg pool (source of truth for DB)
+  src/schema/users.ts   — users table (+ streak, totalStudyTime, todayStudyTime, lastActiveDate)
+  src/schema/study_logs.ts — per-user daily study logs (studyMinutes, tasksCompleted, notesViewed)
 lib/api-spec/           — OpenAPI spec (openapi.yaml)
 lib/api-client-react/   — Generated React Query hooks from OpenAPI
 lib/api-zod/            — Shared Zod schemas
@@ -51,19 +55,20 @@ lib/api-zod/            — Shared Zod schemas
 - **Monorepo with pnpm workspaces** — shared code (DB schema, Zod, generated API client) lives in `lib/*` and is referenced as `workspace:*` dependencies.
 - **Backend pre-built before serving** — the Backend API workflow runs the pre-built `dist/index.mjs`; the `dev` script in `api-server` builds then starts. Rebuild after backend changes.
 - **Vite proxies `/api` to port 8080** — frontend calls relative `/api/*` URLs; Vite dev server forwards them to the Express backend.
-- **Firebase stays as-is** — the app uses Firebase Auth (Google Sign-In) and Firestore for user profiles. Firebase config is in `.replit` `[userenv.shared]` so it's available in both dev and deployed environments.
+- **PostgreSQL is single source of truth for users + study data** — profiles, streak, study time, and daily logs are all in PostgreSQL. Firestore is used only for announcements and SEO meta.
 - **OpenAI via Replit AI Integrations** — the AI chat endpoint reads `AI_INTEGRATIONS_OPENAI_BASE_URL` and `AI_INTEGRATIONS_OPENAI_API_KEY` so it works without a personal API key.
 
 ## Product
 
-- **Notes** — create, browse, and share study notes
+- **Notes** — browse and read study notes; each view logged to `study_logs.notes_viewed`
 - **PYQs** — past-year question browser
 - **MCQ Practice** — multiple-choice quiz practice
-- **Pomodoro** — focus timer
-- **Tasks / To-Do** — task tracking with streaks
-- **Leaderboard** — student ranking
+- **Pomodoro** — focus timer; session completion calls `POST /api/study/session` → updates streak/study time in PostgreSQL
+- **Tasks / To-Do** — task tracking; completing a task calls `POST /api/study/log-task`
+- **Leaderboard** — ranked by all-time study time / today / streak; grade filter (All / 9 / 10 / 11 / 12); reads from `/api/users`
+- **Report Card** — week/month toggle; Duolingo-style daily insights; bar chart; badges; reads from `/api/study/stats/:uid` + `/api/study/logs/:uid`
 - **Nep AI** — AI study assistant (calls `POST /api/ai/chat`)
-- **Admin panel** — standalone admin interface at `/admin/*`
+- **Admin panel** — standalone admin interface at `/admin/*`; reads users from `/api/users`
 
 ## User preferences
 
@@ -75,8 +80,7 @@ _None recorded yet._
 - The `PORT` and `BASE_PATH` env vars are required by the Vite config — they are set in the workflow command, not as secrets.
 - `pnpm-workspace.yaml` enforces a 1-day minimum package age for supply-chain safety — do not disable `minimumReleaseAge`.
 - Firebase is gracefully degraded when env vars are missing (warns in console, stubs auth/db) — but the real Firebase config is already set in `.replit` userenv.
-- **Firestore user fields** — canonical field names: `totalStudyTime` (all-time minutes), `todayStudyTime` (today's minutes, resets when date changes), `lastActiveDate` (YYYY-MM-DD), `streak` (days). Old docs may have `studyTime` — always read with `?? v.studyTime ?? 0` fallback.
-- **Daily report** — generated client-side in `Pomodoro.tsx → generateDailyReport()` when a session ends after 10 PM. Stored in `reports/{uid}_{YYYY-MM-DD}`.
+- **Study stats in PostgreSQL** — canonical columns in `users` table: `streak`, `total_study_time`, `today_study_time`, `last_active_date`. Updated by `POST /api/study/session`.
 - `lib/api-client-react/dist/index.d.ts` not pre-built — pre-existing TS6305 errors from `tsc --noEmit` are harmless; Vite resolves workspace packages at runtime correctly.
 
 ## Pointers

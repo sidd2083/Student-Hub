@@ -34,7 +34,19 @@ function TodoContent() {
   };
 
   const handleToggle = (id: number, completed: boolean) => {
-    updateTask.mutate({ id, data: { completed: !completed } }, { onSuccess: invalidate });
+    const isCompleting = !completed;
+    updateTask.mutate({ id, data: { completed: isCompleting } }, {
+      onSuccess: () => {
+        invalidate();
+        if (isCompleting && uid) {
+          fetch("/api/study/log-task", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ uid }),
+          }).catch(console.error);
+        }
+      }
+    });
   };
 
   const handleDelete = (id: number) => {

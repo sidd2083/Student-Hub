@@ -4,102 +4,28 @@ import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
 import { useListTasks, getListTasksQueryKey } from "@workspace/api-client-react";
 import { Play, Pause, RotateCcw, Timer, CheckSquare } from "lucide-react";
-import {
-  doc, getDoc, updateDoc, setDoc, increment,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
 
 type Preset = 25 | 50 | "custom";
 
-function getToday(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function getYesterday(): string {
-  return new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-}
-
-async function generateDailyReport(uid: string, date: string) {
-  try {
-    const reportId = `${uid}_${date}`;
-    const reportRef = doc(db, "reports", reportId);
-    const reportSnap = await getDoc(reportRef);
-    if (reportSnap.exists()) return; // Already generated today
-
-    const userSnap = await getDoc(doc(db, "users", uid));
-    const userData = userSnap.data() ?? {};
-
-    await setDoc(reportRef, {
-      uid,
-      date,
-      totalStudyTime: userData.totalStudyTime ?? userData.studyTime ?? 0,
-      todayStudyTime: userData.todayStudyTime ?? 0,
-      streak: userData.streak ?? 0,
-      productivityScore: Math.min(100, Math.round(((userData.todayStudyTime ?? 0) / 120) * 100)),
-      generatedAt: new Date().toISOString(),
-    });
-    console.log("[Report] Daily report saved for", uid, "date:", date);
-  } catch (err) {
-    console.error("[Report] Failed to generate daily report:", err);
-  }
-}
-
-async function saveStudySession(uid: string, minutesStudied: number) {
+async function saveStudySession(uid: string, minutesStudied: number): Promise<{
+  streak: number;
+  totalStudyTime: number;
+  todayStudyTime: number;
+} | null> {
   try {
     console.log(`[Pomodoro] Saving ${minutesStudied} min for user ${uid}`);
-    const today = getToday();
-    const yesterday = getYesterday();
-
-    const userRef = doc(db, "users", uid);
-    const userSnap = await getDoc(userRef);
-    const userData = userSnap.data() ?? {};
-
-    const lastActiveDate: string | null = userData.lastActiveDate ?? null;
-    const currentStreak: number = userData.streak ?? 0;
-    const currentTodayStudyTime: number = userData.todayStudyTime ?? 0;
-
-    let newStreak = currentStreak;
-    let newTodayStudyTime: number;
-
-    if (lastActiveDate === today) {
-      // Already studied today — add to today's time, keep streak
-      newStreak = currentStreak;
-      newTodayStudyTime = currentTodayStudyTime + minutesStudied;
-    } else if (lastActiveDate === yesterday) {
-      // Studied yesterday — streak continues, reset today's time
-      newStreak = currentStreak + 1;
-      newTodayStudyTime = minutesStudied;
-    } else {
-      // Haven't studied in 2+ days — reset streak to 1, reset today's time
-      newStreak = 1;
-      newTodayStudyTime = minutesStudied;
-    }
-
-    await updateDoc(userRef, {
-      totalStudyTime: increment(minutesStudied),
-      todayStudyTime: newTodayStudyTime,
-      lastActiveDate: today,
-      streak: newStreak,
+    const res = await fetch("/api/study/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, minutes: minutesStudied }),
     });
-
-    console.log(`[Pomodoro] Saved: totalStudyTime+=${minutesStudied}, todayStudyTime=${newTodayStudyTime}, streak=${newStreak}, lastActiveDate=${today}`);
-
-    // Update study log subcollection
-    const logRef = doc(db, "users", uid, "studyLogs", today);
-    const logSnap = await getDoc(logRef);
-    if (logSnap.exists()) {
-      await updateDoc(logRef, { studyMinutes: increment(minutesStudied) });
-    } else {
-      await setDoc(logRef, { date: today, studyMinutes: minutesStudied, tasksCompleted: 0 });
-    }
-
-    // Generate daily report if it's past 10 PM
-    const hour = new Date().getHours();
-    if (hour >= 22) {
-      await generateDailyReport(uid, today);
-    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    console.log(`[Pomodoro] Saved ✅ streak=${data.streak} total=${data.totalStudyTime} today=${data.todayStudyTime}`);
+    return data;
   } catch (err) {
     console.error("[Pomodoro] Failed to save study time:", err);
+    return null;
   }
 }
 
@@ -111,6 +37,7 @@ function PomodoroContent() {
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
   const [activeTask, setActiveTask] = useState<string>("");
+  const [savedStats, setSavedStats] = useState<{ streak: number; totalStudyTime: number; todayStudyTime: number } | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startSecondsRef = useRef<number>(25 * 60);
 
@@ -130,7 +57,9 @@ function PomodoroContent() {
             clearInterval(intervalRef.current!);
             if (user?.uid) {
               const minsStudied = Math.max(1, Math.ceil(startSecondsRef.current / 60));
-              saveStudySession(user.uid, minsStudied);
+              saveStudySession(user.uid, minsStudied).then(stats => {
+                if (stats) setSavedStats(stats);
+              });
             }
             return 0;
           }
@@ -151,7 +80,7 @@ function PomodoroContent() {
   };
 
   const switchPreset = (p: Preset) => {
-    setPreset(p); setRunning(false); setDone(false);
+    setPreset(p); setRunning(false); setDone(false); setSavedStats(null);
     if (p !== "custom") {
       const s = getPresetSeconds(p);
       setSeconds(s);
@@ -167,11 +96,13 @@ function PomodoroContent() {
     startSecondsRef.current = s;
     setRunning(false);
     setDone(false);
+    setSavedStats(null);
   };
 
   const reset = () => {
     setRunning(false);
     setDone(false);
+    setSavedStats(null);
     const s = getPresetSeconds(preset);
     setSeconds(s);
     startSecondsRef.current = s;
@@ -190,11 +121,13 @@ function PomodoroContent() {
   const secs = (seconds % 60).toString().padStart(2, "0");
   const circumference = 2 * Math.PI * 44;
 
+  const fmtTime = (m: number) => m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
+
   return (
     <div className="p-4 sm:p-8 max-w-lg mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Pomodoro Timer</h1>
-        <p className="text-gray-500 text-sm">Stay focused — study time is saved automatically</p>
+        <p className="text-gray-500 text-sm">Stay focused — study time is saved to the leaderboard</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center mb-5">
@@ -229,7 +162,7 @@ function PomodoroContent() {
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             {done ? (
-              <><span className="text-3xl mb-1">🎉</span><span className="text-sm font-medium text-green-600">Session saved!</span></>
+              <><span className="text-3xl mb-1">🎉</span><span className="text-sm font-medium text-green-600">Session complete!</span></>
             ) : (
               <span className="text-4xl font-bold text-gray-900 tabular-nums">{mins}:{secs}</span>
             )}
@@ -246,10 +179,28 @@ function PomodoroContent() {
           </button>
         </div>
 
-        {done && (
-          <p className="mt-4 text-xs text-green-600 font-medium">
-            ✓ Study time saved — leaderboard updated instantly!
-          </p>
+        {done && savedStats && (
+          <div className="mt-5 space-y-2">
+            <p className="text-xs text-green-600 font-semibold">✓ Saved to leaderboard!</p>
+            <div className="flex justify-center gap-6 mt-2">
+              <div className="text-center">
+                <p className="text-lg font-bold text-blue-600">{fmtTime(savedStats.totalStudyTime)}</p>
+                <p className="text-xs text-gray-400">total</p>
+              </div>
+              <div className="text-center">
+                <p className="text-lg font-bold text-green-600">{fmtTime(savedStats.todayStudyTime)}</p>
+                <p className="text-xs text-gray-400">today</p>
+              </div>
+              <div className="text-center">
+                <p className="text-lg font-bold text-orange-500">🔥 {savedStats.streak}d</p>
+                <p className="text-xs text-gray-400">streak</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {done && !savedStats && (
+          <p className="mt-4 text-xs text-gray-400">Saving your study time…</p>
         )}
       </div>
 

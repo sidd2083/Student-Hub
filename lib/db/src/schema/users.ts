@@ -10,6 +10,10 @@ export const usersTable = pgTable("users", {
   grade: integer("grade").notNull(),
   role: text("role", { enum: ["user", "admin"] }).notNull().default("user"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  streak: integer("streak").notNull().default(0),
+  totalStudyTime: integer("total_study_time").notNull().default(0),
+  todayStudyTime: integer("today_study_time").notNull().default(0),
+  lastActiveDate: text("last_active_date"),
 });
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({ id: true, createdAt: true });

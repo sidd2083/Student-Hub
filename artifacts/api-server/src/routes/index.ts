@@ -7,6 +7,7 @@ import pyqsRouter from "./pyqs";
 import tasksRouter from "./tasks";
 import scoresRouter from "./scores";
 import aiRouter from "./ai";
+import studyRouter from "./study";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(pyqsRouter);
 router.use(tasksRouter);
 router.use(scoresRouter);
 router.use(aiRouter);
+router.use(studyRouter);
 
 export default router;

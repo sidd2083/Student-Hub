@@ -140,10 +140,21 @@ function NoteViewer({ note, onClose }: { note: NoteView; onClose: () => void }) 
 }
 
 function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const [grade, setGrade] = useState<number>(profile?.grade || 10);
   const [subject, setSubject] = useState<string>("");
   const [selectedNote, setSelectedNote] = useState<NoteView | null>(null);
+
+  const openNote = (note: NoteView) => {
+    setSelectedNote(note);
+    if (user?.uid) {
+      fetch("/api/study/log-note", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: user.uid }),
+      }).catch(console.error);
+    }
+  };
 
   const { data: subjects, isLoading: loadingSubjects } = useListNoteSubjects(
     { grade },
@@ -229,7 +240,7 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
               <div key={note.id} className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 hover:shadow-sm hover:border-blue-100 transition-all group">
                 <button
                   data-testid={`note-item-${note.id}`}
-                  onClick={() => setSelectedNote(note)}
+                  onClick={() => openNote(note)}
                   className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 text-left"
                 >
                   <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${

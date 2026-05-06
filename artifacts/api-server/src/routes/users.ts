@@ -16,6 +16,10 @@ router.get("/users", async (req, res) => {
       grade: u.grade,
       role: u.role,
       createdAt: u.createdAt.toISOString(),
+      streak: u.streak,
+      totalStudyTime: u.totalStudyTime,
+      todayStudyTime: u.todayStudyTime,
+      lastActiveDate: u.lastActiveDate,
     })));
   } catch (err) {
     req.log.error(err);
@@ -73,7 +77,7 @@ router.get("/users/:uid", async (req, res) => {
     const users = await db.select().from(usersTable).where(eq(usersTable.uid, uid));
     if (users.length === 0) return res.status(404).json({ error: "User not found" });
     const u = users[0];
-    res.json({ id: u.id, uid: u.uid, name: u.name, email: u.email, grade: u.grade, role: u.role, createdAt: u.createdAt.toISOString() });
+    res.json({ id: u.id, uid: u.uid, name: u.name, email: u.email, grade: u.grade, role: u.role, createdAt: u.createdAt.toISOString(), streak: u.streak, totalStudyTime: u.totalStudyTime, todayStudyTime: u.todayStudyTime, lastActiveDate: u.lastActiveDate });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

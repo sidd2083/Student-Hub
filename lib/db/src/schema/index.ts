@@ -4,3 +4,4 @@ export * from "./mcqs";
 export * from "./pyqs";
 export * from "./tasks";
 export * from "./scores";
+export * from "./study_logs";
