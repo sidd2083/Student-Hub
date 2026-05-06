@@ -1,0 +1,403 @@
+Fix the ENTIRE core system of Student Hub. The app is currently broken due to incorrect authentication flow, missing Firestore writes, and fake frontend state.
+
+This is a CRITICAL FULL LOGIC REBUILD. NOT UI WORK.
+
+---
+
+# 🔴 1. FIX GOOGLE AUTH FLOW (STRICT)
+
+Use Firebase:
+
+onAuthStateChanged(user)
+
+---
+
+## FLOW:
+
+IF user == null:
+→ show login/register
+
+---
+
+IF user exists:
+→ check Firestore: users/{uid}
+
+---
+
+IF user document DOES NOT exist:
+→ redirect to /setup-profile
+
+---
+
+IF user document EXISTS:
+→ redirect to /dashboard
+
+---
+
+## 🚫 IMPORTANT:
+DO NOT redirect to dashboard unless Firestore user exists.
+
+---
+
+# 🔴 2. SETUP PROFILE MUST WORK (MANDATORY)
+
+Page: /setup-profile
+
+User enters:
+- name
+- grade
+- accept terms
+
+---
+
+On submit:
+
+SAVE to Firestore:
+
+collection: users
+document: {uid}
+
+fields:
+- uid
+- name
+- email
+- grade
+- createdAt (timestamp)
+- streak = 0
+- totalStudyTime = 0
+- todayStudyTime = 0
+- lastActiveDate = null
+
+---
+
+After save:
+→ redirect to /dashboard
+
+---
+
+# 🔴 3. FIX USER DATA NOT SAVING
+
+Problem: admin shows 0 users
+
+---
+
+## FIX:
+
+- Ensure collection name EXACTLY = "users"
+- Ensure document ID = uid
+- Ensure write succeeds
+
+Add logs:
+console.log("User saved:", uid)
+
+---
+
+# 🔴 4. GLOBAL AUTH STATE FIX
+
+Create global auth context:
+
+- store Firebase user
+- store Firestore user profile
+
+---
+
+## RULE:
+
+IF auth loading:
+→ show loading
+
+IF user exists:
+→ treat as logged in EVERYWHERE
+
+---
+
+## REMOVE:
+All fake login checks
+
+---
+
+# 🔴 5. NOTES ACCESS FIX
+
+Currently:
+Logged-in user still asked to register
+
+---
+
+## FIX:
+
+Replace all auth checks with:
+
+IF firebaseUser exists:
+→ allow access
+
+---
+
+# 🔴 6. FULL NOTE PAGE FIX
+
+Route: /notes/:id
+
+---
+
+## REQUIREMENTS:
+
+- NO sidebar
+- clean reading layout
+- large readable content
+
+---
+
+## TOP:
+
+- back button
+- "All Notes" button
+
+---
+
+## REMOVE:
+any "please register" message if user is logged in
+
+---
+
+# 🔴 7. ADMIN PANEL FIX (CRITICAL)
+
+Route: /admin
+
+---
+
+## USERS SECTION:
+
+Fetch from Firestore:
+
+collection: users
+
+---
+
+Display:
+- name
+- email
+- grade
+- streak
+- totalStudyTime
+
+---
+
+If empty:
+→ log error
+→ DO NOT show fake 0 silently
+
+---
+
+# 🔴 8. ADMIN SEO FIX
+
+Currently broken.
+
+---
+
+## FIX:
+
+In notes collection, store:
+
+- seoTitle
+- metaDescription
+- keywords
+- slug
+
+---
+
+## WHEN EDITING SEO:
+
+- load existing data from Firestore
+- allow editing
+- SAVE back to Firestore
+
+---
+
+Add logs:
+console.log("SEO saved")
+
+---
+
+# 🔴 9. ADMIN NOTES SAVE FIX
+
+Ensure:
+
+- notes saved to "notes" collection
+- data persists
+- appears on frontend immediately
+
+---
+
+# 🔴 10. REMOVE ALL FAKE STATE
+
+RULE:
+
+Firestore is SINGLE SOURCE OF TRUTH.
+
+NO local-only data.
+
+---
+
+# 🔴 11. DEBUG LOGGING (MANDATORY)
+
+Add logs:
+
+- auth state
+- user fetch
+- user save
+- notes fetch
+- notes save
+- errors
+
+---
+
+# 🔴 12. POMODORO → LEADERBOARD SYNC (CRITICAL NEW FIX)
+
+Current problem:
+User studies (even 1 min) but leaderboard does NOT update.
+
+---
+
+## REQUIRED:
+
+When ANY Pomodoro session ends (even 1 minute):
+
+UPDATE users/{uid}:
+
+- totalStudyTime += sessionDuration
+- todayStudyTime += sessionDuration
+- lastActiveDate = currentDate
+
+---
+
+## RULE:
+
+- update MUST happen instantly
+- NO delay
+- NO refresh needed
+
+---
+
+# 🔴 13. REAL-TIME LEADERBOARD (MANDATORY)
+
+Use Firestore real-time listener:
+
+onSnapshot(users)
+
+---
+
+## SORT USERS BY:
+
+1. totalStudyTime DESC  
+2. streak DESC  
+
+---
+
+## RESULT:
+
+Leaderboard MUST update immediately when:
+- user completes Pomodoro
+- even 1 minute change reflects
+
+---
+
+# 🔴 14. MULTIPLE LEADERBOARD TYPES (NEW FEATURE)
+
+Add these leaderboard views:
+
+---
+
+## 1. STUDY TIME LEADERBOARD
+- based on totalStudyTime
+
+---
+
+## 2. STREAK LEADERBOARD
+- based on streak
+
+---
+
+## 3. DAILY LEADERBOARD
+- based on todayStudyTime
+
+---
+
+# 🔴 15. GRADE-WISE LEADERBOARD (IMPORTANT)
+
+Add filter:
+
+- Grade 9
+- Grade 10
+- Grade 11
+- Grade 12
+
+---
+
+## RULE:
+
+Only show users of selected grade
+
+---
+
+# 🔴 16. REPORT CARD AUTO SYSTEM (CRITICAL)
+
+Current problem: report not working
+
+---
+
+## REQUIRED:
+
+Every day at EXACTLY 10 PM:
+
+Generate report for each user:
+
+- todayStudyTime
+- total sessions
+- streak
+- productivity score
+
+---
+
+## SAVE in Firestore:
+
+collection: reports  
+doc: {uid + date}
+
+---
+
+# 🔴 17. DAILY RESET SYSTEM
+
+At midnight:
+
+RESET:
+
+- todayStudyTime = 0
+
+---
+
+# 🎯 FINAL RESULT REQUIRED
+
+- Google login → setup-profile → dashboard works  
+- user saved in Firestore  
+- admin shows real users  
+- notes accessible without register error  
+- SEO loads and saves properly  
+- Pomodoro updates instantly  
+- leaderboard updates EVERY minute  
+- grade-wise leaderboard works  
+- streak leaderboard works  
+- report card generates daily at 10 PM  
+- no fake login state  
+- no redirect bugs  
+
+---
+
+# 🚫 DO NOT
+
+- DO NOT skip Firestore check  
+- DO NOT use fake local state  
+- DO NOT delay leaderboard updates  
+- DO NOT fake report system  
+
+---
+
+END
