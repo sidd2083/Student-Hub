@@ -235,7 +235,7 @@ export default function NotePage() {
               {/* CTA */}
               <div className="mt-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-center">
                 <h2 className="text-lg font-bold text-white mb-1">Want more? Get full access — free.</h2>
-                <p className="text-blue-100 text-sm mb-4">MCQ practice, AI tutor, progress tracking, and thousands more notes.</p>
+                <p className="text-blue-100 text-sm mb-4">Nep AI tutor, progress tracking, Report Card, and thousands more notes.</p>
                 <Link
                   href="/login"
                   className="inline-flex items-center gap-2 px-6 py-2.5 bg-white text-blue-600 rounded-xl font-semibold text-sm hover:bg-blue-50 transition-all"

@@ -6,9 +6,9 @@ export default function About() {
     <>
       <Helmet>
         <title>About — Student Hub</title>
-        <meta name="description" content="Student Hub is a free study platform for Grade 9–12 students in Nepal. Access notes, past papers, MCQ practice, and AI tools." />
+        <meta name="description" content="Student Hub is a free study platform for Grade 9–12 students in Nepal. Access notes, past papers, Nep AI, and progress tracking." />
         <meta property="og:title" content="About — Student Hub" />
-        <meta property="og:description" content="Free study platform for Nepali students. Notes, PYQs, MCQ practice, and AI tools — all in one place." />
+        <meta property="og:description" content="Free study platform for Nepali students. Notes, PYQs, Nep AI, and progress tracking — all in one place." />
       </Helmet>
 
       <div className="min-h-screen bg-gray-50">
@@ -60,7 +60,7 @@ export default function About() {
               {[
                 ["📚", "Notes", "Study notes organized by grade, subject, and chapter — text, PDF, and image formats."],
                 ["📄", "Previous Year Questions (PYQ)", "Past exam papers from various provinces and boards."],
-                ["🧠", "MCQ Practice", "Thousands of multiple-choice questions with difficulty levels and explanations."],
+                ["📊", "Report Card", "Track your study time, streak, and progress with daily analytics and badges."],
                 ["🤖", "Nep AI", "An AI study assistant that answers your academic questions in seconds."],
                 ["⏱", "Pomodoro Timer", "Built-in focus timer to help you study smarter."],
                 ["✅", "To-Do", "Task manager to keep your study schedule on track."],

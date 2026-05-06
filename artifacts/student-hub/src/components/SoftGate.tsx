@@ -31,7 +31,7 @@ export function SoftGate({ children, feature = "this feature" }: SoftGateProps) 
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Login to unlock {feature}</h2>
           <p className="text-gray-500 text-sm mb-6">
-            Create a free account to access MCQ practice, Nep AI, Pomodoro timer, and more.
+            Create a free account to access Nep AI, Pomodoro timer, Report Card, and more.
           </p>
           <button
             onClick={signInWithGoogle}

@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { useListTasks, useListScores } from "@workspace/api-client-react";
+import { useListTasks } from "@workspace/api-client-react";
 import {
-  BookOpen, Brain, FileText, CheckSquare,
+  BookOpen, BarChart2, FileText, CheckSquare,
   Timer, MessageCircle, Trophy, Flame, Megaphone, X,
 } from "lucide-react";
 import {
@@ -15,7 +15,7 @@ import { db } from "@/lib/firebase";
 
 const sections = [
   { href: "/notes",      icon: BookOpen,      label: "Notes",              desc: "Study materials by subject",  color: "bg-blue-50 text-blue-600"    },
-  { href: "/mcq",        icon: Brain,         label: "MCQ Practice",       desc: "Test your knowledge",         color: "bg-purple-50 text-purple-600" },
+  { href: "/report",     icon: BarChart2,     label: "Report Card",        desc: "Track your study progress",   color: "bg-purple-50 text-purple-600" },
   { href: "/pyqs",       icon: FileText,      label: "Previous Questions", desc: "Past exam papers",            color: "bg-orange-50 text-orange-600" },
   { href: "/todo",       icon: CheckSquare,   label: "To-Do",              desc: "Track your tasks",            color: "bg-green-50 text-green-600"   },
   { href: "/pomodoro",   icon: Timer,         label: "Pomodoro Timer",     desc: "Focus and study",             color: "bg-red-50 text-red-600"       },
@@ -32,6 +32,7 @@ interface Announcement {
 export default function Dashboard() {
   const { profile, user } = useAuth();
   const [streak, setStreak] = useState(0);
+  const [studyMins, setStudyMins] = useState(0);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
@@ -39,10 +40,8 @@ export default function Dashboard() {
     { uid: user?.uid || "" },
     { query: { enabled: !!user?.uid, queryKey: ["listTasks", user?.uid || ""] } }
   );
-  const { data: scores } = useListScores({ period: "daily" });
 
   const pendingTasks = tasks?.filter((t) => !t.completed).length ?? 0;
-  const myRank = scores ? scores.findIndex((s) => s.uid === user?.uid) + 1 : 0;
 
   useEffect(() => {
     if (!user) return;
@@ -54,6 +53,8 @@ export default function Dashboard() {
         const today = new Date().toDateString();
         const last: string | undefined = data.lastActive;
         const current: number = data.streak ?? 0;
+        const studyTime: number = data.studyTime ?? 0;
+        setStudyMins(studyTime);
         if (last === today) { setStreak(current); return; }
         const yesterday = new Date(Date.now() - 86_400_000).toDateString();
         const next = last === yesterday ? current + 1 : 1;
@@ -90,6 +91,9 @@ export default function Dashboard() {
     return "Good evening";
   };
 
+  const fmtStudy = (mins: number) =>
+    mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+
   const visibleAnnouncements = announcements.filter(a => !dismissed.has(a.id));
 
   return (
@@ -117,9 +121,9 @@ export default function Dashboard() {
               <p className="text-2xl sm:text-3xl font-bold text-gray-900">{pendingTasks}</p>
             </div>
             <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
-              <p className="text-xs sm:text-sm text-gray-500 mb-1">Daily Rank</p>
+              <p className="text-xs sm:text-sm text-gray-500 mb-1">Study Time</p>
               <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                {myRank > 0 ? `#${myRank}` : "—"}
+                {studyMins > 0 ? fmtStudy(studyMins) : "—"}
               </p>
             </div>
             <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
@@ -171,7 +175,6 @@ export default function Dashboard() {
             {sections.map(({ href, icon: Icon, label, desc, color }) => (
               <Link key={href} href={href}>
                 <a
-                  data-testid={`card-section-${label.toLowerCase().replace(/\s+/g, "-")}`}
                   className="block bg-white rounded-2xl p-4 sm:p-5 border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
                 >
                   <div className={`w-9 h-9 sm:w-10 sm:h-10 ${color} rounded-xl flex items-center justify-center mb-3 sm:mb-4`}>

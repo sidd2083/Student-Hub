@@ -7,7 +7,7 @@ type Tab = "login" | "register";
 
 const ICONS = [
   { emoji: "📚", label: "Notes",   x: "8%",  y: "15%", delay: "0s",   size: "text-3xl" },
-  { emoji: "🧠", label: "MCQ",     x: "85%", y: "10%", delay: "0.3s", size: "text-2xl" },
+  { emoji: "📊", label: "Report",  x: "85%", y: "10%", delay: "0.3s", size: "text-2xl" },
   { emoji: "⏱️", label: "Timer",   x: "78%", y: "75%", delay: "0.6s", size: "text-3xl" },
   { emoji: "🤖", label: "AI",      x: "12%", y: "78%", delay: "0.9s", size: "text-2xl" },
   { emoji: "🏆", label: "Rank",    x: "50%", y: "5%",  delay: "1.2s", size: "text-xl"  },
@@ -53,9 +53,9 @@ export default function Login() {
     <>
       <Helmet>
         <title>Login — Student Hub | Free Study Platform for Nepal Students</title>
-        <meta name="description" content="Sign in to Student Hub — access notes, past papers, MCQ practice, and an AI study assistant. Free for Grade 9–12 students in Nepal." />
+        <meta name="description" content="Sign in to Student Hub — access notes, past papers, Nep AI, and study progress tracking. Free for Grade 9–12 students in Nepal." />
         <meta property="og:title" content="Student Hub — Free Study Platform" />
-        <meta property="og:description" content="Notes, PYQs, MCQ practice, and AI tools for Grade 9–12 students in Nepal." />
+        <meta property="og:description" content="Notes, PYQs, Nep AI and study tracking for Grade 9–12 students in Nepal." />
       </Helmet>
     <div className="min-h-screen bg-white flex items-center justify-center relative overflow-hidden">
       <style>{`
@@ -168,7 +168,7 @@ export default function Login() {
               <div className="space-y-3 mb-6">
                 {[
                   { emoji: "📚", color: "bg-blue-50 text-blue-700",     text: "Access notes by grade & subject" },
-                  { emoji: "🧠", color: "bg-purple-50 text-purple-700", text: "Practice MCQs and track your scores" },
+                  { emoji: "📊", color: "bg-purple-50 text-purple-700", text: "Track your study time and progress" },
                   { emoji: "🤖", color: "bg-indigo-50 text-indigo-700", text: "Get help from Nep AI study assistant" },
                 ].map(({ emoji, color, text }) => (
                   <div key={text} className={`flex items-center gap-3 p-3 rounded-xl ${color.split(" ")[0]}`}>

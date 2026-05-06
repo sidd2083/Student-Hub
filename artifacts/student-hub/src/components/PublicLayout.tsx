@@ -1,12 +1,11 @@
 import { Link, useLocation } from "wouter";
-import { BookOpen, Menu, X, UserPlus, Home, FileText, Wrench, User, ArrowLeft, Brain, Timer, CheckSquare, Trophy, MessageCircle } from "lucide-react";
+import { BookOpen, Menu, X, UserPlus, Home, FileText, Wrench, User, ArrowLeft, Timer, CheckSquare, Trophy, MessageCircle, BarChart2 } from "lucide-react";
 import { useState, useEffect } from "react";
 
 const toolsMenu = [
   { href: "/ai",          icon: MessageCircle, label: "Nep AI",      color: "text-indigo-600 bg-indigo-50" },
   { href: "/pomodoro",    icon: Timer,         label: "Pomodoro",    color: "text-orange-600 bg-orange-50" },
   { href: "/todo",        icon: CheckSquare,   label: "To-do",       color: "text-green-600  bg-green-50"  },
-  { href: "/mcq",         icon: Brain,         label: "MCQ Practice",color: "text-purple-600 bg-purple-50" },
   { href: "/leaderboard", icon: Trophy,        label: "Leaderboard", color: "text-yellow-600 bg-yellow-50" },
 ];
 
@@ -31,7 +30,6 @@ export function PublicLayout({ children }: PublicLayoutProps) {
   const isActive = (href: string) =>
     href === "/" ? location === "/" || location === "" : location.startsWith(href);
 
-  // Close tools sheet on route change
   useEffect(() => { setToolsOpen(false); setMenuOpen(false); }, [location]);
 
   return (
@@ -39,7 +37,6 @@ export function PublicLayout({ children }: PublicLayoutProps) {
       {/* ── Desktop + Mobile Header ── */}
       <header className="bg-white border-b border-gray-100 sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          {/* Left: logo or back button on mobile */}
           <div className="flex items-center gap-3">
             {!isHome && (
               <button
@@ -115,7 +112,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
         )}
       </header>
 
-      {/* Page content — pb-20 on mobile to clear bottom nav */}
+      {/* Page content */}
       <main className="pb-20 md:pb-0">{children}</main>
 
       {/* Desktop CTA + footer */}
@@ -123,7 +120,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
         <div className="max-w-2xl mx-auto px-4 text-center">
           <h2 className="text-xl font-bold text-white mb-2">Get Full Access — Free</h2>
           <p className="text-blue-100 text-sm mb-5">
-            MCQ practice, AI study assistant, progress tracking, and more — all free.
+            AI study assistant, progress tracking, leaderboard, and more — all free.
           </p>
           <Link
             href="/login"

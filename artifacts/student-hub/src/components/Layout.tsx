@@ -1,9 +1,9 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import {
-  BookOpen, Brain, FileText, CheckSquare, Timer,
+  BookOpen, FileText, CheckSquare, Timer,
   MessageCircle, Trophy, LayoutDashboard, LogOut,
-  Shield, Settings, User, Home, Wrench, ArrowLeft, X,
+  Shield, Settings, User, Home, Wrench, ArrowLeft, X, BarChart2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -14,7 +14,7 @@ const sidebarNav = [
   { href: "/ai",          icon: MessageCircle,    label: "Nep AI"     },
   { href: "/pomodoro",    icon: Timer,            label: "Pomodoro"   },
   { href: "/todo",        icon: CheckSquare,      label: "To-do"      },
-  { href: "/mcq",         icon: Brain,            label: "MCQ"        },
+  { href: "/report",      icon: BarChart2,        label: "Report Card"},
   { href: "/leaderboard", icon: Trophy,           label: "Leaderboard"},
 ];
 
@@ -30,7 +30,7 @@ const toolsMenu = [
   { href: "/ai",          icon: MessageCircle, label: "Nep AI",      color: "text-indigo-600 bg-indigo-50" },
   { href: "/pomodoro",    icon: Timer,         label: "Pomodoro",    color: "text-orange-600 bg-orange-50" },
   { href: "/todo",        icon: CheckSquare,   label: "To-do",       color: "text-green-600  bg-green-50"  },
-  { href: "/mcq",         icon: Brain,         label: "MCQ Practice",color: "text-purple-600 bg-purple-50" },
+  { href: "/report",      icon: BarChart2,     label: "Report Card", color: "text-blue-600   bg-blue-50"   },
   { href: "/leaderboard", icon: Trophy,        label: "Leaderboard", color: "text-yellow-600 bg-yellow-50" },
 ];
 
@@ -49,7 +49,6 @@ export function Layout({ children }: LayoutProps) {
   const isHome = location === "/dashboard";
   const showBack = !isHome;
 
-  // Close tools sheet on route change
   useEffect(() => { setToolsOpen(false); }, [location]);
 
   return (

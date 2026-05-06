@@ -15,13 +15,13 @@ import Onboarding from "@/pages/Onboarding";
 import Dashboard from "@/pages/Dashboard";
 import Notes from "@/pages/Notes";
 import NotePage from "@/pages/NotePage";
-import McqPractice from "@/pages/McqPractice";
 import Pyqs from "@/pages/Pyqs";
 import PyqPage from "@/pages/PyqPage";
 import Todo from "@/pages/Todo";
 import Pomodoro from "@/pages/Pomodoro";
 import NepAi from "@/pages/NepAi";
 import Leaderboard from "@/pages/Leaderboard";
+import ReportCard from "@/pages/ReportCard";
 import Settings from "@/pages/Settings";
 import AdminLogin from "@/pages/AdminLogin";
 import Admin from "@/pages/Admin";
@@ -63,7 +63,7 @@ function Router() {
             <Route path="/contact" component={Contact} />
 
             <Route path="/ai" component={NepAi} />
-            <Route path="/mcq" component={McqPractice} />
+            <Route path="/report" component={ReportCard} />
             <Route path="/todo" component={Todo} />
             <Route path="/pomodoro" component={Pomodoro} />
             <Route path="/leaderboard" component={Leaderboard} />

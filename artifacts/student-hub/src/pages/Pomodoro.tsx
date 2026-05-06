@@ -4,8 +4,31 @@ import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
 import { useListTasks, getListTasksQueryKey } from "@workspace/api-client-react";
 import { Play, Pause, RotateCcw, Timer, CheckSquare } from "lucide-react";
+import {
+  doc, getDoc, updateDoc, setDoc, increment,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 type Preset = 25 | 50 | "custom";
+
+async function saveStudySession(uid: string, minutesStudied: number) {
+  try {
+    const userRef = doc(db, "users", uid);
+    await updateDoc(userRef, { studyTime: increment(minutesStudied) });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const logRef = doc(db, "users", uid, "studyLogs", today);
+    const snap = await getDoc(logRef);
+    if (snap.exists()) {
+      await updateDoc(logRef, { studyMinutes: increment(minutesStudied) });
+    } else {
+      await setDoc(logRef, { date: today, studyMinutes: minutesStudied, tasksCompleted: 0 });
+    }
+    console.log(`[Pomodoro] Saved ${minutesStudied} min study time`);
+  } catch (err) {
+    console.error("[Pomodoro] Failed to save study time:", err);
+  }
+}
 
 function PomodoroContent() {
   const { user } = useAuth();
@@ -16,6 +39,7 @@ function PomodoroContent() {
   const [done, setDone] = useState(false);
   const [activeTask, setActiveTask] = useState<string>("");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startSecondsRef = useRef<number>(25 * 60);
 
   const { data: tasks } = useListTasks(
     { uid: user?.uid || "" },
@@ -27,7 +51,17 @@ function PomodoroContent() {
     if (running) {
       intervalRef.current = setInterval(() => {
         setSeconds(s => {
-          if (s <= 1) { setRunning(false); setDone(true); clearInterval(intervalRef.current!); return 0; }
+          if (s <= 1) {
+            setRunning(false);
+            setDone(true);
+            clearInterval(intervalRef.current!);
+            // Save completed session to Firestore
+            if (user?.uid) {
+              const minsStudied = Math.ceil(startSecondsRef.current / 60);
+              saveStudySession(user.uid, minsStudied);
+            }
+            return 0;
+          }
           return s - 1;
         });
       }, 1000);
@@ -35,7 +69,7 @@ function PomodoroContent() {
       if (intervalRef.current) clearInterval(intervalRef.current);
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [running]);
+  }, [running, user]);
 
   const getPresetSeconds = (p: Preset): number => {
     if (p === 25) return 25 * 60;
@@ -46,16 +80,37 @@ function PomodoroContent() {
 
   const switchPreset = (p: Preset) => {
     setPreset(p); setRunning(false); setDone(false);
-    if (p !== "custom") setSeconds(getPresetSeconds(p));
+    if (p !== "custom") {
+      const s = getPresetSeconds(p);
+      setSeconds(s);
+      startSecondsRef.current = s;
+    }
   };
 
   const applyCustom = () => {
     const m = parseInt(customMins, 10);
     if (isNaN(m) || m < 1) return;
-    setSeconds(m * 60); setRunning(false); setDone(false);
+    const s = m * 60;
+    setSeconds(s);
+    startSecondsRef.current = s;
+    setRunning(false);
+    setDone(false);
   };
 
-  const reset = () => { setRunning(false); setDone(false); setSeconds(getPresetSeconds(preset)); };
+  const reset = () => {
+    setRunning(false);
+    setDone(false);
+    const s = getPresetSeconds(preset);
+    setSeconds(s);
+    startSecondsRef.current = s;
+  };
+
+  const handleStart = () => {
+    if (done) return;
+    if (!running) startSecondsRef.current = seconds;
+    setDone(false);
+    setRunning(r => !r);
+  };
 
   const currentTotal = preset === "custom" ? (parseInt(customMins, 10) || 30) * 60 : getPresetSeconds(preset);
   const progress = currentTotal > 0 ? ((currentTotal - seconds) / currentTotal) * 100 : 0;
@@ -67,7 +122,7 @@ function PomodoroContent() {
     <div className="p-4 sm:p-8 max-w-lg mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Pomodoro Timer</h1>
-        <p className="text-gray-500 text-sm">Stay focused — one session at a time</p>
+        <p className="text-gray-500 text-sm">Stay focused — study time is saved automatically</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center mb-5">
@@ -101,7 +156,9 @@ function PomodoroContent() {
               strokeLinecap="round" className="transition-all duration-1000" />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            {done ? <><span className="text-3xl mb-1">🎉</span><span className="text-sm font-medium text-green-600">Done!</span></> : (
+            {done ? (
+              <><span className="text-3xl mb-1">🎉</span><span className="text-sm font-medium text-green-600">Session saved!</span></>
+            ) : (
               <span className="text-4xl font-bold text-gray-900 tabular-nums">{mins}:{secs}</span>
             )}
           </div>
@@ -111,11 +168,17 @@ function PomodoroContent() {
           <button data-testid="btn-reset-timer" onClick={reset} className="p-3.5 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all" title="Reset">
             <RotateCcw className="w-5 h-5" />
           </button>
-          <button data-testid="btn-toggle-timer" onClick={() => { setDone(false); setRunning(r => !r); }} disabled={done}
+          <button data-testid="btn-toggle-timer" onClick={handleStart} disabled={done}
             className={`px-10 py-3.5 rounded-xl font-semibold transition-all flex items-center gap-2 ${done ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-blue-500 text-white hover:bg-blue-600"}`}>
             {running ? <><Pause className="w-5 h-5" /> Pause</> : <><Play className="w-5 h-5" /> Start</>}
           </button>
         </div>
+
+        {done && (
+          <p className="mt-4 text-xs text-green-600 font-medium">
+            ✓ Study time saved to your report card
+          </p>
+        )}
       </div>
 
       {pendingTasks.length > 0 && (
@@ -144,7 +207,7 @@ export default function Pomodoro() {
     <>
       <Helmet>
         <title>Pomodoro Timer — Student Hub</title>
-        <meta name="description" content="Focus timer for study sessions. 25 or 50 minute sessions for Grade 9–12 students." />
+        <meta name="description" content="Focus timer for study sessions. 25 or 50 minute sessions tracked to your report card." />
       </Helmet>
       <SoftGate feature="the Pomodoro timer">
         <PomodoroContent />

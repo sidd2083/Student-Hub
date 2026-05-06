@@ -154,8 +154,8 @@ export default function PyqPage() {
 
               {/* CTA */}
               <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-center">
-                <h2 className="text-lg font-bold text-white mb-1">Practice with MCQs for this exam</h2>
-                <p className="text-blue-100 text-sm mb-4">Get full access to MCQ practice, AI tools, progress tracking — all free.</p>
+                <h2 className="text-lg font-bold text-white mb-1">Get full access — it's free</h2>
+                <p className="text-blue-100 text-sm mb-4">Access Nep AI, Pomodoro timer, progress tracking, and more — all free.</p>
                 <Link
                   href="/login"
                   className="inline-flex items-center gap-2 px-6 py-2.5 bg-white text-blue-600 rounded-xl font-semibold text-sm hover:bg-blue-50 transition-all"

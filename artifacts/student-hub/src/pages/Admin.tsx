@@ -3,17 +3,15 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import {
   useListNotes, useCreateNote, useDeleteNote,
-  useListMcqs, useCreateMcq, useDeleteMcq,
   useListPyqs, useCreatePyq, useDeletePyq,
-  useListScores, useResetScores,
-  getListNotesQueryKey, getListMcqsQueryKey,
-  getListPyqsQueryKey, getListScoresQueryKey,
+  getListNotesQueryKey,
+  getListPyqsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  LayoutDashboard, BookOpen, Brain, FileText, Users, Trophy,
+  LayoutDashboard, BookOpen, FileText, Users, Trophy,
   Shield, Plus, Trash2, LogOut, Megaphone, Upload, X, Image,
-  CheckCircle, AlertCircle,
+  CheckCircle, AlertCircle, BarChart2, Flame, Clock,
 } from "lucide-react";
 import {
   collection, addDoc, getDocs, deleteDoc,
@@ -25,7 +23,7 @@ import {
 import { db, storage } from "@/lib/firebase";
 
 const ADMIN_SESSION = "admin_session_v1";
-type Section = "dashboard" | "notes" | "mcqs" | "pyqs" | "announcements" | "users" | "leaderboard" | "seo";
+type Section = "dashboard" | "notes" | "pyqs" | "announcements" | "users" | "reports" | "seo";
 
 // ─── File Upload Component ──────────────────────────────────────────────────
 
@@ -134,7 +132,6 @@ interface FSUserSummary { uid: string; grade: number; role: string; createdAt: s
 
 function AdminOverview() {
   const { data: noteStats } = useListNotes({}, { query: { queryKey: getListNotesQueryKey({}) } });
-  const { data: mcqStats }  = useListMcqs({},  { query: { queryKey: getListMcqsQueryKey({})  } });
   const { data: pyqStats }  = useListPyqs({},  { query: { queryKey: getListPyqsQueryKey({})  } });
   const [users, setUsers]   = useState<FSUserSummary[]>([]);
 
@@ -162,9 +159,8 @@ function AdminOverview() {
         <StatCard label="Notes in DB"  value={noteStats?.length || 0} />
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="MCQs in DB"   value={mcqStats?.length || 0} />
-        <StatCard label="PYQs in DB"   value={pyqStats?.length || 0} />
-        <StatCard label="Grades Active" value={Object.keys(byGrade).length} />
+        <StatCard label="PYQs in DB"      value={pyqStats?.length || 0} />
+        <StatCard label="Grades Active"   value={Object.keys(byGrade).length} />
         <StatCard label="Non-Admin Users" value={users.length - admins} />
       </div>
       {Object.keys(byGrade).length > 0 && (
@@ -334,111 +330,118 @@ function ManageNotes() {
   );
 }
 
-// ─── Manage MCQs ───────────────────────────────────────────────────────────
+// ─── Report View ───────────────────────────────────────────────────────────
 
-function ManageMcqs() {
-  const qc = useQueryClient();
-  const { data: mcqs, isLoading } = useListMcqs({}, { query: { queryKey: getListMcqsQueryKey({}) } });
-  const createMcq = useCreateMcq();
-  const deleteMcq = useDeleteMcq();
-  const [show, setShow] = useState(false);
-  const [form, setForm] = useState({
-    grade: 10, subject: "", chapter: "", question: "",
-    optionA: "", optionB: "", optionC: "", optionD: "",
-    correctAnswer: "A" as "A" | "B" | "C" | "D",
-    difficulty: "medium" as "easy" | "medium" | "hard",
-    explanation: "",
-  });
-  const inv = () => qc.invalidateQueries({ queryKey: getListMcqsQueryKey({}) });
+interface FSUserReport {
+  uid: string; name: string; email: string; grade: number;
+  streak: number; studyTime: number; lastActive?: string;
+}
+
+function ReportView() {
+  const [users, setUsers] = useState<FSUserReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sort, setSort] = useState<"studyTime" | "streak">("studyTime");
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const snap = await getDocs(collection(db, "users"));
+      const list = snap.docs.map(d => {
+        const v = d.data();
+        return {
+          uid: d.id,
+          name: v.name ?? "(no name)",
+          email: v.email ?? "",
+          grade: v.grade ?? 0,
+          streak: v.streak ?? 0,
+          studyTime: v.studyTime ?? 0,
+          lastActive: v.lastActive,
+        } as FSUserReport;
+      });
+      setUsers(list);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const sorted = [...users].sort((a, b) => b[sort] - a[sort]);
+  const fmtTime = (mins: number) => mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+  const totalStudy = users.reduce((s, u) => s + u.studyTime, 0);
+  const totalStreak = users.reduce((s, u) => s + u.streak, 0);
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-bold text-gray-900">Manage MCQs</h2>
-        <button onClick={() => setShow(s => !s)} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600 transition-all">
-          <Plus className="w-4 h-4" /> Add MCQ
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Study Reports</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Study hours and streak data from Firestore</p>
+        </div>
+        <button onClick={load} className="px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">
+          Refresh
         </button>
       </div>
 
-      {show && (
-        <form
-          onSubmit={e => {
-            e.preventDefault();
-            createMcq.mutate({
-              data: { ...form, explanation: form.explanation || null }
-            }, { onSuccess: () => { setShow(false); inv(); } });
-          }}
-          className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6 space-y-4"
-        >
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Grade</label>
-              <select value={form.grade} onChange={e => setForm(f => ({ ...f, grade: Number(e.target.value) }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white">
-                {[9, 10, 11, 12].map(g => <option key={g} value={g}>Grade {g}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Correct Answer</label>
-              <select value={form.correctAnswer} onChange={e => setForm(f => ({ ...f, correctAnswer: e.target.value as "A" | "B" | "C" | "D" }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white">
-                {["A", "B", "C", "D"].map(o => <option key={o}>{o}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Difficulty</label>
-              <select value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: e.target.value as "easy" | "medium" | "hard" }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white">
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-              </select>
-            </div>
-          </div>
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
+          <p className="text-2xl font-bold text-blue-600">{users.length}</p>
+          <p className="text-sm text-gray-500 mt-0.5">Total Users</p>
+        </div>
+        <div className="bg-orange-50 rounded-2xl p-4 border border-orange-100">
+          <p className="text-2xl font-bold text-orange-600">{fmtTime(totalStudy)}</p>
+          <p className="text-sm text-gray-500 mt-0.5">Combined Study Time</p>
+        </div>
+        <div className="bg-green-50 rounded-2xl p-4 border border-green-100">
+          <p className="text-2xl font-bold text-green-600">{totalStreak}</p>
+          <p className="text-sm text-gray-500 mt-0.5">Combined Streak Days</p>
+        </div>
+      </div>
 
-          {(["subject", "chapter", "question", "optionA", "optionB", "optionC", "optionD"] as const).map(f => (
-            <div key={f}>
-              <label className="block text-xs font-medium text-gray-600 mb-1 capitalize">{f.replace(/([A-Z])/g, " $1")}</label>
-              <input value={form[f]} onChange={e => setForm(p => ({ ...p, [f]: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" required />
+      <div className="flex gap-2 mb-4">
+        <button onClick={() => setSort("studyTime")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${sort === "studyTime" ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+          <Clock className="w-3.5 h-3.5" /> By Study Time
+        </button>
+        <button onClick={() => setSort("streak")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${sort === "streak" ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+          <Flame className="w-3.5 h-3.5" /> By Streak
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">{[1,2,3,4].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+      ) : sorted.length === 0 ? (
+        <p className="text-center text-gray-400 py-12">No users yet.</p>
+      ) : (
+        sorted.map((u, i) => (
+          <div key={u.uid} className="flex items-center gap-3 bg-white rounded-xl border border-gray-100 px-4 py-3 mb-2">
+            <span className="text-xs font-bold text-gray-400 w-5 text-center">#{i+1}</span>
+            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-semibold flex-shrink-0">
+              {(u.name || "?").charAt(0).toUpperCase()}
             </div>
-          ))}
-
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Explanation <span className="text-gray-400 font-normal">(optional — shown to students after answering)</span>
-            </label>
-            <textarea
-              value={form.explanation}
-              onChange={e => setForm(f => ({ ...f, explanation: e.target.value }))}
-              placeholder="Explain why the correct answer is right…"
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none"
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <button type="submit" disabled={createMcq.isPending} className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50">
-              {createMcq.isPending ? "Saving…" : "Save MCQ"}
-            </button>
-            <button type="button" onClick={() => setShow(false)} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
-          </div>
-        </form>
-      )}
-
-      {isLoading
-        ? <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
-        : (mcqs || []).map(m => (
-          <div key={m.id} className="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3 mb-2">
-            <div className="min-w-0 flex-1 mr-3">
-              <p className="font-medium text-gray-900 text-sm truncate">{m.question}</p>
-              <div className="flex items-center gap-2 mt-0.5">
-                <p className="text-xs text-gray-500">Grade {m.grade} · {m.subject} · {m.difficulty}</p>
-                {m.explanation && <span className="text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full">Has explanation</span>}
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-gray-900 text-sm truncate">{u.name}</p>
+              <p className="text-xs text-gray-500">{u.email} · Grade {u.grade}{u.lastActive ? ` · Last active: ${u.lastActive}` : ""}</p>
+            </div>
+            <div className="flex items-center gap-4 flex-shrink-0">
+              <div className="text-right">
+                <div className="flex items-center gap-1 text-blue-600 justify-end">
+                  <Clock className="w-3 h-3" />
+                  <span className="text-sm font-semibold">{fmtTime(u.studyTime)}</span>
+                </div>
+                <p className="text-xs text-gray-400">studied</p>
+              </div>
+              <div className="text-right">
+                <div className="flex items-center gap-1 text-orange-500 justify-end">
+                  <Flame className="w-3 h-3" />
+                  <span className="text-sm font-semibold">{u.streak}d</span>
+                </div>
+                <p className="text-xs text-gray-400">streak</p>
               </div>
             </div>
-            <button onClick={() => deleteMcq.mutate({ id: m.id }, { onSuccess: inv })} className="p-1.5 text-gray-400 hover:text-red-500 flex-shrink-0">
-              <Trash2 className="w-4 h-4" />
-            </button>
           </div>
         ))
-      }
+      )}
     </div>
   );
 }
@@ -705,43 +708,6 @@ function ManageUsers() {
   );
 }
 
-// ─── Leaderboard Control ───────────────────────────────────────────────────
-
-function LeaderboardControl() {
-  const qc = useQueryClient();
-  const { data: scores } = useListScores({ period: "daily" }, { query: { queryKey: getListScoresQueryKey({ period: "daily" }) } });
-  const resetScores = useResetScores();
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-bold text-gray-900">Leaderboard Control</h2>
-        <button
-          onClick={() => resetScores.mutate(undefined, { onSuccess: () => qc.invalidateQueries({ queryKey: getListScoresQueryKey({ period: "daily" }) }) })}
-          disabled={resetScores.isPending}
-          className="px-4 py-2 bg-red-500 text-white rounded-xl text-sm hover:bg-red-600 disabled:opacity-50"
-        >
-          Reset Daily Scores
-        </button>
-      </div>
-      <div className="space-y-2">
-        {(scores || []).map((s, i) => (
-          <div key={s.id} className="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3">
-            <div className="flex items-center gap-3">
-              <span className="w-6 text-center text-sm font-bold text-gray-500">#{i + 1}</span>
-              <div>
-                <p className="font-medium text-gray-900 text-sm">{s.userName}</p>
-                <p className="text-xs text-gray-500">Grade {s.grade} · {s.subject}</p>
-              </div>
-            </div>
-            <p className="font-bold text-gray-900">{s.score}/{s.totalQuestions}</p>
-          </div>
-        ))}
-        {(scores || []).length === 0 && <p className="text-center text-gray-400 py-8">No scores for today.</p>}
-      </div>
-    </div>
-  );
-}
 
 // ─── SEO Panel ─────────────────────────────────────────────────────────────
 
@@ -981,11 +947,10 @@ export default function Admin() {
   const navItems: { key: Section; icon: typeof LayoutDashboard; label: string }[] = [
     { key: "dashboard",     icon: LayoutDashboard, label: "Dashboard"     },
     { key: "notes",         icon: BookOpen,        label: "Manage Notes"  },
-    { key: "mcqs",          icon: Brain,           label: "Manage MCQs"   },
     { key: "pyqs",          icon: FileText,        label: "Manage PYQs"   },
     { key: "announcements", icon: Megaphone,       label: "Announcements" },
     { key: "users",         icon: Users,           label: "Manage Users"  },
-    { key: "leaderboard",   icon: Trophy,          label: "Leaderboard"   },
+    { key: "reports",       icon: BarChart2,       label: "Study Reports" },
     { key: "seo",           icon: Shield,          label: "SEO Panel"     },
   ];
 
@@ -1034,11 +999,10 @@ export default function Admin() {
       <main className="flex-1 overflow-y-auto p-8">
         {section === "dashboard"     && <AdminOverview />}
         {section === "notes"         && <ManageNotes />}
-        {section === "mcqs"          && <ManageMcqs />}
         {section === "pyqs"          && <ManagePyqs />}
         {section === "announcements" && <ManageAnnouncements />}
         {section === "users"         && <ManageUsers />}
-        {section === "leaderboard"   && <LeaderboardControl />}
+        {section === "reports"       && <ReportView />}
         {section === "seo"           && <SeoPanel />}
       </main>
     </div>

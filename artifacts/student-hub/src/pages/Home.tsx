@@ -1,17 +1,17 @@
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { BookOpen, FileText, Brain, MessageCircle, Timer, CheckSquare, Trophy, ArrowRight, LogIn, Sparkles } from "lucide-react";
+import { BookOpen, FileText, BarChart2, MessageCircle, Timer, CheckSquare, Trophy, ArrowRight, LogIn, Sparkles } from "lucide-react";
 import { useListNotes, useListPyqs } from "@workspace/api-client-react";
 
 const features = [
   { icon: BookOpen,      label: "Study Notes",       desc: "Notes by grade, subject & chapter",  href: "/notes",      color: "bg-blue-50 text-blue-600",    public: true  },
   { icon: FileText,      label: "PYQ Papers",        desc: "Past exam papers with viewer",        href: "/pyqs",       color: "bg-orange-50 text-orange-600", public: true  },
-  { icon: Brain,         label: "MCQ Practice",      desc: "Thousands of practice questions",     href: "/mcq",        color: "bg-purple-50 text-purple-600", public: false },
+  { icon: BarChart2,     label: "Report Card",       desc: "Track your study time and progress",  href: "/report",     color: "bg-purple-50 text-purple-600", public: false },
   { icon: MessageCircle, label: "Nep AI",             desc: "AI study assistant for any topic",    href: "/ai",         color: "bg-indigo-50 text-indigo-600", public: false },
   { icon: Timer,         label: "Pomodoro Timer",     desc: "Focus timer for study sessions",      href: "/pomodoro",   color: "bg-red-50 text-red-600",       public: false },
   { icon: CheckSquare,   label: "To-Do List",         desc: "Track your study tasks",              href: "/todo",       color: "bg-green-50 text-green-600",   public: false },
-  { icon: Trophy,        label: "Leaderboard",        desc: "Top MCQ scorers daily & all-time",    href: "/leaderboard",color: "bg-amber-50 text-amber-600",   public: false },
+  { icon: Trophy,        label: "Leaderboard",        desc: "Top students by study time & streak", href: "/leaderboard",color: "bg-amber-50 text-amber-600",   public: false },
 ];
 
 export default function Home() {
@@ -37,10 +37,10 @@ export default function Home() {
     <>
       <Helmet>
         <title>Student Hub — Free Study Platform for Grade 9–12 Students in Nepal</title>
-        <meta name="description" content="Free notes, past papers (PYQs), MCQ practice, and AI study assistant for Grade 9–12 students in Nepal. SEE and NEB exam preparation." />
-        <meta name="keywords" content="student hub nepal, grade 10 notes, SEE preparation, NEB notes, PYQ nepal, MCQ practice nepal" />
+        <meta name="description" content="Free notes, past papers (PYQs), AI study assistant and progress tracking for Grade 9–12 students in Nepal. SEE and NEB exam preparation." />
+        <meta name="keywords" content="student hub nepal, grade 10 notes, SEE preparation, NEB notes, PYQ nepal, study tracker nepal" />
         <meta property="og:title" content="Student Hub — Free Study Platform for Nepal Students" />
-        <meta property="og:description" content="Notes, PYQs, MCQ practice and AI tools for Grade 9–12 students in Nepal. Free forever." />
+        <meta property="og:description" content="Notes, PYQs, Nep AI and study tracking for Grade 9–12 students in Nepal. Free forever." />
       </Helmet>
 
       {/* ── Hero ── */}
@@ -58,7 +58,7 @@ export default function Home() {
             <span className="text-blue-500">Rank higher.</span>
           </h1>
           <p className="text-lg text-gray-500 mb-8 max-w-xl mx-auto">
-            Notes, past papers, MCQ practice and an AI tutor — all in one place.
+            Notes, past papers, AI tutor and progress tracking — all in one place.
             Built for Grade 9–12 students across Nepal.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -104,7 +104,7 @@ export default function Home() {
       </section>
 
       {/* ── Recent Notes preview ── */}
-      {notes && notes.length > 0 && (
+      {Array.isArray(notes) && notes.length > 0 && (
         <section className="bg-gray-50 py-12 px-4">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-6">
@@ -114,7 +114,7 @@ export default function Home() {
               </Link>
             </div>
             <div className="grid gap-2">
-              {notes.slice(0, 5).map(note => (
+              {(notes as any[]).slice(0, 5).map((note: any) => (
                 <Link key={note.id} href={`/notes/${note.id}`}>
                   <div className="flex items-center gap-4 bg-white rounded-2xl border border-gray-100 px-4 py-3.5 hover:border-blue-100 hover:shadow-sm transition-all">
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
@@ -138,7 +138,7 @@ export default function Home() {
       )}
 
       {/* ── Recent PYQs preview ── */}
-      {pyqs && pyqs.length > 0 && (
+      {Array.isArray(pyqs) && pyqs.length > 0 && (
         <section className="py-12 px-4">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-6">
@@ -148,7 +148,7 @@ export default function Home() {
               </Link>
             </div>
             <div className="grid gap-2">
-              {pyqs.slice(0, 5).map(pyq => (
+              {(pyqs as any[]).slice(0, 5).map((pyq: any) => (
                 <Link key={pyq.id} href={`/pyq/${pyq.id}`}>
                   <div className="flex items-center gap-4 bg-white rounded-2xl border border-gray-100 px-4 py-3.5 hover:border-orange-100 hover:shadow-sm transition-all">
                     <div className="w-9 h-9 bg-orange-50 rounded-xl flex items-center justify-center flex-shrink-0">

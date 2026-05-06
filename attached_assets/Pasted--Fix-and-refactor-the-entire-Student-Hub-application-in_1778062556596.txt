@@ -1,0 +1,344 @@
+
+Fix and refactor the entire "Student Hub" application into a stable, production-ready system.
+
+This is NOT UI work only.
+This is FULL SYSTEM ARCHITECTURE FIX:
+AUTH + FIRESTORE + ROUTING + SYNC + ADMIN CONTROL + DATA CONSISTENCY.
+
+---
+
+# 🔴 0. CRITICAL CHANGE (REMOVE MCQ SYSTEM COMPLETELY)
+
+Remove MCQ system from:
+- frontend
+- backend
+- admin panel
+- navigation
+- database references
+
+DO NOT replace it with quiz logic.
+
+Instead, system focus will be:
+- Study Report System
+- Leaderboard System
+- Streak System
+- Task + Study Tracking System
+
+Ensure NO broken references remain.
+
+---
+
+# 🔴 1. AUTH SYSTEM (FULL FIX REQUIRED)
+
+Fix Firebase authentication completely.
+
+## REQUIRED FLOW:
+
+Use:
+onAuthStateChanged(user)
+
+---
+
+IF user == NULL:
+→ redirect to /login or /register
+
+---
+
+IF user EXISTS:
+Check Firestore:
+users/{uid}
+
+---
+
+IF user document DOES NOT exist:
+→ redirect to:
+/setup-profile
+
+---
+
+IF user document EXISTS:
+→ redirect to:
+/dashboard
+
+---
+
+## CRITICAL RULE:
+DO NOT allow dashboard access without valid user document.
+
+---
+
+## FIX BUGS:
+
+- Same account must not show different grades on different devices
+- Prevent duplicate user creation
+- Use UID as ONLY identity source
+
+---
+
+# 🔴 2. SETUP PROFILE FIX
+
+After Google login:
+
+User must complete:
+- name
+- grade
+
+Save in:
+users/{uid}
+
+Fields:
+- name
+- email
+- grade
+- createdAt
+- streak = 0
+- studyTime = 0
+
+Then redirect → /dashboard
+
+---
+
+# 🔴 3. GLOBAL STATE SYNC (CRITICAL)
+
+Fix inconsistent state issues:
+
+- auth state
+- user profile state
+- grade switching
+- theme switching
+
+---
+
+## RULE:
+
+Firestore is SINGLE SOURCE OF TRUTH.
+
+No local fake state overriding database.
+
+---
+
+# 🔴 4. ADMIN PANEL (FULL CONTROL SYSTEM)
+
+Admin panel MUST be fully functional.
+
+Route:
+/admin
+
+## ADMIN LOGIN:
+- username: siddhant
+- password: siddhant2078
+
+---
+
+## ADMIN DASHBOARD MUST INCLUDE:
+
+### USERS CONTROL:
+- list all users from users collection
+- show:
+  - name
+  - email
+  - grade
+  - streak
+  - studyTime
+- delete user option
+
+---
+
+### NOTES CONTROL:
+- add notes
+- edit notes
+- delete notes
+- upload PDF/images/text
+
+---
+
+### PYQ CONTROL:
+- upload PYQ (PDF/image supported)
+- categorize by grade/year/subject
+
+---
+
+### SEO CONTROL SYSTEM (ADVANCED):
+
+For notes and PYQ:
+
+Fields:
+- seoTitle
+- metaDescription
+- keywords
+- slug
+
+Must:
+- save to Firestore
+- reflect on frontend pages immediately
+
+---
+
+### REPORT VIEW SYSTEM:
+Admin can view:
+- total study hours per user
+- streak data
+- daily activity logs
+
+---
+
+# 🔴 5. NOTES SYSTEM FIX
+
+Notes must:
+
+- load correctly
+- open full page properly
+- NOT crash
+- NOT require re-login
+
+---
+
+## FULL NOTE PAGE:
+
+- clean reading view
+- no sidebar
+- back button
+- next/previous note navigation
+
+---
+
+# 🔴 6. PYQ SYSTEM FIX
+
+PYQ must support:
+
+- PDF upload
+- image upload
+- structured display
+
+Frontend:
+- clean browsing
+- filter by grade/year/subject
+
+---
+
+# 🔴 7. REPORT CARD SYSTEM (CORE FEATURE)
+
+Replace MCQ with full analytics system.
+
+Track:
+
+- daily study time (from Pomodoro)
+- weekly/monthly summaries
+- completed tasks
+- streak history
+
+---
+
+## DISPLAY:
+
+User report card shows:
+- daily study time
+- weekly performance
+- monthly performance
+- streak
+- badges
+- improvement % vs last week
+
+---
+
+# 🔴 8. LEADERBOARD SYSTEM
+
+Create leaderboards:
+
+- grade-wise leaderboard
+- based on:
+  - studyTime
+  - streak
+  - consistency score
+
+---
+
+## RULE:
+Leaderboard must update in real time from Firestore.
+
+---
+
+# 🔴 9. STREAK SYSTEM (LIFETIME)
+
+- streak increases daily when user studies
+- resets if inactive
+- stored in Firestore
+
+---
+
+# 🔴 10. NEP AI UPGRADE
+
+Upgrade Nep AI to latest knowledge baseline (2026-ready behavior simulation):
+
+- must give up-to-date educational explanations
+- must access notes + PYQ context
+- must be able to analyze user report card
+
+---
+
+## REQUIRED CAPABILITY:
+
+Nep AI can:
+- summarize user weak areas
+- suggest study focus
+- explain notes content
+
+---
+
+# 🔴 11. NAVIGATION & ROUTING FIX
+
+Fix all routing bugs:
+
+- no random redirects to home
+- /admin must always work
+- authenticated users must not be forced back to login/setup
+
+---
+
+# 🔴 12. PERFORMANCE FIX
+
+- reduce loading time
+- fix infinite loading on auth
+- ensure fast Firestore reads
+- prevent unnecessary re-renders
+
+---
+
+# 🔴 13. DATA CONSISTENCY RULE
+
+Firestore structure MUST be consistent:
+
+users/{uid}
+notes/{id}
+pyq/{id}
+
+NO duplicate or conflicting collections.
+
+---
+
+# 🎯 FINAL RESULT
+
+After this fix:
+
+- auth works perfectly
+- setup profile flow is stable
+- admin fully controls system
+- notes + pyq fully functional
+- SEO works properly
+- report card system replaces MCQ
+- leaderboard + streak system fully synced
+- Nep AI is upgraded and integrated
+- no redirect bugs or broken states
+
+---
+
+# 🚫 DO NOT
+
+- DO NOT reintroduce MCQ system
+- DO NOT create duplicate users
+- DO NOT bypass Firestore
+- DO NOT allow UI without backend sync
+
+---
+
+END

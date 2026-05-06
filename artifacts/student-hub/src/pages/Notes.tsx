@@ -171,7 +171,7 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
           <div className="mb-5 bg-blue-50 border border-blue-100 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
               <p className="font-semibold text-blue-900 text-sm">Get full access — free</p>
-              <p className="text-blue-700 text-xs mt-0.5">MCQ practice, AI tools, progress tracking &amp; more</p>
+              <p className="text-blue-700 text-xs mt-0.5">Nep AI, progress tracking, Pomodoro &amp; more</p>
             </div>
             <Link
               href="/login"
