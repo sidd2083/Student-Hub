@@ -70,11 +70,6 @@ async function fetchProfile(uid: string): Promise<ProfileResult> {
   }
 }
 
-// ─── Routing helper ───────────────────────────────────────────────────────────
-
-const PUBLIC_PATH_REGEX =
-  /^\/?$|^\/login|^\/notes|^\/pyqs|^\/pyq|^\/about|^\/contact|^\/ai|^\/report|^\/todo|^\/pomodoro|^\/leaderboard|^\/admin/;
-
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -98,6 +93,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then((result: UserCredential | null) => {
         if (result?.user) {
           console.log("[Auth] REDIRECT RESULT:", result.user.email);
+          const isNewUser = getAdditionalUserInfo(result)?.isNewUser ?? false;
+          console.log("Login success:", result.user.uid);
+          // Navigate immediately based on isNewUser
+          if (isNewUser) {
+            window.location.replace("/setup-profile");
+          } else {
+            window.location.replace("/dashboard");
+          }
         } else {
           console.log("[Auth] REDIRECT RESULT: none pending");
         }
@@ -108,7 +111,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!mounted) return;
-      console.log("[Auth] AUTH STATE:", firebaseUser ? firebaseUser.email : null);
 
       // ── No user ──────────────────────────────────────────────────────────
       if (!firebaseUser) {
@@ -116,52 +118,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfileState(null);
         setLoading(false);
         const path = window.location.pathname;
-        console.log("[Auth] ROUTE: no user, path:", path);
-        if (!PUBLIC_PATH_REGEX.test(path)) {
-          console.log("[Auth] ROUTE: protected path → /");
-          window.location.replace("/");
+        // Redirect away from protected pages only
+        const isProtected = /^\/dashboard|^\/settings/.test(path);
+        if (isProtected) {
+          console.log("[Auth] no user on protected page → /login");
+          window.location.replace("/login");
         }
         return;
       }
 
       // ── User signed in ────────────────────────────────────────────────────
-      console.log("[Auth] AUTH STATE: uid=" + firebaseUser.uid);
       setUser(firebaseUser);
 
-      // Fetch from Firestore
+      const path = window.location.pathname;
+
+      // Already going somewhere meaningful — validate profile in background
+      // without blocking the current navigation
       const result = await fetchProfile(firebaseUser.uid);
       if (!mounted) return;
-
-      console.log("[Auth] PROFILE STATUS:", result.status);
-      const path = window.location.pathname;
 
       if (result.status === "found") {
         setProfileState(result.profile);
         setLoading(false);
-        console.log("[Auth] ROUTE:", path, "→ profile found");
+
+        // If sitting on login/home page, push them to dashboard
         if (path === "/" || path === "/login") {
-          console.log("[Auth] ROUTE → /dashboard");
+          console.log("[Auth] profile found, on login → /dashboard");
           window.location.replace("/dashboard");
         }
 
       } else if (result.status === "not_found") {
         setProfileState(null);
         setLoading(false);
+
+        // Only redirect to setup-profile if not already there
         if (path !== "/setup-profile" && path !== "/onboarding") {
-          console.log("[Auth] ROUTE → /setup-profile (new user)");
+          console.log("[Auth] no profile found → /setup-profile");
           window.location.replace("/setup-profile");
-        } else {
-          console.log("[Auth] ROUTE: already on setup-profile, staying");
         }
 
       } else {
-        // Firestore error — route to setup-profile to be safe
-        console.warn("[Auth] Firestore error code:", result.code, "→ /setup-profile");
-        setProfileState(null);
+        // Firestore error — don't redirect, let user stay where they are
+        console.warn("[Auth] Firestore error code:", result.code);
         setLoading(false);
-        if (path === "/" || path === "/login") {
-          window.location.replace("/setup-profile");
-        }
       }
     });
 
@@ -185,7 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfileState(p);
   }, []);
 
-  // ── Google sign-in (popup with redirect fallback) ─────────────────────────
+  // ── Google sign-in: popup with redirect fallback ───────────────────────────
 
   const signInWithGoogle = async (): Promise<{ outcome: SignInOutcome; isNewUser: boolean }> => {
     if (!isConfigured) {
@@ -193,16 +192,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setLoading(true);
     console.log("[Auth] signInWithGoogle — trying popup…");
+
     try {
       const cred = await signInWithPopup(auth, googleProvider);
       const isNewUser = getAdditionalUserInfo(cred)?.isNewUser ?? false;
       console.log("Login success:", cred.user.uid);
-      console.log("[Auth] LOGIN RESULT:", cred.user.email, "uid:", cred.user.uid, "isNewUser:", isNewUser);
-      // onAuthStateChanged handles navigation from here
+      console.log("[Auth] LOGIN:", cred.user.email, "isNewUser:", isNewUser);
+
+      // ── Navigate immediately — don't wait for onAuthStateChanged Firestore check
+      // onAuthStateChanged runs in the background and will correct if needed
+      if (isNewUser) {
+        window.location.replace("/setup-profile");
+      } else {
+        window.location.replace("/dashboard");
+      }
+
       return { outcome: "success", isNewUser };
+
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code ?? "unknown";
-      console.warn("[Auth] signInWithPopup:", code);
+      console.warn("[Auth] signInWithPopup error:", code);
 
       if (code === "auth/popup-blocked") {
         console.log("[Auth] Popup blocked — falling back to redirect…");
@@ -210,7 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await signInWithRedirect(auth, googleProvider);
           return { outcome: "redirect", isNewUser: false };
         } catch (rErr: unknown) {
-          console.error("[Auth] Redirect also failed:", (rErr as { code?: string })?.code, rErr);
+          console.error("[Auth] Redirect failed:", (rErr as { code?: string })?.code, rErr);
         }
       }
 
