@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Request, Response } from "express";
 import { db } from "@workspace/db";
 import { usersTable, studyLogsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
@@ -18,7 +19,7 @@ const toLog = (l: StudyLogRow) => ({
   notesViewed:    l.notesViewed,
 });
 
-router.post("/study/session", async (req, res) => {
+router.post("/study/session", async (req: Request, res: Response) => {
   try {
     const { uid, minutes } = req.body as { uid?: string; minutes?: number };
     if (!uid || typeof minutes !== "number" || minutes < 1) {
@@ -83,7 +84,7 @@ router.post("/study/session", async (req, res) => {
   }
 });
 
-router.post("/study/log-task", async (req, res) => {
+router.post("/study/log-task", async (req: Request, res: Response) => {
   try {
     const { uid } = req.body as { uid?: string };
     if (!uid) return res.status(400).json({ error: "uid required" });
@@ -106,7 +107,7 @@ router.post("/study/log-task", async (req, res) => {
   }
 });
 
-router.post("/study/log-note", async (req, res) => {
+router.post("/study/log-note", async (req: Request, res: Response) => {
   try {
     const { uid } = req.body as { uid?: string };
     if (!uid) return res.status(400).json({ error: "uid required" });
@@ -129,9 +130,9 @@ router.post("/study/log-note", async (req, res) => {
   }
 });
 
-router.get("/study/logs/:uid", async (req, res) => {
+router.get("/study/logs/:uid", async (req: Request, res: Response) => {
   try {
-    const { uid } = req.params;
+    const uid = String(req.params.uid);
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const cutoff = thirtyDaysAgo.toISOString().slice(0, 10);
@@ -147,9 +148,9 @@ router.get("/study/logs/:uid", async (req, res) => {
   }
 });
 
-router.get("/study/stats/:uid", async (req, res) => {
+router.get("/study/stats/:uid", async (req: Request, res: Response) => {
   try {
-    const users = await db.select().from(usersTable).where(eq(usersTable.uid, req.params.uid));
+    const users = await db.select().from(usersTable).where(eq(usersTable.uid, String(req.params.uid)));
     if (users.length === 0) return res.status(404).json({ error: "User not found" });
     const u = users[0];
     return res.json({

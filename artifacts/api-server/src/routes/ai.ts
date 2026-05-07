@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Request, Response } from "express";
 import OpenAI from "openai";
 import { logger } from "../lib/logger";
 
@@ -46,7 +47,7 @@ interface ChatContext {
   weeklyMins?: number;
 }
 
-router.post("/ai/chat", async (req, res) => {
+router.post("/ai/chat", async (req: Request, res: Response) => {
   try {
     const { message, history = [], context } = req.body as {
       message?: string;

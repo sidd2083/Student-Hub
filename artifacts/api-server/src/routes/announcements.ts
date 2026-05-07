@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Request, Response } from "express";
 import { db } from "@workspace/db";
 import { announcements } from "@workspace/db";
 import { desc, eq } from "drizzle-orm";
@@ -15,7 +16,7 @@ const toAnnouncement = (r: AnnouncementRow) => ({
   createdAt: r.createdAt.toISOString(),
 });
 
-router.get("/announcements", async (req, res) => {
+router.get("/announcements", async (_req: Request, res: Response) => {
   try {
     const rows = await db
       .select()
@@ -29,7 +30,7 @@ router.get("/announcements", async (req, res) => {
   }
 });
 
-router.post("/announcements", async (req, res) => {
+router.post("/announcements", async (req: Request, res: Response) => {
   try {
     const { title, body } = req.body as { title?: string; body?: string };
     if (!title?.trim() || !body?.trim()) {
@@ -46,7 +47,7 @@ router.post("/announcements", async (req, res) => {
   }
 });
 
-router.delete("/announcements/:id", async (req, res) => {
+router.delete("/announcements/:id", async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {

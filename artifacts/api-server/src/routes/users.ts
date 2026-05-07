@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Request, Response } from "express";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -27,7 +28,7 @@ const toUser = (u: UserRow) => ({
   badges:         parseBadges(u.badges),
 });
 
-router.get("/users", async (req, res) => {
+router.get("/users", async (_req: Request, res: Response) => {
   try {
     const users = await db.select().from(usersTable).orderBy(usersTable.createdAt);
     return res.json(users.map(toUser));
@@ -37,7 +38,7 @@ router.get("/users", async (req, res) => {
   }
 });
 
-router.post("/users", async (req, res) => {
+router.post("/users", async (req: Request, res: Response) => {
   try {
     const { uid, name, email, grade, role } = req.body as { uid?: string; name?: string; email?: string; grade?: string | number; role?: "user" | "admin" };
     if (!uid || !name || !email || !grade) {
@@ -60,7 +61,7 @@ router.post("/users", async (req, res) => {
   }
 });
 
-router.get("/users/stats/summary", async (req, res) => {
+router.get("/users/stats/summary", async (_req: Request, res: Response) => {
   try {
     const users = await db.select().from(usersTable);
     const byGrade: Record<string, number> = {};
@@ -80,9 +81,9 @@ router.get("/users/stats/summary", async (req, res) => {
   }
 });
 
-router.get("/users/:uid", async (req, res) => {
+router.get("/users/:uid", async (req: Request, res: Response) => {
   try {
-    const users = await db.select().from(usersTable).where(eq(usersTable.uid, req.params.uid));
+    const users = await db.select().from(usersTable).where(eq(usersTable.uid, String(req.params.uid)));
     if (users.length === 0) return res.status(404).json({ error: "User not found" });
     return res.json(toUser(users[0]));
   } catch (err) {
@@ -91,13 +92,13 @@ router.get("/users/:uid", async (req, res) => {
   }
 });
 
-router.put("/users/:uid/badges", async (req, res) => {
+router.put("/users/:uid/badges", async (req: Request, res: Response) => {
   try {
     const { badges } = req.body as { badges?: unknown };
     if (!Array.isArray(badges)) return res.status(400).json({ error: "badges must be an array" });
     const updated = await db.update(usersTable)
       .set({ badges: JSON.stringify(badges) })
-      .where(eq(usersTable.uid, req.params.uid))
+      .where(eq(usersTable.uid, String(req.params.uid)))
       .returning();
     if (updated.length === 0) return res.status(404).json({ error: "User not found" });
     return res.json({ badges: parseBadges(updated[0].badges) });
@@ -107,14 +108,14 @@ router.put("/users/:uid/badges", async (req, res) => {
   }
 });
 
-router.patch("/users/:uid", async (req, res) => {
+router.patch("/users/:uid", async (req: Request, res: Response) => {
   try {
     const { name, grade, role } = req.body as Record<string, unknown>;
     const updates: Record<string, unknown> = {};
     if (name  !== undefined) updates.name  = name;
     if (grade !== undefined) updates.grade = grade;
     if (role  !== undefined) updates.role  = role;
-    const updated = await db.update(usersTable).set(updates).where(eq(usersTable.uid, req.params.uid)).returning();
+    const updated = await db.update(usersTable).set(updates).where(eq(usersTable.uid, String(req.params.uid))).returning();
     if (updated.length === 0) return res.status(404).json({ error: "User not found" });
     return res.json(toUser(updated[0]));
   } catch (err) {
@@ -123,9 +124,9 @@ router.patch("/users/:uid", async (req, res) => {
   }
 });
 
-router.delete("/users/:uid", async (req, res) => {
+router.delete("/users/:uid", async (req: Request, res: Response) => {
   try {
-    await db.delete(usersTable).where(eq(usersTable.uid, req.params.uid));
+    await db.delete(usersTable).where(eq(usersTable.uid, String(req.params.uid)));
     return res.json({ success: true });
   } catch (err) {
     logger.error(err);

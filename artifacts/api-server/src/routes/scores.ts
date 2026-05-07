@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Request, Response } from "express";
 import { db } from "@workspace/db";
 import { scoresTable } from "@workspace/db";
 import { desc, sql } from "drizzle-orm";
@@ -19,7 +20,7 @@ const toScore = (s: ScoreRow) => ({
   createdAt:      s.createdAt.toISOString(),
 });
 
-router.get("/scores", async (req, res) => {
+router.get("/scores", async (req: Request, res: Response) => {
   try {
     const { period } = req.query;
     let scores: ScoreRow[];
@@ -39,7 +40,7 @@ router.get("/scores", async (req, res) => {
   }
 });
 
-router.post("/scores", async (req, res) => {
+router.post("/scores", async (req: Request, res: Response) => {
   try {
     const { uid, userName, grade, score, totalQuestions, subject } = req.body as Record<string, unknown>;
     if (!uid || !userName || !grade || score === undefined || !totalQuestions || !subject) {
@@ -53,7 +54,7 @@ router.post("/scores", async (req, res) => {
   }
 });
 
-router.post("/scores/reset", async (req, res) => {
+router.post("/scores/reset", async (_req: Request, res: Response) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);

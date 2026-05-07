@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Request, Response } from "express";
 import { db } from "@workspace/db";
 import { tasksTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -16,7 +17,7 @@ const toTask = (t: TaskRow) => ({
   createdAt: t.createdAt.toISOString(),
 });
 
-router.get("/tasks", async (req, res) => {
+router.get("/tasks", async (req: Request, res: Response) => {
   try {
     const { uid } = req.query;
     if (!uid) return res.status(400).json({ error: "uid is required" });
@@ -30,7 +31,7 @@ router.get("/tasks", async (req, res) => {
   }
 });
 
-router.post("/tasks", async (req, res) => {
+router.post("/tasks", async (req: Request, res: Response) => {
   try {
     const { uid, text } = req.body as Record<string, string>;
     if (!uid || !text) return res.status(400).json({ error: "Missing required fields" });
@@ -42,7 +43,7 @@ router.post("/tasks", async (req, res) => {
   }
 });
 
-router.patch("/tasks/:id", async (req, res) => {
+router.patch("/tasks/:id", async (req: Request, res: Response) => {
   try {
     const { text, completed } = req.body as Record<string, unknown>;
     const updates: Record<string, unknown> = {};
@@ -57,7 +58,7 @@ router.patch("/tasks/:id", async (req, res) => {
   }
 });
 
-router.delete("/tasks/:id", async (req, res) => {
+router.delete("/tasks/:id", async (req: Request, res: Response) => {
   try {
     await db.delete(tasksTable).where(eq(tasksTable.id, Number(req.params.id)));
     return res.json({ success: true });

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Request, Response } from "express";
 import { db } from "@workspace/db";
 import { notesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
@@ -19,7 +20,7 @@ const toNote = (n: NoteRow) => ({
   createdAt:   n.createdAt.toISOString(),
 });
 
-router.get("/notes", async (req, res) => {
+router.get("/notes", async (req: Request, res: Response) => {
   try {
     const { grade, subject, chapter } = req.query;
     const conditions = [];
@@ -36,13 +37,13 @@ router.get("/notes", async (req, res) => {
   }
 });
 
-router.get("/notes/subjects", async (req, res) => {
+router.get("/notes/subjects", async (req: Request, res: Response) => {
   try {
     const { grade } = req.query;
     const notes = grade
       ? await db.select({ subject: notesTable.subject }).from(notesTable).where(eq(notesTable.grade, Number(grade)))
       : await db.select({ subject: notesTable.subject }).from(notesTable);
-    const subjects = [...new Set(notes.map(n => n.subject))].sort();
+    const subjects = [...new Set(notes.map((n: { subject: string }) => n.subject))].sort();
     return res.json(subjects);
   } catch (err) {
     logger.error(err);
@@ -50,7 +51,7 @@ router.get("/notes/subjects", async (req, res) => {
   }
 });
 
-router.get("/notes/:id", async (req, res) => {
+router.get("/notes/:id", async (req: Request, res: Response) => {
   try {
     const notes = await db.select().from(notesTable).where(eq(notesTable.id, Number(req.params.id)));
     if (notes.length === 0) return res.status(404).json({ error: "Note not found" });
@@ -61,7 +62,7 @@ router.get("/notes/:id", async (req, res) => {
   }
 });
 
-router.post("/notes", async (req, res) => {
+router.post("/notes", async (req: Request, res: Response) => {
   try {
     const { grade, subject, chapter, title, contentType, content } = req.body as Record<string, unknown>;
     if (!grade || !subject || !chapter || !title || !contentType || !content) {
@@ -75,7 +76,7 @@ router.post("/notes", async (req, res) => {
   }
 });
 
-router.patch("/notes/:id", async (req, res) => {
+router.patch("/notes/:id", async (req: Request, res: Response) => {
   try {
     const { grade, subject, chapter, title, contentType, content } = req.body as Record<string, unknown>;
     const updates: Record<string, unknown> = {};
@@ -94,7 +95,7 @@ router.patch("/notes/:id", async (req, res) => {
   }
 });
 
-router.delete("/notes/:id", async (req, res) => {
+router.delete("/notes/:id", async (req: Request, res: Response) => {
   try {
     await db.delete(notesTable).where(eq(notesTable.id, Number(req.params.id)));
     return res.json({ success: true });

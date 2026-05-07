@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Request, Response } from "express";
 import { db } from "@workspace/db";
 import { mcqsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
@@ -24,7 +25,7 @@ const toMcq = (m: McqRow) => ({
   createdAt:     m.createdAt.toISOString(),
 });
 
-router.get("/mcqs", async (req, res) => {
+router.get("/mcqs", async (req: Request, res: Response) => {
   try {
     const { grade, subject, chapter, difficulty, limit } = req.query;
     const conditions = [];
@@ -43,7 +44,7 @@ router.get("/mcqs", async (req, res) => {
   }
 });
 
-router.post("/mcqs", async (req, res) => {
+router.post("/mcqs", async (req: Request, res: Response) => {
   try {
     const {
       grade, subject, chapter, question,
@@ -64,7 +65,7 @@ router.post("/mcqs", async (req, res) => {
   }
 });
 
-router.patch("/mcqs/:id", async (req, res) => {
+router.patch("/mcqs/:id", async (req: Request, res: Response) => {
   try {
     const {
       grade, subject, chapter, question,
@@ -92,7 +93,7 @@ router.patch("/mcqs/:id", async (req, res) => {
   }
 });
 
-router.delete("/mcqs/:id", async (req, res) => {
+router.delete("/mcqs/:id", async (req: Request, res: Response) => {
   try {
     await db.delete(mcqsTable).where(eq(mcqsTable.id, Number(req.params.id)));
     return res.json({ success: true });

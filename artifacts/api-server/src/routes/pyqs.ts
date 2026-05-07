@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Request, Response } from "express";
 import { db } from "@workspace/db";
 import { pyqsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
@@ -19,7 +20,7 @@ const toPyq = (p: PyqRow) => ({
   createdAt: p.createdAt.toISOString(),
 });
 
-router.get("/pyqs", async (req, res) => {
+router.get("/pyqs", async (req: Request, res: Response) => {
   try {
     const { grade, subject } = req.query;
     const conditions = [];
@@ -35,7 +36,7 @@ router.get("/pyqs", async (req, res) => {
   }
 });
 
-router.post("/pyqs", async (req, res) => {
+router.post("/pyqs", async (req: Request, res: Response) => {
   try {
     const { grade, subject, title, year, pdfUrl, fileType } = req.body as Record<string, unknown>;
     if (!grade || !subject || !title || !year || !pdfUrl) {
@@ -52,7 +53,7 @@ router.post("/pyqs", async (req, res) => {
   }
 });
 
-router.delete("/pyqs/:id", async (req, res) => {
+router.delete("/pyqs/:id", async (req: Request, res: Response) => {
   try {
     await db.delete(pyqsTable).where(eq(pyqsTable.id, Number(req.params.id)));
     return res.json({ success: true });

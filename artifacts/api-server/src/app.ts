@@ -2,6 +2,7 @@ import express, { type Express } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
+import { pinoHttp } from "pino-http";
 import router from "./routes";
 
 const app: Express = express();
@@ -11,6 +12,8 @@ app.set("trust proxy", 1);
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "same-site" },
 }));
+
+app.use(pinoHttp());
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
