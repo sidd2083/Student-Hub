@@ -1,9 +1,9 @@
 import { useState, useRef, useCallback } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { useListNotes, useListNoteSubjects, getListNotesQueryKey } from "@workspace/api-client-react";
-import { BookOpen, ChevronRight, FileText, Image, Type, X, ExternalLink, ZoomIn, LogIn } from "lucide-react";
+import { BookOpen, ChevronRight, FileText, Image, Type, X, ExternalLink, ZoomIn, LogIn, Sparkles } from "lucide-react";
 
 type NoteView = {
   id: number;
@@ -35,6 +35,7 @@ function ContentTypeBadge({ type }: { type: string }) {
 }
 
 function NoteViewer({ note, onClose }: { note: NoteView; onClose: () => void }) {
+  const [, setLocation] = useLocation();
   const [imgZoomed, setImgZoomed] = useState(false);
   const [scrollPct, setScrollPct] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -48,44 +49,58 @@ function NoteViewer({ note, onClose }: { note: NoteView; onClose: () => void }) 
     setScrollPct(pct);
   }, []);
 
+  const handleAskAi = () => {
+    onClose();
+    const ctx = note.contentType === "text"
+      ? `I am reading a note titled "${note.title}" (${note.subject}, Chapter: ${note.chapter}). Here is the content:\n\n${note.content.slice(0, 1500)}\n\nPlease explain this clearly and help me understand the key concepts.`
+      : `I am reading a ${note.contentType} note titled "${note.title}" (${note.subject}, Chapter: ${note.chapter}). Please explain this topic to me and tell me the key things I should know.`;
+    setLocation(`/ai?q=${encodeURIComponent(ctx)}`);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2 sm:p-4">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="h-0.5 bg-gray-100 flex-shrink-0">
-          <div className="h-full bg-blue-500 transition-all duration-150" style={{ width: `${scrollPct}%` }} />
+        {/* Progress bar */}
+        <div className="h-1 bg-gray-100 flex-shrink-0 rounded-t-3xl overflow-hidden">
+          <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${scrollPct}%` }} />
         </div>
+
+        {/* Header */}
         <div className="flex items-start justify-between px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-100 flex-shrink-0">
-          <div className="flex-1 min-w-0 mr-4">
+          <div className="flex-1 min-w-0 mr-3">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <ContentTypeBadge type={note.contentType} />
               <span className="text-xs text-gray-400">{note.subject} · {note.chapter}</span>
             </div>
             <h2 className="text-lg sm:text-xl font-bold text-gray-900 leading-snug">{note.title}</h2>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Ask AI button */}
+            <button
+              onClick={handleAskAi}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500 text-white text-xs font-semibold rounded-xl hover:bg-indigo-600 transition-all"
+              title="Ask Nep AI about this note"
+            >
+              <Sparkles className="w-3 h-3" /> Ask AI
+            </button>
             <Link
               href={`/notes/${note.id}`}
               onClick={onClose}
               className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition-all"
             >
-              <ExternalLink className="w-3 h-3" />
-              View Full Note
+              <ExternalLink className="w-3 h-3" /> Full page
             </Link>
             <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-all">
               <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
         </div>
-        {/* Mobile "View Full Note" bar */}
+        {/* Mobile bar */}
         <div className="sm:hidden flex items-center justify-between px-4 py-2 bg-blue-50 border-b border-blue-100 flex-shrink-0">
           <span className="text-xs text-blue-700">Reading preview</span>
-          <Link
-            href={`/notes/${note.id}`}
-            onClick={onClose}
-            className="flex items-center gap-1 text-xs font-semibold text-blue-600"
-          >
-            <ExternalLink className="w-3 h-3" />
-            View Full Note
+          <Link href={`/notes/${note.id}`} onClick={onClose}
+            className="flex items-center gap-1 text-xs font-semibold text-blue-600">
+            <ExternalLink className="w-3 h-3" /> View Full Note
           </Link>
         </div>
 

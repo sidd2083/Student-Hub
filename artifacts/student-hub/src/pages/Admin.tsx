@@ -824,28 +824,50 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
 }
 
 function SeoPanel() {
-  const { data: notes } = useListNotes({}, { query: { queryKey: getListNotesQueryKey({}) } });
-  const { data: pyqs } = useListPyqs({}, { query: { queryKey: getListPyqsQueryKey({}) } });
   const [editing, setEditing] = useState<SeoEditTarget | null>(null);
   const [search, setSearch] = useState("");
-
+  const [noteItems, setNoteItems] = useState<Array<{ id: number; title: string; kind: SeoKind; url: string }>>([]);
+  const [pyqItems,  setPyqItems]  = useState<Array<{ id: number; title: string; kind: SeoKind; url: string }>>([]);
+  const [loadingItems, setLoadingItems] = useState(true);
+  const [filterKind, setFilterKind] = useState<"all" | "note" | "pyq">("all");
+  const [filterGrade, setFilterGrade] = useState<"all" | number>("all");
   const baseUrl = "https://studenthub.np";
 
-  const noteItems = (Array.isArray(notes) ? notes : []).map(n => ({ id: n.id, title: n.title, kind: "note" as SeoKind, url: `${baseUrl}/notes/${n.id}` }));
-  const pyqItems  = (Array.isArray(pyqs)  ? pyqs  : []).map(p => ({ id: p.id, title: p.title, kind: "pyq"  as SeoKind, url: `${baseUrl}/pyq/${p.id}`   }));
+  // Fetch ALL notes and PYQs across all grades
+  useEffect(() => {
+    setLoadingItems(true);
+    Promise.all([
+      Promise.all([9, 10, 11, 12].map(g =>
+        fetch(`/api/notes?grade=${g}`).then(r => r.json()).catch(() => [])
+      )),
+      Promise.all([9, 10, 11, 12].map(g =>
+        fetch(`/api/pyqs?grade=${g}`).then(r => r.json()).catch(() => [])
+      )),
+    ]).then(([notesPerGrade, pyqsPerGrade]) => {
+      const allNotes = notesPerGrade.flat();
+      const allPyqs  = pyqsPerGrade.flat();
+      setNoteItems(allNotes.map((n: any) => ({ id: n.id, title: n.title, grade: n.grade, subject: n.subject, kind: "note" as SeoKind, url: `${baseUrl}/notes/${n.id}` })));
+      setPyqItems(allPyqs.map((p: any)  => ({ id: p.id, title: p.title, grade: p.grade, subject: p.subject, kind: "pyq"  as SeoKind, url: `${baseUrl}/pyq/${p.id}`   })));
+    }).finally(() => setLoadingItems(false));
+  }, []);
 
   const staticUrls = [
-    { url: `${baseUrl}/`, label: "Homepage", kind: "Static" },
-    { url: `${baseUrl}/notes`, label: "Notes List", kind: "Static" },
-    { url: `${baseUrl}/pyqs`, label: "PYQs List", kind: "Static" },
-    { url: `${baseUrl}/about`, label: "About", kind: "Static" },
-    { url: `${baseUrl}/contact`, label: "Contact", kind: "Static" },
+    { url: `${baseUrl}/`,        label: "Homepage",   kind: "Static" },
+    { url: `${baseUrl}/notes`,   label: "Notes List", kind: "Static" },
+    { url: `${baseUrl}/pyqs`,    label: "PYQs List",  kind: "Static" },
+    { url: `${baseUrl}/about`,   label: "About",      kind: "Static" },
+    { url: `${baseUrl}/contact`, label: "Contact",    kind: "Static" },
   ];
 
   const allItems = [
     ...noteItems.map(i => ({ ...i, kindLabel: "Note" })),
-    ...pyqItems.map(i => ({ ...i, kindLabel: "PYQ" })),
-  ].filter(i => !search || i.title.toLowerCase().includes(search.toLowerCase()));
+    ...pyqItems.map(i => ({  ...i, kindLabel: "PYQ"  })),
+  ].filter(i => {
+    if (search && !i.title.toLowerCase().includes(search.toLowerCase())) return false;
+    if (filterKind !== "all" && i.kind !== filterKind) return false;
+    if (filterGrade !== "all" && (i as any).grade !== filterGrade) return false;
+    return true;
+  });
 
   const generateSitemap = () => {
     const all = [...staticUrls, ...noteItems.map(n => ({ url: n.url, label: n.title, kind: "Note" })), ...pyqItems.map(p => ({ url: p.url, label: p.title, kind: "PYQ" }))];
@@ -861,21 +883,39 @@ function SeoPanel() {
     <div>
       {editing && <SeoEditor target={editing} onClose={() => setEditing(null)} />}
 
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
           <h2 className="text-xl font-bold text-gray-900">SEO Panel</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Edit per-page SEO metadata · stored in Firestore</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Edit per-page SEO metadata stored in Firestore ·
+            {" "}<span className="text-purple-600 font-medium">{allItems.length} pages indexable</span>
+          </p>
         </div>
-        <button onClick={generateSitemap} className="px-4 py-2 bg-purple-500 text-white rounded-xl text-sm font-medium hover:bg-purple-600 transition-all">
-          Download sitemap.xml
+        <button onClick={generateSitemap}
+          className="px-4 py-2 bg-purple-500 text-white rounded-xl text-sm font-medium hover:bg-purple-600 transition-all flex items-center gap-2">
+          ⬇ Download sitemap.xml
         </button>
       </div>
 
+      {/* SEO Quick Tips */}
+      <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4 mb-6">
+        <p className="text-xs font-semibold text-purple-700 mb-2">📌 SEO Tips</p>
+        <ul className="text-xs text-purple-600 space-y-1">
+          <li>• <strong>SEO Title:</strong> Keep under 60 characters. Include keywords like "Grade 10 Science Notes Nepal".</li>
+          <li>• <strong>Meta Description:</strong> 120–160 characters. Describe what the page contains clearly.</li>
+          <li>• <strong>Keywords:</strong> Comma-separated. E.g. "SEE notes, grade 10 science, NEB notes Nepal"</li>
+          <li>• <strong>No Index:</strong> Check this to hide low-quality or duplicate pages from Google.</li>
+          <li>• Download sitemap.xml and submit it to Google Search Console after adding content.</li>
+        </ul>
+      </div>
+
+      {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
-          { label: "Static Pages", count: staticUrls.length,  color: "bg-blue-50 text-blue-600"   },
-          { label: "Note Pages",   count: noteItems.length,   color: "bg-green-50 text-green-600"  },
-          { label: "PYQ Pages",    count: pyqItems.length,    color: "bg-orange-50 text-orange-600"},
+          { label: "Static Pages", count: staticUrls.length,  color: "bg-blue-50 text-blue-600"    },
+          { label: "Note Pages",   count: noteItems.length,   color: "bg-green-50 text-green-600"   },
+          { label: "PYQ Pages",    count: pyqItems.length,    color: "bg-orange-50 text-orange-600" },
         ].map(({ label, count, color }) => (
           <div key={label} className={`${color.split(" ")[0]} rounded-2xl p-4 border border-gray-100`}>
             <p className={`text-2xl font-bold ${color.split(" ")[1]}`}>{count}</p>
@@ -886,26 +926,57 @@ function SeoPanel() {
 
       {/* Notes + PYQs with Edit SEO button */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-4">
-        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center gap-3">
-          <p className="text-sm font-medium text-gray-700 flex-1">Notes &amp; PYQs SEO</p>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…"
-            className="px-3 py-1.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 w-40" />
+        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex flex-wrap items-center gap-2">
+          <p className="text-sm font-medium text-gray-700 mr-auto">Notes &amp; PYQs SEO</p>
+
+          {/* Kind filter */}
+          {(["all", "note", "pyq"] as const).map(k => (
+            <button key={k} onClick={() => setFilterKind(k)}
+              className={`px-3 py-1 text-xs rounded-lg font-medium transition-all ${filterKind === k ? "bg-purple-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+              {k === "all" ? "All" : k === "note" ? "Notes" : "PYQs"}
+            </button>
+          ))}
+
+          {/* Grade filter */}
+          {(["all", 9, 10, 11, 12] as const).map(g => (
+            <button key={g} onClick={() => setFilterGrade(g)}
+              className={`px-3 py-1 text-xs rounded-lg font-medium transition-all ${filterGrade === g ? "bg-indigo-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+              {g === "all" ? "All grades" : `G${g}`}
+            </button>
+          ))}
+
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search title…"
+            className="px-3 py-1.5 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 w-36" />
         </div>
-        {allItems.length === 0 ? (
-          <p className="text-center text-gray-400 py-8 text-sm">No notes or PYQs added yet.</p>
+
+        {loadingItems ? (
+          <div className="p-8 space-y-2">{[1,2,3,4].map(i => <div key={i} className="h-10 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+        ) : allItems.length === 0 ? (
+          <p className="text-center text-gray-400 py-8 text-sm">
+            {noteItems.length === 0 ? "No notes or PYQs found. Add some first." : "No results match your filters."}
+          </p>
         ) : (
-          <div className="divide-y divide-gray-50 max-h-[460px] overflow-y-auto">
+          <div className="divide-y divide-gray-50 max-h-[500px] overflow-y-auto">
             {allItems.map((item) => (
               <div key={`${item.kind}-${item.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-all">
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${item.kindLabel === "Note" ? "bg-green-50 text-green-600" : "bg-orange-50 text-orange-600"}`}>
-                  {item.kindLabel}
-                </span>
-                <p className="text-sm text-gray-700 truncate flex-1">{item.title}</p>
+                <div className="flex-shrink-0 flex flex-col items-center gap-0.5">
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${item.kindLabel === "Note" ? "bg-green-50 text-green-600" : "bg-orange-50 text-orange-600"}`}>
+                    {item.kindLabel}
+                  </span>
+                  {(item as any).grade && (
+                    <span className="text-[9px] text-gray-400">G{(item as any).grade}</span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-800 font-medium truncate">{item.title}</p>
+                  {(item as any).subject && <p className="text-xs text-gray-400 truncate">{(item as any).subject}</p>}
+                </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline">Open ↗</a>
+                  <a href={item.url} target="_blank" rel="noopener noreferrer"
+                    className="text-xs text-blue-400 hover:text-blue-600 transition-colors">Open ↗</a>
                   <button
                     onClick={() => setEditing({ id: item.id, defaultTitle: item.title, kind: item.kind })}
-                    className="px-3 py-1 bg-purple-50 text-purple-600 text-xs font-medium rounded-lg hover:bg-purple-100 transition-all"
+                    className="px-3 py-1.5 bg-purple-50 text-purple-600 text-xs font-semibold rounded-lg hover:bg-purple-100 transition-all"
                   >
                     Edit SEO
                   </button>
@@ -918,12 +989,13 @@ function SeoPanel() {
 
       {/* Static pages list */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
           <p className="text-sm font-medium text-gray-700">Static Pages</p>
+          <span className="text-xs text-gray-400">These use Helmet meta tags in code</span>
         </div>
         <div className="divide-y divide-gray-50">
           {staticUrls.map((u) => (
-            <div key={u.url} className="flex items-center gap-3 px-5 py-3">
+            <div key={u.url} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50">
               <span className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 bg-blue-50 text-blue-600">Static</span>
               <p className="text-sm text-gray-700 truncate flex-1">{u.label}</p>
               <a href={u.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex-shrink-0">Open ↗</a>
@@ -931,6 +1003,10 @@ function SeoPanel() {
           ))}
         </div>
       </div>
+
+      <p className="text-xs text-gray-400 mt-4 text-center">
+        SEO data saved to Firestore · Changes apply immediately on the live site
+      </p>
     </div>
   );
 }
