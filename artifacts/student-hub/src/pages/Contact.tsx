@@ -31,8 +31,8 @@ export default function Contact() {
 
           <div className="grid sm:grid-cols-2 gap-4 mb-8">
             {[
-              { icon: Mail, label: "Email", value: "support@studenthub.np", color: "bg-blue-50 text-blue-600" },
-              { icon: MessageCircle, label: "Response Time", value: "Within 24 hours", color: "bg-green-50 text-green-600" },
+              { icon: Mail, label: "Email", value: "siddhantlmc0@gmail.com", color: "bg-blue-50 text-blue-600" },
+              { icon: MessageCircle, label: "Phone", value: "9744875783", color: "bg-green-50 text-green-600" },
             ].map(({ icon: Icon, label, value, color }) => (
               <div key={label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
                 <div className={`w-10 h-10 ${color} rounded-xl flex items-center justify-center flex-shrink-0`}>

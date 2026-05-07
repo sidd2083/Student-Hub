@@ -772,9 +772,17 @@ function ManageAnnouncements() {
     if (!title.trim() || !body.trim()) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, "announcements"), { title: title.trim(), body: body.trim(), createdAt: new Date().toISOString() });
+      await addDoc(collection(db, "announcements"), {
+        title: title.trim(),
+        body: body.trim(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
       setTitle(""); setBody("");
       await load();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to post announcement. Please try again.");
     } finally { setSaving(false); }
   };
 
