@@ -126,7 +126,7 @@ export default function Onboarding() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Alex Sharma"
+                placeholder="e.g. Siddhant Lamichhane"
                 disabled={saving}
                 className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-60"
               />
