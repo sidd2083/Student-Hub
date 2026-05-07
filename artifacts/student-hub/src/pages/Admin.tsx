@@ -389,12 +389,12 @@ function BadgeManager() {
   const [users, setUsers] = useState<ApiUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [gradeFilter, setGradeFilter] = useState<"all" | 9 | 10 | 11 | 12>("all");
   const [openUid, setOpenUid] = useState<string | null>(null);
   const [badgeText, setBadgeText] = useState("");
   const [badgeEmoji, setBadgeEmoji] = useState("⭐");
   const [badgeColor, setBadgeColor] = useState("#6366f1");
   const [userBadges, setUserBadges] = useState<Record<string, CustomBadge[]>>({});
-  const [saving, setSaving] = useState(false);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -402,7 +402,7 @@ function BadgeManager() {
       const list: ApiUser[] = await fetch("/api/users").then(r => r.json());
       list.sort((a, b) => (b.totalStudyTime ?? 0) - (a.totalStudyTime ?? 0));
       setUsers(list);
-      // Load badges for all users
+      // Load badges for all users in parallel, don't block if some fail
       const badgeSnaps = await Promise.all(
         list.map(u => getDoc(doc(db, "user_badges", u.uid)).catch(() => null))
       );
@@ -418,15 +418,16 @@ function BadgeManager() {
 
   useEffect(() => { loadUsers(); }, []);
 
-  const filtered = users.filter(u =>
-    !search ||
-    u.name?.toLowerCase().includes(search.toLowerCase()) ||
-    u.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = users.filter(u => {
+    if (gradeFilter !== "all" && u.grade !== gradeFilter) return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
+  });
 
-  const addBadge = async (uid: string) => {
+  // Optimistic badge add — UI updates instantly, Firestore writes in background
+  const addBadge = (uid: string) => {
     if (!badgeText.trim()) return;
-    setSaving(true);
     const newBadge: CustomBadge = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       text: badgeText.trim(),
@@ -434,23 +435,20 @@ function BadgeManager() {
       color: badgeColor,
       createdAt: new Date().toISOString(),
     };
-    const existing = userBadges[uid] ?? [];
-    const updated = [...existing, newBadge];
-    try {
-      await setDoc(doc(db, "user_badges", uid), { badges: updated });
-      setUserBadges(prev => ({ ...prev, [uid]: updated }));
-      setBadgeText("");
-      setOpenUid(null);
-    } catch (e) { console.error("Badge save failed:", e); }
-    finally { setSaving(false); }
+    const updated = [...(userBadges[uid] ?? []), newBadge];
+    setUserBadges(prev => ({ ...prev, [uid]: updated }));
+    setBadgeText("");
+    setOpenUid(null);
+    setDoc(doc(db, "user_badges", uid), { badges: updated })
+      .catch(e => console.error("Badge save failed:", e));
   };
 
-  const removeBadge = async (uid: string, badgeId: string) => {
+  // Optimistic badge remove — UI updates instantly, Firestore writes in background
+  const removeBadge = (uid: string, badgeId: string) => {
     const updated = (userBadges[uid] ?? []).filter(b => b.id !== badgeId);
-    try {
-      await setDoc(doc(db, "user_badges", uid), { badges: updated });
-      setUserBadges(prev => ({ ...prev, [uid]: updated }));
-    } catch (e) { console.error("Badge remove failed:", e); }
+    setUserBadges(prev => ({ ...prev, [uid]: updated }));
+    setDoc(doc(db, "user_badges", uid), { badges: updated })
+      .catch(e => console.error("Badge remove failed:", e));
   };
 
   return (
@@ -484,15 +482,28 @@ function BadgeManager() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search users by name or email…"
-          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-        />
+      {/* Search + Grade filter */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name or email…"
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+          />
+        </div>
+        <div className="flex gap-1.5 items-center flex-shrink-0">
+          {(["all", 9, 10, 11, 12] as const).map(g => (
+            <button
+              key={g}
+              onClick={() => setGradeFilter(g)}
+              className={`px-3 py-2 text-xs font-semibold rounded-xl transition-all ${gradeFilter === g ? "bg-purple-500 text-white shadow-sm" : "bg-white border border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600"}`}
+            >
+              {g === "all" ? "All" : `G${g}`}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
@@ -612,10 +623,10 @@ function BadgeManager() {
                       )}
                       <button
                         onClick={() => addBadge(u.uid)}
-                        disabled={!badgeText.trim() || saving}
+                        disabled={!badgeText.trim()}
                         className="ml-auto px-4 py-2 bg-purple-500 text-white text-xs font-semibold rounded-xl hover:bg-purple-600 disabled:opacity-50 transition-all"
                       >
-                        {saving ? "Saving…" : "Assign Badge"}
+                        Assign Badge
                       </button>
                       <button onClick={() => setOpenUid(null)} className="px-3 py-2 bg-gray-100 text-gray-600 text-xs rounded-xl hover:bg-gray-200">
                         Cancel
@@ -914,17 +925,27 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const load = async () => {
       try {
-        const snap = await getDoc(doc(db, "seo_meta", docId));
+        // Race against a 4s timeout so the modal never hangs blank
+        const snap = await Promise.race([
+          getDoc(doc(db, "seo_meta", docId)),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 4000)),
+        ]);
+        if (cancelled) return;
         if (snap.exists()) setForm(snap.data() as SeoMeta);
         else setForm({ ...emptySeo(), seoTitle: target.defaultTitle });
       } catch (e) {
-        console.error("SEO load failed:", e);
+        if (cancelled) return;
+        console.warn("SEO load failed (using defaults):", e);
         setForm({ ...emptySeo(), seoTitle: target.defaultTitle });
-      } finally { setLoading(false); }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
     load();
+    return () => { cancelled = true; };
   }, [docId, target.defaultTitle]);
 
   const handleSave = async (e: React.FormEvent) => {
