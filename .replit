@@ -33,20 +33,20 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "PORT=22581 BASE_PATH=/ pnpm --filter @workspace/student-hub run dev"
-waitForPort = 22581
+args = "PORT=5000 BASE_PATH=/ pnpm --filter @workspace/student-hub run dev"
+waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Backend API"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "PORT=8080 DATABASE_URL=$DATABASE_URL node --enable-source-maps artifacts/api-server/dist/index.mjs"
-waitForPort = 8080
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=8080 node --enable-source-maps artifacts/api-server/dist/index.mjs"
+waitForPort = 8080
 
 [agent]
 stack = "BEST_EFFORT_FALLBACK"
@@ -58,12 +58,12 @@ path = "scripts/post-merge.sh"
 timeoutMs = 20000
 
 [[ports]]
-localPort = 8080
-externalPort = 8080
+localPort = 5000
+externalPort = 80
 
 [[ports]]
-localPort = 8081
-externalPort = 80
+localPort = 8080
+externalPort = 8080
 
 [[ports]]
 localPort = 8082
