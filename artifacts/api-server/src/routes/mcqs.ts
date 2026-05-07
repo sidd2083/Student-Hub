@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { db } from "@workspace/db";
 import { mcqsTable } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, type SQL } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -28,7 +28,7 @@ const toMcq = (m: McqRow) => ({
 router.get("/mcqs", async (req: Request, res: Response) => {
   try {
     const { grade, subject, chapter, difficulty, limit } = req.query;
-    const conditions = [];
+    const conditions: SQL<unknown>[] = [];
     if (grade)      conditions.push(eq(mcqsTable.grade,      Number(grade)));
     if (subject)    conditions.push(eq(mcqsTable.subject,    String(subject)));
     if (chapter)    conditions.push(eq(mcqsTable.chapter,    String(chapter)));

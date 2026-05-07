@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { db } from "@workspace/db";
 import { pyqsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, type SQL } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -23,7 +23,7 @@ const toPyq = (p: PyqRow) => ({
 router.get("/pyqs", async (req: Request, res: Response) => {
   try {
     const { grade, subject } = req.query;
-    const conditions = [];
+    const conditions: SQL<unknown>[] = [];
     if (grade)   conditions.push(eq(pyqsTable.grade,   Number(grade)));
     if (subject) conditions.push(eq(pyqsTable.subject, String(subject)));
     const pyqs = conditions.length > 0

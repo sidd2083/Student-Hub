@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { db } from "@workspace/db";
 import { notesTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, type SQL } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -23,7 +23,7 @@ const toNote = (n: NoteRow) => ({
 router.get("/notes", async (req: Request, res: Response) => {
   try {
     const { grade, subject, chapter } = req.query;
-    const conditions = [];
+    const conditions: SQL<unknown>[] = [];
     if (grade)   conditions.push(eq(notesTable.grade,   Number(grade)));
     if (subject) conditions.push(eq(notesTable.subject, String(subject)));
     if (chapter) conditions.push(eq(notesTable.chapter, String(chapter)));
