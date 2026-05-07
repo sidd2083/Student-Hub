@@ -1,5 +1,6 @@
 import { Router } from "express";
 import OpenAI from "openai";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -98,7 +99,7 @@ router.post("/ai/chat", async (req, res) => {
     const reply = completion.choices[0]?.message?.content ?? "I couldn't generate a response. Please try again.";
     return res.json({ reply });
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "AI service unavailable" });
   }
 });

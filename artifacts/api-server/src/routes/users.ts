@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -31,7 +32,7 @@ router.get("/users", async (req, res) => {
     const users = await db.select().from(usersTable).orderBy(usersTable.createdAt);
     return res.json(users.map(toUser));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -54,7 +55,7 @@ router.post("/users", async (req, res) => {
     const inserted = await db.insert(usersTable).values({ uid, name, email, grade: Number(grade), role: roleVal }).returning();
     return res.status(201).json(toUser(inserted[0]));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -74,7 +75,7 @@ router.get("/users/stats/summary", async (req, res) => {
     }
     return res.json({ total: users.length, byGrade, admins, newToday });
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -85,7 +86,7 @@ router.get("/users/:uid", async (req, res) => {
     if (users.length === 0) return res.status(404).json({ error: "User not found" });
     return res.json(toUser(users[0]));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -101,7 +102,7 @@ router.put("/users/:uid/badges", async (req, res) => {
     if (updated.length === 0) return res.status(404).json({ error: "User not found" });
     return res.json({ badges: parseBadges(updated[0].badges) });
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -117,7 +118,7 @@ router.patch("/users/:uid", async (req, res) => {
     if (updated.length === 0) return res.status(404).json({ error: "User not found" });
     return res.json(toUser(updated[0]));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -127,7 +128,7 @@ router.delete("/users/:uid", async (req, res) => {
     await db.delete(usersTable).where(eq(usersTable.uid, req.params.uid));
     return res.json({ success: true });
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

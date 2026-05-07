@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { scoresTable } from "@workspace/db";
 import { desc, sql } from "drizzle-orm";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.get("/scores", async (req, res) => {
     }
     return res.json(scores.map(toScore));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -47,7 +48,7 @@ router.post("/scores", async (req, res) => {
     const inserted = await db.insert(scoresTable).values({ uid, userName, grade, score, totalQuestions, subject } as ScoreRow).returning();
     return res.status(201).json(toScore(inserted[0]));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -59,7 +60,7 @@ router.post("/scores/reset", async (req, res) => {
     await db.delete(scoresTable).where(sql`${scoresTable.createdAt} >= ${today}`);
     return res.json({ success: true });
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

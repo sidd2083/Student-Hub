@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, studyLogsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -68,7 +69,7 @@ router.post("/study/session", async (req, res) => {
     }
 
     const u = updated[0];
-    req.log.info({ uid, minutes, newStreak, newTodayStudyTime }, "Study session saved");
+    logger.info({ uid, minutes, newStreak, newTodayStudyTime }, "Study session saved");
     return res.json({
       uid:            u.uid,
       streak:         u.streak,
@@ -77,7 +78,7 @@ router.post("/study/session", async (req, res) => {
       lastActiveDate: u.lastActiveDate,
     });
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -100,7 +101,7 @@ router.post("/study/log-task", async (req, res) => {
     }
     return res.json({ success: true });
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -123,7 +124,7 @@ router.post("/study/log-note", async (req, res) => {
     }
     return res.json({ success: true });
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -141,7 +142,7 @@ router.get("/study/logs/:uid", async (req, res) => {
 
     return res.json(logs.map(toLog));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -158,7 +159,7 @@ router.get("/study/stats/:uid", async (req, res) => {
       lastActiveDate: u.lastActiveDate,
     });
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

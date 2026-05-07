@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { pyqsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -29,7 +30,7 @@ router.get("/pyqs", async (req, res) => {
       : await db.select().from(pyqsTable).orderBy(pyqsTable.year);
     return res.json(pyqs.map(toPyq));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -46,7 +47,7 @@ router.post("/pyqs", async (req, res) => {
     } as PyqRow).returning();
     return res.status(201).json(toPyq(inserted[0]));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -56,7 +57,7 @@ router.delete("/pyqs/:id", async (req, res) => {
     await db.delete(pyqsTable).where(eq(pyqsTable.id, Number(req.params.id)));
     return res.json({ success: true });
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

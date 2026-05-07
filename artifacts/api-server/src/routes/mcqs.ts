@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { mcqsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -37,7 +38,7 @@ router.get("/mcqs", async (req, res) => {
     if (limit) mcqs = mcqs.slice(0, Number(limit));
     return res.json(mcqs.map(toMcq));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -58,7 +59,7 @@ router.post("/mcqs", async (req, res) => {
     } as McqRow).returning();
     return res.status(201).json(toMcq(inserted[0]));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -86,7 +87,7 @@ router.patch("/mcqs/:id", async (req, res) => {
     if (updated.length === 0) return res.status(404).json({ error: "MCQ not found" });
     return res.json(toMcq(updated[0]));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -96,7 +97,7 @@ router.delete("/mcqs/:id", async (req, res) => {
     await db.delete(mcqsTable).where(eq(mcqsTable.id, Number(req.params.id)));
     return res.json({ success: true });
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

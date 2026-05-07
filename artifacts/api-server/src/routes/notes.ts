@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { notesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -30,7 +31,7 @@ router.get("/notes", async (req, res) => {
       : await db.select().from(notesTable).orderBy(notesTable.createdAt);
     return res.json(notes.map(toNote));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -44,7 +45,7 @@ router.get("/notes/subjects", async (req, res) => {
     const subjects = [...new Set(notes.map(n => n.subject))].sort();
     return res.json(subjects);
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -55,7 +56,7 @@ router.get("/notes/:id", async (req, res) => {
     if (notes.length === 0) return res.status(404).json({ error: "Note not found" });
     return res.json(toNote(notes[0]));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -69,7 +70,7 @@ router.post("/notes", async (req, res) => {
     const inserted = await db.insert(notesTable).values({ grade, subject, chapter, title, contentType, content } as NoteRow).returning();
     return res.status(201).json(toNote(inserted[0]));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -88,7 +89,7 @@ router.patch("/notes/:id", async (req, res) => {
     if (updated.length === 0) return res.status(404).json({ error: "Note not found" });
     return res.json(toNote(updated[0]));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -98,7 +99,7 @@ router.delete("/notes/:id", async (req, res) => {
     await db.delete(notesTable).where(eq(notesTable.id, Number(req.params.id)));
     return res.json({ success: true });
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

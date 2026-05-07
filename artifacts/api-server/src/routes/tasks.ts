@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { tasksTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.get("/tasks", async (req, res) => {
       .orderBy(tasksTable.createdAt);
     return res.json(tasks.map(toTask));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -36,7 +37,7 @@ router.post("/tasks", async (req, res) => {
     const inserted = await db.insert(tasksTable).values({ uid, text, completed: false }).returning();
     return res.status(201).json(toTask(inserted[0]));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -51,7 +52,7 @@ router.patch("/tasks/:id", async (req, res) => {
     if (updated.length === 0) return res.status(404).json({ error: "Task not found" });
     return res.json(toTask(updated[0]));
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -61,7 +62,7 @@ router.delete("/tasks/:id", async (req, res) => {
     await db.delete(tasksTable).where(eq(tasksTable.id, Number(req.params.id)));
     return res.json({ success: true });
   } catch (err) {
-    req.log.error(err);
+    logger.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

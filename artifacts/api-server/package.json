@@ -19,8 +19,7 @@
     "express-rate-limit": "^8.5.1",
     "helmet": "^8.1.0",
     "openai": "^6.35.0",
-    "pino": "^9",
-    "pino-http": "^10"
+    "pino": "^9"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
