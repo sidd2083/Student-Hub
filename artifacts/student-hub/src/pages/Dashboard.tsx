@@ -5,11 +5,10 @@ import { useAuth } from "@/context/AuthContext";
 import { useListTasks } from "@workspace/api-client-react";
 import {
   BookOpen, BarChart2, FileText, CheckSquare,
-  Timer, MessageCircle, Trophy, Flame, Megaphone, X,
+  Timer, MessageCircle, Flame, Megaphone, X,
 } from "lucide-react";
 import {
-  doc, updateDoc, getDoc,
-  collection, getDocs, query, orderBy, limit,
+  collection, getDocs, query, orderBy, limit, doc, getDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -29,12 +28,65 @@ interface Announcement {
   createdAt: string;
 }
 
+interface CustomBadge {
+  id: string;
+  text: string;
+  emoji: string;
+  color: string;
+  createdAt: string;
+}
+
+const STUDY_TIERS = [
+  { mins: 24000, emoji: "🏆", label: "Champion",    bg: "linear-gradient(135deg,#94a3b8,#e2e8f0,#94a3b8)", shadow: "0 4px 20px rgba(148,163,184,0.5)" },
+  { mins: 12000, emoji: "🌟", label: "Master",      bg: "linear-gradient(135deg,#d97706,#fcd34d,#d97706)", shadow: "0 4px 20px rgba(217,119,6,0.5)"   },
+  { mins: 6000,  emoji: "👑", label: "Legend",      bg: "linear-gradient(135deg,#b45309,#fbbf24,#b45309)", shadow: "0 4px 20px rgba(180,83,9,0.5)"    },
+  { mins: 4500,  emoji: "💎", label: "Scholar",     bg: "linear-gradient(135deg,#6d28d9,#a78bfa,#6d28d9)", shadow: "0 4px 20px rgba(109,40,217,0.5)"  },
+  { mins: 3000,  emoji: "🔥", label: "Achiever",    bg: "linear-gradient(135deg,#c2410c,#fb923c,#c2410c)", shadow: "0 4px 20px rgba(194,65,12,0.5)"   },
+  { mins: 1500,  emoji: "⚡", label: "Explorer",    bg: "linear-gradient(135deg,#1d4ed8,#60a5fa,#1d4ed8)", shadow: "0 4px 20px rgba(29,78,216,0.5)"   },
+  { mins: 600,   emoji: "🌱", label: "Beginner",    bg: "linear-gradient(135deg,#15803d,#4ade80,#15803d)", shadow: "0 4px 20px rgba(21,128,61,0.5)"   },
+];
+
+const STREAK_TIERS = [
+  { days: 100, emoji: "🦁", label: "Elite",         bg: "linear-gradient(135deg,#1e1b4b,#4338ca,#1e1b4b)", shadow: "0 4px 20px rgba(30,27,75,0.6)"   },
+  { days: 60,  emoji: "⭐", label: "Legendary",     bg: "linear-gradient(135deg,#92400e,#fcd34d,#92400e)", shadow: "0 4px 20px rgba(146,64,14,0.5)"  },
+  { days: 30,  emoji: "🚀", label: "Unstoppable",   bg: "linear-gradient(135deg,#5b21b6,#c4b5fd,#5b21b6)", shadow: "0 4px 20px rgba(91,33,182,0.5)"  },
+  { days: 15,  emoji: "💪", label: "Dedicated",     bg: "linear-gradient(135deg,#991b1b,#f87171,#991b1b)", shadow: "0 4px 20px rgba(153,27,27,0.5)"  },
+  { days: 5,   emoji: "🎯", label: "Consistent",    bg: "linear-gradient(135deg,#164e63,#67e8f9,#164e63)", shadow: "0 4px 20px rgba(22,78,99,0.5)"   },
+];
+
+function getHighestStudyBadge(mins: number) {
+  return STUDY_TIERS.find(t => mins >= t.mins) ?? null;
+}
+function getHighestStreakBadge(days: number) {
+  return STREAK_TIERS.find(t => days >= t.days) ?? null;
+}
+
+function BadgePill({ emoji, label, bg, shadow, isCustom, customColor }: {
+  emoji: string; label: string; bg?: string; shadow?: string; isCustom?: boolean; customColor?: string;
+}) {
+  const style: React.CSSProperties = isCustom
+    ? { background: customColor || "#6366f1", boxShadow: `0 4px 16px ${customColor || "#6366f1"}66` }
+    : { background: bg, boxShadow: shadow };
+
+  return (
+    <div
+      style={style}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-xs font-bold select-none cursor-default"
+    >
+      <span className="text-sm leading-none">{emoji}</span>
+      <span className="leading-none">{label}</span>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { profile, user } = useAuth();
   const [streak, setStreak] = useState(0);
   const [studyMins, setStudyMins] = useState(0);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [customBadges, setCustomBadges] = useState<CustomBadge[]>([]);
+  const [statsLoaded, setStatsLoaded] = useState(false);
 
   const { data: tasks } = useListTasks(
     { uid: user?.uid || "" },
@@ -43,30 +95,44 @@ export default function Dashboard() {
 
   const pendingTasks = (Array.isArray(tasks) ? tasks : []).filter((t) => !t.completed).length;
 
+  // Fetch study stats from PostgreSQL API (source of truth)
   useEffect(() => {
     if (!user) return;
-    const updateStreak = async () => {
+    const fetchStats = async () => {
       try {
-        const ref = doc(db, "users", user.uid);
-        const snap = await getDoc(ref);
-        const data = snap.data() ?? {};
-        const today = new Date().toDateString();
-        const last: string | undefined = data.lastActive;
-        const current: number = data.streak ?? 0;
-        const studyTime: number = data.studyTime ?? 0;
-        setStudyMins(studyTime);
-        if (last === today) { setStreak(current); return; }
-        const yesterday = new Date(Date.now() - 86_400_000).toDateString();
-        const next = last === yesterday ? current + 1 : 1;
-        await updateDoc(ref, { streak: next, lastActive: today });
-        setStreak(next);
+        const res = await fetch(`/api/study/stats/${user.uid}`);
+        if (res.ok) {
+          const data = await res.json();
+          setStudyMins(data.totalStudyTime ?? 0);
+          setStreak(data.streak ?? 0);
+        }
       } catch (err) {
-        console.error("Streak update failed:", err);
+        console.error("Stats fetch failed:", err);
+      } finally {
+        setStatsLoaded(true);
       }
     };
-    updateStreak();
+    fetchStats();
   }, [user]);
 
+  // Fetch custom badges from Firestore
+  useEffect(() => {
+    if (!user) return;
+    const fetchBadges = async () => {
+      try {
+        const snap = await getDoc(doc(db, "user_badges", user.uid));
+        if (snap.exists()) {
+          const data = snap.data();
+          setCustomBadges(data.badges ?? []);
+        }
+      } catch (err) {
+        console.error("Badge fetch failed:", err);
+      }
+    };
+    fetchBadges();
+  }, [user]);
+
+  // Fetch announcements from Firestore
   useEffect(() => {
     const load = async () => {
       try {
@@ -96,97 +162,147 @@ export default function Dashboard() {
 
   const visibleAnnouncements = announcements.filter(a => !dismissed.has(a.id));
 
+  const studyBadge = getHighestStudyBadge(studyMins);
+  const streakBadge = getHighestStreakBadge(streak);
+  const hasBadges = studyBadge || streakBadge || customBadges.length > 0;
+
   return (
     <>
       <Helmet>
         <title>Dashboard — Student Hub</title>
       </Helmet>
       <div className="p-4 sm:p-6 lg:p-8">
-          <div className="mb-6 sm:mb-8">
-            <div className="flex items-center gap-3 mb-1 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-                {greeting()}, {profile?.name?.split(" ")[0]}
-              </h1>
-              <span className="px-2.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-                Grade {profile?.grade}
-              </span>
-            </div>
-            <p className="text-gray-500 text-sm">Ready to learn something new today?</p>
+        <div className="mb-6 sm:mb-8">
+          <div className="flex items-center gap-3 mb-1 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+              {greeting()}, {profile?.name?.split(" ")[0]}
+            </h1>
+            <span className="px-2.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+              Grade {profile?.grade}
+            </span>
           </div>
+          <p className="text-gray-500 text-sm">Ready to learn something new today?</p>
+        </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
-            <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
-              <p className="text-xs sm:text-sm text-gray-500 mb-1">Pending Tasks</p>
-              <p className="text-2xl sm:text-3xl font-bold text-gray-900">{pendingTasks}</p>
-            </div>
-            <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
-              <p className="text-xs sm:text-sm text-gray-500 mb-1">Study Time</p>
-              <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                {studyMins > 0 ? fmtStudy(studyMins) : "—"}
-              </p>
-            </div>
-            <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
-              <div className="flex items-center gap-1 sm:gap-1.5 mb-1">
-                <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />
-                <p className="text-xs sm:text-sm text-gray-500">Streak</p>
-              </div>
-              <p className="text-2xl sm:text-3xl font-bold text-orange-500">
-                {streak}<span className="text-xs sm:text-base font-normal text-gray-400 ml-1">days</span>
-              </p>
-            </div>
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-5 sm:mb-6">
+          <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
+            <p className="text-xs sm:text-sm text-gray-500 mb-1">Pending Tasks</p>
+            <p className="text-2xl sm:text-3xl font-bold text-gray-900">{pendingTasks}</p>
           </div>
-
-          {/* Announcements with close button */}
-          {visibleAnnouncements.length > 0 && (
-            <div className="mb-6 sm:mb-8">
-              <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                <Megaphone className="w-4 h-4 text-gray-400" />
-                <h2 className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
-                  Announcements
-                </h2>
-              </div>
-              <div className="space-y-3">
-                {visibleAnnouncements.map((a) => (
-                  <div key={a.id} className="bg-blue-50 border border-blue-100 rounded-2xl p-4 relative">
-                    <button
-                      onClick={() => setDismissed(prev => new Set([...prev, a.id]))}
-                      className="absolute top-3 right-3 p-1 rounded-full hover:bg-blue-200/60 transition-all"
-                      aria-label="Close announcement"
-                    >
-                      <X className="w-4 h-4 text-blue-400" />
-                    </button>
-                    <p className="font-semibold text-blue-900 text-sm mb-1 pr-6">{a.title}</p>
-                    <p className="text-blue-700 text-sm leading-relaxed">{a.body}</p>
-                    <p className="text-blue-400 text-xs mt-2">
-                      {new Date(a.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                    </p>
-                  </div>
-                ))}
-              </div>
+          <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
+            <p className="text-xs sm:text-sm text-gray-500 mb-1">Study Time</p>
+            <p className="text-2xl sm:text-3xl font-bold text-gray-900">
+              {!statsLoaded ? "—" : studyMins > 0 ? fmtStudy(studyMins) : "0m"}
+            </p>
+          </div>
+          <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
+            <div className="flex items-center gap-1 sm:gap-1.5 mb-1">
+              <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />
+              <p className="text-xs sm:text-sm text-gray-500">Streak</p>
             </div>
-          )}
-
-          {/* Quick Access */}
-          <h2 className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider mb-3 sm:mb-4">
-            Quick Access
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            {sections.map(({ href, icon: Icon, label, desc, color }) => (
-              <Link key={href} href={href}>
-                <a
-                  className="block bg-white rounded-2xl p-4 sm:p-5 border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
-                >
-                  <div className={`w-9 h-9 sm:w-10 sm:h-10 ${color} rounded-xl flex items-center justify-center mb-3 sm:mb-4`}>
-                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900 text-sm sm:text-base mb-0.5 sm:mb-1 leading-tight">{label}</h3>
-                  <p className="text-xs sm:text-sm text-gray-500 leading-tight">{desc}</p>
-                </a>
-              </Link>
-            ))}
+            <p className="text-2xl sm:text-3xl font-bold text-orange-500">
+              {streak}<span className="text-xs sm:text-base font-normal text-gray-400 ml-1">days</span>
+            </p>
           </div>
         </div>
+
+        {/* Badges */}
+        {hasBadges && (
+          <div className="mb-6 sm:mb-8">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-sm">🏅</span>
+              <h2 className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
+                Your Achievements
+              </h2>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {studyBadge && (
+                <BadgePill
+                  emoji={studyBadge.emoji}
+                  label={studyBadge.label}
+                  bg={studyBadge.bg}
+                  shadow={studyBadge.shadow}
+                />
+              )}
+              {streakBadge && (
+                <BadgePill
+                  emoji={streakBadge.emoji}
+                  label={streakBadge.label}
+                  bg={streakBadge.bg}
+                  shadow={streakBadge.shadow}
+                />
+              )}
+              {customBadges.map(b => (
+                <BadgePill
+                  key={b.id}
+                  emoji={b.emoji}
+                  label={b.text}
+                  isCustom
+                  customColor={b.color}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!hasBadges && statsLoaded && (
+          <div className="mb-6 sm:mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100 rounded-2xl p-4">
+            <p className="text-sm font-medium text-blue-800 mb-0.5">🎯 Earn your first badge!</p>
+            <p className="text-xs text-blue-600">Study for 10 hours with the Pomodoro timer to unlock the 🌱 Beginner badge.</p>
+          </div>
+        )}
+
+        {/* Announcements */}
+        {visibleAnnouncements.length > 0 && (
+          <div className="mb-6 sm:mb-8">
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
+              <Megaphone className="w-4 h-4 text-gray-400" />
+              <h2 className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
+                Announcements
+              </h2>
+            </div>
+            <div className="space-y-3">
+              {visibleAnnouncements.map((a) => (
+                <div key={a.id} className="bg-blue-50 border border-blue-100 rounded-2xl p-4 relative">
+                  <button
+                    onClick={() => setDismissed(prev => new Set([...prev, a.id]))}
+                    className="absolute top-3 right-3 p-1 rounded-full hover:bg-blue-200/60 transition-all"
+                    aria-label="Close announcement"
+                  >
+                    <X className="w-4 h-4 text-blue-400" />
+                  </button>
+                  <p className="font-semibold text-blue-900 text-sm mb-1 pr-6">{a.title}</p>
+                  <p className="text-blue-700 text-sm leading-relaxed">{a.body}</p>
+                  <p className="text-blue-400 text-xs mt-2">
+                    {new Date(a.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quick Access */}
+        <h2 className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider mb-3 sm:mb-4">
+          Quick Access
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          {sections.map(({ href, icon: Icon, label, desc, color }) => (
+            <Link key={href} href={href}>
+              <a
+                className="block bg-white rounded-2xl p-4 sm:p-5 border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+              >
+                <div className={`w-9 h-9 sm:w-10 sm:h-10 ${color} rounded-xl flex items-center justify-center mb-3 sm:mb-4`}>
+                  <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                </div>
+                <h3 className="font-semibold text-gray-900 text-sm sm:text-base mb-0.5 sm:mb-1 leading-tight">{label}</h3>
+                <p className="text-xs sm:text-sm text-gray-500 leading-tight">{desc}</p>
+              </a>
+            </Link>
+          ))}
+        </div>
+      </div>
     </>
   );
 }

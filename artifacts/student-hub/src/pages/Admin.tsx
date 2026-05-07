@@ -9,9 +9,9 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  LayoutDashboard, BookOpen, FileText, Users, Trophy,
+  LayoutDashboard, BookOpen, FileText, Users,
   Shield, Plus, Trash2, LogOut, Megaphone, Upload, X, Image,
-  CheckCircle, AlertCircle, BarChart2, Flame, Clock,
+  CheckCircle, AlertCircle, Award, Search,
 } from "lucide-react";
 import {
   collection, addDoc, getDocs, deleteDoc,
@@ -128,7 +128,7 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 
 // ─── Admin Overview ────────────────────────────────────────────────────────
 
-interface ApiUser { id: number; uid: string; name: string; email: string; grade: number; role: string; createdAt: string }
+interface ApiUser { id: number; uid: string; name: string; email: string; grade: number; role: string; createdAt: string; streak: number; totalStudyTime: number; todayStudyTime: number; }
 
 function AdminOverview() {
   const { data: noteStats } = useListNotes({}, { query: { queryKey: getListNotesQueryKey({}) } });
@@ -331,117 +331,302 @@ function ManageNotes() {
   );
 }
 
-// ─── Report View ───────────────────────────────────────────────────────────
+// ─── Badge Manager ─────────────────────────────────────────────────────────
 
-interface FSUserReport {
-  uid: string; name: string; email: string; grade: number;
-  streak: number; studyTime: number; lastActive?: string;
+interface CustomBadge { id: string; text: string; emoji: string; color: string; createdAt: string; }
+
+const STUDY_TIERS = [
+  { mins: 24000, emoji: "🏆", label: "Champion",   bg: "linear-gradient(135deg,#94a3b8,#e2e8f0,#94a3b8)" },
+  { mins: 12000, emoji: "🌟", label: "Master",     bg: "linear-gradient(135deg,#d97706,#fcd34d,#d97706)" },
+  { mins: 6000,  emoji: "👑", label: "Legend",     bg: "linear-gradient(135deg,#b45309,#fbbf24,#b45309)" },
+  { mins: 4500,  emoji: "💎", label: "Scholar",    bg: "linear-gradient(135deg,#6d28d9,#a78bfa,#6d28d9)" },
+  { mins: 3000,  emoji: "🔥", label: "Achiever",   bg: "linear-gradient(135deg,#c2410c,#fb923c,#c2410c)" },
+  { mins: 1500,  emoji: "⚡", label: "Explorer",   bg: "linear-gradient(135deg,#1d4ed8,#60a5fa,#1d4ed8)" },
+  { mins: 600,   emoji: "🌱", label: "Beginner",   bg: "linear-gradient(135deg,#15803d,#4ade80,#15803d)" },
+];
+
+const STREAK_TIERS = [
+  { days: 100, emoji: "🦁", label: "Elite",        bg: "linear-gradient(135deg,#1e1b4b,#4338ca,#1e1b4b)" },
+  { days: 60,  emoji: "⭐", label: "Legendary",    bg: "linear-gradient(135deg,#92400e,#fcd34d,#92400e)" },
+  { days: 30,  emoji: "🚀", label: "Unstoppable",  bg: "linear-gradient(135deg,#5b21b6,#c4b5fd,#5b21b6)" },
+  { days: 15,  emoji: "💪", label: "Dedicated",    bg: "linear-gradient(135deg,#991b1b,#f87171,#991b1b)" },
+  { days: 5,   emoji: "🎯", label: "Consistent",   bg: "linear-gradient(135deg,#164e63,#67e8f9,#164e63)" },
+];
+
+const EMOJI_OPTIONS = ["⭐","🔥","💎","👑","🌟","🚀","💪","🎯","🌱","⚡","🏆","🦁","✨","🎓","🌈","🎪","🏅","🥇","🛡️","🎉","🧠","🪄","🌸","🐉","☄️","🔮"];
+const COLOR_PRESETS = ["#6366f1","#ec4899","#f59e0b","#10b981","#3b82f6","#ef4444","#8b5cf6","#06b6d4","#84cc16","#f97316","#e11d48","#0ea5e9"];
+
+function getUnlockedStudyBadges(mins: number) { return STUDY_TIERS.filter(t => mins >= t.mins); }
+function getUnlockedStreakBadges(days: number) { return STREAK_TIERS.filter(t => days >= t.days); }
+const fmtTime = (mins: number) => mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+
+function MicroBadge({ emoji, label, bg }: { emoji: string; label: string; bg: string }) {
+  return (
+    <span
+      style={{ background: bg }}
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-white text-[10px] font-bold"
+    >
+      {emoji} {label}
+    </span>
+  );
 }
 
-function ReportView() {
-  const [users, setUsers] = useState<FSUserReport[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sort, setSort] = useState<"studyTime" | "streak">("studyTime");
+function CustomBadgePill({ badge, onRemove }: { badge: CustomBadge; onRemove: () => void }) {
+  return (
+    <span
+      style={{ background: badge.color, boxShadow: `0 2px 10px ${badge.color}55` }}
+      className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-white text-[10px] font-bold"
+    >
+      {badge.emoji} {badge.text}
+      <button onClick={onRemove} className="ml-0.5 opacity-70 hover:opacity-100 rounded-full">
+        <X className="w-3 h-3" />
+      </button>
+    </span>
+  );
+}
 
-  const load = async () => {
+function BadgeManager() {
+  const [users, setUsers] = useState<ApiUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [openUid, setOpenUid] = useState<string | null>(null);
+  const [badgeText, setBadgeText] = useState("");
+  const [badgeEmoji, setBadgeEmoji] = useState("⭐");
+  const [badgeColor, setBadgeColor] = useState("#6366f1");
+  const [userBadges, setUserBadges] = useState<Record<string, CustomBadge[]>>({});
+  const [saving, setSaving] = useState(false);
+
+  const loadUsers = async () => {
     setLoading(true);
     try {
-      const snap = await getDocs(collection(db, "users"));
-      const list = snap.docs.map(d => {
-        const v = d.data();
-        return {
-          uid: d.id,
-          name: v.name ?? "(no name)",
-          email: v.email ?? "",
-          grade: v.grade ?? 0,
-          streak: v.streak ?? 0,
-          studyTime: v.studyTime ?? 0,
-          lastActive: v.lastActive,
-        } as FSUserReport;
-      });
+      const list: ApiUser[] = await fetch("/api/users").then(r => r.json());
+      list.sort((a, b) => (b.totalStudyTime ?? 0) - (a.totalStudyTime ?? 0));
       setUsers(list);
+      // Load badges for all users
+      const badgeSnaps = await Promise.all(
+        list.map(u => getDoc(doc(db, "user_badges", u.uid)).catch(() => null))
+      );
+      const map: Record<string, CustomBadge[]> = {};
+      badgeSnaps.forEach((snap, i) => {
+        if (snap?.exists()) map[list[i].uid] = snap.data()?.badges ?? [];
+        else map[list[i].uid] = [];
+      });
+      setUserBadges(map);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { loadUsers(); }, []);
 
-  const sorted = [...users].sort((a, b) => b[sort] - a[sort]);
-  const fmtTime = (mins: number) => mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
-  const totalStudy = users.reduce((s, u) => s + u.studyTime, 0);
-  const totalStreak = users.reduce((s, u) => s + u.streak, 0);
+  const filtered = users.filter(u =>
+    !search ||
+    u.name?.toLowerCase().includes(search.toLowerCase()) ||
+    u.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const addBadge = async (uid: string) => {
+    if (!badgeText.trim()) return;
+    setSaving(true);
+    const newBadge: CustomBadge = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      text: badgeText.trim(),
+      emoji: badgeEmoji,
+      color: badgeColor,
+      createdAt: new Date().toISOString(),
+    };
+    const existing = userBadges[uid] ?? [];
+    const updated = [...existing, newBadge];
+    try {
+      await setDoc(doc(db, "user_badges", uid), { badges: updated });
+      setUserBadges(prev => ({ ...prev, [uid]: updated }));
+      setBadgeText("");
+      setOpenUid(null);
+    } catch (e) { console.error("Badge save failed:", e); }
+    finally { setSaving(false); }
+  };
+
+  const removeBadge = async (uid: string, badgeId: string) => {
+    const updated = (userBadges[uid] ?? []).filter(b => b.id !== badgeId);
+    try {
+      await setDoc(doc(db, "user_badges", uid), { badges: updated });
+      setUserBadges(prev => ({ ...prev, [uid]: updated }));
+    } catch (e) { console.error("Badge remove failed:", e); }
+  };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Study Reports</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Study hours and streak data from Firestore</p>
+          <h2 className="text-xl font-bold text-gray-900">Badge Manager</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Assign custom badges · Auto badges earned by study time &amp; streak</p>
         </div>
-        <button onClick={load} className="px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">
-          Refresh
-        </button>
+        <button onClick={loadUsers} className="px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Refresh</button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
-          <p className="text-2xl font-bold text-blue-600">{users.length}</p>
-          <p className="text-sm text-gray-500 mt-0.5">Total Users</p>
+      {/* Badge tier legend */}
+      <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 mb-6">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Auto Badge Tiers</p>
+        <div className="flex flex-wrap gap-3 mb-3">
+          <p className="text-xs text-gray-500 w-full font-medium">📚 Study Time:</p>
+          {STUDY_TIERS.map(t => (
+            <span key={t.label} style={{ background: t.bg }} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-xs font-bold">
+              {t.emoji} {t.label} <span className="opacity-70">({fmtTime(t.mins)}+)</span>
+            </span>
+          ))}
         </div>
-        <div className="bg-orange-50 rounded-2xl p-4 border border-orange-100">
-          <p className="text-2xl font-bold text-orange-600">{fmtTime(totalStudy)}</p>
-          <p className="text-sm text-gray-500 mt-0.5">Combined Study Time</p>
-        </div>
-        <div className="bg-green-50 rounded-2xl p-4 border border-green-100">
-          <p className="text-2xl font-bold text-green-600">{totalStreak}</p>
-          <p className="text-sm text-gray-500 mt-0.5">Combined Streak Days</p>
+        <div className="flex flex-wrap gap-3">
+          <p className="text-xs text-gray-500 w-full font-medium">🔥 Streak:</p>
+          {STREAK_TIERS.map(t => (
+            <span key={t.label} style={{ background: t.bg }} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-xs font-bold">
+              {t.emoji} {t.label} <span className="opacity-70">({t.days}+ days)</span>
+            </span>
+          ))}
         </div>
       </div>
 
-      <div className="flex gap-2 mb-4">
-        <button onClick={() => setSort("studyTime")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${sort === "studyTime" ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-          <Clock className="w-3.5 h-3.5" /> By Study Time
-        </button>
-        <button onClick={() => setSort("streak")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${sort === "streak" ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-          <Flame className="w-3.5 h-3.5" /> By Streak
-        </button>
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search users by name or email…"
+          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+        />
       </div>
 
       {loading ? (
-        <div className="space-y-2">{[1,2,3,4].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
-      ) : sorted.length === 0 ? (
-        <p className="text-center text-gray-400 py-12">No users yet.</p>
+        <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-2xl animate-pulse" />)}</div>
+      ) : filtered.length === 0 ? (
+        <p className="text-center text-gray-400 py-12">{search ? "No users match your search." : "No users yet."}</p>
       ) : (
-        sorted.map((u, i) => (
-          <div key={u.uid} className="flex items-center gap-3 bg-white rounded-xl border border-gray-100 px-4 py-3 mb-2">
-            <span className="text-xs font-bold text-gray-400 w-5 text-center">#{i+1}</span>
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-semibold flex-shrink-0">
-              {(u.name || "?").charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-gray-900 text-sm truncate">{u.name}</p>
-              <p className="text-xs text-gray-500">{u.email} · Grade {u.grade}{u.lastActive ? ` · Last active: ${u.lastActive}` : ""}</p>
-            </div>
-            <div className="flex items-center gap-4 flex-shrink-0">
-              <div className="text-right">
-                <div className="flex items-center gap-1 text-blue-600 justify-end">
-                  <Clock className="w-3 h-3" />
-                  <span className="text-sm font-semibold">{fmtTime(u.studyTime)}</span>
+        <div className="space-y-3">
+          {filtered.map(u => {
+            const studyBadges = getUnlockedStudyBadges(u.totalStudyTime ?? 0);
+            const streakBadges = getUnlockedStreakBadges(u.streak ?? 0);
+            const custom = userBadges[u.uid] ?? [];
+            const isOpen = openUid === u.uid;
+
+            return (
+              <div key={u.uid} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                {/* User row */}
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                    {(u.name || "?").charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm truncate">{u.name || "(no name)"}</p>
+                    <p className="text-xs text-gray-400 truncate">{u.email} · Grade {u.grade}</p>
+                    <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
+                      <span>⏱ {fmtTime(u.totalStudyTime ?? 0)}</span>
+                      <span>🔥 {u.streak ?? 0} days</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setOpenUid(isOpen ? null : u.uid); setBadgeText(""); setBadgeEmoji("⭐"); setBadgeColor("#6366f1"); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-600 text-xs font-semibold rounded-xl hover:bg-purple-100 transition-all flex-shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Badge
+                  </button>
                 </div>
-                <p className="text-xs text-gray-400">studied</p>
+
+                {/* Badges row */}
+                {(studyBadges.length > 0 || streakBadges.length > 0 || custom.length > 0) && (
+                  <div className="px-4 pb-3 flex flex-wrap gap-1.5">
+                    {studyBadges.map(b => <MicroBadge key={b.label} emoji={b.emoji} label={b.label} bg={b.bg} />)}
+                    {streakBadges.map(b => <MicroBadge key={b.label} emoji={b.emoji} label={b.label} bg={b.bg} />)}
+                    {custom.map(b => <CustomBadgePill key={b.id} badge={b} onRemove={() => removeBadge(u.uid, b.id)} />)}
+                  </div>
+                )}
+
+                {/* Add badge form */}
+                {isOpen && (
+                  <div className="border-t border-gray-100 bg-purple-50/60 px-4 py-4 space-y-3">
+                    <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide">New Custom Badge</p>
+
+                    {/* Badge text */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Badge Text</label>
+                      <input
+                        value={badgeText}
+                        onChange={e => setBadgeText(e.target.value)}
+                        placeholder="e.g. Top Performer, Most Dedicated…"
+                        maxLength={30}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                      />
+                    </div>
+
+                    {/* Emoji picker */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Emoji</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {EMOJI_OPTIONS.map(e => (
+                          <button
+                            key={e}
+                            onClick={() => setBadgeEmoji(e)}
+                            className={`w-8 h-8 rounded-lg text-base flex items-center justify-center transition-all ${badgeEmoji === e ? "bg-purple-200 ring-2 ring-purple-500 scale-110" : "bg-white border border-gray-200 hover:bg-purple-50"}`}
+                          >
+                            {e}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Color picker */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Badge Color</label>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        {COLOR_PRESETS.map(c => (
+                          <button
+                            key={c}
+                            onClick={() => setBadgeColor(c)}
+                            style={{ background: c }}
+                            className={`w-7 h-7 rounded-full transition-all ${badgeColor === c ? "ring-2 ring-offset-2 ring-gray-400 scale-110" : "hover:scale-105"}`}
+                          />
+                        ))}
+                        <div className="flex items-center gap-2 ml-1">
+                          <input
+                            type="color"
+                            value={badgeColor}
+                            onChange={e => setBadgeColor(e.target.value)}
+                            className="w-7 h-7 rounded-full cursor-pointer border border-gray-200"
+                            title="Custom color"
+                          />
+                          <span className="text-xs text-gray-400">Custom</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Preview + save */}
+                    <div className="flex items-center gap-3 pt-1">
+                      {badgeText && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">Preview:</span>
+                          <span
+                            style={{ background: badgeColor, boxShadow: `0 4px 16px ${badgeColor}66` }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-white text-xs font-bold"
+                          >
+                            {badgeEmoji} {badgeText}
+                          </span>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => addBadge(u.uid)}
+                        disabled={!badgeText.trim() || saving}
+                        className="ml-auto px-4 py-2 bg-purple-500 text-white text-xs font-semibold rounded-xl hover:bg-purple-600 disabled:opacity-50 transition-all"
+                      >
+                        {saving ? "Saving…" : "Assign Badge"}
+                      </button>
+                      <button onClick={() => setOpenUid(null)} className="px-3 py-2 bg-gray-100 text-gray-600 text-xs rounded-xl hover:bg-gray-200">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="text-right">
-                <div className="flex items-center gap-1 text-orange-500 justify-end">
-                  <Flame className="w-3 h-3" />
-                  <span className="text-sm font-semibold">{u.streak}d</span>
-                </div>
-                <p className="text-xs text-gray-400">streak</p>
-              </div>
-            </div>
-          </div>
-        ))
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -734,8 +919,10 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
         const snap = await getDoc(doc(db, "seo_meta", docId));
         if (snap.exists()) setForm(snap.data() as SeoMeta);
         else setForm({ ...emptySeo(), seoTitle: target.defaultTitle });
-      } catch (e) { console.error("SEO load failed:", e); }
-      finally { setLoading(false); }
+      } catch (e) {
+        console.error("SEO load failed:", e);
+        setForm({ ...emptySeo(), seoTitle: target.defaultTitle });
+      } finally { setLoading(false); }
     };
     load();
   }, [docId, target.defaultTitle]);
@@ -1030,7 +1217,7 @@ export default function Admin() {
     { key: "pyqs",          icon: FileText,        label: "Manage PYQs"   },
     { key: "announcements", icon: Megaphone,       label: "Announcements" },
     { key: "users",         icon: Users,           label: "Manage Users"  },
-    { key: "reports",       icon: BarChart2,       label: "Study Reports" },
+    { key: "reports",       icon: Award,           label: "Badges"        },
     { key: "seo",           icon: Shield,          label: "SEO Panel"     },
   ];
 
@@ -1082,7 +1269,7 @@ export default function Admin() {
         {section === "pyqs"          && <ManagePyqs />}
         {section === "announcements" && <ManageAnnouncements />}
         {section === "users"         && <ManageUsers />}
-        {section === "reports"       && <ReportView />}
+        {section === "reports"       && <BadgeManager />}
         {section === "seo"           && <SeoPanel />}
       </main>
     </div>
