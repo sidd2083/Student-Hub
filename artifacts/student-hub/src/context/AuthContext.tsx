@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   User as FirebaseUser,
   onAuthStateChanged,
@@ -41,7 +41,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 // ─── Profile fetch from backend API (PostgreSQL) ──────────────────────────────
-// Single source of truth — avoids Firestore security rule issues entirely.
 
 async function fetchProfile(uid: string): Promise<ProfileResult> {
   try {
@@ -80,6 +79,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfileState] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Ref so onAuthStateChanged callback (captured once at mount) can always
+  // see whether a profile has already been set — avoids stale-closure bug.
+  const profileRef = useRef<UserProfile | null>(null);
+
+  const applyProfile = useCallback((p: UserProfile | null) => {
+    profileRef.current = p;
+    setProfileState(p);
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
@@ -93,14 +101,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Handle any pending redirect sign-in (popup-blocked fallback)
     getRedirectResult(auth)
-      .then((result: UserCredential | null) => {
+      .then(async (result: UserCredential | null) => {
         if (result?.user) {
           console.log("[Auth] REDIRECT RESULT:", result.user.email);
           const isNewUser = getAdditionalUserInfo(result)?.isNewUser ?? false;
           if (isNewUser) {
             window.location.replace("/setup-profile");
           } else {
-            window.location.replace("/dashboard");
+            // Existing Firebase user — verify profile in our DB before navigating
+            const pr = await fetchProfile(result.user.uid);
+            if (pr.status === "found") {
+              applyProfile(pr.profile);
+              window.location.replace("/dashboard");
+            } else {
+              window.location.replace("/setup-profile");
+            }
           }
         }
       })
@@ -113,7 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!firebaseUser) {
         setUser(null);
-        setProfileState(null);
+        applyProfile(null);
         setLoading(false);
         const path = window.location.pathname;
         const isProtected = /^\/dashboard|^\/settings/.test(path);
@@ -125,31 +140,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(firebaseUser);
 
-      // If we already have a profile in state (set by Onboarding) keep it —
-      // no need to re-fetch from the API on every auth state change
-      if (profile) {
+      // If profile is already set (by signInWithGoogle or Onboarding), skip re-fetch.
+      // Uses a ref so this check always reflects current state, not a stale closure.
+      if (profileRef.current) {
         setLoading(false);
         return;
       }
 
-      const path = window.location.pathname;
       const result = await fetchProfile(firebaseUser.uid);
       if (!mounted) return;
 
+      // Re-read the CURRENT path AFTER the async fetch — by now signInWithGoogle
+      // may have already navigated (e.g. to /dashboard), so we must not override it.
+      const currentPath = window.location.pathname;
+
       if (result.status === "found") {
-        setProfileState(result.profile);
+        applyProfile(result.profile);
         setLoading(false);
-        if (path === "/" || path === "/login") {
+        if (currentPath === "/" || currentPath === "/login") {
           window.location.replace("/dashboard");
         }
       } else if (result.status === "not_found") {
-        setProfileState(null);
+        applyProfile(null);
         setLoading(false);
-        if (path !== "/setup-profile" && path !== "/onboarding") {
+        // Only redirect to setup-profile if we are NOT already navigating to a
+        // protected destination (signInWithGoogle already sent the user to /dashboard
+        // for the "existing Firebase user, not yet in our DB" edge case — that path
+        // will correctly redirect them to /setup-profile via the PrivateRoute guard).
+        const safePages = ["/setup-profile", "/onboarding", "/dashboard", "/"];
+        if (!safePages.some(p => currentPath.startsWith(p))) {
           console.log("[Auth] no profile → /setup-profile");
           window.location.replace("/setup-profile");
         }
       } else {
+        // API error — don't redirect, just stop the loading spinner.
         console.warn("[Auth] API error:", result.code);
         setLoading(false);
       }
@@ -166,12 +190,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
     const result = await fetchProfile(currentUser.uid);
-    if (result.status === "found") setProfileState(result.profile);
-  }, []);
+    if (result.status === "found") applyProfile(result.profile);
+  }, [applyProfile]);
 
   const setProfile = useCallback((p: UserProfile | null) => {
-    setProfileState(p);
-  }, []);
+    applyProfile(p);
+  }, [applyProfile]);
 
   const signInWithGoogle = async (): Promise<{ outcome: SignInOutcome; isNewUser: boolean }> => {
     if (!isConfigured) throw new Error("Firebase not configured.");
@@ -180,11 +204,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const cred = await signInWithPopup(auth, googleProvider);
       const isNewUser = getAdditionalUserInfo(cred)?.isNewUser ?? false;
       console.log("[Auth] LOGIN:", cred.user.email, "isNewUser:", isNewUser);
+
       if (isNewUser) {
         window.location.replace("/setup-profile");
-      } else {
-        window.location.replace("/dashboard");
+        return { outcome: "success", isNewUser: true };
       }
+
+      // Existing Firebase user — check if they have a profile in our database.
+      // We do this HERE (before navigating) so the result is set in the ref,
+      // which prevents onAuthStateChanged from doing a redundant re-fetch and
+      // potentially racing with us on the redirect destination.
+      const pr = await fetchProfile(cred.user.uid);
+      if (pr.status === "found") {
+        applyProfile(pr.profile);
+        window.location.replace("/dashboard");
+      } else {
+        // Existing Firebase account, but no profile in our DB yet (e.g. first
+        // login after migration). Send them through setup.
+        window.location.replace("/setup-profile");
+      }
+
       return { outcome: "success", isNewUser };
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code ?? "unknown";
@@ -203,7 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     await firebaseSignOut(auth);
     setUser(null);
-    setProfileState(null);
+    applyProfile(null);
     setLoading(false);
     window.location.replace("/");
   };
