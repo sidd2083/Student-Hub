@@ -254,25 +254,31 @@ function getBadges(stats: StudyStats, logs: DailyLog[]) {
 
 // ─── Main Report Content ──────────────────────────────────────────────────────
 
+interface CustomBadge { id: string; text: string; emoji: string; color: string }
+
 function ReportContent() {
   const { user } = useAuth();
   const [stats, setStats] = useState<StudyStats | null>(null);
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<ViewPeriod>("week");
+  const [customBadges, setCustomBadges] = useState<CustomBadge[]>([]);
 
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
-      const [statsRes, logsRes] = await Promise.all([
+      const [statsRes, logsRes, userRes] = await Promise.all([
         fetch(`/api/study/stats/${user.uid}`),
         fetch(`/api/study/logs/${user.uid}`),
+        fetch(`/api/users/${user.uid}`),
       ]);
       const s: StudyStats = statsRes.ok ? await statsRes.json() : { streak: 0, totalStudyTime: 0, todayStudyTime: 0, lastActiveDate: null };
       const l: DailyLog[] = logsRes.ok ? await logsRes.json() : [];
+      const u = userRes.ok ? await userRes.json() : null;
       setStats(s);
       setDailyLogs(l);
+      if (u?.badges) setCustomBadges(u.badges);
     } catch {
       setStats({ streak: 0, totalStudyTime: 0, todayStudyTime: 0, lastActiveDate: null });
       setDailyLogs([]);
@@ -466,13 +472,22 @@ function ReportContent() {
       </Link>
 
       {/* Badges */}
-      {badges.length > 0 ? (
+      {(badges.length > 0 || customBadges.length > 0) ? (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
             <Award className="w-4 h-4 text-purple-500" />
             Badges Earned
           </h3>
           <div className="flex flex-wrap gap-2">
+            {customBadges.map(b => (
+              <span
+                key={b.id}
+                style={{ background: b.color, boxShadow: `0 2px 8px ${b.color}55` }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white"
+              >
+                {b.emoji} {b.text}
+              </span>
+            ))}
             {badges.map(b => (
               <span key={b.label} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border ${b.color}`}>
                 {b.icon} {b.label}

@@ -113,8 +113,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (pr.status === "found") {
               applyProfile(pr.profile);
               window.location.replace("/dashboard");
-            } else {
+            } else if (pr.status === "not_found") {
               window.location.replace("/setup-profile");
+            } else {
+              // API error — let them into dashboard, profile will retry
+              window.location.replace("/dashboard");
             }
           }
         }
@@ -218,10 +221,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (pr.status === "found") {
         applyProfile(pr.profile);
         window.location.replace("/dashboard");
-      } else {
+      } else if (pr.status === "not_found") {
         // Existing Firebase account, but no profile in our DB yet (e.g. first
         // login after migration). Send them through setup.
         window.location.replace("/setup-profile");
+      } else {
+        // API error (network issue, server down, etc.) — let them into the
+        // dashboard. The onAuthStateChanged listener will retry the fetch.
+        window.location.replace("/dashboard");
       }
 
       return { outcome: "success", isNewUser };

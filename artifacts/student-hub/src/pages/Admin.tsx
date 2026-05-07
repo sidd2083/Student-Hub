@@ -402,15 +402,9 @@ function BadgeManager() {
       const list: ApiUser[] = await fetch("/api/users").then(r => r.json());
       list.sort((a, b) => (b.totalStudyTime ?? 0) - (a.totalStudyTime ?? 0));
       setUsers(list);
-      // Load badges for all users in parallel, don't block if some fail
-      const badgeSnaps = await Promise.all(
-        list.map(u => getDoc(doc(db, "user_badges", u.uid)).catch(() => null))
-      );
+      // Badges are now returned directly from the API response
       const map: Record<string, CustomBadge[]> = {};
-      badgeSnaps.forEach((snap, i) => {
-        if (snap?.exists()) map[list[i].uid] = snap.data()?.badges ?? [];
-        else map[list[i].uid] = [];
-      });
+      list.forEach(u => { map[u.uid] = (u as any).badges ?? []; });
       setUserBadges(map);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
@@ -425,7 +419,7 @@ function BadgeManager() {
     return u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
   });
 
-  // Optimistic badge add — UI updates instantly, Firestore writes in background
+  // Optimistic badge add — UI updates instantly, API writes in background
   const addBadge = (uid: string) => {
     if (!badgeText.trim()) return;
     const newBadge: CustomBadge = {
@@ -439,16 +433,22 @@ function BadgeManager() {
     setUserBadges(prev => ({ ...prev, [uid]: updated }));
     setBadgeText("");
     setOpenUid(null);
-    setDoc(doc(db, "user_badges", uid), { badges: updated })
-      .catch(e => console.error("Badge save failed:", e));
+    fetch(`/api/users/${uid}/badges`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ badges: updated }),
+    }).catch(e => console.error("Badge save failed:", e));
   };
 
-  // Optimistic badge remove — UI updates instantly, Firestore writes in background
+  // Optimistic badge remove — UI updates instantly, API writes in background
   const removeBadge = (uid: string, badgeId: string) => {
     const updated = (userBadges[uid] ?? []).filter(b => b.id !== badgeId);
     setUserBadges(prev => ({ ...prev, [uid]: updated }));
-    setDoc(doc(db, "user_badges", uid), { badges: updated })
-      .catch(e => console.error("Badge remove failed:", e));
+    fetch(`/api/users/${uid}/badges`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ badges: updated }),
+    }).catch(e => console.error("Badge remove failed:", e));
   };
 
   return (

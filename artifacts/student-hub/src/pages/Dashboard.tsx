@@ -140,8 +140,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user) return;
-    getDoc(doc(db, "user_badges", user.uid))
-      .then(snap => { if (snap.exists()) setCustomBadges(snap.data()?.badges ?? []); })
+    fetch(`/api/users/${user.uid}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.badges) setCustomBadges(data.badges); })
       .catch(console.error)
       .finally(() => setBadgesLoaded(true));
   }, [user]);

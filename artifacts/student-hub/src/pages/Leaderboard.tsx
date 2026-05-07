@@ -3,8 +3,8 @@ import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
 import { Trophy, Flame, Clock, Sun, RefreshCw } from "lucide-react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+
+interface CustomBadge { id: string; text: string; emoji: string; color: string }
 
 interface LeaderEntry {
   uid: string;
@@ -14,9 +14,8 @@ interface LeaderEntry {
   totalStudyTime: number;
   todayStudyTime: number;
   role: string;
+  badges?: CustomBadge[];
 }
-
-interface CustomBadge { id: string; text: string; emoji: string; color: string }
 
 type SortKey = "totalStudyTime" | "streak" | "todayStudyTime";
 
@@ -101,16 +100,10 @@ function LeaderboardContent() {
       setEntries(valid);
       setLastUpdated(new Date());
 
-      // Load custom badges for all users in parallel (fire-and-forget)
-      const snaps = await Promise.all(
-        valid.map(e => getDoc(doc(db, "user_badges", e.uid)).catch(() => null))
-      );
+      // Extract custom badges directly from the API response (badges stored in PostgreSQL)
       const map: Record<string, CustomBadge> = {};
-      snaps.forEach((snap, i) => {
-        if (snap?.exists()) {
-          const badges: CustomBadge[] = snap.data()?.badges ?? [];
-          if (badges.length > 0) map[valid[i].uid] = badges[0];
-        }
+      valid.forEach(e => {
+        if (e.badges && e.badges.length > 0) map[e.uid] = e.badges[0];
       });
       setCustomBadges(map);
     } catch (e) { console.error(e); }

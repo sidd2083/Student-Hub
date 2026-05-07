@@ -1,9 +1,13 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 const router = Router();
+
+function parseBadges(raw: string | null | undefined): unknown[] {
+  try { return JSON.parse(raw || "[]"); } catch { return []; }
+}
 
 router.get("/users", async (req, res) => {
   try {
@@ -20,6 +24,7 @@ router.get("/users", async (req, res) => {
       totalStudyTime: u.totalStudyTime,
       todayStudyTime: u.todayStudyTime,
       lastActiveDate: u.lastActiveDate,
+      badges: parseBadges(u.badges),
     })));
   } catch (err) {
     req.log.error(err);
@@ -77,7 +82,24 @@ router.get("/users/:uid", async (req, res) => {
     const users = await db.select().from(usersTable).where(eq(usersTable.uid, uid));
     if (users.length === 0) return res.status(404).json({ error: "User not found" });
     const u = users[0];
-    res.json({ id: u.id, uid: u.uid, name: u.name, email: u.email, grade: u.grade, role: u.role, createdAt: u.createdAt.toISOString(), streak: u.streak, totalStudyTime: u.totalStudyTime, todayStudyTime: u.todayStudyTime, lastActiveDate: u.lastActiveDate });
+    res.json({ id: u.id, uid: u.uid, name: u.name, email: u.email, grade: u.grade, role: u.role, createdAt: u.createdAt.toISOString(), streak: u.streak, totalStudyTime: u.totalStudyTime, todayStudyTime: u.todayStudyTime, lastActiveDate: u.lastActiveDate, badges: parseBadges(u.badges) });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.put("/users/:uid/badges", async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const { badges } = req.body;
+    if (!Array.isArray(badges)) return res.status(400).json({ error: "badges must be an array" });
+    const updated = await db.update(usersTable)
+      .set({ badges: JSON.stringify(badges) })
+      .where(eq(usersTable.uid, uid))
+      .returning();
+    if (updated.length === 0) return res.status(404).json({ error: "User not found" });
+    res.json({ badges: parseBadges(updated[0].badges) });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

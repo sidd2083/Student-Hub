@@ -14,6 +14,7 @@ export const usersTable = pgTable("users", {
   totalStudyTime: integer("total_study_time").notNull().default(0),
   todayStudyTime: integer("today_study_time").notNull().default(0),
   lastActiveDate: text("last_active_date"),
+  badges: text("badges").default("[]"),
 });
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({ id: true, createdAt: true });
