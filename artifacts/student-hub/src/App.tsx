@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/context/AuthContext";
+import { TimerProvider } from "@/context/TimerContext";
 import {
   PrivateRoute,
   AdminDashboardRoute,
@@ -91,9 +92,11 @@ function App() {
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <AuthProvider>
-              <ErrorBoundary>
-                <Router />
-              </ErrorBoundary>
+              <TimerProvider>
+                <ErrorBoundary>
+                  <Router />
+                </ErrorBoundary>
+              </TimerProvider>
             </AuthProvider>
           </WouterRouter>
           <Toaster />

@@ -16,6 +16,18 @@ interface LeaderEntry {
 
 type SortKey = "totalStudyTime" | "streak" | "todayStudyTime";
 
+function fmtTime(mins: number) {
+  if (mins <= 0) return "0m";
+  return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+}
+
+function medal(i: number) {
+  if (i === 0) return "bg-yellow-100 text-yellow-700";
+  if (i === 1) return "bg-gray-100 text-gray-500";
+  if (i === 2) return "bg-orange-100 text-orange-600";
+  return "bg-white text-gray-500 border border-gray-100";
+}
+
 function LeaderboardContent() {
   const { user } = useAuth();
   const [entries, setEntries] = useState<LeaderEntry[]>([]);
@@ -29,8 +41,7 @@ function LeaderboardContent() {
     fetch("/api/users")
       .then(r => r.json())
       .then((data: LeaderEntry[]) => {
-        const valid = data.filter(e => e.name && e.grade && e.role !== "admin");
-        setEntries(valid);
+        setEntries(data.filter(e => e.name && e.grade && e.role !== "admin"));
         setLastUpdated(new Date());
       })
       .catch(console.error)
@@ -39,29 +50,28 @@ function LeaderboardContent() {
 
   useEffect(() => {
     load();
-    // Refresh every 60 seconds
-    const interval = setInterval(load, 60_000);
-    return () => clearInterval(interval);
+    const id = setInterval(load, 60_000);
+    return () => clearInterval(id);
   }, [load]);
 
   const filtered = entries
     .filter(e => gradeFilter === "all" || e.grade === gradeFilter)
     .sort((a, b) => b[sortBy] - a[sortBy]);
 
-  const medal = (i: number) => {
-    if (i === 0) return "bg-yellow-100 text-yellow-700";
-    if (i === 1) return "bg-gray-100 text-gray-500";
-    if (i === 2) return "bg-orange-100 text-orange-600";
-    return "bg-white text-gray-500";
-  };
-
-  const fmtTime = (mins: number) =>
-    mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
-
   const myRank = filtered.findIndex(e => e.uid === user?.uid);
+
+  const tabBtn = (key: SortKey, label: string, icon: React.ReactNode, active: string, inactive: string) => (
+    <button
+      onClick={() => setSortBy(key)}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${sortBy === key ? active : inactive}`}
+    >
+      {icon} {label}
+    </button>
+  );
 
   return (
     <div className="p-4 sm:p-8 max-w-2xl mx-auto">
+      {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Leaderboard</h1>
@@ -75,39 +85,29 @@ function LeaderboardContent() {
         </button>
       </div>
 
-      {/* Sort tabs */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <button onClick={() => setSortBy("totalStudyTime")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${sortBy === "totalStudyTime" ? "bg-blue-500 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-          <Clock className="w-3.5 h-3.5" /> All Time
-        </button>
-        <button onClick={() => setSortBy("todayStudyTime")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${sortBy === "todayStudyTime" ? "bg-green-500 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-          <Sun className="w-3.5 h-3.5" /> Today
-        </button>
-        <button onClick={() => setSortBy("streak")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${sortBy === "streak" ? "bg-orange-500 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-          <Flame className="w-3.5 h-3.5" /> Streak
-        </button>
+      {/* Sort + grade filters */}
+      <div className="flex flex-wrap gap-2 mb-5">
+        {tabBtn("totalStudyTime", "All Time", <Clock className="w-3.5 h-3.5" />, "bg-blue-500 text-white shadow-sm", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
+        {tabBtn("todayStudyTime", "Today", <Sun className="w-3.5 h-3.5" />, "bg-green-500 text-white shadow-sm", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
+        {tabBtn("streak", "Streak", <Flame className="w-3.5 h-3.5" />, "bg-orange-500 text-white shadow-sm", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
 
-        <div className="w-px bg-gray-200 mx-1" />
+        <div className="w-px bg-gray-200" />
 
-        <button onClick={() => setGradeFilter("all")}
-          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${gradeFilter === "all" ? "bg-indigo-500 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-          All Grades
-        </button>
-        {[9, 10, 11, 12].map(g => (
+        {(["all", 9, 10, 11, 12] as const).map(g => (
           <button key={g} onClick={() => setGradeFilter(g)}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${gradeFilter === g ? "bg-indigo-500 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-            Grade {g}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              gradeFilter === g ? "bg-indigo-500 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}>
+            {g === "all" ? "All Grades" : `Grade ${g}`}
           </button>
         ))}
       </div>
 
+      {/* Context label */}
       <div className="mb-3 text-xs text-gray-400 font-medium uppercase tracking-wide">
-        {sortBy === "totalStudyTime" && "📚 Ranked by total study time"}
-        {sortBy === "todayStudyTime" && "☀️ Ranked by today's study time"}
-        {sortBy === "streak" && "🔥 Ranked by study streak"}
+        {sortBy === "totalStudyTime" && "📚 All-time study time"}
+        {sortBy === "todayStudyTime" && "☀️ Today's study time"}
+        {sortBy === "streak" && "🔥 Study streak (days)"}
         {gradeFilter !== "all" && ` · Grade ${gradeFilter} only`}
       </div>
 
@@ -126,7 +126,7 @@ function LeaderboardContent() {
         <div className="text-center py-16 text-gray-400">
           <Trophy className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p className="font-medium">No students here yet.</p>
-          <p className="text-sm mt-1">Complete a Pomodoro session to appear on the leaderboard!</p>
+          <p className="text-sm mt-1">Complete a Pomodoro session to appear!</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -134,66 +134,51 @@ function LeaderboardContent() {
             const isMe = entry.uid === user?.uid;
             return (
               <div key={entry.uid}
-                className={`flex items-center gap-3 sm:gap-4 rounded-2xl border px-4 sm:px-5 py-4 transition-all ${isMe ? "border-blue-200 bg-blue-50 shadow-sm" : "border-gray-100 bg-white hover:border-gray-200"}`}>
-
+                className={`flex items-center gap-3 sm:gap-4 rounded-2xl border px-4 sm:px-5 py-4 transition-all ${
+                  isMe ? "border-blue-200 bg-blue-50 shadow-sm" : "border-gray-100 bg-white hover:border-gray-200"
+                }`}
+              >
+                {/* Rank badge */}
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${medal(i)}`}>
-                  {i < 3 ? ["🥇", "🥈", "🥉"][i] : `${i + 1}`}
+                  {i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}
                 </div>
 
+                {/* Name + grade */}
                 <div className="flex-1 min-w-0">
                   <p className={`font-semibold truncate text-sm sm:text-base ${isMe ? "text-blue-700" : "text-gray-900"}`}>
-                    {entry.name} {isMe && <span className="text-xs font-normal text-blue-500">(you)</span>}
+                    {entry.name} {isMe && <span className="text-xs font-normal text-blue-400">(you)</span>}
                   </p>
                   <p className="text-xs text-gray-400">Grade {entry.grade}</p>
                 </div>
 
-                <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0 text-right">
+                {/* ONLY the primary stat for selected tab */}
+                <div className="flex-shrink-0 text-right min-w-[60px]">
                   {sortBy === "totalStudyTime" && (
-                    <div>
+                    <>
                       <div className="flex items-center gap-1 text-blue-600 justify-end">
-                        <Clock className="w-3 h-3" />
+                        <Clock className="w-3.5 h-3.5" />
                         <span className="text-sm font-bold">{fmtTime(entry.totalStudyTime)}</span>
                       </div>
-                      <p className="text-[10px] text-gray-400">all time</p>
-                    </div>
+                      <p className="text-[10px] text-gray-400 mt-0.5">all time</p>
+                    </>
                   )}
                   {sortBy === "todayStudyTime" && (
-                    <div>
+                    <>
                       <div className="flex items-center gap-1 text-green-600 justify-end">
-                        <Sun className="w-3 h-3" />
+                        <Sun className="w-3.5 h-3.5" />
                         <span className="text-sm font-bold">{fmtTime(entry.todayStudyTime)}</span>
                       </div>
-                      <p className="text-[10px] text-gray-400">today</p>
-                    </div>
+                      <p className="text-[10px] text-gray-400 mt-0.5">today</p>
+                    </>
                   )}
                   {sortBy === "streak" && (
-                    <div>
+                    <>
                       <div className="flex items-center gap-1 text-orange-500 justify-end">
-                        <Flame className="w-3 h-3" />
+                        <Flame className="w-3.5 h-3.5" />
                         <span className="text-sm font-bold">{entry.streak}d</span>
                       </div>
-                      <p className="text-[10px] text-gray-400">streak</p>
-                    </div>
-                  )}
-
-                  {/* Always show secondary stats */}
-                  {sortBy !== "streak" && (
-                    <div className="hidden sm:block">
-                      <div className="flex items-center gap-1 text-orange-400 justify-end">
-                        <Flame className="w-3 h-3" />
-                        <span className="text-sm font-semibold">{entry.streak}d</span>
-                      </div>
-                      <p className="text-[10px] text-gray-400">streak</p>
-                    </div>
-                  )}
-                  {sortBy !== "totalStudyTime" && (
-                    <div className="hidden sm:block">
-                      <div className="flex items-center gap-1 text-blue-400 justify-end">
-                        <Clock className="w-3 h-3" />
-                        <span className="text-sm font-semibold">{fmtTime(entry.totalStudyTime)}</span>
-                      </div>
-                      <p className="text-[10px] text-gray-400">total</p>
-                    </div>
+                      <p className="text-[10px] text-gray-400 mt-0.5">streak</p>
+                    </>
                   )}
                 </div>
               </div>
@@ -210,7 +195,7 @@ export default function Leaderboard() {
     <>
       <Helmet>
         <title>Leaderboard — Student Hub</title>
-        <meta name="description" content="Top students on Student Hub ranked by study time and streak. Grade-wise leaderboard for Grade 9–12 students." />
+        <meta name="description" content="Top students on Student Hub ranked by study time and streak." />
       </Helmet>
       <SoftGate feature="the leaderboard">
         <LeaderboardContent />

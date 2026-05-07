@@ -1,9 +1,11 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
+import { useTimer } from "@/context/TimerContext";
 import {
   BookOpen, FileText, CheckSquare, Timer,
   MessageCircle, Trophy, LayoutDashboard, LogOut,
   Shield, Settings, User, Home, Wrench, ArrowLeft, X, BarChart2,
+  Pause, Play,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -38,6 +40,36 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+function FloatingTimerBar() {
+  const [location, setLocation] = useLocation();
+  const { phase, seconds, running, pause, start } = useTimer();
+  if (!running || location === "/pomodoro") return null;
+  const mins = Math.floor(seconds / 60).toString().padStart(2, "0");
+  const secs = (seconds % 60).toString().padStart(2, "0");
+  const color = phase === "work" ? "bg-blue-500" : phase === "shortBreak" ? "bg-green-500" : "bg-purple-500";
+  const label = phase === "work" ? "Focus" : phase === "shortBreak" ? "Short Break" : "Long Break";
+  return (
+    <div
+      className={`fixed top-0 left-0 right-0 z-50 ${color} text-white text-xs flex items-center justify-between px-4 py-1.5 shadow-md cursor-pointer`}
+      onClick={() => setLocation("/pomodoro")}
+    >
+      <div className="flex items-center gap-2">
+        <Timer className="w-3.5 h-3.5 animate-pulse" />
+        <span className="font-semibold">{label}: {mins}:{secs}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={e => { e.stopPropagation(); running ? pause() : start(); }}
+          className="hover:bg-white/20 rounded-full p-1 transition-colors"
+        >
+          {running ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+        </button>
+        <span className="opacity-75 text-[10px]">Tap to open</span>
+      </div>
+    </div>
+  );
+}
+
 export function Layout({ children }: LayoutProps) {
   const [location, setLocation] = useLocation();
   const { user, profile, signOut } = useAuth();
@@ -53,6 +85,7 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
+      <FloatingTimerBar />
       {/* ── Sidebar (desktop only) ── */}
       <aside className="hidden md:flex w-64 bg-white border-r border-gray-100 flex-col shadow-sm flex-shrink-0">
         <div className="p-6 border-b border-gray-100">
