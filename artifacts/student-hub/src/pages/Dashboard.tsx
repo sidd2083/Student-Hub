@@ -21,20 +21,8 @@ const sections = [
   { href: "/ai",         icon: MessageCircle, label: "Nep AI",             desc: "AI study assistant",          color: "bg-indigo-50 text-indigo-600" },
 ];
 
-interface Announcement {
-  id: string;
-  title: string;
-  body: string;
-  createdAt: string;
-}
-
-interface CustomBadge {
-  id: string;
-  text: string;
-  emoji: string;
-  color: string;
-  createdAt: string;
-}
+interface Announcement { id: string; title: string; body: string; createdAt: string }
+interface CustomBadge { id: string; text: string; emoji: string; color: string; createdAt: string }
 
 const STUDY_TIERS = [
   { mins: 24000, emoji: "🏆", label: "Champion",    bg: "linear-gradient(135deg,#94a3b8,#e2e8f0,#94a3b8)", shadow: "0 4px 20px rgba(148,163,184,0.5)" },
@@ -54,98 +42,117 @@ const STREAK_TIERS = [
   { days: 5,   emoji: "🎯", label: "Consistent",    bg: "linear-gradient(135deg,#164e63,#67e8f9,#164e63)", shadow: "0 4px 20px rgba(22,78,99,0.5)"   },
 ];
 
-function getHighestStudyBadge(mins: number) {
-  return STUDY_TIERS.find(t => mins >= t.mins) ?? null;
-}
-function getHighestStreakBadge(days: number) {
-  return STREAK_TIERS.find(t => days >= t.days) ?? null;
-}
+function getHighestStudyBadge(mins: number) { return STUDY_TIERS.find(t => mins >= t.mins) ?? null; }
+function getHighestStreakBadge(days: number) { return STREAK_TIERS.find(t => days >= t.days) ?? null; }
 
-function BadgePill({ emoji, label, bg, shadow, isCustom, customColor }: {
-  emoji: string; label: string; bg?: string; shadow?: string; isCustom?: boolean; customColor?: string;
-}) {
-  const style: React.CSSProperties = isCustom
-    ? { background: customColor || "#6366f1", boxShadow: `0 4px 16px ${customColor || "#6366f1"}66` }
-    : { background: bg, boxShadow: shadow };
+// ─── Achievement Card ────────────────────────────────────────────────────────
+
+function AchievementsCard({
+  studyMins, streak, customBadges,
+}: { studyMins: number; streak: number; customBadges: CustomBadge[] }) {
+  const studyBadge  = getHighestStudyBadge(studyMins);
+  const streakBadge = getHighestStreakBadge(streak);
+  const autoBadges  = [studyBadge, streakBadge].filter(Boolean) as (typeof STUDY_TIERS[0])[];
+  const total       = autoBadges.length + customBadges.length;
+
+  if (total === 0) return null;
 
   return (
-    <div
-      style={style}
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-xs font-bold select-none cursor-default"
-    >
-      <span className="text-sm leading-none">{emoji}</span>
-      <span className="leading-none">{label}</span>
+    <div className="mb-6 sm:mb-8 rounded-2xl overflow-hidden border border-purple-100 shadow-sm">
+      {/* Card header */}
+      <div
+        className="px-4 sm:px-5 py-3 flex items-center gap-2"
+        style={{ background: "linear-gradient(135deg,#6d28d9 0%,#7c3aed 50%,#4f46e5 100%)" }}
+      >
+        <span className="text-lg leading-none">🏅</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-white font-bold text-sm leading-tight">Your Achievements</p>
+          <p className="text-purple-200 text-xs leading-tight">
+            {total} badge{total !== 1 ? "s" : ""} earned
+          </p>
+        </div>
+        <span className="text-purple-200 text-xs font-medium">{total} / ∞</span>
+      </div>
+
+      {/* Badge grid */}
+      <div className="bg-white px-4 sm:px-5 py-4">
+        <div className="flex flex-wrap gap-2">
+          {autoBadges.map(b => (
+            <div
+              key={b.label}
+              style={{ background: b.bg, boxShadow: b.shadow }}
+              className="flex items-center gap-2 px-4 py-2 rounded-2xl text-white select-none"
+            >
+              <span className="text-xl leading-none">{b.emoji}</span>
+              <div>
+                <p className="text-xs font-bold leading-tight">{b.label}</p>
+                <p className="text-[10px] opacity-75 leading-tight">
+                  {STUDY_TIERS.includes(b as typeof STUDY_TIERS[0]) ? "Study badge" : "Streak badge"}
+                </p>
+              </div>
+            </div>
+          ))}
+          {customBadges.map(b => (
+            <div
+              key={b.id}
+              style={{ background: b.color, boxShadow: `0 4px 20px ${b.color}55` }}
+              className="flex items-center gap-2 px-4 py-2 rounded-2xl text-white select-none"
+            >
+              <span className="text-xl leading-none">{b.emoji}</span>
+              <div>
+                <p className="text-xs font-bold leading-tight">{b.text}</p>
+                <p className="text-[10px] opacity-75 leading-tight">Special award</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
 
 export default function Dashboard() {
   const { profile, user } = useAuth();
-  const [streak, setStreak] = useState(0);
-  const [studyMins, setStudyMins] = useState(0);
+  const [streak, setStreak]             = useState(0);
+  const [studyMins, setStudyMins]       = useState(0);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [dismissed, setDismissed]       = useState<Set<string>>(new Set());
   const [customBadges, setCustomBadges] = useState<CustomBadge[]>([]);
-  const [statsLoaded, setStatsLoaded] = useState(false);
+  const [statsLoaded, setStatsLoaded]   = useState(false);
+  const [badgesLoaded, setBadgesLoaded] = useState(false);
 
   const { data: tasks } = useListTasks(
     { uid: user?.uid || "" },
     { query: { enabled: !!user?.uid, queryKey: ["listTasks", user?.uid || ""] } }
   );
+  const pendingTasks = (Array.isArray(tasks) ? tasks : []).filter(t => !t.completed).length;
 
-  const pendingTasks = (Array.isArray(tasks) ? tasks : []).filter((t) => !t.completed).length;
-
-  // Fetch study stats from PostgreSQL API (source of truth)
   useEffect(() => {
     if (!user) return;
-    const fetchStats = async () => {
-      try {
-        const res = await fetch(`/api/study/stats/${user.uid}`);
-        if (res.ok) {
-          const data = await res.json();
-          setStudyMins(data.totalStudyTime ?? 0);
-          setStreak(data.streak ?? 0);
-        }
-      } catch (err) {
-        console.error("Stats fetch failed:", err);
-      } finally {
-        setStatsLoaded(true);
-      }
-    };
-    fetchStats();
+    fetch(`/api/study/stats/${user.uid}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) { setStudyMins(data.totalStudyTime ?? 0); setStreak(data.streak ?? 0); }
+      })
+      .catch(console.error)
+      .finally(() => setStatsLoaded(true));
   }, [user]);
 
-  // Fetch custom badges from Firestore
   useEffect(() => {
     if (!user) return;
-    const fetchBadges = async () => {
-      try {
-        const snap = await getDoc(doc(db, "user_badges", user.uid));
-        if (snap.exists()) {
-          const data = snap.data();
-          setCustomBadges(data.badges ?? []);
-        }
-      } catch (err) {
-        console.error("Badge fetch failed:", err);
-      }
-    };
-    fetchBadges();
+    getDoc(doc(db, "user_badges", user.uid))
+      .then(snap => { if (snap.exists()) setCustomBadges(snap.data()?.badges ?? []); })
+      .catch(console.error)
+      .finally(() => setBadgesLoaded(true));
   }, [user]);
 
-  // Fetch announcements from Firestore
   useEffect(() => {
     const load = async () => {
       try {
-        const q = query(
-          collection(db, "announcements"),
-          orderBy("createdAt", "desc"),
-          limit(3)
-        );
+        const q = query(collection(db, "announcements"), orderBy("createdAt", "desc"), limit(3));
         const snap = await getDocs(q);
-        setAnnouncements(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Announcement)));
-      } catch {
-        /* collection may not exist yet */
-      }
+        setAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement)));
+      } catch { /* collection may not exist yet */ }
     };
     load();
   }, []);
@@ -162,16 +169,17 @@ export default function Dashboard() {
 
   const visibleAnnouncements = announcements.filter(a => !dismissed.has(a.id));
 
-  const studyBadge = getHighestStudyBadge(studyMins);
+  const studyBadge  = getHighestStudyBadge(studyMins);
   const streakBadge = getHighestStreakBadge(streak);
-  const hasBadges = studyBadge || streakBadge || customBadges.length > 0;
+  const hasBadges   = studyBadge || streakBadge || customBadges.length > 0;
+  const loaded      = statsLoaded && badgesLoaded;
 
   return (
     <>
-      <Helmet>
-        <title>Dashboard — Student Hub</title>
-      </Helmet>
+      <Helmet><title>Dashboard — Student Hub</title></Helmet>
       <div className="p-4 sm:p-6 lg:p-8">
+
+        {/* Greeting */}
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center gap-3 mb-1 flex-wrap">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
@@ -207,46 +215,17 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Badges */}
-        {hasBadges && (
-          <div className="mb-6 sm:mb-8">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-sm">🏅</span>
-              <h2 className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
-                Your Achievements
-              </h2>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {studyBadge && (
-                <BadgePill
-                  emoji={studyBadge.emoji}
-                  label={studyBadge.label}
-                  bg={studyBadge.bg}
-                  shadow={studyBadge.shadow}
-                />
-              )}
-              {streakBadge && (
-                <BadgePill
-                  emoji={streakBadge.emoji}
-                  label={streakBadge.label}
-                  bg={streakBadge.bg}
-                  shadow={streakBadge.shadow}
-                />
-              )}
-              {customBadges.map(b => (
-                <BadgePill
-                  key={b.id}
-                  emoji={b.emoji}
-                  label={b.text}
-                  isCustom
-                  customColor={b.color}
-                />
-              ))}
-            </div>
-          </div>
+        {/* Achievements Card */}
+        {loaded && hasBadges && (
+          <AchievementsCard
+            studyMins={studyMins}
+            streak={streak}
+            customBadges={customBadges}
+          />
         )}
 
-        {!hasBadges && statsLoaded && (
+        {/* First badge motivator */}
+        {loaded && !hasBadges && (
           <div className="mb-6 sm:mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100 rounded-2xl p-4">
             <p className="text-sm font-medium text-blue-800 mb-0.5">🎯 Earn your first badge!</p>
             <p className="text-xs text-blue-600">Study for 10 hours with the Pomodoro timer to unlock the 🌱 Beginner badge.</p>
@@ -258,17 +237,14 @@ export default function Dashboard() {
           <div className="mb-6 sm:mb-8">
             <div className="flex items-center gap-2 mb-3 sm:mb-4">
               <Megaphone className="w-4 h-4 text-gray-400" />
-              <h2 className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
-                Announcements
-              </h2>
+              <h2 className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">Announcements</h2>
             </div>
             <div className="space-y-3">
-              {visibleAnnouncements.map((a) => (
+              {visibleAnnouncements.map(a => (
                 <div key={a.id} className="bg-blue-50 border border-blue-100 rounded-2xl p-4 relative">
                   <button
                     onClick={() => setDismissed(prev => new Set([...prev, a.id]))}
                     className="absolute top-3 right-3 p-1 rounded-full hover:bg-blue-200/60 transition-all"
-                    aria-label="Close announcement"
                   >
                     <X className="w-4 h-4 text-blue-400" />
                   </button>
@@ -284,15 +260,11 @@ export default function Dashboard() {
         )}
 
         {/* Quick Access */}
-        <h2 className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider mb-3 sm:mb-4">
-          Quick Access
-        </h2>
+        <h2 className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider mb-3 sm:mb-4">Quick Access</h2>
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {sections.map(({ href, icon: Icon, label, desc, color }) => (
             <Link key={href} href={href}>
-              <a
-                className="block bg-white rounded-2xl p-4 sm:p-5 border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
-              >
+              <a className="block bg-white rounded-2xl p-4 sm:p-5 border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer">
                 <div className={`w-9 h-9 sm:w-10 sm:h-10 ${color} rounded-xl flex items-center justify-center mb-3 sm:mb-4`}>
                   <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>

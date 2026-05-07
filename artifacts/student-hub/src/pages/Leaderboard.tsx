@@ -3,6 +3,8 @@ import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
 import { Trophy, Flame, Clock, Sun, RefreshCw } from "lucide-react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface LeaderEntry {
   uid: string;
@@ -13,6 +15,8 @@ interface LeaderEntry {
   todayStudyTime: number;
   role: string;
 }
+
+interface CustomBadge { id: string; text: string; emoji: string; color: string }
 
 type SortKey = "totalStudyTime" | "streak" | "todayStudyTime";
 
@@ -28,24 +32,89 @@ function medal(i: number) {
   return "bg-white text-gray-500 border border-gray-100";
 }
 
+const STUDY_TIERS = [
+  { mins: 24000, emoji: "🏆", label: "Champion",  bg: "linear-gradient(135deg,#94a3b8,#e2e8f0,#94a3b8)" },
+  { mins: 12000, emoji: "🌟", label: "Master",    bg: "linear-gradient(135deg,#d97706,#fcd34d,#d97706)" },
+  { mins: 6000,  emoji: "👑", label: "Legend",    bg: "linear-gradient(135deg,#b45309,#fbbf24,#b45309)" },
+  { mins: 4500,  emoji: "💎", label: "Scholar",   bg: "linear-gradient(135deg,#6d28d9,#a78bfa,#6d28d9)" },
+  { mins: 3000,  emoji: "🔥", label: "Achiever",  bg: "linear-gradient(135deg,#c2410c,#fb923c,#c2410c)" },
+  { mins: 1500,  emoji: "⚡", label: "Explorer",  bg: "linear-gradient(135deg,#1d4ed8,#60a5fa,#1d4ed8)" },
+  { mins: 600,   emoji: "🌱", label: "Beginner",  bg: "linear-gradient(135deg,#15803d,#4ade80,#15803d)" },
+];
+
+const STREAK_TIERS = [
+  { days: 100, emoji: "🦁", label: "Elite",        bg: "linear-gradient(135deg,#1e1b4b,#4338ca,#1e1b4b)" },
+  { days: 60,  emoji: "⭐", label: "Legendary",    bg: "linear-gradient(135deg,#92400e,#fcd34d,#92400e)" },
+  { days: 30,  emoji: "🚀", label: "Unstoppable",  bg: "linear-gradient(135deg,#5b21b6,#c4b5fd,#5b21b6)" },
+  { days: 15,  emoji: "💪", label: "Dedicated",    bg: "linear-gradient(135deg,#991b1b,#f87171,#991b1b)" },
+  { days: 5,   emoji: "🎯", label: "Consistent",   bg: "linear-gradient(135deg,#164e63,#67e8f9,#164e63)" },
+];
+
+function getTopBadge(entry: LeaderEntry) {
+  return STUDY_TIERS.find(t => entry.totalStudyTime >= t.mins)
+    ?? STREAK_TIERS.find(t => entry.streak >= t.days)
+    ?? null;
+}
+
+// Compact pill shown in the leaderboard row next to the name
+function RowBadge({ badge, custom }: {
+  badge: { emoji: string; label: string; bg: string } | null;
+  custom: CustomBadge | null;
+}) {
+  if (custom) {
+    return (
+      <span
+        style={{ background: custom.color, boxShadow: `0 2px 8px ${custom.color}55` }}
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-white text-[10px] font-bold leading-none flex-shrink-0"
+      >
+        {custom.emoji} {custom.text}
+      </span>
+    );
+  }
+  if (badge) {
+    return (
+      <span
+        style={{ background: badge.bg }}
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-white text-[10px] font-bold leading-none flex-shrink-0"
+      >
+        {badge.emoji} {badge.label}
+      </span>
+    );
+  }
+  return null;
+}
+
 function LeaderboardContent() {
   const { user } = useAuth();
-  const [entries, setEntries] = useState<LeaderEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<SortKey>("totalStudyTime");
+  const [entries, setEntries]       = useState<LeaderEntry[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [sortBy, setSortBy]         = useState<SortKey>("totalStudyTime");
   const [gradeFilter, setGradeFilter] = useState<number | "all">("all");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [customBadges, setCustomBadges] = useState<Record<string, CustomBadge>>({});
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
-    fetch("/api/users")
-      .then(r => r.json())
-      .then((data: LeaderEntry[]) => {
-        setEntries(data.filter(e => e.name && e.grade && e.role !== "admin"));
-        setLastUpdated(new Date());
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    try {
+      const data: LeaderEntry[] = await fetch("/api/users").then(r => r.json());
+      const valid = data.filter(e => e.name && e.grade && e.role !== "admin");
+      setEntries(valid);
+      setLastUpdated(new Date());
+
+      // Load custom badges for all users in parallel (fire-and-forget)
+      const snaps = await Promise.all(
+        valid.map(e => getDoc(doc(db, "user_badges", e.uid)).catch(() => null))
+      );
+      const map: Record<string, CustomBadge> = {};
+      snaps.forEach((snap, i) => {
+        if (snap?.exists()) {
+          const badges: CustomBadge[] = snap.data()?.badges ?? [];
+          if (badges.length > 0) map[valid[i].uid] = badges[0];
+        }
+      });
+      setCustomBadges(map);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -88,11 +157,9 @@ function LeaderboardContent() {
       {/* Sort + grade filters */}
       <div className="flex flex-wrap gap-2 mb-5">
         {tabBtn("totalStudyTime", "All Time", <Clock className="w-3.5 h-3.5" />, "bg-blue-500 text-white shadow-sm", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
-        {tabBtn("todayStudyTime", "Today", <Sun className="w-3.5 h-3.5" />, "bg-green-500 text-white shadow-sm", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
-        {tabBtn("streak", "Streak", <Flame className="w-3.5 h-3.5" />, "bg-orange-500 text-white shadow-sm", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
-
+        {tabBtn("todayStudyTime", "Today",    <Sun   className="w-3.5 h-3.5" />, "bg-green-500 text-white shadow-sm", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
+        {tabBtn("streak",         "Streak",   <Flame className="w-3.5 h-3.5" />, "bg-orange-500 text-white shadow-sm", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
         <div className="w-px bg-gray-200" />
-
         {(["all", 9, 10, 11, 12] as const).map(g => (
           <button key={g} onClick={() => setGradeFilter(g)}
             className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
@@ -107,7 +174,7 @@ function LeaderboardContent() {
       <div className="mb-3 text-xs text-gray-400 font-medium uppercase tracking-wide">
         {sortBy === "totalStudyTime" && "📚 All-time study time"}
         {sortBy === "todayStudyTime" && "☀️ Today's study time"}
-        {sortBy === "streak" && "🔥 Study streak (days)"}
+        {sortBy === "streak"         && "🔥 Study streak (days)"}
         {gradeFilter !== "all" && ` · Grade ${gradeFilter} only`}
       </div>
 
@@ -131,27 +198,37 @@ function LeaderboardContent() {
       ) : (
         <div className="space-y-2">
           {filtered.map((entry, i) => {
-            const isMe = entry.uid === user?.uid;
+            const isMe    = entry.uid === user?.uid;
+            const topBadge = getTopBadge(entry);
+            const custom   = customBadges[entry.uid] ?? null;
+            const hasBadge = topBadge || custom;
+
             return (
               <div key={entry.uid}
-                className={`flex items-center gap-3 sm:gap-4 rounded-2xl border px-4 sm:px-5 py-4 transition-all ${
+                className={`flex items-center gap-3 sm:gap-4 rounded-2xl border px-4 sm:px-5 py-3.5 transition-all ${
                   isMe ? "border-blue-200 bg-blue-50 shadow-sm" : "border-gray-100 bg-white hover:border-gray-200"
                 }`}
               >
-                {/* Rank badge */}
+                {/* Rank */}
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${medal(i)}`}>
                   {i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}
                 </div>
 
-                {/* Name + grade */}
+                {/* Name + grade + badge */}
                 <div className="flex-1 min-w-0">
-                  <p className={`font-semibold truncate text-sm sm:text-base ${isMe ? "text-blue-700" : "text-gray-900"}`}>
-                    {entry.name} {isMe && <span className="text-xs font-normal text-blue-400">(you)</span>}
-                  </p>
-                  <p className="text-xs text-gray-400">Grade {entry.grade}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className={`font-semibold text-sm sm:text-base leading-tight ${isMe ? "text-blue-700" : "text-gray-900"}`}>
+                      {entry.name}
+                      {isMe && <span className="text-xs font-normal text-blue-400 ml-1">(you)</span>}
+                    </p>
+                    {hasBadge && (
+                      <RowBadge badge={topBadge} custom={custom} />
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">Grade {entry.grade}</p>
                 </div>
 
-                {/* ONLY the primary stat for selected tab */}
+                {/* Stat */}
                 <div className="flex-shrink-0 text-right min-w-[60px]">
                   {sortBy === "totalStudyTime" && (
                     <>
