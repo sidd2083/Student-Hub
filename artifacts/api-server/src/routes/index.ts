@@ -8,6 +8,7 @@ import tasksRouter from "./tasks";
 import scoresRouter from "./scores";
 import aiRouter from "./ai";
 import studyRouter from "./study";
+import announcementsRouter from "./announcements";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(tasksRouter);
 router.use(scoresRouter);
 router.use(aiRouter);
 router.use(studyRouter);
+router.use(announcementsRouter);
 
 export default router;

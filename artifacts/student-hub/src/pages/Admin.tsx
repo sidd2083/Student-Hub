@@ -14,8 +14,8 @@ import {
   CheckCircle, AlertCircle, Award, Search,
 } from "lucide-react";
 import {
-  collection, addDoc, getDocs, deleteDoc,
-  doc, query, orderBy, setDoc, getDoc, onSnapshot,
+  collection, getDocs,
+  doc, query, setDoc, getDoc,
 } from "firebase/firestore";
 import {
   ref, uploadBytesResumable, getDownloadURL,
@@ -747,7 +747,7 @@ function ManagePyqs() {
 
 // ─── Announcements ─────────────────────────────────────────────────────────
 
-interface Announcement { id: string; title: string; body: string; createdAt: string }
+interface Announcement { id: number; title: string; body: string; createdAt: string }
 
 function ManageAnnouncements() {
   const [list, setList] = useState<Announcement[]>([]);
@@ -755,14 +755,20 @@ function ManageAnnouncements() {
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const load = async () => {
+    setLoadingList(true);
     try {
-      const q = query(collection(db, "announcements"), orderBy("createdAt", "desc"));
-      const snap = await getDocs(q);
-      setList(snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement)));
-    } catch (e) { console.error(e); }
-    finally { setLoadingList(false); }
+      const res = await fetch("/api/announcements");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json() as Announcement[];
+      setList(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingList(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -771,19 +777,35 @@ function ManageAnnouncements() {
     e.preventDefault();
     if (!title.trim() || !body.trim()) return;
     setSaving(true);
+    setErrorMsg("");
     try {
-      await addDoc(collection(db, "announcements"), {
-        title: title.trim(),
-        body: body.trim(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+      const res = await fetch("/api/announcements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title.trim(), body: body.trim() }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error ?? `HTTP ${res.status}`);
+      }
       setTitle(""); setBody("");
       await load();
     } catch (error) {
       console.error(error);
-      alert("Failed to post announcement. Please try again.");
-    } finally { setSaving(false); }
+      setErrorMsg(error instanceof Error ? error.message : "Failed to post announcement.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      const res = await fetch(`/api/announcements/${id}`, { method: "DELETE" });
+      if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+      setList(l => l.filter(x => x.id !== id));
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
@@ -799,6 +821,7 @@ function ManageAnnouncements() {
           <label className="block text-xs font-medium text-gray-600 mb-1">Message</label>
           <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Write your announcement…" rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none" required />
         </div>
+        {errorMsg && <p className="text-red-500 text-xs">{errorMsg}</p>}
         <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50">
           <Megaphone className="w-4 h-4" /> {saving ? "Posting…" : "Post Announcement"}
         </button>
@@ -815,7 +838,7 @@ function ManageAnnouncements() {
               <p className="text-gray-600 text-sm">{a.body}</p>
               <p className="text-gray-400 text-xs mt-1">{new Date(a.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
             </div>
-            <button onClick={async () => { await deleteDoc(doc(db, "announcements", a.id)); setList(l => l.filter(x => x.id !== a.id)); }} className="p-1.5 text-gray-400 hover:text-red-500 flex-shrink-0">
+            <button onClick={() => handleDelete(a.id)} className="p-1.5 text-gray-400 hover:text-red-500 flex-shrink-0">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>

@@ -7,10 +7,6 @@ import {
   BookOpen, BarChart2, FileText, CheckSquare,
   Timer, MessageCircle, Flame, Megaphone, X,
 } from "lucide-react";
-import {
-  collection, getDocs, query, orderBy, limit, doc, getDoc,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
 
 const sections = [
   { href: "/notes",      icon: BookOpen,      label: "Notes",              desc: "Study materials by subject",  color: "bg-blue-50 text-blue-600"    },
@@ -21,7 +17,7 @@ const sections = [
   { href: "/ai",         icon: MessageCircle, label: "Nep AI",             desc: "AI study assistant",          color: "bg-indigo-50 text-indigo-600" },
 ];
 
-interface Announcement { id: string; title: string; body: string; createdAt: string }
+interface Announcement { id: number; title: string; body: string; createdAt: string }
 interface CustomBadge { id: string; text: string; emoji: string; color: string; createdAt: string }
 
 const STUDY_TIERS = [
@@ -116,7 +112,7 @@ export default function Dashboard() {
   const [streak, setStreak]             = useState(0);
   const [studyMins, setStudyMins]       = useState(0);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [dismissed, setDismissed]       = useState<Set<string>>(new Set());
+  const [dismissed, setDismissed]       = useState<Set<number>>(new Set());
   const [customBadges, setCustomBadges] = useState<CustomBadge[]>([]);
   const [statsLoaded, setStatsLoaded]   = useState(false);
   const [badgesLoaded, setBadgesLoaded] = useState(false);
@@ -148,14 +144,10 @@ export default function Dashboard() {
   }, [user]);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const q = query(collection(db, "announcements"), orderBy("createdAt", "desc"), limit(3));
-        const snap = await getDocs(q);
-        setAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement)));
-      } catch { /* collection may not exist yet */ }
-    };
-    load();
+    fetch("/api/announcements")
+      .then(r => r.ok ? r.json() : [])
+      .then((data: Announcement[]) => setAnnouncements(data.slice(0, 3)))
+      .catch(() => setAnnouncements([]));
   }, []);
 
   const greeting = () => {

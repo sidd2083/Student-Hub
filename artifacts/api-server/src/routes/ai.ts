@@ -3,10 +3,10 @@ import OpenAI from "openai";
 
 const router = Router();
 
-function getClient() {
+function getClient(): OpenAI {
   return new OpenAI({
     baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || "placeholder",
+    apiKey:  process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? "placeholder",
   });
 }
 
@@ -38,14 +38,24 @@ When you receive study context (tasks, stats), use it actively:
 - Suggest which subjects to prioritize based on pending tasks
 - Give daily/weekly study targets based on their current performance`;
 
+interface ChatMessage { role: string; content: string }
+interface ChatContext {
+  stats?: { streak: number; totalStudyTime: number; todayStudyTime: number; lastActiveDate?: string };
+  tasks?: { completed: boolean; text: string }[];
+  weeklyMins?: number;
+}
+
 router.post("/ai/chat", async (req, res) => {
   try {
-    const { message, history = [], context } = req.body;
+    const { message, history = [], context } = req.body as {
+      message?: string;
+      history?: ChatMessage[];
+      context?: ChatContext;
+    };
     if (!message) return res.status(400).json({ error: "message is required" });
 
     let systemContent = SYSTEM_PROMPT;
 
-    // Inject student context if provided
     if (context) {
       const parts: string[] = ["\n\n--- STUDENT'S CURRENT DATA (use this to personalize your response) ---"];
       if (context.stats) {
@@ -54,14 +64,14 @@ router.post("/ai/chat", async (req, res) => {
 - Streak: ${s.streak} days
 - Total study time: ${s.totalStudyTime} minutes (${Math.floor(s.totalStudyTime / 60)}h ${s.totalStudyTime % 60}m)
 - Studied today: ${s.todayStudyTime} minutes
-- Last active: ${s.lastActiveDate || "unknown"}`);
+- Last active: ${s.lastActiveDate ?? "unknown"}`);
       }
       if (context.tasks && context.tasks.length > 0) {
-        const pending = context.tasks.filter((t: { completed: boolean }) => !t.completed);
-        const done = context.tasks.filter((t: { completed: boolean }) => t.completed);
+        const pending = context.tasks.filter(t => !t.completed);
+        const done    = context.tasks.filter(t => t.completed);
         parts.push(`Tasks:
-- Pending (${pending.length}): ${pending.map((t: { text: string }) => t.text).join(", ") || "none"}
-- Completed (${done.length}): ${done.map((t: { text: string }) => t.text).join(", ") || "none"}`);
+- Pending (${pending.length}): ${pending.map(t => t.text).join(", ") || "none"}
+- Completed (${done.length}): ${done.map(t => t.text).join(", ") || "none"}`);
       }
       if (context.weeklyMins !== undefined) {
         parts.push(`Weekly study: ${context.weeklyMins} minutes this week`);
@@ -72,25 +82,24 @@ router.post("/ai/chat", async (req, res) => {
 
     const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
       { role: "system", content: systemContent },
-      ...history.map((h: { role: string; content: string }) => ({
-        role: h.role as "user" | "assistant",
+      ...history.map(h => ({
+        role:    h.role as "user" | "assistant",
         content: h.content,
       })),
       { role: "user" as const, content: message },
     ];
 
-    const client = getClient();
-    const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+    const completion = await getClient().chat.completions.create({
+      model:      "gpt-4o-mini",
       messages,
       max_tokens: 1200,
     });
 
-    const reply = completion.choices[0]?.message?.content || "I couldn't generate a response. Please try again.";
-    res.json({ reply });
+    const reply = completion.choices[0]?.message?.content ?? "I couldn't generate a response. Please try again.";
+    return res.json({ reply });
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "AI service unavailable" });
+    return res.status(500).json({ error: "AI service unavailable" });
   }
 });
 

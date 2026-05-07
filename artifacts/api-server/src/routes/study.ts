@@ -5,18 +5,26 @@ import { eq, and, sql } from "drizzle-orm";
 
 const router = Router();
 
-function getToday(): string { return new Date().toISOString().slice(0, 10); }
+type StudyLogRow = typeof studyLogsTable.$inferSelect;
+
+function getToday(): string    { return new Date().toISOString().slice(0, 10); }
 function getYesterday(): string { return new Date(Date.now() - 86400000).toISOString().slice(0, 10); }
 
-// POST /api/study/session — record a completed Pomodoro session
+const toLog = (l: StudyLogRow) => ({
+  date:           l.date,
+  studyMinutes:   l.studyMinutes,
+  tasksCompleted: l.tasksCompleted,
+  notesViewed:    l.notesViewed,
+});
+
 router.post("/study/session", async (req, res) => {
   try {
-    const { uid, minutes } = req.body;
+    const { uid, minutes } = req.body as { uid?: string; minutes?: number };
     if (!uid || typeof minutes !== "number" || minutes < 1) {
       return res.status(400).json({ error: "uid and minutes (>=1) required" });
     }
 
-    const today = getToday();
+    const today     = getToday();
     const yesterday = getYesterday();
 
     const users = await db.select().from(usersTable).where(eq(usersTable.uid, uid));
@@ -42,13 +50,12 @@ router.post("/study/session", async (req, res) => {
       .set({
         totalStudyTime: sql`${usersTable.totalStudyTime} + ${minutes}`,
         todayStudyTime: newTodayStudyTime,
-        streak: newStreak,
+        streak:         newStreak,
         lastActiveDate: today,
       })
       .where(eq(usersTable.uid, uid))
       .returning();
 
-    // Upsert daily study log
     const existing = await db.select().from(studyLogsTable)
       .where(and(eq(studyLogsTable.uid, uid), eq(studyLogsTable.date, today)));
 
@@ -62,23 +69,22 @@ router.post("/study/session", async (req, res) => {
 
     const u = updated[0];
     req.log.info({ uid, minutes, newStreak, newTodayStudyTime }, "Study session saved");
-    res.json({
-      uid: u.uid,
-      streak: u.streak,
+    return res.json({
+      uid:            u.uid,
+      streak:         u.streak,
       totalStudyTime: u.totalStudyTime,
       todayStudyTime: u.todayStudyTime,
       lastActiveDate: u.lastActiveDate,
     });
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// POST /api/study/log-task — increment task count for today
 router.post("/study/log-task", async (req, res) => {
   try {
-    const { uid } = req.body;
+    const { uid } = req.body as { uid?: string };
     if (!uid) return res.status(400).json({ error: "uid required" });
     const today = getToday();
 
@@ -92,17 +98,16 @@ router.post("/study/log-task", async (req, res) => {
     } else {
       await db.insert(studyLogsTable).values({ uid, date: today, studyMinutes: 0, tasksCompleted: 1, notesViewed: 0 });
     }
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// POST /api/study/log-note — increment notes viewed for today
 router.post("/study/log-note", async (req, res) => {
   try {
-    const { uid } = req.body;
+    const { uid } = req.body as { uid?: string };
     if (!uid) return res.status(400).json({ error: "uid required" });
     const today = getToday();
 
@@ -116,14 +121,13 @@ router.post("/study/log-note", async (req, res) => {
     } else {
       await db.insert(studyLogsTable).values({ uid, date: today, studyMinutes: 0, tasksCompleted: 0, notesViewed: 1 });
     }
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// GET /api/study/logs/:uid — get last 30 days of study logs
 router.get("/study/logs/:uid", async (req, res) => {
   try {
     const { uid } = req.params;
@@ -135,34 +139,27 @@ router.get("/study/logs/:uid", async (req, res) => {
       .where(and(eq(studyLogsTable.uid, uid), sql`${studyLogsTable.date} >= ${cutoff}`))
       .orderBy(studyLogsTable.date);
 
-    res.json(logs.map(l => ({
-      date: l.date,
-      studyMinutes: l.studyMinutes,
-      tasksCompleted: l.tasksCompleted,
-      notesViewed: l.notesViewed,
-    })));
+    return res.json(logs.map(toLog));
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// GET /api/study/stats/:uid — get user's current stats (for report card)
 router.get("/study/stats/:uid", async (req, res) => {
   try {
-    const { uid } = req.params;
-    const users = await db.select().from(usersTable).where(eq(usersTable.uid, uid));
+    const users = await db.select().from(usersTable).where(eq(usersTable.uid, req.params.uid));
     if (users.length === 0) return res.status(404).json({ error: "User not found" });
     const u = users[0];
-    res.json({
-      streak: u.streak,
+    return res.json({
+      streak:         u.streak,
       totalStudyTime: u.totalStudyTime,
       todayStudyTime: u.todayStudyTime,
       lastActiveDate: u.lastActiveDate,
     });
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
