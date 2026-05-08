@@ -79,7 +79,7 @@ function AchievementsCard({
     : null;
 
   return (
-    <div className="mb-6 sm:mb-8 rounded-2xl overflow-hidden border border-purple-100 shadow-sm">
+    <div className="mb-6 sm:mb-8 rounded-2xl border border-purple-100 shadow-sm">
       <div
         className="px-4 sm:px-5 py-3 flex items-center gap-2"
         style={{ background: "linear-gradient(135deg,#6d28d9 0%,#7c3aed 50%,#4f46e5 100%)" }}
