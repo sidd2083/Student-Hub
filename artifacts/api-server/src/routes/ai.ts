@@ -6,10 +6,15 @@ import { logger } from "../lib/logger";
 const router = Router();
 
 function getClient(): OpenAI {
-  return new OpenAI({
-    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-    apiKey:  process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? "placeholder",
-  });
+  const apiKey =
+    process.env.AI_INTEGRATIONS_OPENAI_API_KEY ??
+    process.env.OPENAI_API_KEY ??
+    "placeholder";
+  const baseURL =
+    process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ??
+    process.env.OPENAI_BASE_URL ??
+    undefined;
+  return new OpenAI({ baseURL, apiKey });
 }
 
 const SYSTEM_PROMPT = `You are Nep AI, a friendly and highly knowledgeable study assistant for high school students (grades 9-12) in Nepal. You have up-to-date knowledge through 2026.

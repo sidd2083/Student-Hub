@@ -1,41 +1,38 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import { db } from "@workspace/db";
-import { scoresTable } from "@workspace/db";
-import { desc, sql } from "drizzle-orm";
-import { dbError } from "../lib/errors";
+import { adminDb } from "../lib/firestore-admin";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
-type ScoreRow = typeof scoresTable.$inferSelect;
-
-const toScore = (s: ScoreRow) => ({
-  id:             s.id,
-  uid:            s.uid,
-  userName:       s.userName,
-  grade:          s.grade,
-  score:          s.score,
-  totalQuestions: s.totalQuestions,
-  subject:        s.subject,
-  createdAt:      s.createdAt.toISOString(),
-});
+function toScore(id: string, data: FirebaseFirestore.DocumentData) {
+  return {
+    id,
+    uid:            data.uid ?? "",
+    userName:       data.userName ?? "",
+    grade:          data.grade ?? null,
+    score:          data.score ?? 0,
+    totalQuestions: data.totalQuestions ?? 0,
+    subject:        data.subject ?? "",
+    createdAt:      data.createdAt ?? new Date().toISOString(),
+  };
+}
 
 router.get("/scores", async (req: Request, res: Response) => {
   try {
     const { period } = req.query;
-    let scores: ScoreRow[];
+    let query: FirebaseFirestore.Query = adminDb.collection("scores");
     if (period === "daily") {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      scores = await db.select().from(scoresTable)
-        .where(sql`${scoresTable.createdAt} >= ${today}`)
-        .orderBy(desc(scoresTable.score));
-    } else {
-      scores = await db.select().from(scoresTable).orderBy(desc(scoresTable.score));
+      const todayStr = new Date().toISOString().slice(0, 10);
+      query = query.where("createdAt", ">=", todayStr);
     }
-    return res.json(scores.map(toScore));
+    const snap = await query.orderBy("createdAt", "desc").get();
+    const docs = snap.docs.map((d) => toScore(d.id, d.data()));
+    docs.sort((a, b) => b.score - a.score);
+    return res.json(docs);
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "GET /scores");
+    return res.status(500).json({ error: "Failed to fetch scores" });
   }
 });
 
@@ -45,21 +42,26 @@ router.post("/scores", async (req: Request, res: Response) => {
     if (!uid || !userName || !grade || score === undefined || !totalQuestions || !subject) {
       return res.status(400).json({ error: "Missing required fields" });
     }
-    const inserted = await db.insert(scoresTable).values({ uid, userName, grade, score, totalQuestions, subject } as ScoreRow).returning();
-    return res.status(201).json(toScore(inserted[0]));
+    const data = { uid, userName, grade, score, totalQuestions, subject, createdAt: new Date().toISOString() };
+    const ref = await adminDb.collection("scores").add(data);
+    return res.status(201).json(toScore(ref.id, data));
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "POST /scores");
+    return res.status(500).json({ error: "Failed to save score" });
   }
 });
 
 router.post("/scores/reset", async (_req: Request, res: Response) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    await db.delete(scoresTable).where(sql`${scoresTable.createdAt} >= ${today}`);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const snap = await adminDb.collection("scores").where("createdAt", ">=", todayStr).get();
+    const batch = adminDb.batch();
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
     return res.json({ success: true });
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "POST /scores/reset");
+    return res.status(500).json({ error: "Failed to reset scores" });
   }
 });
 

@@ -1,62 +1,61 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import { db } from "@workspace/db";
-import { notesTable } from "@workspace/db";
-import { eq, and, type SQL } from "drizzle-orm";
+import { adminDb } from "../lib/firestore-admin";
 import { logger } from "../lib/logger";
-import { dbError } from "../lib/errors";
 
 const router = Router();
 
-type NoteRow = typeof notesTable.$inferSelect;
-
-const toNote = (n: NoteRow) => ({
-  id:          n.id,
-  grade:       n.grade,
-  subject:     n.subject,
-  chapter:     n.chapter,
-  title:       n.title,
-  contentType: n.contentType,
-  content:     n.content,
-  createdAt:   n.createdAt.toISOString(),
-});
+function toNote(id: string, data: FirebaseFirestore.DocumentData) {
+  return {
+    id,
+    grade:       data.grade ?? null,
+    subject:     data.subject ?? "",
+    chapter:     data.chapter ?? "",
+    title:       data.title ?? "",
+    contentType: data.contentType ?? "text",
+    content:     data.content ?? "",
+    createdAt:   data.createdAt ?? new Date().toISOString(),
+  };
+}
 
 router.get("/notes", async (req: Request, res: Response) => {
   try {
     const { grade, subject, chapter } = req.query;
-    const conditions: SQL<unknown>[] = [];
-    if (grade)   conditions.push(eq(notesTable.grade,   Number(grade)));
-    if (subject) conditions.push(eq(notesTable.subject, String(subject)));
-    if (chapter) conditions.push(eq(notesTable.chapter, String(chapter)));
-    const notes = conditions.length > 0
-      ? await db.select().from(notesTable).where(and(...conditions)).orderBy(notesTable.createdAt)
-      : await db.select().from(notesTable).orderBy(notesTable.createdAt);
-    return res.json(notes.map(toNote));
+    let query: FirebaseFirestore.Query = adminDb.collection("notes");
+    if (grade)   query = query.where("grade",   "==", Number(grade));
+    if (subject) query = query.where("subject", "==", String(subject));
+    if (chapter) query = query.where("chapter", "==", String(chapter));
+    query = query.orderBy("createdAt", "desc");
+    const snap = await query.get();
+    return res.json(snap.docs.map((d) => toNote(d.id, d.data())));
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "GET /notes");
+    return res.status(500).json({ error: "Failed to fetch notes" });
   }
 });
 
 router.get("/notes/subjects", async (req: Request, res: Response) => {
   try {
     const { grade } = req.query;
-    const notes = grade
-      ? await db.select({ subject: notesTable.subject }).from(notesTable).where(eq(notesTable.grade, Number(grade)))
-      : await db.select({ subject: notesTable.subject }).from(notesTable);
-    const subjects = [...new Set(notes.map((n: { subject: string }) => n.subject))].sort();
+    let query: FirebaseFirestore.Query = adminDb.collection("notes");
+    if (grade) query = query.where("grade", "==", Number(grade));
+    const snap = await query.get();
+    const subjects = [...new Set(snap.docs.map((d) => d.data().subject as string))].sort();
     return res.json(subjects);
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "GET /notes/subjects");
+    return res.status(500).json({ error: "Failed to fetch subjects" });
   }
 });
 
 router.get("/notes/:id", async (req: Request, res: Response) => {
   try {
-    const notes = await db.select().from(notesTable).where(eq(notesTable.id, Number(req.params.id)));
-    if (notes.length === 0) return res.status(404).json({ error: "Note not found" });
-    return res.json(toNote(notes[0]));
+    const snap = await adminDb.collection("notes").doc(req.params.id).get();
+    if (!snap.exists) return res.status(404).json({ error: "Note not found" });
+    return res.json(toNote(snap.id, snap.data()!));
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "GET /notes/:id");
+    return res.status(500).json({ error: "Failed to fetch note" });
   }
 });
 
@@ -66,10 +65,12 @@ router.post("/notes", async (req: Request, res: Response) => {
     if (!grade || !subject || !chapter || !title || !contentType || !content) {
       return res.status(400).json({ error: "Missing required fields: grade, subject, chapter, title, contentType, content" });
     }
-    const inserted = await db.insert(notesTable).values({ grade, subject, chapter, title, contentType, content } as NoteRow).returning();
-    return res.status(201).json(toNote(inserted[0]));
+    const data = { grade, subject, chapter, title, contentType, content, createdAt: new Date().toISOString() };
+    const ref = await adminDb.collection("notes").add(data);
+    return res.status(201).json(toNote(ref.id, data));
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "POST /notes");
+    return res.status(500).json({ error: "Failed to create note" });
   }
 });
 
@@ -83,20 +84,25 @@ router.patch("/notes/:id", async (req: Request, res: Response) => {
     if (title       !== undefined) updates.title       = title;
     if (contentType !== undefined) updates.contentType = contentType;
     if (content     !== undefined) updates.content     = content;
-    const updated = await db.update(notesTable).set(updates).where(eq(notesTable.id, Number(req.params.id))).returning();
-    if (updated.length === 0) return res.status(404).json({ error: "Note not found" });
-    return res.json(toNote(updated[0]));
+    const docRef = adminDb.collection("notes").doc(req.params.id);
+    const snap = await docRef.get();
+    if (!snap.exists) return res.status(404).json({ error: "Note not found" });
+    await docRef.update(updates);
+    const updated = await docRef.get();
+    return res.json(toNote(updated.id, updated.data()!));
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "PATCH /notes/:id");
+    return res.status(500).json({ error: "Failed to update note" });
   }
 });
 
 router.delete("/notes/:id", async (req: Request, res: Response) => {
   try {
-    await db.delete(notesTable).where(eq(notesTable.id, Number(req.params.id)));
+    await adminDb.collection("notes").doc(req.params.id).delete();
     return res.json({ success: true });
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "DELETE /notes/:id");
+    return res.status(500).json({ error: "Failed to delete note" });
   }
 });
 

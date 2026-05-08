@@ -1,14 +1,10 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import { db } from "@workspace/db";
-import { usersTable, studyLogsTable } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { FieldValue } from "firebase-admin/firestore";
+import { adminDb } from "../lib/firestore-admin";
 import { logger } from "../lib/logger";
-import { dbError } from "../lib/errors";
 
 const router = Router();
-
-type StudyLogRow = typeof studyLogsTable.$inferSelect;
 
 function getNepalDate(): string {
   const now = new Date();
@@ -24,13 +20,6 @@ function getNepalYesterday(): string {
   return nepalTime.toISOString().slice(0, 10);
 }
 
-const toLog = (l: StudyLogRow) => ({
-  date:           l.date,
-  studyMinutes:   l.studyMinutes,
-  tasksCompleted: l.tasksCompleted,
-  notesViewed:    l.notesViewed,
-});
-
 router.post("/study/session", async (req: Request, res: Response) => {
   try {
     const { uid, minutes } = req.body as { uid?: string; minutes?: number };
@@ -41,57 +30,54 @@ router.post("/study/session", async (req: Request, res: Response) => {
     const today     = getNepalDate();
     const yesterday = getNepalYesterday();
 
-    const users = await db.select().from(usersTable).where(eq(usersTable.uid, uid));
-    if (users.length === 0) return res.status(404).json({ error: "User not found" });
-    const user = users[0];
+    const userRef = adminDb.collection("users").doc(uid);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) return res.status(404).json({ error: "User not found" });
+    const user = userSnap.data()!;
 
     const lastActive = user.lastActiveDate ?? null;
     let newStreak: number;
     let newTodayStudyTime: number;
 
     if (lastActive === today) {
-      newStreak = user.streak;
-      newTodayStudyTime = user.todayStudyTime + minutes;
+      newStreak = user.streak ?? 0;
+      newTodayStudyTime = (user.todayStudyTime ?? 0) + minutes;
     } else if (lastActive === yesterday) {
-      newStreak = user.streak + 1;
+      newStreak = (user.streak ?? 0) + 1;
       newTodayStudyTime = minutes;
     } else {
       newStreak = 1;
       newTodayStudyTime = minutes;
     }
 
-    const updated = await db.update(usersTable)
-      .set({
-        totalStudyTime: sql`${usersTable.totalStudyTime} + ${minutes}`,
-        todayStudyTime: newTodayStudyTime,
-        streak:         newStreak,
-        lastActiveDate: today,
-      })
-      .where(eq(usersTable.uid, uid))
-      .returning();
+    await userRef.update({
+      totalStudyTime: FieldValue.increment(minutes),
+      todayStudyTime: newTodayStudyTime,
+      streak:         newStreak,
+      lastActiveDate: today,
+    });
 
-    const existing = await db.select().from(studyLogsTable)
-      .where(and(eq(studyLogsTable.uid, uid), eq(studyLogsTable.date, today)));
-
-    if (existing.length > 0) {
-      await db.update(studyLogsTable)
-        .set({ studyMinutes: sql`${studyLogsTable.studyMinutes} + ${minutes}` })
-        .where(and(eq(studyLogsTable.uid, uid), eq(studyLogsTable.date, today)));
+    const logDocId = `${uid}_${today}`;
+    const logRef = adminDb.collection("study_logs").doc(logDocId);
+    const logSnap = await logRef.get();
+    if (logSnap.exists) {
+      await logRef.update({ studyMinutes: FieldValue.increment(minutes) });
     } else {
-      await db.insert(studyLogsTable).values({ uid, date: today, studyMinutes: minutes, tasksCompleted: 0, notesViewed: 0 });
+      await logRef.set({ uid, date: today, studyMinutes: minutes, tasksCompleted: 0, notesViewed: 0 });
     }
 
-    const u = updated[0];
+    const updatedUser = (await userRef.get()).data()!;
     logger.info({ uid, minutes, newStreak, newTodayStudyTime }, "Study session saved");
     return res.json({
-      uid:            u.uid,
-      streak:         u.streak,
-      totalStudyTime: u.totalStudyTime,
-      todayStudyTime: u.todayStudyTime,
-      lastActiveDate: u.lastActiveDate,
+      uid,
+      streak:         updatedUser.streak,
+      totalStudyTime: updatedUser.totalStudyTime,
+      todayStudyTime: updatedUser.todayStudyTime,
+      lastActiveDate: updatedUser.lastActiveDate,
     });
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "POST /study/session");
+    return res.status(500).json({ error: "Failed to save study session" });
   }
 });
 
@@ -100,20 +86,18 @@ router.post("/study/log-task", async (req: Request, res: Response) => {
     const { uid } = req.body as { uid?: string };
     if (!uid) return res.status(400).json({ error: "uid required" });
     const today = getNepalDate();
-
-    const existing = await db.select().from(studyLogsTable)
-      .where(and(eq(studyLogsTable.uid, uid), eq(studyLogsTable.date, today)));
-
-    if (existing.length > 0) {
-      await db.update(studyLogsTable)
-        .set({ tasksCompleted: sql`${studyLogsTable.tasksCompleted} + 1` })
-        .where(and(eq(studyLogsTable.uid, uid), eq(studyLogsTable.date, today)));
+    const logDocId = `${uid}_${today}`;
+    const logRef = adminDb.collection("study_logs").doc(logDocId);
+    const logSnap = await logRef.get();
+    if (logSnap.exists) {
+      await logRef.update({ tasksCompleted: FieldValue.increment(1) });
     } else {
-      await db.insert(studyLogsTable).values({ uid, date: today, studyMinutes: 0, tasksCompleted: 1, notesViewed: 0 });
+      await logRef.set({ uid, date: today, studyMinutes: 0, tasksCompleted: 1, notesViewed: 0 });
     }
     return res.json({ success: true });
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "POST /study/log-task");
+    return res.status(500).json({ error: "Failed to log task" });
   }
 });
 
@@ -122,20 +106,18 @@ router.post("/study/log-note", async (req: Request, res: Response) => {
     const { uid } = req.body as { uid?: string };
     if (!uid) return res.status(400).json({ error: "uid required" });
     const today = getNepalDate();
-
-    const existing = await db.select().from(studyLogsTable)
-      .where(and(eq(studyLogsTable.uid, uid), eq(studyLogsTable.date, today)));
-
-    if (existing.length > 0) {
-      await db.update(studyLogsTable)
-        .set({ notesViewed: sql`${studyLogsTable.notesViewed} + 1` })
-        .where(and(eq(studyLogsTable.uid, uid), eq(studyLogsTable.date, today)));
+    const logDocId = `${uid}_${today}`;
+    const logRef = adminDb.collection("study_logs").doc(logDocId);
+    const logSnap = await logRef.get();
+    if (logSnap.exists) {
+      await logRef.update({ notesViewed: FieldValue.increment(1) });
     } else {
-      await db.insert(studyLogsTable).values({ uid, date: today, studyMinutes: 0, tasksCompleted: 0, notesViewed: 1 });
+      await logRef.set({ uid, date: today, studyMinutes: 0, tasksCompleted: 0, notesViewed: 1 });
     }
     return res.json({ success: true });
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "POST /study/log-note");
+    return res.status(500).json({ error: "Failed to log note view" });
   }
 });
 
@@ -146,29 +128,41 @@ router.get("/study/logs/:uid", async (req: Request, res: Response) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const cutoff = thirtyDaysAgo.toISOString().slice(0, 10);
 
-    const logs = await db.select().from(studyLogsTable)
-      .where(and(eq(studyLogsTable.uid, uid), sql`${studyLogsTable.date} >= ${cutoff}`))
-      .orderBy(studyLogsTable.date);
+    const snap = await adminDb.collection("study_logs")
+      .where("uid", "==", uid)
+      .where("date", ">=", cutoff)
+      .orderBy("date")
+      .get();
 
-    return res.json(logs.map(toLog));
+    return res.json(snap.docs.map((d) => {
+      const data = d.data();
+      return {
+        date:           data.date,
+        studyMinutes:   data.studyMinutes ?? 0,
+        tasksCompleted: data.tasksCompleted ?? 0,
+        notesViewed:    data.notesViewed ?? 0,
+      };
+    }));
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "GET /study/logs/:uid");
+    return res.status(500).json({ error: "Failed to fetch study logs" });
   }
 });
 
 router.get("/study/stats/:uid", async (req: Request, res: Response) => {
   try {
-    const users = await db.select().from(usersTable).where(eq(usersTable.uid, String(req.params.uid)));
-    if (users.length === 0) return res.status(404).json({ error: "User not found" });
-    const u = users[0];
+    const snap = await adminDb.collection("users").doc(req.params.uid).get();
+    if (!snap.exists) return res.status(404).json({ error: "User not found" });
+    const u = snap.data()!;
     return res.json({
-      streak:         u.streak,
-      totalStudyTime: u.totalStudyTime,
-      todayStudyTime: u.todayStudyTime,
-      lastActiveDate: u.lastActiveDate,
+      streak:         u.streak ?? 0,
+      totalStudyTime: u.totalStudyTime ?? 0,
+      todayStudyTime: u.todayStudyTime ?? 0,
+      lastActiveDate: u.lastActiveDate ?? null,
     });
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "GET /study/stats/:uid");
+    return res.status(500).json({ error: "Failed to fetch study stats" });
   }
 });
 

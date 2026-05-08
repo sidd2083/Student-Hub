@@ -1,31 +1,29 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import { db } from "@workspace/db";
-import { announcements } from "@workspace/db";
-import { desc, eq } from "drizzle-orm";
-import { dbError } from "../lib/errors";
+import { adminDb } from "../lib/firestore-admin";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
-type AnnouncementRow = typeof announcements.$inferSelect;
-
-const toAnnouncement = (r: AnnouncementRow) => ({
-  id:        r.id,
-  title:     r.title,
-  body:      r.body,
-  createdAt: r.createdAt.toISOString(),
-});
+function toAnnouncement(id: string, data: FirebaseFirestore.DocumentData) {
+  return {
+    id,
+    title:     data.title ?? "",
+    body:      data.body ?? "",
+    createdAt: data.createdAt ?? new Date().toISOString(),
+  };
+}
 
 router.get("/announcements", async (_req: Request, res: Response) => {
   try {
-    const rows = await db
-      .select()
-      .from(announcements)
-      .orderBy(desc(announcements.createdAt))
-      .limit(50);
-    return res.json(rows.map(toAnnouncement));
+    const snap = await adminDb.collection("announcements")
+      .orderBy("createdAt", "desc")
+      .limit(50)
+      .get();
+    return res.json(snap.docs.map((d) => toAnnouncement(d.id, d.data())));
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "GET /announcements");
+    return res.status(500).json({ error: "Failed to fetch announcements" });
   }
 });
 
@@ -35,26 +33,24 @@ router.post("/announcements", async (req: Request, res: Response) => {
     if (!title?.trim() || !body?.trim()) {
       return res.status(400).json({ error: "title and body are required" });
     }
-    const [row] = await db
-      .insert(announcements)
-      .values({ title: title.trim(), body: body.trim() })
-      .returning();
-    return res.status(201).json(toAnnouncement(row));
+    const data = { title: title.trim(), body: body.trim(), createdAt: new Date().toISOString() };
+    const ref = await adminDb.collection("announcements").add(data);
+    return res.status(201).json(toAnnouncement(ref.id, data));
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "POST /announcements");
+    return res.status(500).json({ error: "Failed to create announcement" });
   }
 });
 
 router.delete("/announcements/:id", async (req: Request, res: Response) => {
   try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ error: "Invalid id" });
-    }
-    await db.delete(announcements).where(eq(announcements.id, id));
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: "Invalid id" });
+    await adminDb.collection("announcements").doc(id).delete();
     return res.status(204).end();
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "DELETE /announcements/:id");
+    return res.status(500).json({ error: "Failed to delete announcement" });
   }
 });
 

@@ -1,37 +1,35 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import { db } from "@workspace/db";
-import { pyqsTable } from "@workspace/db";
-import { eq, and, type SQL } from "drizzle-orm";
-import { dbError } from "../lib/errors";
+import { adminDb } from "../lib/firestore-admin";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
-type PyqRow = typeof pyqsTable.$inferSelect;
-
-const toPyq = (p: PyqRow) => ({
-  id:        p.id,
-  grade:     p.grade,
-  subject:   p.subject,
-  title:     p.title,
-  year:      p.year,
-  pdfUrl:    p.pdfUrl,
-  fileType:  p.fileType ?? "pdf",
-  createdAt: p.createdAt.toISOString(),
-});
+function toPyq(id: string, data: FirebaseFirestore.DocumentData) {
+  return {
+    id,
+    grade:     data.grade ?? null,
+    subject:   data.subject ?? "",
+    title:     data.title ?? "",
+    year:      data.year ?? null,
+    pdfUrl:    data.pdfUrl ?? "",
+    fileType:  data.fileType ?? "pdf",
+    createdAt: data.createdAt ?? new Date().toISOString(),
+  };
+}
 
 router.get("/pyqs", async (req: Request, res: Response) => {
   try {
     const { grade, subject } = req.query;
-    const conditions: SQL<unknown>[] = [];
-    if (grade)   conditions.push(eq(pyqsTable.grade,   Number(grade)));
-    if (subject) conditions.push(eq(pyqsTable.subject, String(subject)));
-    const pyqs = conditions.length > 0
-      ? await db.select().from(pyqsTable).where(and(...conditions)).orderBy(pyqsTable.year)
-      : await db.select().from(pyqsTable).orderBy(pyqsTable.year);
-    return res.json(pyqs.map(toPyq));
+    let query: FirebaseFirestore.Query = adminDb.collection("pyqs");
+    if (grade)   query = query.where("grade",   "==", Number(grade));
+    if (subject) query = query.where("subject", "==", String(subject));
+    query = query.orderBy("createdAt", "desc");
+    const snap = await query.get();
+    return res.json(snap.docs.map((d) => toPyq(d.id, d.data())));
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "GET /pyqs");
+    return res.status(500).json({ error: "Failed to fetch PYQs" });
   }
 });
 
@@ -41,22 +39,22 @@ router.post("/pyqs", async (req: Request, res: Response) => {
     if (!grade || !subject || !title || !year || !pdfUrl) {
       return res.status(400).json({ error: "Missing required fields: grade, subject, title, year, pdfUrl" });
     }
-    const inserted = await db.insert(pyqsTable).values({
-      grade, subject, title, year, pdfUrl,
-      fileType: (fileType as string) || "pdf",
-    } as PyqRow).returning();
-    return res.status(201).json(toPyq(inserted[0]));
+    const data = { grade, subject, title, year, pdfUrl, fileType: fileType ?? "pdf", createdAt: new Date().toISOString() };
+    const ref = await adminDb.collection("pyqs").add(data);
+    return res.status(201).json(toPyq(ref.id, data));
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "POST /pyqs");
+    return res.status(500).json({ error: "Failed to create PYQ" });
   }
 });
 
 router.delete("/pyqs/:id", async (req: Request, res: Response) => {
   try {
-    await db.delete(pyqsTable).where(eq(pyqsTable.id, Number(req.params.id)));
+    await adminDb.collection("pyqs").doc(req.params.id).delete();
     return res.json({ success: true });
   } catch (err) {
-    return dbError(res, err);
+    logger.error(err, "DELETE /pyqs/:id");
+    return res.status(500).json({ error: "Failed to delete PYQ" });
   }
 });
 
