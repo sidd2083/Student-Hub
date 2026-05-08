@@ -1,0 +1,14 @@
+{
+  "buildCommand": "node build.mjs",
+  "installCommand": "pnpm install",
+  "functions": {
+    "api/index.mjs": {
+      "memory": 512,
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/(.*)", "destination": "/api/index" }
+  ]
+}
