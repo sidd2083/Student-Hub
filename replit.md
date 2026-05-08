@@ -7,68 +7,73 @@ A study platform for high-school students (grades 9–12) in Nepal, featuring no
 | Command | Description |
 |---|---|
 | `pnpm install` | Install all workspace dependencies |
-| `pnpm --filter @workspace/api-server run build` | Build the backend |
-| `pnpm --filter @workspace/db run push` | Push DB schema (uses `DATABASE_URL`) |
 | `pnpm --filter @workspace/student-hub run dev` | Run frontend dev server |
+| `pnpm --filter @workspace/student-hub run build` | Build frontend for production |
 
 **Workflows (managed by Replit):**
-- `Start application` — Frontend Vite dev server on port 22581 (`PORT=22581 BASE_PATH=/`)
-- `Backend API` — Express API server on port 8080 (runs pre-built `dist/index.mjs`)
+- `Start application` — Frontend Vite dev server on port 5000
 
-**Required env vars:** `DATABASE_URL` (auto-provisioned by Replit PostgreSQL)
+**Required env vars (Replit userenv / Vercel environment variables):**
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_STORAGE_BUCKET`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID`
+- `VITE_FIREBASE_APP_ID`
+- `VITE_OPENAI_API_KEY` — for Nep AI chat (falls back to local answers if not set)
+- `VITE_OPENAI_BASE_URL` — optional, defaults to `https://api.openai.com/v1`
 
-**Optional secrets:** `AI_INTEGRATIONS_OPENAI_API_KEY`, `AI_INTEGRATIONS_OPENAI_BASE_URL` (set via Replit AI Integrations for Nep AI chat)
-
-**Firebase env vars (in `.replit` userenv):** `VITE_FIREBASE_*` — already configured for the `studenthub-6bcc5` project.
+**No backend, no DATABASE_URL, no Express server needed.** Everything runs in the browser via Firebase.
 
 ## Stack
 
 - **Frontend:** React 19 + Vite 7, Wouter (routing), TanStack Query, Tailwind CSS v4, Radix UI, Framer Motion
-- **Backend:** Express v5, TypeScript (ESM, bundled via esbuild)
-- **Database:** PostgreSQL via Drizzle ORM + `pg`
-- **Auth:** Firebase Auth (Google Sign-In); Firestore used only for announcements/SEO meta (NOT user profiles)
-- **AI:** OpenAI SDK (`gpt-4o-mini`) via Replit AI Integrations
+- **Auth:** Firebase Auth (Google Sign-In)
+- **Database:** Firestore (all user data, tasks, study logs, announcements)
+- **AI:** OpenAI `gpt-4o-mini` called directly from the browser via `VITE_OPENAI_API_KEY`
 - **Monorepo:** pnpm workspaces
+
+## Architecture
+
+This is a **pure frontend app** — no Express backend, no PostgreSQL. All data lives in Firestore.
+
+### Firestore collections
+
+| Collection | What's stored |
+|---|---|
+| `users/{uid}` | Profile (name, email, grade, role), streak, totalStudyTime, todayStudyTime, lastActiveDate, badges |
+| `tasks/{docId}` | Per-user to-do tasks (uid, text, completed, createdAt) |
+| `study_logs/{uid_date}` | Daily study logs (studyMinutes, tasksCompleted, notesViewed) |
+| `announcements/{docId}` | Admin-posted announcements shown on Dashboard |
+
+### How each feature works
+
+- **Auth** — Firebase Auth Google Sign-In → profile stored in `users/{uid}`
+- **Onboarding** — `setDoc` to `users/{uid}` with name + grade
+- **Pomodoro** — `updateDoc` on `users/{uid}` and `study_logs` directly from `TimerContext`
+- **Tasks / To-Do** — CRUD on `tasks` collection
+- **Leaderboard** — reads all docs from `users` collection, sorts in browser
+- **Report Card** — reads `users/{uid}` + `study_logs` collection
+- **Nep AI** — `fetch` directly to OpenAI API using `VITE_OPENAI_API_KEY`; graceful fallback to local answers if key is missing
+- **Dashboard** — reads `users/{uid}`, `tasks`, `study_logs`, `announcements`
+
+## Vercel deployment
+
+`vercel.json` is already configured. Deploy steps:
+1. Push this repo to GitHub
+2. Import in [vercel.com](https://vercel.com)
+3. Set all `VITE_*` environment variables in Vercel dashboard
+4. Deploy — no DATABASE_URL needed, no backend
 
 ## Where things live
 
 ```
-artifacts/api-server/   — Express backend (src/, build.mjs, dist/)
-  src/routes/study.ts   — Study session, logs, task/note tracking endpoints
-  src/routes/users.ts   — User CRUD (now includes study stats in responses)
 artifacts/student-hub/  — React frontend (src/)
-lib/db/                 — Drizzle schema + pg pool (source of truth for DB)
-  src/schema/users.ts   — users table (+ streak, totalStudyTime, todayStudyTime, lastActiveDate)
-  src/schema/study_logs.ts — per-user daily study logs (studyMinutes, tasksCompleted, notesViewed)
-lib/api-spec/           — OpenAPI spec (openapi.yaml)
-lib/api-client-react/   — Generated React Query hooks from OpenAPI
-lib/api-zod/            — Shared Zod schemas
+  src/pages/            — All pages (Dashboard, Todo, Pomodoro, NepAi, Leaderboard, ReportCard, …)
+  src/context/          — AuthContext (Firebase Auth + Firestore), TimerContext (Pomodoro + Firestore)
+  src/lib/firebase.ts   — Firebase SDK init
+artifacts/api-server/   — Legacy Express backend (kept for reference, NOT deployed to Vercel)
 ```
-
-- DB schema: `lib/db/src/schema/`
-- API contract: `lib/api-spec/openapi.yaml`
-- Drizzle config: `lib/db/drizzle.config.ts`
-- Vite config: `artifacts/student-hub/vite.config.ts`
-
-## Architecture decisions
-
-- **Monorepo with pnpm workspaces** — shared code (DB schema, Zod, generated API client) lives in `lib/*` and is referenced as `workspace:*` dependencies.
-- **Backend pre-built before serving** — the Backend API workflow runs the pre-built `dist/index.mjs`; the `dev` script in `api-server` builds then starts. Rebuild after backend changes.
-- **Vite proxies `/api` to port 8080** — frontend calls relative `/api/*` URLs; Vite dev server forwards them to the Express backend.
-- **PostgreSQL is single source of truth for users + study data** — profiles, streak, study time, and daily logs are all in PostgreSQL. Firestore is used only for announcements and SEO meta.
-- **OpenAI via Replit AI Integrations** — the AI chat endpoint reads `AI_INTEGRATIONS_OPENAI_BASE_URL` and `AI_INTEGRATIONS_OPENAI_API_KEY` so it works without a personal API key.
-
-## Product
-
-- **Notes** — browse and read study notes; each view logged to `study_logs.notes_viewed`
-- **PYQs** — past-year question browser
-- **MCQ Practice** — multiple-choice quiz practice
-- **Pomodoro** — focus timer; session completion calls `POST /api/study/session` → updates streak/study time in PostgreSQL
-- **Tasks / To-Do** — task tracking; completing a task calls `POST /api/study/log-task`
-- **Leaderboard** — ranked by all-time study time / today / streak; grade filter (All / 9 / 10 / 11 / 12); reads from `/api/users`
-- **Report Card** — week/month toggle; Duolingo-style daily insights; bar chart; badges; reads from `/api/study/stats/:uid` + `/api/study/logs/:uid`
-- **Nep AI** — AI study assistant (calls `POST /api/ai/chat`)
-- **Admin panel** — standalone admin interface at `/admin/*`; reads users from `/api/users`
 
 ## User preferences
 
@@ -76,16 +81,8 @@ _None recorded yet._
 
 ## Gotchas
 
-- Always rebuild the backend (`pnpm --filter @workspace/api-server run build`) before restarting the Backend API workflow after TypeScript changes.
-- The `PORT` and `BASE_PATH` env vars are required by the Vite config — they are set in the workflow command, not as secrets.
 - `pnpm-workspace.yaml` enforces a 1-day minimum package age for supply-chain safety — do not disable `minimumReleaseAge`.
-- Firebase is gracefully degraded when env vars are missing (warns in console, stubs auth/db) — but the real Firebase config is already set in `.replit` userenv.
-- **Study stats in PostgreSQL** — canonical columns in `users` table: `streak`, `total_study_time`, `today_study_time`, `last_active_date`. Updated by `POST /api/study/session`.
-- `lib/api-client-react/dist/index.d.ts` not pre-built — pre-existing TS6305 errors from `tsc --noEmit` are harmless; Vite resolves workspace packages at runtime correctly.
-
-## Pointers
-
-- [Drizzle ORM docs](https://orm.drizzle.team/)
-- [TanStack Query docs](https://tanstack.com/query/latest)
-- [Vite proxy config](https://vite.dev/config/server-options.html#server-proxy)
-- Replit skills: `database`, `environment-secrets`, `workflows`, `integrations`
+- Firebase is gracefully degraded when env vars are missing (warns in console, stubs auth/db).
+- Nep AI gracefully falls back to local pre-written answers if `VITE_OPENAI_API_KEY` is not set.
+- The Backend API workflow on Replit is no longer needed by the frontend; it can be ignored.
+- Pre-existing TS warning in `SiteGuide.tsx` (TS7030) is harmless — Vite builds successfully.

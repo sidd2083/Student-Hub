@@ -1,17 +1,9 @@
 {
-  "buildCommand": "pnpm -w run build:vercel",
+  "buildCommand": "PORT=3000 BASE_PATH=/ pnpm --filter @workspace/student-hub run build",
   "outputDirectory": "artifacts/student-hub/dist/public",
   "installCommand": "pnpm install",
   "framework": null,
-  "functions": {
-    "api/index.js": {
-      "memory": 1024,
-      "maxDuration": 30,
-      "includeFiles": "artifacts/api-server/dist/**"
-    }
-  },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
