@@ -67,9 +67,9 @@ function NepAiContent() {
       let ctx: StudyContext | null = null;
       try {
         const [statsRes, tasksRes, logsRes] = await Promise.all([
-          fetch(`/api/study/stats/${user.uid}`),
-          fetch(`/api/tasks?uid=${user.uid}`),
-          fetch(`/api/study/logs/${user.uid}`),
+          fetch(`/api/study/stats/${user.id}`),
+          fetch(`/api/tasks?uid=${user.id}`),
+          fetch(`/api/study/logs/${user.id}`),
         ]);
         const stats = statsRes.ok ? await statsRes.json() : undefined;
         const tasks = tasksRes.ok ? await tasksRes.json() : undefined;
@@ -101,13 +101,13 @@ function NepAiContent() {
 
   // Load context (tasks + study stats) when user is present
   const loadContext = useCallback(async () => {
-    if (!user?.uid) return;
+    if (!user?.id) return;
     setLoadingCtx(true);
     try {
       const [statsRes, tasksRes, logsRes] = await Promise.all([
-        fetch(`/api/study/stats/${user.uid}`),
-        fetch(`/api/tasks?uid=${user.uid}`),
-        fetch(`/api/study/logs/${user.uid}`),
+        fetch(`/api/study/stats/${user.id}`),
+        fetch(`/api/tasks?uid=${user.id}`),
+        fetch(`/api/study/logs/${user.id}`),
       ]);
       const stats = statsRes.ok ? await statsRes.json() : undefined;
       const tasks = tasksRes.ok ? await tasksRes.json() : undefined;

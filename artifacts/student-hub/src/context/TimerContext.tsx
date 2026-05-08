@@ -128,7 +128,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const settingsRef = useRef(persisted?.settings ?? DEFAULT_SETTINGS);
   const sessionsRef = useRef(persisted?.sessionsCompleted ?? 0);
 
-  useEffect(() => { userRef.current = user?.uid ?? null; }, [user]);
+  useEffect(() => { userRef.current = user?.id ?? null; }, [user]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
 
   // ── Persist state to localStorage on every tick ──────────────────────────────

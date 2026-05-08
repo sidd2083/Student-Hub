@@ -5,7 +5,7 @@ import { useAuth, UserProfile } from "@/context/AuthContext";
 export default function Onboarding() {
   const { user, setProfile } = useAuth();
   const [, setLocation] = useLocation();
-  const [name, setName] = useState(user?.displayName || "");
+  const [name, setName] = useState(user?.name || "");
   const [grade, setGrade] = useState<number | "">("");
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
@@ -23,9 +23,9 @@ export default function Onboarding() {
 
     const now = new Date().toISOString();
     const data = {
-      uid: user.uid,
+      uid: user.id,
       name: name.trim(),
-      email: user.email ?? "",
+      email: "",
       grade: Number(grade),
       role: "user" as const,
       createdAt: now,
@@ -34,7 +34,6 @@ export default function Onboarding() {
     console.log("[Onboarding] Saving profile:", data.name, "grade:", data.grade);
 
     try {
-      // Save to backend (PostgreSQL) — this is the source of truth
       const res = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -49,7 +48,6 @@ export default function Onboarding() {
       const saved = await res.json();
       console.log("[Onboarding] Backend save ✅ id:", saved.id);
 
-      // Set profile in React state (no page reload — client-side nav)
       const profileForState: UserProfile = {
         id: saved.id ?? 0,
         uid: saved.uid ?? data.uid,
@@ -61,7 +59,6 @@ export default function Onboarding() {
       };
       setProfile(profileForState);
 
-      // Client-side navigation — no page reload, profile stays in React state
       console.log("[Onboarding] Navigating to /dashboard (client-side)");
       setLocation("/dashboard");
 
@@ -102,16 +99,16 @@ export default function Onboarding() {
         <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-8 anim anim-2">
           {user && (
             <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-100 rounded-2xl mb-6">
-              {user.photoURL ? (
-                <img src={user.photoURL} className="w-9 h-9 rounded-full ring-2 ring-green-200" alt="" />
+              {user.profileImage ? (
+                <img src={user.profileImage} className="w-9 h-9 rounded-full ring-2 ring-green-200" alt="" />
               ) : (
                 <div className="w-9 h-9 rounded-full bg-green-200 flex items-center justify-center text-green-700 font-bold text-sm">
-                  {user.displayName?.charAt(0)?.toUpperCase() ?? "?"}
+                  {user.name?.charAt(0)?.toUpperCase() ?? "?"}
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-green-800">✓ Google account connected</p>
-                <p className="text-xs text-green-600 truncate">{user.email}</p>
+                <p className="text-sm font-semibold text-green-800">✓ Account connected</p>
+                <p className="text-xs text-green-600 truncate">{user.name}</p>
               </div>
             </div>
           )}

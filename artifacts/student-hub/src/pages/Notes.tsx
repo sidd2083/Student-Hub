@@ -162,11 +162,11 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
 
   const openNote = (note: NoteView) => {
     setSelectedNote(note);
-    if (user?.uid) {
+    if (user?.id) {
       fetch("/api/study/log-note", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: user.uid }),
+        body: JSON.stringify({ uid: user.id }),
       }).catch(console.error);
     }
   };

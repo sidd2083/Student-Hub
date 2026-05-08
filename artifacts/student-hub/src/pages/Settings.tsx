@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { User, Sun, Moon, Shield, Check } from "lucide-react";
 
 export default function Settings() {
@@ -24,16 +22,11 @@ export default function Settings() {
     }
   }, [profile]);
 
-  const toggleTheme = async () => {
+  const toggleTheme = () => {
     const next = !darkMode;
     setDarkMode(next);
     localStorage.setItem("theme", next ? "dark" : "light");
     document.documentElement.classList.toggle("dark", next);
-    if (user) {
-      try {
-        await updateDoc(doc(db, "users", user.uid), { darkMode: next });
-      } catch {}
-    }
   };
 
   const handleGradeSwitch = async (g: number) => {
@@ -42,7 +35,7 @@ export default function Settings() {
     setProfile({ ...profile!, grade: g });
     setGradeSaving(true);
     try {
-      const res = await fetch(`/api/users/${user.uid}`, {
+      const res = await fetch(`/api/users/${user.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ grade: g }),
@@ -63,7 +56,7 @@ export default function Settings() {
     setError("");
     setSuccess(false);
     try {
-      const res = await fetch(`/api/users/${user.uid}`, {
+      const res = await fetch(`/api/users/${user.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim() }),
@@ -179,8 +172,8 @@ export default function Settings() {
             </div>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between py-2 border-b border-gray-50">
-                <span className="text-gray-500">Email</span>
-                <span className="text-gray-900 font-medium">{profile?.email || user?.email || "—"}</span>
+                <span className="text-gray-500">Display Name</span>
+                <span className="text-gray-900 font-medium">{user?.name || "—"}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-gray-50">
                 <span className="text-gray-500">Grade</span>

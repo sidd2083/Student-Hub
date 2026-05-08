@@ -13,19 +13,11 @@ import {
   Shield, Plus, Trash2, LogOut, Megaphone, Upload, X, Image,
   CheckCircle, AlertCircle, Award, Search,
 } from "lucide-react";
-import {
-  collection, getDocs,
-  doc, query, setDoc, getDoc,
-} from "firebase/firestore";
-import {
-  ref, uploadBytesResumable, getDownloadURL,
-} from "firebase/storage";
-import { db, storage } from "@/lib/firebase";
 
 const ADMIN_SESSION = "admin_session_v1";
 type Section = "dashboard" | "notes" | "pyqs" | "announcements" | "users" | "reports" | "seo";
 
-// ─── File Upload Component ──────────────────────────────────────────────────
+// ─── URL Input Component (replaces Firebase Storage upload) ────────────────
 
 interface FileUploadProps {
   accept: string;
@@ -35,82 +27,41 @@ interface FileUploadProps {
   disabled?: boolean;
 }
 
-function FileUpload({ accept, label, storagePath, onUploaded, disabled }: FileUploadProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dragging, setDragging] = useState(false);
-  const [progress, setProgress] = useState<number | null>(null);
+function FileUpload({ label, onUploaded, disabled }: FileUploadProps) {
+  const [url, setUrl] = useState("");
   const [error, setError] = useState("");
 
-  const upload = (file: File) => {
+  const handleApply = () => {
     setError("");
-    const isImage = file.type.startsWith("image/");
-    const isPdf = file.type === "application/pdf";
-    if (!isImage && !isPdf) {
-      setError("Please upload a PDF or image file.");
-      return;
-    }
-    const ext = file.name.split(".").pop();
-    const path = `${storagePath}/${Date.now()}.${ext}`;
-    const storageRef = ref(storage, path);
-    const task = uploadBytesResumable(storageRef, file);
-
-    task.on(
-      "state_changed",
-      (snap) => setProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
-      (err) => { setError(err.message); setProgress(null); },
-      async () => {
-        const url = await getDownloadURL(task.snapshot.ref);
-        setProgress(null);
-        onUploaded(url, isPdf ? "pdf" : "image");
-      }
-    );
+    const trimmed = url.trim();
+    if (!trimmed) { setError("Please enter a URL."); return; }
+    try { new URL(trimmed); } catch { setError("Enter a valid URL."); return; }
+    const isPdf = trimmed.toLowerCase().includes(".pdf") || trimmed.toLowerCase().includes("pdf");
+    onUploaded(trimmed, isPdf ? "pdf" : "image");
+    setUrl("");
   };
 
   return (
     <div>
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          const file = e.dataTransfer.files[0];
-          if (file) upload(file);
-        }}
-        onClick={() => !disabled && inputRef.current?.click()}
-        className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all select-none ${
-          dragging
-            ? "border-blue-400 bg-blue-50"
-            : disabled
-            ? "border-gray-200 bg-gray-50 cursor-not-allowed opacity-60"
-            : "border-gray-300 hover:border-blue-400 hover:bg-blue-50/50"
-        }`}
-      >
-        <Upload className="w-6 h-6 mx-auto mb-2 text-gray-400" />
-        {progress !== null ? (
-          <div>
-            <p className="text-sm text-blue-600 font-medium mb-2">Uploading… {progress}%</p>
-            <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
-            </div>
-          </div>
-        ) : (
-          <>
-            <p className="text-sm font-medium text-gray-700">{label}</p>
-            <p className="text-xs text-gray-400 mt-0.5">Drag & drop or click to select</p>
-            <p className="text-xs text-gray-400">{accept}</p>
-          </>
-        )}
+      <p className="text-xs text-gray-500 mb-1">{label} — paste a public URL (Google Drive, Dropbox, etc.)</p>
+      <div className="flex gap-2">
+        <input
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+          placeholder="https://..."
+          disabled={disabled}
+          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        <button
+          type="button"
+          onClick={handleApply}
+          disabled={disabled}
+          className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50"
+        >
+          Apply
+        </button>
       </div>
       {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
-      <input
-        ref={inputRef}
-        type="file"
-        accept={accept}
-        className="hidden"
-        disabled={disabled}
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }}
-      />
     </div>
   );
 }
@@ -951,7 +902,6 @@ type SeoKind = "note" | "pyq";
 interface SeoEditTarget { id: number; defaultTitle: string; kind: SeoKind }
 
 function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => void }) {
-  const docId = `${target.kind}_${target.id}`;
   const [form, setForm] = useState<SeoMeta>(emptySeo());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -959,34 +909,24 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
 
   useEffect(() => {
     let cancelled = false;
-    const load = async () => {
-      try {
-        // Race against a 4s timeout so the modal never hangs blank
-        const snap = await Promise.race([
-          getDoc(doc(db, "seo_meta", docId)),
-          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 4000)),
-        ]);
-        if (cancelled) return;
-        if (snap.exists()) setForm(snap.data() as SeoMeta);
-        else setForm({ ...emptySeo(), seoTitle: target.defaultTitle });
-      } catch (e) {
-        if (cancelled) return;
-        console.warn("SEO load failed (using defaults):", e);
-        setForm({ ...emptySeo(), seoTitle: target.defaultTitle });
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    load();
+    fetch(`/api/notes/${target.id}/seo`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (!cancelled) setForm(data ?? { ...emptySeo(), seoTitle: target.defaultTitle }); })
+      .catch(() => { if (!cancelled) setForm({ ...emptySeo(), seoTitle: target.defaultTitle }); })
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [docId, target.defaultTitle]);
+  }, [target.id, target.defaultTitle]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setSaved(false);
     try {
-      await setDoc(doc(db, "seo_meta", docId), { ...form, updatedAt: new Date().toISOString() });
+      await fetch(`/api/notes/${target.id}/seo`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
@@ -1246,7 +1186,7 @@ function SeoPanel() {
       </div>
 
       <p className="text-xs text-gray-400 mt-4 text-center">
-        SEO data saved to Firestore · Changes apply immediately on the live site
+        SEO data saved to database · Changes apply immediately on the live site
       </p>
     </div>
   );
@@ -1286,7 +1226,7 @@ export default function Admin() {
             <span className="text-lg font-semibold text-gray-900">Admin Panel</span>
           </div>
           {profile?.role === "admin" && (
-            <p className="text-xs text-purple-500 mt-1">Firebase admin: {profile.name}</p>
+            <p className="text-xs text-purple-500 mt-1">Admin: {profile.name}</p>
           )}
         </div>
 

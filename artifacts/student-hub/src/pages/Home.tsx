@@ -15,7 +15,7 @@ const features = [
 ];
 
 export default function Home() {
-  const { user, loading, signInWithGoogle } = useAuth();
+  const { user, loading, signIn } = useAuth();
 
   const { data: notes } = useListNotes({ grade: 10 }, { query: { queryKey: ["notes-preview"] } });
   const { data: pyqs } = useListPyqs({ grade: 10 }, { query: { queryKey: ["pyqs-preview"] } });
@@ -69,13 +69,13 @@ export default function Home() {
               <BookOpen className="w-5 h-5" /> Browse Notes
             </Link>
             <button
-              onClick={signInWithGoogle}
+              onClick={signIn}
               className="flex items-center justify-center gap-2 px-7 py-3.5 bg-white border border-gray-200 text-gray-700 rounded-2xl font-semibold text-base hover:bg-gray-50 transition-all shadow-sm"
             >
               <LogIn className="w-4 h-4" /> Register — It's free
             </button>
           </div>
-          <p className="text-xs text-gray-400 mt-4">No credit card required · Sign in with Google</p>
+          <p className="text-xs text-gray-400 mt-4">No credit card required · Instant access</p>
         </div>
       </section>
 

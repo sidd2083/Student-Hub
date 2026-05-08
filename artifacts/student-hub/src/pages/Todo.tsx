@@ -13,7 +13,7 @@ function TodoContent() {
   const { user } = useAuth();
   const [newTask, setNewTask] = useState("");
   const qc = useQueryClient();
-  const uid = user?.uid || "";
+  const uid = user?.id || "";
 
   const { data: tasks, isLoading } = useListTasks(
     { uid },

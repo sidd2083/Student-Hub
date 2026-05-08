@@ -159,7 +159,7 @@ export default function PyqPage() {
                     <h1 className="text-lg sm:text-xl font-bold text-gray-900">{pyq.title}</h1>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {user && <SaveButton pyqId={id} uid={user.uid} />}
+                    {user && <SaveButton pyqId={id} uid={user.id} />}
                     {isImage && (
                       <a
                         href={pyq.pdfUrl}

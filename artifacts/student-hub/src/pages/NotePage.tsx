@@ -6,8 +6,6 @@ import {
   ArrowLeft, FileText, Image, Type, ExternalLink, ZoomIn, X,
   BookOpen, Maximize2, Minimize2, Sparkles, ChevronRight, Bookmark,
 } from "lucide-react";
-import { db } from "@/lib/firebase";
-import { getDoc, doc } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 
 const NOTE_VIEWED_KEY = "studenthub_viewed_notes_session";
@@ -213,14 +211,15 @@ export default function NotePage() {
 
   useEffect(() => {
     if (!id || isNaN(id)) return;
-    getDoc(doc(db, "seo_meta", `note_${id}`))
-      .then(snap => { if (snap.exists()) setSeoMeta(snap.data() as SeoMeta); })
+    fetch(`/api/notes/${id}/seo`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setSeoMeta(data as SeoMeta); })
       .catch(() => {});
   }, [id]);
 
   // Once-per-session note view logging
   useEffect(() => {
-    if (!user?.uid || !note || isNaN(id)) return;
+    if (!user?.id || !note || isNaN(id)) return;
     try {
       const stored = sessionStorage.getItem(NOTE_VIEWED_KEY);
       const viewed: number[] = stored ? JSON.parse(stored) : [];
@@ -230,7 +229,7 @@ export default function NotePage() {
         fetch("/api/study/log-note", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ uid: user.uid }),
+          body: JSON.stringify({ uid: user.id }),
         }).catch(console.error);
       }
     } catch {}
@@ -369,7 +368,7 @@ export default function NotePage() {
 
                 {/* Action buttons */}
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {user && <SaveButton noteId={id} uid={user.uid} />}
+                  {user && <SaveButton noteId={id} uid={user.id} />}
                   <button
                     onClick={handleAskAi}
                     className="flex items-center gap-1.5 px-3 py-2 bg-indigo-500 text-white rounded-xl text-xs font-semibold hover:bg-indigo-600 transition-all"

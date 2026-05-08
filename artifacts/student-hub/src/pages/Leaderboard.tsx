@@ -143,7 +143,7 @@ function LeaderboardContent() {
     .filter(e => gradeFilter === "all" || e.grade === gradeFilter)
     .sort((a, b) => b[sortBy] - a[sortBy]);
 
-  const myRank = filtered.findIndex(e => e.uid === user?.uid);
+  const myRank = filtered.findIndex(e => e.uid === user?.id);
 
   const tabBtn = (key: SortKey, label: string, icon: React.ReactNode, active: string, inactive: string) => (
     <button
@@ -214,9 +214,9 @@ function LeaderboardContent() {
       ) : (
         <div className="space-y-2">
           {filtered.map((entry, i) => {
-            const isMe    = entry.uid === user?.uid;
+            const isMe    = entry.uid === user?.id;
             const topBadge = isMe
-              ? (getMySelectedBadge(entry, user?.uid) ?? getTopBadge(entry))
+              ? (getMySelectedBadge(entry, user?.id) ?? getTopBadge(entry))
               : getTopBadge(entry);
             const custom   = isMe ? null : (customBadges[entry.uid] ?? null);
             const hasBadge = topBadge || custom;

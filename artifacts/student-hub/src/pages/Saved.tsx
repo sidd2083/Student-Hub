@@ -26,10 +26,10 @@ function SavedContent() {
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
-    if (!user?.uid) return;
+    if (!user?.id) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/saved?uid=${user.uid}`);
+      const res = await fetch(`/api/saved?uid=${user.id}`);
       if (res.ok) {
         const data = await res.json();
         setItems(data);
@@ -44,9 +44,9 @@ function SavedContent() {
   useEffect(() => { load(); }, [user]);
 
   const remove = async (id: number) => {
-    if (!user?.uid) return;
+    if (!user?.id) return;
     try {
-      await fetch(`/api/saved/${id}?uid=${user.uid}`, { method: "DELETE" });
+      await fetch(`/api/saved/${id}?uid=${user.id}`, { method: "DELETE" });
       setItems(prev => prev.filter(i => i.id !== id));
     } catch (e) {
       console.error(e);

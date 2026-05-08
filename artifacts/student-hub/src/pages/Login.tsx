@@ -1,10 +1,5 @@
-import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { isConfigured } from "@/lib/firebase";
-
-type Tab = "login" | "register";
-type BusyState = false | "signing-in" | "redirecting" | "exists";
 
 const ICONS = [
   { emoji: "📚", label: "Notes",   x: "8%",  y: "15%", delay: "0s",   size: "text-3xl" },
@@ -28,55 +23,7 @@ function FloatingIcon({ emoji, x, y, delay, size }: { emoji: string; label: stri
 }
 
 export default function Login() {
-  const { signInWithGoogle } = useAuth();
-  const [tab, setTab] = useState<Tab>("login");
-  const [busy, setBusy] = useState<BusyState>(false);
-  const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
-
-  const firebaseReady = isConfigured;
-
-  const handleGoogle = async () => {
-    setBusy("signing-in");
-    setError("");
-    setInfo("");
-    try {
-      const { outcome, isNewUser } = await signInWithGoogle();
-
-      if (outcome === "cancelled") {
-        // User closed the popup — reset
-        setBusy(false);
-        return;
-      }
-
-      if (outcome === "redirect") {
-        // Page is navigating away via redirect flow
-        setBusy("redirecting");
-        return;
-      }
-
-      // outcome === "success"
-      if (tab === "register" && !isNewUser) {
-        // Returning user on the "Create Account" tab — show friendly message
-        setBusy("exists");
-        setInfo("This Google account already has a Student Hub profile. Taking you to your dashboard…");
-        // AuthContext will navigate to /dashboard shortly
-        return;
-      }
-
-      // New user or login tab — stay busy; AuthContext navigates to /setup-profile or /dashboard
-      setBusy("redirecting");
-
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Sign-in failed. Please try again.";
-      const isConfig = msg.toLowerCase().includes("firebase") || msg.toLowerCase().includes("configured");
-      setError(isConfig
-        ? "Login is not set up yet — Firebase credentials are missing. Please contact the site admin."
-        : "Sign-in failed. Please try again.");
-      console.error("Sign-in failed:", err);
-      setBusy(false);
-    }
-  };
+  const { signIn } = useAuth();
 
   return (
     <>
@@ -129,152 +76,39 @@ export default function Login() {
 
         {/* Main card */}
         <div className="bg-white/80 backdrop-blur-sm rounded-3xl border border-gray-100 shadow-xl shadow-gray-100 p-8 anim-up" style={{ animationDelay: "0.1s" }}>
-          {/* Tabs */}
-          <div className="flex gap-1 p-1 bg-gray-100 rounded-2xl mb-7">
-            {(["login", "register"] as Tab[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => { setTab(t); setError(""); }}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                  tab === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                {t === "login" ? "Sign In" : "Create Account"}
-              </button>
-            ))}
+          <div className="anim-up">
+            <h2 className="text-xl font-bold text-gray-900 mb-1">Welcome to Student Hub 👋</h2>
+            <p className="text-gray-500 text-sm mb-6">Sign in to access notes, PYQs, Nep AI, and more</p>
+
+            <div className="space-y-3 mb-6">
+              {[
+                { emoji: "📚", color: "bg-blue-50 text-blue-700",     text: "Access notes by grade & subject" },
+                { emoji: "📊", color: "bg-purple-50 text-purple-700", text: "Track your study time and progress" },
+                { emoji: "🤖", color: "bg-indigo-50 text-indigo-700", text: "Get help from Nep AI study assistant" },
+              ].map(({ emoji, color, text }) => (
+                <div key={text} className={`flex items-center gap-3 p-3 rounded-xl ${color.split(" ")[0]}`}>
+                  <span className="text-lg">{emoji}</span>
+                  <p className={`text-sm font-medium ${color.split(" ")[1]}`}>{text}</p>
+                </div>
+              ))}
+            </div>
+
+            <button
+              data-testid="btn-signin"
+              type="button"
+              onClick={signIn}
+              className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-2xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-200"
+            >
+              <span>Sign In to Continue</span>
+            </button>
           </div>
-
-          {/* Firebase not configured banner */}
-          {!firebaseReady && (
-            <div className="flex items-start gap-3 px-4 py-3 mb-5 bg-amber-50 border border-amber-200 rounded-xl">
-              <span className="text-lg mt-0.5">🔧</span>
-              <div>
-                <p className="text-amber-800 text-sm font-semibold">Firebase not configured</p>
-                <p className="text-amber-700 text-xs mt-0.5">
-                  Add your Firebase credentials in Replit Secrets to enable login.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Error message */}
-          {error && (
-            <div className="flex items-center gap-2 px-4 py-3 mb-4 bg-red-50 border border-red-100 rounded-xl">
-              <span className="text-base">⚠️</span>
-              <p className="text-red-600 text-sm">{error}</p>
-            </div>
-          )}
-
-          {/* Info message (e.g. "account already exists") */}
-          {info && (
-            <div className="flex items-center gap-2 px-4 py-3 mb-4 bg-blue-50 border border-blue-100 rounded-xl">
-              <span className="text-base">ℹ️</span>
-              <p className="text-blue-700 text-sm">{info}</p>
-            </div>
-          )}
-
-          {tab === "login" ? (
-            <div className="anim-up">
-              <h2 className="text-xl font-bold text-gray-900 mb-1">Welcome back! 👋</h2>
-              <p className="text-gray-500 text-sm mb-6">Sign in with your Google account to continue</p>
-              <button
-                data-testid="btn-google-signin"
-                type="button"
-                onClick={handleGoogle}
-                disabled={!!busy || !firebaseReady}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3.5 border border-gray-200 rounded-2xl text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-              >
-                {busy ? (
-                  <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <GoogleLogo />
-                )}
-                <span>
-                  {busy === "redirecting" ? "Taking you in…"
-                    : busy ? "Opening Google Sign-In…"
-                    : firebaseReady ? "Continue with Google"
-                    : "Login unavailable"}
-                </span>
-              </button>
-              <p className="text-center text-xs text-gray-400 mt-5">
-                Don't have an account?{" "}
-                <button onClick={() => { setTab("register"); setError(""); setInfo(""); }} className="text-blue-500 hover:underline font-medium">
-                  Create one
-                </button>
-              </p>
-            </div>
-          ) : (
-            <div className="anim-up">
-              <h2 className="text-xl font-bold text-gray-900 mb-1">Join Student Hub 🚀</h2>
-              <p className="text-gray-500 text-sm mb-5">Connect your Google account — we'll collect a few details after</p>
-              <div className="space-y-3 mb-6">
-                {[
-                  { emoji: "📚", color: "bg-blue-50 text-blue-700",     text: "Access notes by grade & subject" },
-                  { emoji: "📊", color: "bg-purple-50 text-purple-700", text: "Track your study time and progress" },
-                  { emoji: "🤖", color: "bg-indigo-50 text-indigo-700", text: "Get help from Nep AI study assistant" },
-                ].map(({ emoji, color, text }) => (
-                  <div key={text} className={`flex items-center gap-3 p-3 rounded-xl ${color.split(" ")[0]}`}>
-                    <span className="text-lg">{emoji}</span>
-                    <p className={`text-sm font-medium ${color.split(" ")[1]}`}>{text}</p>
-                  </div>
-                ))}
-              </div>
-              <button
-                data-testid="btn-google-register"
-                type="button"
-                onClick={handleGoogle}
-                disabled={!!busy || !firebaseReady}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-2xl hover:from-blue-600 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-200"
-              >
-                {busy ? (
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <GoogleLogo white />
-                )}
-                <span>
-                  {busy === "exists" ? "Taking you to your dashboard…"
-                    : busy === "redirecting" ? "Setting up your profile…"
-                    : busy ? "Opening Google Sign-In…"
-                    : firebaseReady ? "Sign up with Google"
-                    : "Signup unavailable"}
-                </span>
-              </button>
-              <p className="text-center text-xs text-gray-400 mt-5">
-                Already have an account?{" "}
-                <button onClick={() => setTab("login")} className="text-blue-500 hover:underline font-medium">
-                  Sign in
-                </button>
-              </p>
-            </div>
-          )}
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-5">
-          For students in grades 9–12 · Secure Google authentication
+          For students in grades 9–12 · Secure authentication
         </p>
       </div>
     </div>
     </>
-  );
-}
-
-function GoogleLogo({ white }: { white?: boolean }) {
-  if (white) {
-    return (
-      <svg className="w-5 h-5" viewBox="0 0 24 24">
-        <path fill="rgba(255,255,255,0.9)" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-        <path fill="rgba(255,255,255,0.9)" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-        <path fill="rgba(255,255,255,0.9)" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-        <path fill="rgba(255,255,255,0.9)" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-      </svg>
-    );
-  }
-  return (
-    <svg className="w-5 h-5" viewBox="0 0 24 24">
-      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-    </svg>
   );
 }

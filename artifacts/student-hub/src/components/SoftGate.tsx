@@ -7,7 +7,7 @@ interface SoftGateProps {
 }
 
 export function SoftGate({ children, feature = "this feature" }: SoftGateProps) {
-  const { user, loading, signInWithGoogle } = useAuth();
+  const { user, loading, signIn } = useAuth();
 
   if (loading) return null;
   if (user) return <>{children}</>;
@@ -34,11 +34,11 @@ export function SoftGate({ children, feature = "this feature" }: SoftGateProps) 
             Create a free account to access Nep AI, Pomodoro timer, Report Card, and more.
           </p>
           <button
-            onClick={signInWithGoogle}
+            onClick={signIn}
             className="w-full flex items-center justify-center gap-2.5 py-3.5 bg-blue-500 text-white rounded-2xl font-semibold text-sm hover:bg-blue-600 transition-all mb-3 shadow-lg shadow-blue-200"
           >
             <LogIn className="w-4 h-4" />
-            Continue with Google — Free
+            Sign In — Free
           </button>
           <p className="text-xs text-gray-400">No credit card · Instant access</p>
         </div>

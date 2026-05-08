@@ -84,8 +84,8 @@ function PomodoroContent() {
   const [showSettings, setShowSettings] = useState(false);
 
   const { data: tasks } = useListTasks(
-    { uid: user?.uid || "" },
-    { query: { enabled: !!user?.uid, queryKey: getListTasksQueryKey({ uid: user?.uid || "" }) } }
+    { uid: user?.id || "" },
+    { query: { enabled: !!user?.id, queryKey: getListTasksQueryKey({ uid: user?.id || "" }) } }
   );
   const pendingTasks = (Array.isArray(tasks) ? tasks : []).filter(t => !t.completed);
 

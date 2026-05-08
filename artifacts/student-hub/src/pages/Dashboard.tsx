@@ -205,8 +205,8 @@ export default function Dashboard() {
   const [badgesLoaded, setBadgesLoaded] = useState(false);
 
   const { data: tasks } = useListTasks(
-    { uid: user?.uid || "" },
-    { query: { enabled: !!user?.uid, queryKey: ["listTasks", user?.uid || ""] } }
+    { uid: user?.id || "" },
+    { query: { enabled: !!user?.id, queryKey: ["listTasks", user?.id || ""] } }
   );
   const pendingTasks = (Array.isArray(tasks) ? tasks : []).filter(t => !t.completed).length;
 
@@ -220,7 +220,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user) return;
-    fetch(`/api/study/stats/${user.uid}`)
+    fetch(`/api/study/stats/${user.id}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data) { setStudyMins(data.totalStudyTime ?? 0); setStreak(data.streak ?? 0); }
@@ -231,7 +231,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user) return;
-    fetch(`/api/users/${user.uid}`)
+    fetch(`/api/users/${user.id}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.badges) setCustomBadges(data.badges); })
       .catch(console.error)

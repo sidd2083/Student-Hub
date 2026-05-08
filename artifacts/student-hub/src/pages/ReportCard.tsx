@@ -269,9 +269,9 @@ function ReportContent() {
     setLoading(true);
     try {
       const [statsRes, logsRes, userRes] = await Promise.all([
-        fetch(`/api/study/stats/${user.uid}`),
-        fetch(`/api/study/logs/${user.uid}`),
-        fetch(`/api/users/${user.uid}`),
+        fetch(`/api/study/stats/${user.id}`),
+        fetch(`/api/study/logs/${user.id}`),
+        fetch(`/api/users/${user.id}`),
       ]);
       const s: StudyStats = statsRes.ok ? await statsRes.json() : { streak: 0, totalStudyTime: 0, todayStudyTime: 0, lastActiveDate: null };
       const l: DailyLog[] = logsRes.ok ? await logsRes.json() : [];

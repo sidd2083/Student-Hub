@@ -42,7 +42,7 @@ function McqContent() {
     if (!mcqs) return;
     if (currentIdx + 1 >= mcqs.length) {
       const finalScore = answers.filter(a => a.correct).length;
-      submitScore.mutate({ data: { uid: user?.uid || "", userName: profile?.name || "Unknown", grade, score: finalScore, totalQuestions: mcqs.length, subject: subject || "Mixed" } });
+      submitScore.mutate({ data: { uid: user?.id || "", userName: profile?.name || "Unknown", grade, score: finalScore, totalQuestions: mcqs.length, subject: subject || "Mixed" } });
       setPhase("results");
     } else {
       setCurrentIdx(i => i + 1); setSelected(null); setRevealed(false);
