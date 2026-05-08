@@ -1,0 +1,115 @@
+IMPORTANT: The app works in Replit but breaks on Vercel.
+
+Reason:
+Replit uses internal database/backend, but Vercel CANNOT access Replit database.
+So anything using Replit DB or server will FAIL on Vercel.
+
+---
+
+YOU MUST FIX THIS COMPLETELY.
+
+---
+
+DO NOT:
+- DO NOT use Replit database anywhere
+- DO NOT use DATABASE_URL
+- DO NOT use any SQL / Prisma / Postgres
+- DO NOT use any backend API like /api/user
+- DO NOT use Express or server
+- DO NOT rely on Replit-only environment
+
+---
+
+THIS APP MUST WORK ON VERCEL (FRONTEND ONLY).
+
+---
+
+USE ONLY:
+- Firebase Authentication
+- Firestore database
+
+Firestore must be the ONLY database for EVERYTHING.
+
+---
+
+REMOVE COMPLETELY:
+- api folder
+- server folder
+- any backend files
+- any database config requiring DATABASE_URL
+- any process.env.DATABASE_URL usage
+- any fetch("/api/...") or axios calls
+
+---
+
+FIX THE ERROR:
+"DATABASE_URL is not set"
+
+This must NEVER appear again.
+
+---
+
+IMPLEMENT THIS:
+
+1. Setup Profile:
+When clicking "Let's go", store data in Firestore:
+
+collection: users
+doc: user.uid
+
+fields:
+- uid
+- name
+- email
+- grade
+- createdAt
+- streak = 0
+- totalStudyTime = 0
+
+Use:
+
+import { doc, setDoc } from "firebase/firestore";
+
+await setDoc(doc(db, "users", user.uid), {
+  uid: user.uid,
+  name,
+  email: user.email,
+  grade,
+  createdAt: new Date(),
+  streak: 0,
+  totalStudyTime: 0
+});
+
+Then redirect to /dashboard
+
+---
+
+2. Auth Flow:
+After login:
+
+If user doc exists in Firestore → go to /dashboard  
+If not → go to /setup-profile  
+
+DO NOT skip this check.
+
+---
+
+3. Admin Panel:
+Fetch users from Firestore (collection: users)
+
+---
+
+4. Global Rule:
+Wherever any data is stored (reports, notes, scores, tasks),
+REPLACE ALL with Firestore.
+
+---
+
+FINAL REQUIREMENT:
+
+- Must work perfectly on Vercel
+- Must NOT depend on Replit in any way
+- Must NOT require DATABASE_URL
+- Must NOT use backend at all
+
+Firestore + Firebase Auth ONLY.

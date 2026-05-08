@@ -20,7 +20,94 @@ interface StudyContext {
   weeklyMins?: number;
 }
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY as string | undefined;
+const OPENAI_BASE_URL = (import.meta.env.VITE_OPENAI_BASE_URL as string | undefined) ?? "https://api.openai.com/v1";
+
+const SYSTEM_PROMPT = `You are Nep AI, a friendly and highly knowledgeable study assistant for high school students (grades 9-12) in Nepal. You have up-to-date knowledge through 2026.
+
+Your identity:
+- You were built by Siddhant Lamichhane.
+- When asked "who built you?", "who made you?", "who created you?", or "who are you?", always respond: "I was built by Siddhant Lamichhane. I'm Nep AI, your AI study assistant for Grade 9–12 students in Nepal!"
+- Never claim to be ChatGPT, GPT, OpenAI, or any other AI brand.
+
+Your capabilities:
+- Explain academic concepts clearly for grades 9-12
+- Help solve problems step by step across all subjects
+- Give personalized study advice based on the student's actual progress data
+- Analyze study habits and suggest improvements
+- Cover the Nepal NEB/SEE curriculum and all subjects: Math, Science, English, Nepali, Social Studies, Computer Science, Accounts, Economics, Biology, Physics, Chemistry
+
+Guidelines:
+- Keep responses concise, clear, and encouraging
+- Use simple language appropriate for high school students
+- For math/science: show clear step-by-step working
+- When the student shares their study stats or tasks: analyze them and give SPECIFIC, actionable advice
+- Be motivating and positive — like a personal tutor who genuinely cares
+- Format answers with bullet points, numbered steps, or sections where helpful
+- Current year is 2026
+
+When you receive study context (tasks, stats), use it actively:
+- Comment on their streak, study time, or tasks specifically
+- Suggest which subjects to prioritize based on pending tasks
+- Give daily/weekly study targets based on their current performance`;
+
+function buildSystemContent(ctx: StudyContext | null): string {
+  if (!ctx) return SYSTEM_PROMPT;
+  const parts: string[] = ["\n\n--- STUDENT'S CURRENT DATA (use this to personalize your response) ---"];
+  if (ctx.stats) {
+    const s = ctx.stats;
+    parts.push(`Study Stats:\n- Streak: ${s.streak} days\n- Total study time: ${s.totalStudyTime} minutes (${Math.floor(s.totalStudyTime / 60)}h ${s.totalStudyTime % 60}m)\n- Studied today: ${s.todayStudyTime} minutes\n- Last active: ${s.lastActiveDate ?? "unknown"}`);
+  }
+  if (ctx.tasks && ctx.tasks.length > 0) {
+    const pending = ctx.tasks.filter(t => !t.completed);
+    const done    = ctx.tasks.filter(t => t.completed);
+    parts.push(`Tasks:\n- Pending (${pending.length}): ${pending.map(t => t.text).join(", ") || "none"}\n- Completed (${done.length}): ${done.map(t => t.text).join(", ") || "none"}`);
+  }
+  if (ctx.weeklyMins !== undefined) {
+    parts.push(`Weekly study: ${ctx.weeklyMins} minutes this week`);
+  }
+  parts.push("--- END OF STUDENT DATA ---");
+  return SYSTEM_PROMPT + parts.join("\n");
+}
+
+async function callOpenAI(
+  message: string,
+  history: Message[],
+  ctx: StudyContext | null,
+): Promise<string> {
+  if (!OPENAI_API_KEY) {
+    throw new Error("VITE_OPENAI_API_KEY not set");
+  }
+
+  const systemContent = buildSystemContent(ctx);
+
+  const messages = [
+    { role: "system", content: systemContent },
+    ...history.map(h => ({ role: h.role, content: h.content })),
+    { role: "user", content: message },
+  ];
+
+  const res = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages,
+      max_tokens: 1200,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`OpenAI ${res.status}: ${text}`);
+  }
+
+  const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
+  return data.choices?.[0]?.message?.content ?? "I couldn't generate a response. Please try again.";
+}
 
 const STUDY_FALLBACKS: [RegExp, string][] = [
   [/who (built|made|created|developed) you|who are you|tell me about yourself/i,
@@ -110,14 +197,8 @@ function NepAiContent() {
       setMessages([{ role: "user", content: msg }]);
       setLoading(true);
       try {
-        const res = await fetch(`${BASE}/api/ai/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: msg, history: [], context: ctx ?? undefined }),
-        });
-        if (!res.ok) throw new Error(`Status ${res.status}`);
-        const data = await res.json() as { reply?: string };
-        setMessages(prev => [...prev, { role: "assistant", content: data.reply || "No response." }]);
+        const reply = await callOpenAI(msg, [], ctx);
+        setMessages(prev => [...prev, { role: "assistant", content: reply }]);
       } catch {
         setMessages(prev => [...prev, { role: "assistant", content: getLocalFallback(msg) }]);
       } finally { setLoading(false); }
@@ -148,16 +229,10 @@ function NepAiContent() {
     setMessages(newMessages);
     setLoading(true);
     try {
-      const res = await fetch(`${BASE}/api/ai/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg, history: messages, context: context ?? undefined }),
-      });
-      if (!res.ok) throw new Error(`Status ${res.status}`);
-      const data = await res.json() as { reply?: string };
-      setMessages(prev => [...prev, { role: "assistant", content: data.reply || "No response generated." }]);
+      const reply = await callOpenAI(msg, messages, context);
+      setMessages(prev => [...prev, { role: "assistant", content: reply }]);
     } catch (err) {
-      console.warn("AI API failed, using fallback:", err);
+      console.warn("[NepAI] OpenAI call failed, using fallback:", err);
       setMessages(prev => [...prev, { role: "assistant", content: getLocalFallback(msg) }]);
     } finally {
       setLoading(false);
