@@ -138,7 +138,7 @@ function AdminOverview() {
   useEffect(() => {
     fetch("/api/users")
       .then(r => r.json())
-      .then(setUsers)
+      .then(data => { if (Array.isArray(data)) setUsers(data); })
       .catch(console.error);
   }, []);
 
@@ -399,7 +399,8 @@ function BadgeManager() {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const list: ApiUser[] = await fetch("/api/users").then(r => r.json());
+      const data = await fetch("/api/users").then(r => r.json());
+      const list: ApiUser[] = Array.isArray(data) ? data : [];
       list.sort((a, b) => (b.totalStudyTime ?? 0) - (a.totalStudyTime ?? 0));
       setUsers(list);
       // Badges are now returned directly from the API response
@@ -859,7 +860,8 @@ function ManageUsers() {
     setLoading(true);
     fetch("/api/users")
       .then(r => r.json())
-      .then((list: ApiUser[]) => {
+      .then((data) => {
+        const list: ApiUser[] = Array.isArray(data) ? data : [];
         list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
         setUsers(list);
       })

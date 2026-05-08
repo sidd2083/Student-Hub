@@ -19,14 +19,19 @@ export function LoadingScreen() {
 
 /** All private pages — show spinner while auth loads, then render */
 export function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { loading, user } = useAuth();
+  const { loading, user, profile } = useAuth();
 
   // While auth is initialising, show spinner
   if (loading) return <LoadingScreen />;
 
-  // Auth listener will redirect unauthenticated users away — just render null
-  // while the redirect takes effect so there's no flash of content
+  // Not logged in — auth listener will redirect away
   if (!user) return null;
+
+  // Logged in but no profile yet — send to setup
+  if (!profile) {
+    window.location.replace("/setup-profile");
+    return null;
+  }
 
   return <>{children}</>;
 }

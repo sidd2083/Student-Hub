@@ -190,11 +190,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (result.status === "not_found") {
         applyProfile(null);
         setLoading(false);
-        // Only redirect to setup-profile if we are NOT already navigating to a
-        // protected destination (signInWithGoogle already sent the user to /dashboard
-        // for the "existing Firebase user, not yet in our DB" edge case — that path
-        // will correctly redirect them to /setup-profile via the PrivateRoute guard).
-        const safePages = ["/setup-profile", "/onboarding", "/dashboard", "/"];
+        // No profile yet — redirect to setup unless already heading there
+        const safePages = ["/setup-profile", "/onboarding"];
         if (!safePages.some(p => currentPath.startsWith(p))) {
           console.log("[Auth] no profile → /setup-profile");
           window.location.replace("/setup-profile");
@@ -251,9 +248,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // login after migration). Send them through setup.
         window.location.replace("/setup-profile");
       } else {
-        // API error (network issue, server down, etc.) — let them into the
-        // dashboard. The onAuthStateChanged listener will retry the fetch.
-        window.location.replace("/dashboard");
+        // API error (network issue, server down, etc.) — send to setup-profile
+        // so they can create their profile. Onboarding handles existing users.
+        window.location.replace("/setup-profile");
       }
 
       return { outcome: "success", isNewUser };
