@@ -45,7 +45,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "pnpm --filter @workspace/api-server run build && PORT=8080 node --enable-source-maps /home/runner/workspace/artifacts/api-server/dist/index.mjs"
+args = "while true; do pnpm --filter @workspace/api-server run build && PORT=8080 node --enable-source-maps /home/runner/workspace/artifacts/api-server/dist/index.mjs; echo 'Backend exited, restarting in 2s...'; sleep 2; done"
 waitForPort = 8080
 
 [agent]
@@ -64,10 +64,6 @@ externalPort = 80
 [[ports]]
 localPort = 8080
 externalPort = 8080
-
-[[ports]]
-localPort = 8081
-externalPort = 8081
 
 [[ports]]
 localPort = 8082

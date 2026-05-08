@@ -14,7 +14,16 @@ function getPool(): pg.Pool {
         "DATABASE_URL must be set. Did you forget to provision a database?",
       );
     }
-    _pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    _pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    });
+
+    _pool.on("error", (err) => {
+      console.error("[db] Pool client error:", err.message);
+    });
   }
   return _pool;
 }
