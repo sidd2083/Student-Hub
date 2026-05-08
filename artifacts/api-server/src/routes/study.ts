@@ -9,8 +9,20 @@ const router = Router();
 
 type StudyLogRow = typeof studyLogsTable.$inferSelect;
 
-function getToday(): string    { return new Date().toISOString().slice(0, 10); }
-function getYesterday(): string { return new Date(Date.now() - 86400000).toISOString().slice(0, 10); }
+// Nepal is UTC+5:45 (345 minutes ahead of UTC)
+function getNepalDate(): string {
+  const now = new Date();
+  const nepalOffset = 5 * 60 + 45; // 345 minutes
+  const nepalTime = new Date(now.getTime() + nepalOffset * 60 * 1000);
+  return nepalTime.toISOString().slice(0, 10);
+}
+
+function getNepalYesterday(): string {
+  const now = new Date();
+  const nepalOffset = 5 * 60 + 45;
+  const nepalTime = new Date(now.getTime() + nepalOffset * 60 * 1000 - 86400000);
+  return nepalTime.toISOString().slice(0, 10);
+}
 
 const toLog = (l: StudyLogRow) => ({
   date:           l.date,
@@ -26,8 +38,8 @@ router.post("/study/session", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "uid and minutes (>=1) required" });
     }
 
-    const today     = getToday();
-    const yesterday = getYesterday();
+    const today     = getNepalDate();
+    const yesterday = getNepalYesterday();
 
     const users = await db.select().from(usersTable).where(eq(usersTable.uid, uid));
     if (users.length === 0) return res.status(404).json({ error: "User not found" });
@@ -88,7 +100,7 @@ router.post("/study/log-task", async (req: Request, res: Response) => {
   try {
     const { uid } = req.body as { uid?: string };
     if (!uid) return res.status(400).json({ error: "uid required" });
-    const today = getToday();
+    const today = getNepalDate();
 
     const existing = await db.select().from(studyLogsTable)
       .where(and(eq(studyLogsTable.uid, uid), eq(studyLogsTable.date, today)));
@@ -111,7 +123,7 @@ router.post("/study/log-note", async (req: Request, res: Response) => {
   try {
     const { uid } = req.body as { uid?: string };
     if (!uid) return res.status(400).json({ error: "uid required" });
-    const today = getToday();
+    const today = getNepalDate();
 
     const existing = await db.select().from(studyLogsTable)
       .where(and(eq(studyLogsTable.uid, uid), eq(studyLogsTable.date, today)));

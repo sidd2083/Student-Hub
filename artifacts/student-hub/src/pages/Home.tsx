@@ -166,6 +166,18 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      {/* ── Footer ── */}
+      <footer className="py-8 px-4 border-t border-gray-100 bg-white">
+        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p className="text-xs text-gray-400">© {new Date().getFullYear()} Student Hub · Free for every Nepali student</p>
+          <div className="flex items-center gap-4 text-xs text-gray-400">
+            <Link href="/about" className="hover:text-gray-600 transition-colors">About</Link>
+            <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-gray-600 transition-colors">Terms of Use</Link>
+          </div>
+        </div>
+      </footer>
     </>
   );
 }

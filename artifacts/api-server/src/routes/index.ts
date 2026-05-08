@@ -9,6 +9,7 @@ import scoresRouter from "./scores";
 import aiRouter from "./ai";
 import studyRouter from "./study";
 import announcementsRouter from "./announcements";
+import savedRouter from "./saved";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(scoresRouter);
 router.use(aiRouter);
 router.use(studyRouter);
 router.use(announcementsRouter);
+router.use(savedRouter);
 
 export default router;

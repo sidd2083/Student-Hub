@@ -5,7 +5,7 @@ import {
   BookOpen, FileText, CheckSquare, Timer,
   MessageCircle, Trophy, LayoutDashboard, LogOut,
   Shield, Settings, User, Home, Wrench, ArrowLeft, X, BarChart2,
-  Pause, Play,
+  Pause, Play, Bookmark,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -13,6 +13,7 @@ const sidebarNav = [
   { href: "/dashboard",   icon: LayoutDashboard, label: "Dashboard"  },
   { href: "/notes",       icon: BookOpen,         label: "Notes"      },
   { href: "/pyqs",        icon: FileText,         label: "PYQ"        },
+  { href: "/saved",       icon: Bookmark,         label: "Saved"      },
   { href: "/ai",          icon: MessageCircle,    label: "Nep AI"     },
   { href: "/pomodoro",    icon: Timer,            label: "Pomodoro"   },
   { href: "/todo",        icon: CheckSquare,      label: "To-do"      },

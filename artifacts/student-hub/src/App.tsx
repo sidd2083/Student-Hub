@@ -29,6 +29,9 @@ import AdminLogin from "@/pages/AdminLogin";
 import Admin from "@/pages/Admin";
 import About from "@/pages/About";
 import Contact from "@/pages/Contact";
+import Saved from "@/pages/Saved";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import Terms from "@/pages/Terms";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -63,12 +66,15 @@ function Router() {
             <Route path="/pyqs" component={Pyqs} />
             <Route path="/about" component={About} />
             <Route path="/contact" component={Contact} />
+            <Route path="/privacy" component={PrivacyPolicy} />
+            <Route path="/terms" component={Terms} />
 
             <Route path="/ai" component={NepAi} />
             <Route path="/report" component={ReportCard} />
             <Route path="/todo" component={Todo} />
             <Route path="/pomodoro" component={Pomodoro} />
             <Route path="/leaderboard" component={Leaderboard} />
+            <Route path="/saved" component={Saved} />
 
             <Route path="/dashboard">
               <PrivateRoute><Dashboard /></PrivateRoute>

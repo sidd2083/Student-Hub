@@ -1,17 +1,79 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useListPyqs } from "@workspace/api-client-react";
-import { ArrowLeft, FileText, Image, ExternalLink, X, BookOpen } from "lucide-react";
+import { ArrowLeft, FileText, Image, ExternalLink, X, BookOpen, Bookmark, Download } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 function toSlug(str: string) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+// ─── Save button ──────────────────────────────────────────────────────────────
+
+function SaveButton({ pyqId, uid }: { pyqId: number; uid: string }) {
+  const [saved, setSaved] = useState(false);
+  const [savedId, setSavedId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/saved/check?uid=${uid}&itemType=pyq&itemId=${pyqId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) { setSaved(data.saved); setSavedId(data.id); } })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [pyqId, uid]);
+
+  const toggle = async () => {
+    if (toggling) return;
+    setToggling(true);
+    try {
+      if (saved && savedId) {
+        await fetch(`/api/saved/${savedId}?uid=${uid}`, { method: "DELETE" });
+        setSaved(false);
+        setSavedId(null);
+      } else {
+        const res = await fetch("/api/saved", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uid, itemType: "pyq", itemId: pyqId }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSaved(true);
+          setSavedId(data.id);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  if (loading) return <div className="w-9 h-9 bg-gray-100 rounded-xl animate-pulse" />;
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={toggling}
+      title={saved ? "Remove from saved" : "Save this paper"}
+      className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl transition-all disabled:opacity-50 ${
+        saved ? "bg-blue-500 text-white hover:bg-blue-600" : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+      }`}
+    >
+      <Bookmark className={`w-3.5 h-3.5 ${saved ? "fill-white" : ""}`} />
+      <span className="hidden sm:inline">{saved ? "Saved" : "Save"}</span>
+    </button>
+  );
 }
 
 export default function PyqPage() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
   const [imgZoomed, setImgZoomed] = useState(false);
+  const { user } = useAuth();
 
   const { data: allPyqs, isLoading } = useListPyqs(
     {},
@@ -96,15 +158,29 @@ export default function PyqPage() {
                     </div>
                     <h1 className="text-lg sm:text-xl font-bold text-gray-900">{pyq.title}</h1>
                   </div>
-                  <a
-                    href={pyq.pdfUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-2 text-sm text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-50 transition-all flex-shrink-0"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Open</span>
-                  </a>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {user && <SaveButton pyqId={id} uid={user.uid} />}
+                    {isImage && (
+                      <a
+                        href={pyq.pdfUrl}
+                        download
+                        className="flex items-center gap-1.5 px-3 py-2 text-sm text-green-600 border border-green-200 rounded-xl hover:bg-green-50 transition-all"
+                        title="Download image"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Download</span>
+                      </a>
+                    )}
+                    <a
+                      href={pyq.pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-2 text-sm text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-50 transition-all"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Open</span>
+                    </a>
+                  </div>
                 </div>
               </div>
 
@@ -119,7 +195,7 @@ export default function PyqPage() {
                       className="max-w-full rounded-2xl shadow-sm cursor-zoom-in hover:opacity-95 transition-opacity"
                       style={{ maxHeight: "70vh", objectFit: "contain" }}
                     />
-                    <p className="text-xs text-gray-400">Click to zoom</p>
+                    <p className="text-xs text-gray-400">Click to zoom · Use the Download button to save the image</p>
                     {imgZoomed && (
                       <div
                         className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center cursor-zoom-out"
@@ -132,6 +208,14 @@ export default function PyqPage() {
                         >
                           <X className="w-4 h-4 text-white" />
                         </button>
+                        <a
+                          href={pyq.pdfUrl}
+                          download
+                          onClick={e => e.stopPropagation()}
+                          className="absolute bottom-4 right-4 flex items-center gap-1.5 px-3 py-2 bg-white/20 text-white rounded-xl text-sm hover:bg-white/30 transition-all"
+                        >
+                          <Download className="w-3.5 h-3.5" /> Download
+                        </a>
                       </div>
                     )}
                   </div>

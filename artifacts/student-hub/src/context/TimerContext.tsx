@@ -11,8 +11,8 @@ export interface TimerSettings {
   workMins: number;
   shortBreakMins: number;
   longBreakMins: number;
-  sessionsBeforeLongBreak: number; // e.g. 4 → long break after every 4 work sessions
-  sessionsBeforeShortBreak: number; // e.g. 2 → short break after every 2 sessions (if < longBreak threshold)
+  sessionsBeforeLongBreak: number;
+  sessionsBeforeShortBreak: number;
 }
 
 const DEFAULT_SETTINGS: TimerSettings = {
@@ -24,15 +24,12 @@ const DEFAULT_SETTINGS: TimerSettings = {
 };
 
 interface TimerContextType {
-  // State
   phase: Phase;
   seconds: number;
   running: boolean;
   sessionsCompleted: number;
   settings: TimerSettings;
   savedMinutesToday: number;
-
-  // Actions
   start: () => void;
   pause: () => void;
   reset: () => void;
@@ -41,6 +38,48 @@ interface TimerContextType {
 }
 
 const TimerContext = createContext<TimerContextType | null>(null);
+
+// ─── localStorage keys ────────────────────────────────────────────────────────
+
+const LS_KEY = "studenthub_timer_state";
+
+interface PersistedState {
+  phase: Phase;
+  seconds: number;
+  running: boolean;
+  sessionsCompleted: number;
+  settings: TimerSettings;
+  savedMinutesToday: number;
+  totalWorkSeconds: number;
+  savedMinutes: number;
+  updatedAt: number; // timestamp for cross-tab sync
+}
+
+function loadState(): PersistedState | null {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw) as PersistedState;
+    if (!s.updatedAt) return null;
+
+    // Adjust seconds for elapsed time if timer was running
+    const elapsed = Math.floor((Date.now() - s.updatedAt) / 1000);
+    if (s.running && elapsed > 0 && elapsed < 3600) {
+      // Advance the timer state forward by elapsed seconds
+      s.totalWorkSeconds = s.phase === "work" ? s.totalWorkSeconds + elapsed : s.totalWorkSeconds;
+      s.seconds = Math.max(0, s.seconds - elapsed);
+    }
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+function saveState(s: PersistedState) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({ ...s, updatedAt: Date.now() }));
+  } catch {}
+}
 
 // ─── Sound ───────────────────────────────────────────────────────────────────
 
@@ -71,26 +110,69 @@ function playBeep(type: "work" | "break" = "work") {
 export function TimerProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
 
-  const [settings, setSettings] = useState<TimerSettings>(DEFAULT_SETTINGS);
-  const [phase, setPhase] = useState<Phase>("work");
-  const [seconds, setSeconds] = useState(DEFAULT_SETTINGS.workMins * 60);
-  const [running, setRunning] = useState(false);
-  const [sessionsCompleted, setSessionsCompleted] = useState(0);
-  const [savedMinutesToday, setSavedMinutesToday] = useState(0);
+  // Load persisted state on mount
+  const persisted = loadState();
 
-  // Refs for live saving — don't need re-renders
-  const totalWorkSecondsRef = useRef(0); // cumulative work seconds elapsed
-  const savedMinutesRef = useRef(0);     // minutes already POSTed to backend
-  const phaseRef = useRef<Phase>("work");
-  const runningRef = useRef(false);
+  const [settings, setSettings] = useState<TimerSettings>(persisted?.settings ?? DEFAULT_SETTINGS);
+  const [phase, setPhase] = useState<Phase>(persisted?.phase ?? "work");
+  const [seconds, setSeconds] = useState(persisted?.seconds ?? (DEFAULT_SETTINGS.workMins * 60));
+  const [running, setRunning] = useState(persisted?.running ?? false);
+  const [sessionsCompleted, setSessionsCompleted] = useState(persisted?.sessionsCompleted ?? 0);
+  const [savedMinutesToday, setSavedMinutesToday] = useState(persisted?.savedMinutesToday ?? 0);
+
+  const totalWorkSecondsRef = useRef(persisted?.totalWorkSeconds ?? 0);
+  const savedMinutesRef = useRef(persisted?.savedMinutes ?? 0);
+  const phaseRef = useRef<Phase>(persisted?.phase ?? "work");
+  const runningRef = useRef(persisted?.running ?? false);
   const userRef = useRef<string | null>(null);
-  const settingsRef = useRef(settings);
-  const sessionsRef = useRef(0);
+  const settingsRef = useRef(persisted?.settings ?? DEFAULT_SETTINGS);
+  const sessionsRef = useRef(persisted?.sessionsCompleted ?? 0);
 
   useEffect(() => { userRef.current = user?.uid ?? null; }, [user]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
 
-  // ── Save work minutes to backend ────────────────────────────────────────────
+  // ── Persist state to localStorage on every tick ──────────────────────────────
+  const persistState = useCallback(() => {
+    saveState({
+      phase: phaseRef.current,
+      seconds: 0, // will be overwritten by caller
+      running: runningRef.current,
+      sessionsCompleted: sessionsRef.current,
+      settings: settingsRef.current,
+      savedMinutesToday: savedMinutesRef.current,
+      totalWorkSeconds: totalWorkSecondsRef.current,
+      savedMinutes: savedMinutesRef.current,
+      updatedAt: Date.now(),
+    });
+  }, []);
+
+  // ── Cross-tab sync via storage event ─────────────────────────────────────────
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key !== LS_KEY || !e.newValue) return;
+      try {
+        const s = JSON.parse(e.newValue) as PersistedState;
+        // Only sync non-running state changes from other tabs (pause/reset)
+        // to avoid fighting over the tick
+        if (!s.running && runningRef.current) {
+          runningRef.current = false;
+          setRunning(false);
+        }
+        // Sync sessions / saved minutes
+        if (s.sessionsCompleted !== sessionsRef.current) {
+          sessionsRef.current = s.sessionsCompleted;
+          setSessionsCompleted(s.sessionsCompleted);
+        }
+        if (s.savedMinutesToday !== savedMinutesRef.current) {
+          setSavedMinutesToday(s.savedMinutesToday);
+        }
+      } catch {}
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  // ── Save work minutes to backend ─────────────────────────────────────────────
   const saveMinutes = useCallback(async (mins: number) => {
     const uid = userRef.current;
     if (!uid || mins < 1) return;
@@ -111,14 +193,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // ── Phase durations ──────────────────────────────────────────────────────────
+  // ── Phase durations ───────────────────────────────────────────────────────────
   const phaseSeconds = useCallback((p: Phase, s: TimerSettings) => {
     if (p === "work") return s.workMins * 60;
     if (p === "shortBreak") return s.shortBreakMins * 60;
     return s.longBreakMins * 60;
   }, []);
 
-  // ── Transition to next phase ─────────────────────────────────────────────────
+  // ── Transition to next phase ──────────────────────────────────────────────────
   const nextPhase = useCallback((currentPhase: Phase, currentSessions: number, s: TimerSettings) => {
     if (currentPhase === "work") {
       const newSessions = currentSessions + 1;
@@ -132,7 +214,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       setSeconds(phaseSeconds(nextP, s));
       playBeep("break");
     } else {
-      // Break ended → back to work
       phaseRef.current = "work";
       setPhase("work");
       setSeconds(phaseSeconds("work", s));
@@ -140,12 +221,11 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [phaseSeconds]);
 
-  // ── Main tick ────────────────────────────────────────────────────────────────
+  // ── Main tick ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!running) return;
 
     const interval = setInterval(() => {
-      // Live-save work minutes
       if (phaseRef.current === "work") {
         totalWorkSecondsRef.current += 1;
         const earnedMinutes = Math.floor(totalWorkSecondsRef.current / 60);
@@ -156,45 +236,58 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       }
 
       setSeconds(prev => {
+        const next = prev <= 1 ? 0 : prev - 1;
+
+        // Persist every 5 seconds to avoid too much I/O
+        if (totalWorkSecondsRef.current % 5 === 0) {
+          saveState({
+            phase: phaseRef.current,
+            seconds: next,
+            running: runningRef.current,
+            sessionsCompleted: sessionsRef.current,
+            settings: settingsRef.current,
+            savedMinutesToday: savedMinutesRef.current,
+            totalWorkSeconds: totalWorkSecondsRef.current,
+            savedMinutes: savedMinutesRef.current,
+            updatedAt: Date.now(),
+          });
+        }
+
         if (prev <= 1) {
-          // Phase complete
           runningRef.current = false;
           setRunning(false);
 
-          // Save any remaining work seconds as a fraction round-up
           if (phaseRef.current === "work") {
             const remainingWorkSecs = totalWorkSecondsRef.current % 60;
-            if (remainingWorkSecs > 0) {
-              // Already saved the whole minutes; the last partial minute
-              // gets saved only if ≥ 30 seconds (round-half-up)
-              if (remainingWorkSecs >= 30) {
-                saveMinutes(1);
-              }
+            if (remainingWorkSecs >= 30) {
+              saveMinutes(1);
             }
           }
 
           nextPhase(phaseRef.current, sessionsRef.current, settingsRef.current);
           return 0;
         }
-        return prev - 1;
+        return next;
       });
     }, 1000);
 
     return () => clearInterval(interval);
   }, [running, saveMinutes, nextPhase]);
 
-  // ── Actions ──────────────────────────────────────────────────────────────────
+  // ── Actions ───────────────────────────────────────────────────────────────────
 
   const start = useCallback(() => {
     if (running) return;
     runningRef.current = true;
     setRunning(true);
-  }, [running]);
+    persistState();
+  }, [running, persistState]);
 
   const pause = useCallback(() => {
     runningRef.current = false;
     setRunning(false);
-  }, []);
+    persistState();
+  }, [persistState]);
 
   const reset = useCallback(() => {
     runningRef.current = false;
@@ -206,10 +299,20 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     setPhase("work");
     setSessionsCompleted(0);
     setSeconds(settingsRef.current.workMins * 60);
+    saveState({
+      phase: "work",
+      seconds: settingsRef.current.workMins * 60,
+      running: false,
+      sessionsCompleted: 0,
+      settings: settingsRef.current,
+      savedMinutesToday: 0,
+      totalWorkSeconds: 0,
+      savedMinutes: 0,
+      updatedAt: Date.now(),
+    });
   }, []);
 
   const skipPhase = useCallback(() => {
-    // Skip to next phase (save remaining work time first)
     if (phaseRef.current === "work") {
       const toSave = Math.floor(totalWorkSecondsRef.current / 60) - savedMinutesRef.current;
       if (toSave > 0) saveMinutes(toSave);
@@ -223,7 +326,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     setSettings(prev => {
       const next = { ...prev, ...partial };
       settingsRef.current = next;
-      // Reset timer with new work minutes if in work phase and not running
       if (!runningRef.current && phaseRef.current === "work") {
         setSeconds(next.workMins * 60);
       }

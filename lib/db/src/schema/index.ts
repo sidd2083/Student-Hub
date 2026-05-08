@@ -6,3 +6,4 @@ export * from "./tasks";
 export * from "./scores";
 export * from "./study_logs";
 export * from "./announcements";
+export * from "./saved_items";

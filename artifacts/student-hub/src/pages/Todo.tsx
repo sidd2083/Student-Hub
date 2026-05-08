@@ -33,12 +33,12 @@ function TodoContent() {
     });
   };
 
-  const handleToggle = (id: number, completed: boolean) => {
-    const isCompleting = !completed;
-    updateTask.mutate({ id, data: { completed: isCompleting } }, {
+  // One-way: only allow completing (not un-completing)
+  const handleComplete = (id: number) => {
+    updateTask.mutate({ id, data: { completed: true } }, {
       onSuccess: () => {
         invalidate();
-        if (isCompleting && uid) {
+        if (uid) {
           fetch("/api/study/log-task", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -101,8 +101,11 @@ function TodoContent() {
                 {pending.map(task => (
                   <div key={task.id} data-testid={`task-item-${task.id}`}
                     className="flex items-center gap-3 bg-white border border-gray-100 rounded-2xl px-4 py-3.5 hover:shadow-sm transition-all group">
-                    <button onClick={() => handleToggle(task.id, task.completed)}
-                      className="w-5 h-5 rounded-full border-2 border-gray-200 hover:border-blue-400 transition-all flex items-center justify-center flex-shrink-0" />
+                    <button
+                      onClick={() => handleComplete(task.id)}
+                      title="Mark as done"
+                      className="w-5 h-5 rounded-full border-2 border-gray-200 hover:border-green-400 hover:bg-green-50 transition-all flex items-center justify-center flex-shrink-0"
+                    />
                     <p className="flex-1 text-sm text-gray-800">{task.text}</p>
                     <button onClick={() => handleDelete(task.id)}
                       className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-all">
@@ -120,10 +123,10 @@ function TodoContent() {
               <div className="space-y-2">
                 {done.map(task => (
                   <div key={task.id} className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 group">
-                    <button onClick={() => handleToggle(task.id, task.completed)}
-                      className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0 hover:bg-green-600 transition-all">
+                    {/* Completed tasks: non-interactive green check (no toggle back) */}
+                    <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
                       <Check className="w-3 h-3 text-white" />
-                    </button>
+                    </div>
                     <p className="flex-1 text-sm text-gray-400 line-through">{task.text}</p>
                     <button onClick={() => handleDelete(task.id)}
                       className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-all">

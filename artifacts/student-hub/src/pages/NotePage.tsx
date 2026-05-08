@@ -4,11 +4,13 @@ import { Helmet } from "react-helmet-async";
 import { useGetNote } from "@workspace/api-client-react";
 import {
   ArrowLeft, FileText, Image, Type, ExternalLink, ZoomIn, X,
-  BookOpen, Maximize2, Minimize2, Sparkles, ChevronRight,
+  BookOpen, Maximize2, Minimize2, Sparkles, ChevronRight, Bookmark,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { getDoc, doc } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
+
+const NOTE_VIEWED_KEY = "studenthub_viewed_notes_session";
 
 interface SeoMeta {
   seoTitle: string;
@@ -64,7 +66,6 @@ function FocusReaderOverlay({
     setScrollPct(pct);
   }, []);
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
@@ -73,12 +74,9 @@ function FocusReaderOverlay({
 
   return (
     <div className="fixed inset-0 z-[60] bg-white flex flex-col">
-      {/* Progress bar */}
       <div className="h-1 bg-gray-100 flex-shrink-0">
         <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${scrollPct}%` }} />
       </div>
-
-      {/* Header */}
       <div className="flex items-center gap-3 px-4 sm:px-6 py-3 border-b border-gray-100 flex-shrink-0 bg-white">
         <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-all flex-shrink-0">
           <Minimize2 className="w-4 h-4 text-gray-500" />
@@ -94,8 +92,6 @@ function FocusReaderOverlay({
           <Sparkles className="w-3.5 h-3.5" /> Ask AI
         </button>
       </div>
-
-      {/* Content */}
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
         {note.contentType === "text" && (
           <div className="max-w-2xl mx-auto px-5 sm:px-10 py-10">
@@ -138,7 +134,66 @@ function FocusReaderOverlay({
   );
 }
 
-// ─── Main NotePage ────────────────────────────────────────────────────────────
+// ─── Save button ──────────────────────────────────────────────────────────────
+
+function SaveButton({ noteId, uid }: { noteId: number; uid: string }) {
+  const [saved, setSaved] = useState(false);
+  const [savedId, setSavedId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/saved/check?uid=${uid}&itemType=note&itemId=${noteId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) { setSaved(data.saved); setSavedId(data.id); } })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [noteId, uid]);
+
+  const toggle = async () => {
+    if (toggling) return;
+    setToggling(true);
+    try {
+      if (saved && savedId) {
+        await fetch(`/api/saved/${savedId}?uid=${uid}`, { method: "DELETE" });
+        setSaved(false);
+        setSavedId(null);
+      } else {
+        const res = await fetch("/api/saved", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uid, itemType: "note", itemId: noteId }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSaved(true);
+          setSavedId(data.id);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  if (loading) return <div className="w-9 h-9 bg-gray-100 rounded-xl animate-pulse" />;
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={toggling}
+      title={saved ? "Remove from saved" : "Save this note"}
+      className={`p-2 rounded-xl transition-all disabled:opacity-50 ${
+        saved ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+      }`}
+    >
+      <Bookmark className={`w-4 h-4 ${saved ? "fill-white" : ""}`} />
+    </button>
+  );
+}
+
+// ─── Main NotePage ─────────────────────────────────────────────────────────────
 
 export default function NotePage() {
   const params = useParams<{ id: string }>();
@@ -162,6 +217,24 @@ export default function NotePage() {
       .then(snap => { if (snap.exists()) setSeoMeta(snap.data() as SeoMeta); })
       .catch(() => {});
   }, [id]);
+
+  // Once-per-session note view logging
+  useEffect(() => {
+    if (!user?.uid || !note || isNaN(id)) return;
+    try {
+      const stored = sessionStorage.getItem(NOTE_VIEWED_KEY);
+      const viewed: number[] = stored ? JSON.parse(stored) : [];
+      if (!viewed.includes(id)) {
+        viewed.push(id);
+        sessionStorage.setItem(NOTE_VIEWED_KEY, JSON.stringify(viewed));
+        fetch("/api/study/log-note", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uid: user.uid }),
+        }).catch(console.error);
+      }
+    } catch {}
+  }, [id, user, note]);
 
   // Track scroll on the main content area
   useEffect(() => {
@@ -227,7 +300,6 @@ export default function NotePage() {
 
       <div ref={mainRef} className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 overflow-y-auto">
 
-        {/* Scroll progress — embedded in the page, not fixed to header */}
         {note && (
           <div className="mb-4 h-1 bg-gray-100 rounded-full overflow-hidden">
             <div
@@ -297,7 +369,7 @@ export default function NotePage() {
 
                 {/* Action buttons */}
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {/* Ask AI */}
+                  {user && <SaveButton noteId={id} uid={user.uid} />}
                   <button
                     onClick={handleAskAi}
                     className="flex items-center gap-1.5 px-3 py-2 bg-indigo-500 text-white rounded-xl text-xs font-semibold hover:bg-indigo-600 transition-all"
@@ -306,7 +378,6 @@ export default function NotePage() {
                     <Sparkles className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Ask AI</span>
                   </button>
-                  {/* Focus / fullscreen */}
                   <button
                     onClick={() => setFocusMode(true)}
                     className="p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"

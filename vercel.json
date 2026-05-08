@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm run typecheck:libs && pnpm --filter @workspace/api-server run typecheck && pnpm --filter @workspace/api-server run build && PORT=3000 BASE_PATH=/ pnpm --filter @workspace/student-hub run build",
+  "buildCommand": "pnpm -w run typecheck:libs && pnpm --filter @workspace/api-server run typecheck && pnpm --filter @workspace/api-server run build && PORT=3000 BASE_PATH=/ pnpm --filter @workspace/student-hub run build",
   "outputDirectory": "artifacts/student-hub/dist/public",
   "installCommand": "pnpm install",
   "framework": null,

@@ -4,6 +4,8 @@ import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
 import { Trophy, Flame, Clock, Sun, RefreshCw } from "lucide-react";
 
+const SELECTED_BADGE_KEY = "studenthub_selected_leaderboard_badge";
+
 interface CustomBadge { id: string; text: string; emoji: string; color: string }
 
 interface LeaderEntry {
@@ -38,7 +40,7 @@ const STUDY_TIERS = [
   { mins: 4500,  emoji: "💎", label: "Scholar",   bg: "linear-gradient(135deg,#6d28d9,#a78bfa,#6d28d9)" },
   { mins: 3000,  emoji: "🔥", label: "Achiever",  bg: "linear-gradient(135deg,#c2410c,#fb923c,#c2410c)" },
   { mins: 1500,  emoji: "⚡", label: "Explorer",  bg: "linear-gradient(135deg,#1d4ed8,#60a5fa,#1d4ed8)" },
-  { mins: 600,   emoji: "🌱", label: "Beginner",  bg: "linear-gradient(135deg,#15803d,#4ade80,#15803d)" },
+  { mins: 180,   emoji: "🌱", label: "Beginner",  bg: "linear-gradient(135deg,#15803d,#4ade80,#15803d)" },
 ];
 
 const STREAK_TIERS = [
@@ -53,6 +55,27 @@ function getTopBadge(entry: LeaderEntry) {
   return STUDY_TIERS.find(t => entry.totalStudyTime >= t.mins)
     ?? STREAK_TIERS.find(t => entry.streak >= t.days)
     ?? null;
+}
+
+// ─── My selected badge (from localStorage) ───────────────────────────────────
+
+function getMySelectedBadge(entry: LeaderEntry, myUid: string | undefined): { emoji: string; label: string; bg: string } | null {
+  if (entry.uid !== myUid) return null;
+  const key = localStorage.getItem(SELECTED_BADGE_KEY);
+  if (!key) return null;
+
+  // Check auto badges by label
+  const studyMatch = STUDY_TIERS.find(t => t.label === key);
+  if (studyMatch) return studyMatch;
+  const streakMatch = STREAK_TIERS.find(t => t.label === key);
+  if (streakMatch) return streakMatch;
+
+  // Check custom badges by id
+  if (entry.badges) {
+    const custom = entry.badges.find(b => b.id === key);
+    if (custom) return { emoji: custom.emoji, label: custom.text, bg: custom.color };
+  }
+  return null;
 }
 
 // Compact pill shown in the leaderboard row next to the name
@@ -100,7 +123,7 @@ function LeaderboardContent() {
       setEntries(valid);
       setLastUpdated(new Date());
 
-      // Extract custom badges directly from the API response (badges stored in PostgreSQL)
+      // Extract custom badges directly from the API response
       const map: Record<string, CustomBadge> = {};
       valid.forEach(e => {
         if (e.badges && e.badges.length > 0) map[e.uid] = e.badges[0];
@@ -192,8 +215,10 @@ function LeaderboardContent() {
         <div className="space-y-2">
           {filtered.map((entry, i) => {
             const isMe    = entry.uid === user?.uid;
-            const topBadge = getTopBadge(entry);
-            const custom   = customBadges[entry.uid] ?? null;
+            const topBadge = isMe
+              ? (getMySelectedBadge(entry, user?.uid) ?? getTopBadge(entry))
+              : getTopBadge(entry);
+            const custom   = isMe ? null : (customBadges[entry.uid] ?? null);
             const hasBadge = topBadge || custom;
 
             return (

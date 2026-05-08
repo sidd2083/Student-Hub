@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { useListTasks } from "@workspace/api-client-react";
 import {
   BookOpen, BarChart2, FileText, CheckSquare,
-  Timer, MessageCircle, Flame, Megaphone, X,
+  Timer, MessageCircle, Flame, Megaphone, X, Bookmark,
+  ChevronDown,
 } from "lucide-react";
+import { SiteGuide } from "@/components/SiteGuide";
 
 const sections = [
   { href: "/notes",      icon: BookOpen,      label: "Notes",              desc: "Study materials by subject",  color: "bg-blue-50 text-blue-600"    },
@@ -15,10 +17,14 @@ const sections = [
   { href: "/todo",       icon: CheckSquare,   label: "To-Do",              desc: "Track your tasks",            color: "bg-green-50 text-green-600"   },
   { href: "/pomodoro",   icon: Timer,         label: "Pomodoro Timer",     desc: "Focus and study",             color: "bg-red-50 text-red-600"       },
   { href: "/ai",         icon: MessageCircle, label: "Nep AI",             desc: "AI study assistant",          color: "bg-indigo-50 text-indigo-600" },
+  { href: "/saved",      icon: Bookmark,      label: "Saved",              desc: "Your bookmarked items",       color: "bg-teal-50 text-teal-600"     },
 ];
 
 interface Announcement { id: number; title: string; body: string; createdAt: string }
 interface CustomBadge { id: string; text: string; emoji: string; color: string; createdAt: string }
+interface AutoBadge { emoji: string; label: string; bg: string; shadow: string; type: "study" | "streak" }
+
+const DISMISSED_KEY = "studenthub_dismissed_announcements";
 
 const STUDY_TIERS = [
   { mins: 24000, emoji: "🏆", label: "Champion",    bg: "linear-gradient(135deg,#94a3b8,#e2e8f0,#94a3b8)", shadow: "0 4px 20px rgba(148,163,184,0.5)" },
@@ -27,7 +33,7 @@ const STUDY_TIERS = [
   { mins: 4500,  emoji: "💎", label: "Scholar",     bg: "linear-gradient(135deg,#6d28d9,#a78bfa,#6d28d9)", shadow: "0 4px 20px rgba(109,40,217,0.5)"  },
   { mins: 3000,  emoji: "🔥", label: "Achiever",    bg: "linear-gradient(135deg,#c2410c,#fb923c,#c2410c)", shadow: "0 4px 20px rgba(194,65,12,0.5)"   },
   { mins: 1500,  emoji: "⚡", label: "Explorer",    bg: "linear-gradient(135deg,#1d4ed8,#60a5fa,#1d4ed8)", shadow: "0 4px 20px rgba(29,78,216,0.5)"   },
-  { mins: 600,   emoji: "🌱", label: "Beginner",    bg: "linear-gradient(135deg,#15803d,#4ade80,#15803d)", shadow: "0 4px 20px rgba(21,128,61,0.5)"   },
+  { mins: 180,   emoji: "🌱", label: "Beginner",    bg: "linear-gradient(135deg,#15803d,#4ade80,#15803d)", shadow: "0 4px 20px rgba(21,128,61,0.5)"   },
 ];
 
 const STREAK_TIERS = [
@@ -41,21 +47,39 @@ const STREAK_TIERS = [
 function getHighestStudyBadge(mins: number) { return STUDY_TIERS.find(t => mins >= t.mins) ?? null; }
 function getHighestStreakBadge(days: number) { return STREAK_TIERS.find(t => days >= t.days) ?? null; }
 
-// ─── Achievement Card ────────────────────────────────────────────────────────
+const SELECTED_BADGE_KEY = "studenthub_selected_leaderboard_badge";
+
+// ─── Achievement Card ─────────────────────────────────────────────────────────
 
 function AchievementsCard({
   studyMins, streak, customBadges,
 }: { studyMins: number; streak: number; customBadges: CustomBadge[] }) {
   const studyBadge  = getHighestStudyBadge(studyMins);
   const streakBadge = getHighestStreakBadge(streak);
-  const autoBadges  = [studyBadge, streakBadge].filter(Boolean) as (typeof STUDY_TIERS[0])[];
-  const total       = autoBadges.length + customBadges.length;
+  const autoBadges: AutoBadge[]  = [
+    ...(studyBadge  ? [{ ...studyBadge,  type: "study"  as const }] : []),
+    ...(streakBadge ? [{ ...streakBadge, type: "streak" as const }] : []),
+  ];
+  const total = autoBadges.length + customBadges.length;
+  const [selectedKey, setSelectedKey] = useState<string>(() => localStorage.getItem(SELECTED_BADGE_KEY) || "");
+  const [showPicker, setShowPicker] = useState(false);
 
   if (total === 0) return null;
 
+  const handleSelect = (key: string) => {
+    setSelectedKey(key);
+    localStorage.setItem(SELECTED_BADGE_KEY, key);
+    setShowPicker(false);
+  };
+
+  const currentSelected = selectedKey
+    ? ([...autoBadges, ...customBadges.map(b => ({ label: b.text, emoji: b.emoji, id: b.id }))] as { label?: string; text?: string; emoji: string; id?: string }[]).find(
+        b => (b as { label?: string }).label === selectedKey || (b as { id?: string }).id === selectedKey
+      )
+    : null;
+
   return (
     <div className="mb-6 sm:mb-8 rounded-2xl overflow-hidden border border-purple-100 shadow-sm">
-      {/* Card header */}
       <div
         className="px-4 sm:px-5 py-3 flex items-center gap-2"
         style={{ background: "linear-gradient(135deg,#6d28d9 0%,#7c3aed 50%,#4f46e5 100%)" }}
@@ -70,9 +94,8 @@ function AchievementsCard({
         <span className="text-purple-200 text-xs font-medium">{total} / ∞</span>
       </div>
 
-      {/* Badge grid */}
       <div className="bg-white px-4 sm:px-5 py-4">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 mb-4">
           {autoBadges.map(b => (
             <div
               key={b.label}
@@ -83,7 +106,7 @@ function AchievementsCard({
               <div>
                 <p className="text-xs font-bold leading-tight">{b.label}</p>
                 <p className="text-[10px] opacity-75 leading-tight">
-                  {STUDY_TIERS.includes(b as typeof STUDY_TIERS[0]) ? "Study badge" : "Streak badge"}
+                  {b.type === "study" ? "Study badge" : "Streak badge"}
                 </p>
               </div>
             </div>
@@ -102,6 +125,65 @@ function AchievementsCard({
             </div>
           ))}
         </div>
+
+        {/* Badge chooser for leaderboard */}
+        <div className="border-t border-gray-50 pt-3">
+          <p className="text-xs text-gray-500 mb-2">Badge shown on leaderboard:</p>
+          <div className="relative">
+            <button
+              onClick={() => setShowPicker(p => !p)}
+              className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm hover:bg-gray-100 transition-all w-full sm:w-auto"
+            >
+              {selectedKey && currentSelected ? (
+                <>
+                  <span>{currentSelected.emoji}</span>
+                  <span className="font-medium text-gray-800">
+                    {(currentSelected as { label?: string }).label || (currentSelected as { text?: string }).text}
+                  </span>
+                </>
+              ) : (
+                <span className="text-gray-500">Choose badge…</span>
+              )}
+              <ChevronDown className="w-3.5 h-3.5 text-gray-400 ml-auto" />
+            </button>
+
+            {showPicker && (
+              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-100 rounded-2xl shadow-xl z-20 min-w-[200px] overflow-hidden">
+                <div className="p-2 space-y-1">
+                  <button
+                    onClick={() => handleSelect("")}
+                    className="w-full text-left px-3 py-2 text-xs text-gray-500 hover:bg-gray-50 rounded-xl transition-all"
+                  >
+                    Auto (highest earned)
+                  </button>
+                  {autoBadges.map(b => (
+                    <button
+                      key={b.label}
+                      onClick={() => handleSelect(b.label)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left text-sm hover:bg-gray-50 transition-all ${selectedKey === b.label ? "bg-gray-100" : ""}`}
+                    >
+                      <span>{b.emoji}</span>
+                      <span className="font-medium text-gray-800">{b.label}</span>
+                      {selectedKey === b.label && <span className="ml-auto text-blue-500 text-xs">✓</span>}
+                    </button>
+                  ))}
+                  {customBadges.map(b => (
+                    <button
+                      key={b.id}
+                      onClick={() => handleSelect(b.id)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left text-sm hover:bg-gray-50 transition-all ${selectedKey === b.id ? "bg-gray-100" : ""}`}
+                    >
+                      <span>{b.emoji}</span>
+                      <span className="font-medium text-gray-800">{b.text}</span>
+                      {selectedKey === b.id && <span className="ml-auto text-blue-500 text-xs">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1">Saved automatically in your browser</p>
+        </div>
       </div>
     </div>
   );
@@ -112,7 +194,12 @@ export default function Dashboard() {
   const [streak, setStreak]             = useState(0);
   const [studyMins, setStudyMins]       = useState(0);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [dismissed, setDismissed]       = useState<Set<number>>(new Set());
+  const [dismissed, setDismissed]       = useState<Set<number>>(() => {
+    try {
+      const stored = localStorage.getItem(DISMISSED_KEY);
+      return stored ? new Set(JSON.parse(stored) as number[]) : new Set();
+    } catch { return new Set(); }
+  });
   const [customBadges, setCustomBadges] = useState<CustomBadge[]>([]);
   const [statsLoaded, setStatsLoaded]   = useState(false);
   const [badgesLoaded, setBadgesLoaded] = useState(false);
@@ -122,6 +209,14 @@ export default function Dashboard() {
     { query: { enabled: !!user?.uid, queryKey: ["listTasks", user?.uid || ""] } }
   );
   const pendingTasks = (Array.isArray(tasks) ? tasks : []).filter(t => !t.completed).length;
+
+  const dismissAnnouncement = useCallback((id: number) => {
+    setDismissed(prev => {
+      const next = new Set([...prev, id]);
+      try { localStorage.setItem(DISMISSED_KEY, JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -170,6 +265,7 @@ export default function Dashboard() {
   return (
     <>
       <Helmet><title>Dashboard — Student Hub</title></Helmet>
+      <SiteGuide />
       <div className="p-4 sm:p-6 lg:p-8">
 
         {/* Greeting */}
@@ -221,7 +317,7 @@ export default function Dashboard() {
         {loaded && !hasBadges && (
           <div className="mb-6 sm:mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100 rounded-2xl p-4">
             <p className="text-sm font-medium text-blue-800 mb-0.5">🎯 Earn your first badge!</p>
-            <p className="text-xs text-blue-600">Study for 10 hours with the Pomodoro timer to unlock the 🌱 Beginner badge.</p>
+            <p className="text-xs text-blue-600">Study for 3 hours with the Pomodoro timer to unlock the 🌱 Beginner badge.</p>
           </div>
         )}
 
@@ -236,7 +332,7 @@ export default function Dashboard() {
               {visibleAnnouncements.map(a => (
                 <div key={a.id} className="bg-blue-50 border border-blue-100 rounded-2xl p-4 relative">
                   <button
-                    onClick={() => setDismissed(prev => new Set([...prev, a.id]))}
+                    onClick={() => dismissAnnouncement(a.id)}
                     className="absolute top-3 right-3 p-1 rounded-full hover:bg-blue-200/60 transition-all"
                   >
                     <X className="w-4 h-4 text-blue-400" />
