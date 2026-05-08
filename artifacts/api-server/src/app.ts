@@ -2,7 +2,6 @@ import express, { type Express } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
-import { pinoHttp } from "pino-http";
 import router from "./routes";
 
 const app: Express = express();
@@ -13,7 +12,14 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "same-site" },
 }));
 
-app.use(pinoHttp());
+// Only use pino-http in non-serverless environments (workers don't run in Vercel)
+if (process.env.NODE_ENV !== "production" || process.env.ENABLE_PINO === "true") {
+  import("pino-http").then(({ pinoHttp }) => {
+    app.use(pinoHttp());
+  }).catch(() => {
+    // silently skip if pino-http is unavailable
+  });
+}
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
