@@ -9,10 +9,12 @@ function getClient(): OpenAI {
   const apiKey =
     process.env.AI_INTEGRATIONS_OPENAI_API_KEY ??
     process.env.OPENAI_API_KEY ??
+    process.env.VITE_OPENAI_API_KEY ??
     "placeholder";
   const baseURL =
     process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ??
     process.env.OPENAI_BASE_URL ??
+    process.env.VITE_OPENAI_BASE_URL ??
     undefined;
   return new OpenAI({ baseURL, apiKey });
 }
