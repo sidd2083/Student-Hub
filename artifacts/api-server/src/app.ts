@@ -4,7 +4,12 @@ import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import pino from "pino";
 import pinoHttp from "pino-http";
+import { fileURLToPath } from "url";
+import path from "path";
+import fs from "fs";
 import router from "./routes";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app: Express = express();
 
@@ -12,6 +17,7 @@ app.set("trust proxy", 1);
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "same-site" },
+  contentSecurityPolicy: false,
 }));
 
 const serverLogger = pino({ level: process.env.LOG_LEVEL ?? "info" });
@@ -43,9 +49,18 @@ app.use(express.urlencoded({ extended: true, limit: "50kb" }));
 app.use("/api/ai", aiLimiter);
 app.use("/api", limiter, router);
 
-app.use((_req: Request, res: Response, _next: NextFunction) => {
-  res.status(404).json({ error: "Not found" });
-});
+// Serve built React frontend in production
+const frontendPath = path.resolve(__dirname, "../../student-hub/dist/public");
+if (fs.existsSync(frontendPath)) {
+  app.use(express.static(frontendPath, { index: false }));
+  app.get(/.*/, (_req: Request, res: Response) => {
+    res.sendFile(path.join(frontendPath, "index.html"));
+  });
+} else {
+  app.use((_req: Request, res: Response, _next: NextFunction) => {
+    res.status(404).json({ error: "Not found" });
+  });
+}
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   serverLogger.error(err);

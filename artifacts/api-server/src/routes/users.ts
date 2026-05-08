@@ -41,19 +41,20 @@ router.get("/users", async (_req: Request, res: Response) => {
 router.post("/users", async (req: Request, res: Response) => {
   try {
     const { uid, name, email, grade, role } = req.body as { uid?: string; name?: string; email?: string; grade?: string | number; role?: "user" | "admin" };
-    if (!uid || !name || !email || !grade) {
-      return res.status(400).json({ error: "Missing required fields: uid, name, email, grade" });
+    if (!uid || !name || !grade) {
+      return res.status(400).json({ error: "Missing required fields: uid, name, grade" });
     }
+    const emailVal = email || "";
     const roleVal: "user" | "admin" = role === "admin" ? "admin" : "user";
     const existing = await db.select().from(usersTable).where(eq(usersTable.uid, uid));
     if (existing.length > 0) {
       const updated = await db.update(usersTable)
-        .set({ name, email, grade: Number(grade), role: roleVal })
+        .set({ name, email: emailVal, grade: Number(grade), role: roleVal })
         .where(eq(usersTable.uid, uid))
         .returning();
       return res.json(toUser(updated[0]));
     }
-    const inserted = await db.insert(usersTable).values({ uid, name, email, grade: Number(grade), role: roleVal }).returning();
+    const inserted = await db.insert(usersTable).values({ uid, name, email: emailVal, grade: Number(grade), role: roleVal }).returning();
     return res.status(201).json(toUser(inserted[0]));
   } catch (err) {
     return dbError(res, err);
