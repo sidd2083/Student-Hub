@@ -30,6 +30,7 @@ import Admin from "@/pages/Admin";
 import About from "@/pages/About";
 import Contact from "@/pages/Contact";
 import Saved from "@/pages/Saved";
+import McqPractice from "@/pages/McqPractice";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import Terms from "@/pages/Terms";
 import NotFound from "@/pages/not-found";
@@ -75,6 +76,7 @@ function Router() {
             <Route path="/pomodoro" component={Pomodoro} />
             <Route path="/leaderboard" component={Leaderboard} />
             <Route path="/saved" component={Saved} />
+            <Route path="/mcq" component={McqPractice} />
 
             <Route path="/dashboard">
               <PrivateRoute><Dashboard /></PrivateRoute>
