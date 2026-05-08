@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { doc, updateDoc } from "firebase/firestore";
@@ -16,6 +16,13 @@ export default function Settings() {
   const [darkMode, setDarkMode] = useState(
     typeof window !== "undefined" && localStorage.getItem("theme") === "dark"
   );
+
+  useEffect(() => {
+    if (profile) {
+      setName(profile.name || "");
+      setGrade(profile.grade || 10);
+    }
+  }, [profile]);
 
   const toggleTheme = async () => {
     const next = !darkMode;
@@ -35,7 +42,12 @@ export default function Settings() {
     setProfile({ ...profile!, grade: g });
     setGradeSaving(true);
     try {
-      await updateDoc(doc(db, "users", user.uid), { grade: g });
+      const res = await fetch(`/api/users/${user.uid}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grade: g }),
+      });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
     } catch (err) {
       console.error("Grade update failed:", err);
     } finally {
@@ -51,8 +63,14 @@ export default function Settings() {
     setError("");
     setSuccess(false);
     try {
-      await updateDoc(doc(db, "users", user.uid), { name: name.trim() });
-      setProfile({ ...profile!, name: name.trim() });
+      const res = await fetch(`/api/users/${user.uid}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const updated = await res.json();
+      setProfile({ ...profile!, name: updated.name ?? name.trim() });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
@@ -160,8 +178,18 @@ export default function Settings() {
               <h2 className="text-lg font-semibold text-gray-900">Account</h2>
             </div>
             <div className="space-y-3 text-sm">
-              <div className="flex justify-between py-2 border-b border-gray-50"><span className="text-gray-500">Email</span><span className="text-gray-900 font-medium">{profile?.email || "—"}</span></div>
-              <div className="flex justify-between py-2 border-b border-gray-50"><span className="text-gray-500">Role</span><span className="text-gray-900 font-medium capitalize">{profile?.role || "user"}</span></div>
+              <div className="flex justify-between py-2 border-b border-gray-50">
+                <span className="text-gray-500">Email</span>
+                <span className="text-gray-900 font-medium">{profile?.email || user?.email || "—"}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-50">
+                <span className="text-gray-500">Grade</span>
+                <span className="text-gray-900 font-medium">{profile?.grade ? `Grade ${profile.grade}` : "—"}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-gray-50">
+                <span className="text-gray-500">Role</span>
+                <span className="text-gray-900 font-medium capitalize">{profile?.role || "user"}</span>
+              </div>
             </div>
           </div>
         </div>

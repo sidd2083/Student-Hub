@@ -72,6 +72,28 @@ async function fetchProfile(uid: string): Promise<ProfileResult> {
   }
 }
 
+// ─── Patch missing profile fields from Firebase user data ─────────────────────
+
+async function patchProfileFromFirebase(uid: string, firebaseUser: FirebaseUser, profile: UserProfile): Promise<UserProfile> {
+  const updates: Record<string, unknown> = {};
+  if (!profile.name && firebaseUser.displayName) updates.name = firebaseUser.displayName;
+  if (!profile.email && firebaseUser.email) updates.email = firebaseUser.email;
+  if (Object.keys(updates).length === 0) return profile;
+  try {
+    console.log("[Auth] Auto-patching missing profile fields:", Object.keys(updates));
+    const res = await fetch(`/api/users/${uid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) return profile;
+    const d = await res.json();
+    return { ...profile, name: d.name ?? profile.name, email: d.email ?? profile.email };
+  } catch {
+    return profile;
+  }
+}
+
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -158,7 +180,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const currentPath = window.location.pathname;
 
       if (result.status === "found") {
-        applyProfile(result.profile);
+        const patched = await patchProfileFromFirebase(firebaseUser.uid, firebaseUser, result.profile);
+        if (!mounted) return;
+        applyProfile(patched);
         setLoading(false);
         if (currentPath === "/" || currentPath === "/login") {
           window.location.replace("/dashboard");
@@ -219,7 +243,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // potentially racing with us on the redirect destination.
       const pr = await fetchProfile(cred.user.uid);
       if (pr.status === "found") {
-        applyProfile(pr.profile);
+        const patched = await patchProfileFromFirebase(cred.user.uid, cred.user, pr.profile);
+        applyProfile(patched);
         window.location.replace("/dashboard");
       } else if (pr.status === "not_found") {
         // Existing Firebase account, but no profile in our DB yet (e.g. first
