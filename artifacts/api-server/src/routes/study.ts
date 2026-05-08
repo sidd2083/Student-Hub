@@ -4,15 +4,15 @@ import { db } from "@workspace/db";
 import { usersTable, studyLogsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { dbError } from "../lib/errors";
 
 const router = Router();
 
 type StudyLogRow = typeof studyLogsTable.$inferSelect;
 
-// Nepal is UTC+5:45 (345 minutes ahead of UTC)
 function getNepalDate(): string {
   const now = new Date();
-  const nepalOffset = 5 * 60 + 45; // 345 minutes
+  const nepalOffset = 5 * 60 + 45;
   const nepalTime = new Date(now.getTime() + nepalOffset * 60 * 1000);
   return nepalTime.toISOString().slice(0, 10);
 }
@@ -91,8 +91,7 @@ router.post("/study/session", async (req: Request, res: Response) => {
       lastActiveDate: u.lastActiveDate,
     });
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -114,8 +113,7 @@ router.post("/study/log-task", async (req: Request, res: Response) => {
     }
     return res.json({ success: true });
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -137,8 +135,7 @@ router.post("/study/log-note", async (req: Request, res: Response) => {
     }
     return res.json({ success: true });
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -155,8 +152,7 @@ router.get("/study/logs/:uid", async (req: Request, res: Response) => {
 
     return res.json(logs.map(toLog));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -172,8 +168,7 @@ router.get("/study/stats/:uid", async (req: Request, res: Response) => {
       lastActiveDate: u.lastActiveDate,
     });
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 

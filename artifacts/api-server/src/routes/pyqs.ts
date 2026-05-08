@@ -3,7 +3,7 @@ import type { Request, Response } from "express";
 import { db } from "@workspace/db";
 import { pyqsTable } from "@workspace/db";
 import { eq, and, type SQL } from "drizzle-orm";
-import { logger } from "../lib/logger";
+import { dbError } from "../lib/errors";
 
 const router = Router();
 
@@ -31,8 +31,7 @@ router.get("/pyqs", async (req: Request, res: Response) => {
       : await db.select().from(pyqsTable).orderBy(pyqsTable.year);
     return res.json(pyqs.map(toPyq));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -40,7 +39,7 @@ router.post("/pyqs", async (req: Request, res: Response) => {
   try {
     const { grade, subject, title, year, pdfUrl, fileType } = req.body as Record<string, unknown>;
     if (!grade || !subject || !title || !year || !pdfUrl) {
-      return res.status(400).json({ error: "Missing required fields" });
+      return res.status(400).json({ error: "Missing required fields: grade, subject, title, year, pdfUrl" });
     }
     const inserted = await db.insert(pyqsTable).values({
       grade, subject, title, year, pdfUrl,
@@ -48,8 +47,7 @@ router.post("/pyqs", async (req: Request, res: Response) => {
     } as PyqRow).returning();
     return res.status(201).json(toPyq(inserted[0]));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -58,8 +56,7 @@ router.delete("/pyqs/:id", async (req: Request, res: Response) => {
     await db.delete(pyqsTable).where(eq(pyqsTable.id, Number(req.params.id)));
     return res.json({ success: true });
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 

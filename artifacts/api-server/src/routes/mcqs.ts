@@ -3,7 +3,7 @@ import type { Request, Response } from "express";
 import { db } from "@workspace/db";
 import { mcqsTable } from "@workspace/db";
 import { eq, and, sql, type SQL } from "drizzle-orm";
-import { logger } from "../lib/logger";
+import { dbError } from "../lib/errors";
 
 const router = Router();
 
@@ -39,8 +39,7 @@ router.get("/mcqs", async (req: Request, res: Response) => {
     if (limit) mcqs = mcqs.slice(0, Number(limit));
     return res.json(mcqs.map(toMcq));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -60,8 +59,7 @@ router.post("/mcqs", async (req: Request, res: Response) => {
     } as McqRow).returning();
     return res.status(201).json(toMcq(inserted[0]));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -88,8 +86,7 @@ router.patch("/mcqs/:id", async (req: Request, res: Response) => {
     if (updated.length === 0) return res.status(404).json({ error: "MCQ not found" });
     return res.json(toMcq(updated[0]));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -98,8 +95,7 @@ router.delete("/mcqs/:id", async (req: Request, res: Response) => {
     await db.delete(mcqsTable).where(eq(mcqsTable.id, Number(req.params.id)));
     return res.json({ success: true });
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 

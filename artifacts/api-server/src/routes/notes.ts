@@ -4,6 +4,7 @@ import { db } from "@workspace/db";
 import { notesTable } from "@workspace/db";
 import { eq, and, type SQL } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { dbError } from "../lib/errors";
 
 const router = Router();
 
@@ -32,8 +33,7 @@ router.get("/notes", async (req: Request, res: Response) => {
       : await db.select().from(notesTable).orderBy(notesTable.createdAt);
     return res.json(notes.map(toNote));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -46,8 +46,7 @@ router.get("/notes/subjects", async (req: Request, res: Response) => {
     const subjects = [...new Set(notes.map((n: { subject: string }) => n.subject))].sort();
     return res.json(subjects);
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -57,8 +56,7 @@ router.get("/notes/:id", async (req: Request, res: Response) => {
     if (notes.length === 0) return res.status(404).json({ error: "Note not found" });
     return res.json(toNote(notes[0]));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -66,13 +64,12 @@ router.post("/notes", async (req: Request, res: Response) => {
   try {
     const { grade, subject, chapter, title, contentType, content } = req.body as Record<string, unknown>;
     if (!grade || !subject || !chapter || !title || !contentType || !content) {
-      return res.status(400).json({ error: "Missing required fields" });
+      return res.status(400).json({ error: "Missing required fields: grade, subject, chapter, title, contentType, content" });
     }
     const inserted = await db.insert(notesTable).values({ grade, subject, chapter, title, contentType, content } as NoteRow).returning();
     return res.status(201).json(toNote(inserted[0]));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -90,8 +87,7 @@ router.patch("/notes/:id", async (req: Request, res: Response) => {
     if (updated.length === 0) return res.status(404).json({ error: "Note not found" });
     return res.json(toNote(updated[0]));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -100,8 +96,7 @@ router.delete("/notes/:id", async (req: Request, res: Response) => {
     await db.delete(notesTable).where(eq(notesTable.id, Number(req.params.id)));
     return res.json({ success: true });
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 

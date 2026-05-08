@@ -4,10 +4,10 @@ import { db } from "@workspace/db";
 import { savedItemsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { dbError } from "../lib/errors";
 
 const router = Router();
 
-// GET /api/saved?uid=xxx — list saved items with full item details
 router.get("/saved", async (req: Request, res: Response) => {
   try {
     const uid = String(req.query.uid || "");
@@ -17,10 +17,8 @@ router.get("/saved", async (req: Request, res: Response) => {
       .where(eq(savedItemsTable.uid, uid))
       .orderBy(savedItemsTable.createdAt);
 
-    // Enrich with item details
     const enriched = await Promise.all(rows.map(async (row) => {
       try {
-        const endpoint = row.itemType === "note" ? `/api/notes/${row.itemId}` : null;
         if (row.itemType === "note") {
           const { notesTable } = await import("@workspace/db");
           const notes = await db.select().from(notesTable)
@@ -46,19 +44,16 @@ router.get("/saved", async (req: Request, res: Response) => {
 
     return res.json(enriched);
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
-// POST /api/saved — save an item
 router.post("/saved", async (req: Request, res: Response) => {
   try {
     const { uid, itemType, itemId } = req.body as { uid?: string; itemType?: string; itemId?: number };
     if (!uid || !itemType || !itemId) return res.status(400).json({ error: "uid, itemType, itemId required" });
     if (itemType !== "note" && itemType !== "pyq") return res.status(400).json({ error: "itemType must be note or pyq" });
 
-    // Check if already saved
     const existing = await db.select().from(savedItemsTable)
       .where(and(eq(savedItemsTable.uid, uid), eq(savedItemsTable.itemType, itemType), eq(savedItemsTable.itemId, itemId)));
 
@@ -72,12 +67,10 @@ router.post("/saved", async (req: Request, res: Response) => {
 
     return res.status(201).json(inserted[0]);
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
-// DELETE /api/saved/:id?uid=xxx — unsave
 router.delete("/saved/:id", async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
@@ -89,12 +82,10 @@ router.delete("/saved/:id", async (req: Request, res: Response) => {
 
     return res.json({ success: true });
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
-// GET /api/saved/check?uid=xxx&itemType=note&itemId=1 — check if saved
 router.get("/saved/check", async (req: Request, res: Response) => {
   try {
     const uid = String(req.query.uid || "");
@@ -107,8 +98,7 @@ router.get("/saved/check", async (req: Request, res: Response) => {
 
     return res.json({ saved: existing.length > 0, id: existing[0]?.id ?? null });
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 

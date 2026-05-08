@@ -3,7 +3,7 @@ import type { Request, Response } from "express";
 import { db } from "@workspace/db";
 import { announcements } from "@workspace/db";
 import { desc, eq } from "drizzle-orm";
-import { logger } from "../lib/logger";
+import { dbError } from "../lib/errors";
 
 const router = Router();
 
@@ -25,8 +25,7 @@ router.get("/announcements", async (_req: Request, res: Response) => {
       .limit(50);
     return res.json(rows.map(toAnnouncement));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Failed to fetch announcements" });
+    return dbError(res, err);
   }
 });
 
@@ -42,8 +41,7 @@ router.post("/announcements", async (req: Request, res: Response) => {
       .returning();
     return res.status(201).json(toAnnouncement(row));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Failed to create announcement" });
+    return dbError(res, err);
   }
 });
 
@@ -56,8 +54,7 @@ router.delete("/announcements/:id", async (req: Request, res: Response) => {
     await db.delete(announcements).where(eq(announcements.id, id));
     return res.status(204).end();
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Failed to delete announcement" });
+    return dbError(res, err);
   }
 });
 

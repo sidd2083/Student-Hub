@@ -4,6 +4,7 @@ import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { dbError } from "../lib/errors";
 
 const router = Router();
 
@@ -33,8 +34,7 @@ router.get("/users", async (_req: Request, res: Response) => {
     const users = await db.select().from(usersTable).orderBy(usersTable.createdAt);
     return res.json(users.map(toUser));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -42,7 +42,7 @@ router.post("/users", async (req: Request, res: Response) => {
   try {
     const { uid, name, email, grade, role } = req.body as { uid?: string; name?: string; email?: string; grade?: string | number; role?: "user" | "admin" };
     if (!uid || !name || !email || !grade) {
-      return res.status(400).json({ error: "Missing required fields" });
+      return res.status(400).json({ error: "Missing required fields: uid, name, email, grade" });
     }
     const roleVal: "user" | "admin" = role === "admin" ? "admin" : "user";
     const existing = await db.select().from(usersTable).where(eq(usersTable.uid, uid));
@@ -56,8 +56,7 @@ router.post("/users", async (req: Request, res: Response) => {
     const inserted = await db.insert(usersTable).values({ uid, name, email, grade: Number(grade), role: roleVal }).returning();
     return res.status(201).json(toUser(inserted[0]));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -76,8 +75,7 @@ router.get("/users/stats/summary", async (_req: Request, res: Response) => {
     }
     return res.json({ total: users.length, byGrade, admins, newToday });
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -87,8 +85,7 @@ router.get("/users/:uid", async (req: Request, res: Response) => {
     if (users.length === 0) return res.status(404).json({ error: "User not found" });
     return res.json(toUser(users[0]));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -103,24 +100,23 @@ router.put("/users/:uid/badges", async (req: Request, res: Response) => {
     if (updated.length === 0) return res.status(404).json({ error: "User not found" });
     return res.json({ badges: parseBadges(updated[0].badges) });
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
 router.patch("/users/:uid", async (req: Request, res: Response) => {
   try {
-    const { name, grade, role } = req.body as Record<string, unknown>;
+    const { name, grade, role, email } = req.body as Record<string, unknown>;
     const updates: Record<string, unknown> = {};
     if (name  !== undefined) updates.name  = name;
+    if (email !== undefined) updates.email = email;
     if (grade !== undefined) updates.grade = grade;
     if (role  !== undefined) updates.role  = role;
     const updated = await db.update(usersTable).set(updates).where(eq(usersTable.uid, String(req.params.uid))).returning();
     if (updated.length === 0) return res.status(404).json({ error: "User not found" });
     return res.json(toUser(updated[0]));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -129,8 +125,7 @@ router.delete("/users/:uid", async (req: Request, res: Response) => {
     await db.delete(usersTable).where(eq(usersTable.uid, String(req.params.uid)));
     return res.json({ success: true });
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 

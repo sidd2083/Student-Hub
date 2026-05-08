@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
@@ -14,7 +14,6 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "same-site" },
 }));
 
-// Use a plain pino instance with no transport — safe for serverless (no worker threads)
 const serverLogger = pino({ level: process.env.LOG_LEVEL ?? "info" });
 app.use(pinoHttp({ logger: serverLogger }));
 
@@ -43,5 +42,16 @@ app.use(express.urlencoded({ extended: true, limit: "50kb" }));
 
 app.use("/api/ai", aiLimiter);
 app.use("/api", limiter, router);
+
+app.use((_req: Request, res: Response, _next: NextFunction) => {
+  res.status(404).json({ error: "Not found" });
+});
+
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  serverLogger.error(err);
+  if (!res.headersSent) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 export default app;

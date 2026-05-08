@@ -3,7 +3,7 @@ import type { Request, Response } from "express";
 import { db } from "@workspace/db";
 import { tasksTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { logger } from "../lib/logger";
+import { dbError } from "../lib/errors";
 
 const router = Router();
 
@@ -26,20 +26,18 @@ router.get("/tasks", async (req: Request, res: Response) => {
       .orderBy(tasksTable.createdAt);
     return res.json(tasks.map(toTask));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
 router.post("/tasks", async (req: Request, res: Response) => {
   try {
     const { uid, text } = req.body as Record<string, string>;
-    if (!uid || !text) return res.status(400).json({ error: "Missing required fields" });
+    if (!uid || !text) return res.status(400).json({ error: "Missing required fields: uid, text" });
     const inserted = await db.insert(tasksTable).values({ uid, text, completed: false }).returning();
     return res.status(201).json(toTask(inserted[0]));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -53,8 +51,7 @@ router.patch("/tasks/:id", async (req: Request, res: Response) => {
     if (updated.length === 0) return res.status(404).json({ error: "Task not found" });
     return res.json(toTask(updated[0]));
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
@@ -63,8 +60,7 @@ router.delete("/tasks/:id", async (req: Request, res: Response) => {
     await db.delete(tasksTable).where(eq(tasksTable.id, Number(req.params.id)));
     return res.json({ success: true });
   } catch (err) {
-    logger.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    return dbError(res, err);
   }
 });
 
