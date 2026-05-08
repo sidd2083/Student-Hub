@@ -1,16 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { SoftGate } from "@/components/SoftGate";
 import { useTimer } from "@/context/TimerContext";
-import { useListTasks, getListTasksQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import {
   Play, Pause, RotateCcw, Timer, CheckSquare,
   SkipForward, Settings, X,
 } from "lucide-react";
 import type { Phase } from "@/context/TimerContext";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtTime(mins: number) {
   return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
@@ -27,8 +26,6 @@ function phaseColor(p: Phase) {
   if (p === "shortBreak") return { ring: "#22c55e", text: "text-green-500", bg: "bg-green-500" };
   return { ring: "#a855f7", text: "text-purple-500", bg: "bg-purple-500" };
 }
-
-// ─── Settings Panel ──────────────────────────────────────────────────────────
 
 function SettingsPanel({ onClose }: { onClose: () => void }) {
   const { settings, updateSettings, running } = useTimer();
@@ -71,8 +68,6 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── Main Pomodoro UI ─────────────────────────────────────────────────────────
-
 function PomodoroContent() {
   const { user } = useAuth();
   const {
@@ -82,12 +77,16 @@ function PomodoroContent() {
   } = useTimer();
   const [activeTask, setActiveTask] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [pendingTasks, setPendingTasks] = useState<Array<{ id: string; text: string }>>([]);
 
-  const { data: tasks } = useListTasks(
-    { uid: user?.uid || "" },
-    { query: { enabled: !!user?.uid, queryKey: getListTasksQueryKey({ uid: user?.uid || "" }) } }
-  );
-  const pendingTasks = (Array.isArray(tasks) ? tasks : []).filter(t => !t.completed);
+  useEffect(() => {
+    if (!user?.uid) return;
+    getDocs(query(collection(db, "tasks"), where("uid", "==", user.uid), where("completed", "==", false)))
+      .then(snap => {
+        setPendingTasks(snap.docs.map(d => ({ id: d.id, text: d.data().text })));
+      })
+      .catch(console.error);
+  }, [user?.uid]);
 
   const totalSecs = (() => {
     if (phase === "work") return settings.workMins * 60;
@@ -100,9 +99,6 @@ function PomodoroContent() {
   const secs = (seconds % 60).toString().padStart(2, "0");
   const circumference = 2 * Math.PI * 44;
   const colors = phaseColor(phase);
-
-  // Session dots (compact)
-  const dots = Array.from({ length: settings.sessionsBeforeLongBreak }, (_, i) => i < sessionsCompleted % settings.sessionsBeforeLongBreak || (sessionsCompleted > 0 && sessionsCompleted % settings.sessionsBeforeLongBreak === 0 && i < settings.sessionsBeforeLongBreak));
 
   return (
     <div className="p-4 sm:p-8 max-w-lg mx-auto">
@@ -121,16 +117,13 @@ function PomodoroContent() {
 
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
 
-      {/* Live stats banner */}
       {savedMinutesToday > 0 && (
         <div className="flex gap-3 mb-4 px-4 py-2.5 bg-blue-50 border border-blue-100 rounded-2xl">
           <span className="text-sm text-blue-700 font-medium">Today: <span className="font-bold">{fmtTime(savedMinutesToday)}</span> saved to leaderboard</span>
         </div>
       )}
 
-      {/* Main timer card */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center mb-5">
-        {/* Phase badge */}
         <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-6 ${
           phase === "work" ? "bg-blue-50 text-blue-600" :
           phase === "shortBreak" ? "bg-green-50 text-green-600" :
@@ -140,7 +133,6 @@ function PomodoroContent() {
           {phaseLabel(phase)}
         </div>
 
-        {/* Session dots */}
         <div className="flex gap-1.5 justify-center mb-6">
           {Array.from({ length: settings.sessionsBeforeLongBreak }, (_, i) => {
             const completed = sessionsCompleted % settings.sessionsBeforeLongBreak;
@@ -152,7 +144,6 @@ function PomodoroContent() {
           })}
         </div>
 
-        {/* Circular progress */}
         <div className="relative w-52 h-52 mx-auto mb-8">
           <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
             <circle cx="50" cy="50" r="44" fill="none" stroke="#f3f4f6" strokeWidth="7" />
@@ -171,13 +162,8 @@ function PomodoroContent() {
           </div>
         </div>
 
-        {/* Controls */}
         <div className="flex gap-3 justify-center">
-          <button
-            onClick={reset}
-            className="p-3.5 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
-            title="Reset"
-          >
+          <button onClick={reset} className="p-3.5 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all" title="Reset">
             <RotateCcw className="w-5 h-5" />
           </button>
           <button
@@ -188,22 +174,16 @@ function PomodoroContent() {
           >
             {running ? <><Pause className="w-5 h-5" /> Pause</> : <><Play className="w-5 h-5" /> Start</>}
           </button>
-          <button
-            onClick={skipPhase}
-            className="p-3.5 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
-            title="Skip to next phase"
-          >
+          <button onClick={skipPhase} className="p-3.5 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all" title="Skip to next phase">
             <SkipForward className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Session count */}
         <p className="mt-4 text-xs text-gray-400">
           Sessions completed: {sessionsCompleted} · Long break every {settings.sessionsBeforeLongBreak}
         </p>
       </div>
 
-      {/* Task selector */}
       {pendingTasks.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">

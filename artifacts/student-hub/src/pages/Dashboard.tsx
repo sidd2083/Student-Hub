@@ -2,7 +2,10 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { useListTasks } from "@workspace/api-client-react";
+import {
+  collection, query, where, getDocs, doc, getDoc, orderBy,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import {
   BookOpen, BarChart2, FileText, CheckSquare,
   Timer, MessageCircle, Flame, Megaphone, X, Bookmark,
@@ -20,7 +23,7 @@ const sections = [
   { href: "/saved",      icon: Bookmark,      label: "Saved",              desc: "Your bookmarked items",       color: "bg-teal-50 text-teal-600"     },
 ];
 
-interface Announcement { id: number; title: string; body: string; createdAt: string }
+interface Announcement { id: string; title: string; body: string; createdAt: string }
 interface CustomBadge { id: string; text: string; emoji: string; color: string; createdAt: string }
 interface AutoBadge { emoji: string; label: string; bg: string; shadow: string; type: "study" | "streak" }
 
@@ -48,8 +51,6 @@ function getHighestStudyBadge(mins: number) { return STUDY_TIERS.find(t => mins 
 function getHighestStreakBadge(days: number) { return STREAK_TIERS.find(t => days >= t.days) ?? null; }
 
 const SELECTED_BADGE_KEY = "studenthub_selected_leaderboard_badge";
-
-// ─── Achievement Card ─────────────────────────────────────────────────────────
 
 function AchievementsCard({
   studyMins, streak, customBadges,
@@ -126,7 +127,6 @@ function AchievementsCard({
           ))}
         </div>
 
-        {/* Badge chooser for leaderboard */}
         <div className="border-t border-gray-50 pt-3">
           <p className="text-xs text-gray-500 mb-2">Badge shown on leaderboard:</p>
           <div className="relative">
@@ -194,23 +194,17 @@ export default function Dashboard() {
   const [streak, setStreak]             = useState(0);
   const [studyMins, setStudyMins]       = useState(0);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [dismissed, setDismissed]       = useState<Set<number>>(() => {
+  const [dismissed, setDismissed]       = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem(DISMISSED_KEY);
-      return stored ? new Set(JSON.parse(stored) as number[]) : new Set();
+      return stored ? new Set(JSON.parse(stored) as string[]) : new Set();
     } catch { return new Set(); }
   });
   const [customBadges, setCustomBadges] = useState<CustomBadge[]>([]);
+  const [pendingTasks, setPendingTasks] = useState(0);
   const [statsLoaded, setStatsLoaded]   = useState(false);
-  const [badgesLoaded, setBadgesLoaded] = useState(false);
 
-  const { data: tasks } = useListTasks(
-    { uid: user?.uid || "" },
-    { query: { enabled: !!user?.uid, queryKey: ["listTasks", user?.uid || ""] } }
-  );
-  const pendingTasks = (Array.isArray(tasks) ? tasks : []).filter(t => !t.completed).length;
-
-  const dismissAnnouncement = useCallback((id: number) => {
+  const dismissAnnouncement = useCallback((id: string) => {
     setDismissed(prev => {
       const next = new Set([...prev, id]);
       try { localStorage.setItem(DISMISSED_KEY, JSON.stringify([...next])); } catch {}
@@ -219,30 +213,48 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
-    fetch(`/api/study/stats/${user.uid}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data) { setStudyMins(data.totalStudyTime ?? 0); setStreak(data.streak ?? 0); }
-      })
-      .catch(console.error)
-      .finally(() => setStatsLoaded(true));
+    if (!user?.uid) return;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        if (snap.exists()) {
+          const d = snap.data();
+          setStudyMins(d.totalStudyTime ?? 0);
+          setStreak(d.streak ?? 0);
+          setCustomBadges(d.badges ?? []);
+        }
+      } catch (e) {
+        console.error("[Dashboard] Stats load failed:", e);
+      } finally {
+        setStatsLoaded(true);
+      }
+    })();
   }, [user]);
 
   useEffect(() => {
-    if (!user) return;
-    fetch(`/api/users/${user.uid}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.badges) setCustomBadges(data.badges); })
-      .catch(console.error)
-      .finally(() => setBadgesLoaded(true));
+    if (!user?.uid) return;
+    (async () => {
+      try {
+        const q = query(collection(db, "tasks"), where("uid", "==", user.uid), where("completed", "==", false));
+        const snap = await getDocs(q);
+        setPendingTasks(snap.size);
+      } catch (e) {
+        console.error("[Dashboard] Tasks load failed:", e);
+      }
+    })();
   }, [user]);
 
   useEffect(() => {
-    fetch("/api/announcements")
-      .then(r => r.ok ? r.json() : [])
-      .then((data: Announcement[]) => setAnnouncements(data.slice(0, 3)))
-      .catch(() => setAnnouncements([]));
+    (async () => {
+      try {
+        const snap = await getDocs(query(collection(db, "announcements"), orderBy("createdAt", "desc")));
+        const list: Announcement[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
+        setAnnouncements(list.slice(0, 3));
+      } catch (e) {
+        console.error("[Dashboard] Announcements load failed:", e);
+        setAnnouncements([]);
+      }
+    })();
   }, []);
 
   const greeting = () => {
@@ -260,7 +272,6 @@ export default function Dashboard() {
   const studyBadge  = getHighestStudyBadge(studyMins);
   const streakBadge = getHighestStreakBadge(streak);
   const hasBadges   = studyBadge || streakBadge || customBadges.length > 0;
-  const loaded      = statsLoaded && badgesLoaded;
 
   return (
     <>
@@ -268,7 +279,6 @@ export default function Dashboard() {
       <SiteGuide />
       <div className="p-4 sm:p-6 lg:p-8">
 
-        {/* Greeting */}
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center gap-3 mb-1 flex-wrap">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
@@ -281,7 +291,6 @@ export default function Dashboard() {
           <p className="text-gray-500 text-sm">Ready to learn something new today?</p>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-5 sm:mb-6">
           <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
             <p className="text-xs sm:text-sm text-gray-500 mb-1">Pending Tasks</p>
@@ -304,8 +313,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Achievements Card */}
-        {loaded && hasBadges && (
+        {statsLoaded && hasBadges && (
           <AchievementsCard
             studyMins={studyMins}
             streak={streak}
@@ -313,15 +321,13 @@ export default function Dashboard() {
           />
         )}
 
-        {/* First badge motivator */}
-        {loaded && !hasBadges && (
+        {statsLoaded && !hasBadges && (
           <div className="mb-6 sm:mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100 rounded-2xl p-4">
             <p className="text-sm font-medium text-blue-800 mb-0.5">🎯 Earn your first badge!</p>
             <p className="text-xs text-blue-600">Study for 3 hours with the Pomodoro timer to unlock the 🌱 Beginner badge.</p>
           </div>
         )}
 
-        {/* Announcements */}
         {visibleAnnouncements.length > 0 && (
           <div className="mb-6 sm:mb-8">
             <div className="flex items-center gap-2 mb-3 sm:mb-4">
@@ -348,7 +354,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Quick Access */}
         <h2 className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider mb-3 sm:mb-4">Quick Access</h2>
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {sections.map(({ href, icon: Icon, label, desc, color }) => (

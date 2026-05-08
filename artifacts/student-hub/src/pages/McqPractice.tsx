@@ -1,12 +1,37 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
-import { useListMcqs, useListNoteSubjects, useSubmitScore, getListMcqsQueryKey } from "@workspace/api-client-react";
+import { collection, query, where, getDocs, addDoc, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Brain, CheckCircle, XCircle, Lightbulb } from "lucide-react";
 
+interface Mcq {
+  id: string;
+  grade: number;
+  subject: string;
+  chapter: string;
+  question: string;
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+  correctAnswer: string;
+  difficulty: string;
+  explanation?: string;
+}
+
 type Phase = "setup" | "quiz" | "results";
-interface Answer { questionId: number; selected: string; correct: boolean }
+interface Answer { questionId: string; selected: string; correct: boolean }
+
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 function McqContent() {
   const { profile, user } = useAuth();
@@ -18,40 +43,77 @@ function McqContent() {
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const [allMcqs, setAllMcqs] = useState<Mcq[]>([]);
+  const [quizMcqs, setQuizMcqs] = useState<Mcq[]>([]);
+  const [loadingMcqs, setLoadingMcqs] = useState(true);
 
   const grade = profile?.grade || 10;
-  const { data: subjects } = useListNoteSubjects({ grade }, { query: { queryKey: getListMcqsQueryKey({ grade }) } });
-  const { data: mcqs, refetch } = useListMcqs(
-    { grade, ...(subject ? { subject } : {}), ...(difficulty ? { difficulty } : {}), limit: count },
-    { query: { enabled: phase === "quiz", queryKey: getListMcqsQueryKey({ grade, subject, difficulty, limit: count }) } }
-  );
-  const submitScore = useSubmitScore();
+
+  useEffect(() => {
+    setLoadingMcqs(true);
+    const q = query(collection(db, "mcqs"), where("grade", "==", grade));
+    getDocs(q).then(snap => {
+      setAllMcqs(snap.docs.map(d => ({ id: d.id, ...d.data() } as Mcq)));
+    }).catch(e => {
+      console.error("[MCQ] Load failed:", e);
+      setAllMcqs([]);
+    }).finally(() => setLoadingMcqs(false));
+  }, [grade]);
+
+  const subjects = useMemo(() => [...new Set(allMcqs.map(m => m.subject))].sort(), [allMcqs]);
+
+  const filteredMcqs = useMemo(() => {
+    return allMcqs.filter(m => {
+      if (subject && m.subject !== subject) return false;
+      if (difficulty && m.difficulty !== difficulty) return false;
+      return true;
+    });
+  }, [allMcqs, subject, difficulty]);
 
   const startQuiz = () => {
-    setCurrentIdx(0); setAnswers([]); setSelected(null); setRevealed(false); setPhase("quiz"); refetch();
+    const shuffled = shuffleArray(filteredMcqs).slice(0, count);
+    setQuizMcqs(shuffled);
+    setCurrentIdx(0);
+    setAnswers([]);
+    setSelected(null);
+    setRevealed(false);
+    setPhase("quiz");
   };
 
   const handleConfirm = () => {
-    if (!selected || !mcqs) return;
-    const q = mcqs[currentIdx];
+    if (!selected) return;
+    const q = quizMcqs[currentIdx];
     setRevealed(true);
     setAnswers(prev => [...prev, { questionId: q.id, selected, correct: selected === q.correctAnswer }]);
   };
 
-  const handleNext = () => {
-    if (!mcqs) return;
-    if (currentIdx + 1 >= mcqs.length) {
+  const handleNext = async () => {
+    if (currentIdx + 1 >= quizMcqs.length) {
       const finalScore = answers.filter(a => a.correct).length;
-      submitScore.mutate({ data: { uid: user?.uid || "", userName: profile?.name || "Unknown", grade, score: finalScore, totalQuestions: mcqs.length, subject: subject || "Mixed" } });
+      try {
+        await addDoc(collection(db, "scores"), {
+          uid: user?.uid || "",
+          userName: profile?.name || "Unknown",
+          grade,
+          score: finalScore,
+          totalQuestions: quizMcqs.length,
+          subject: subject || "Mixed",
+          createdAt: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.error("[MCQ] Score submit failed:", e);
+      }
       setPhase("results");
     } else {
-      setCurrentIdx(i => i + 1); setSelected(null); setRevealed(false);
+      setCurrentIdx(i => i + 1);
+      setSelected(null);
+      setRevealed(false);
     }
   };
 
   const score = answers.filter(a => a.correct).length;
-  const total = mcqs?.length || count;
-  const pct = Math.round((score / total) * 100);
+  const total = quizMcqs.length || count;
+  const pct = total > 0 ? Math.round((score / total) * 100) : 0;
 
   if (phase === "results") {
     return (
@@ -74,7 +136,7 @@ function McqContent() {
   }
 
   if (phase === "quiz") {
-    const q = mcqs?.[currentIdx];
+    const q = quizMcqs[currentIdx];
     if (!q) return <div className="p-8 text-center text-gray-500"><Brain className="w-12 h-12 mx-auto mb-3 opacity-30" /><p>Loading questions…</p></div>;
 
     const opts: [string, string][] = [["A", q.optionA], ["B", q.optionB], ["C", q.optionC], ["D", q.optionD]];
@@ -83,11 +145,11 @@ function McqContent() {
     return (
       <div className="p-4 sm:p-8 max-w-2xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <span className="text-sm text-gray-500 font-medium">Question {currentIdx + 1} <span className="text-gray-400">of {mcqs.length}</span></span>
+          <span className="text-sm text-gray-500 font-medium">Question {currentIdx + 1} <span className="text-gray-400">of {quizMcqs.length}</span></span>
           <div className="flex items-center gap-3">
             <span className="text-sm text-green-600 font-medium">{answers.filter(a => a.correct).length} ✓</span>
             <div className="w-32 h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${((currentIdx + 1) / mcqs.length) * 100}%` }} />
+              <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${((currentIdx + 1) / quizMcqs.length) * 100}%` }} />
             </div>
           </div>
         </div>
@@ -149,7 +211,6 @@ function McqContent() {
     );
   }
 
-  // Setup phase
   return (
     <div className="p-4 sm:p-8 max-w-2xl mx-auto">
       <div className="mb-6">
@@ -165,12 +226,15 @@ function McqContent() {
               className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${!subject ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
               All Subjects
             </button>
-            {(subjects || []).map(s => (
-              <button key={s} onClick={() => setSubject(s)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${subject === s ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-                {s}
-              </button>
-            ))}
+            {loadingMcqs
+              ? [1,2,3].map(i => <div key={i} className="h-8 w-20 bg-gray-100 rounded-full animate-pulse" />)
+              : subjects.map(s => (
+                <button key={s} onClick={() => setSubject(s)}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${subject === s ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                  {s}
+                </button>
+              ))
+            }
           </div>
         </div>
 
@@ -197,10 +261,21 @@ function McqContent() {
             ))}
           </div>
         </div>
+
+        {!loadingMcqs && filteredMcqs.length === 0 && (
+          <div className="px-4 py-3 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-700">
+            No questions found for this selection. Try different filters.
+          </div>
+        )}
+        {!loadingMcqs && filteredMcqs.length > 0 && (
+          <p className="text-xs text-gray-400">{filteredMcqs.length} questions available</p>
+        )}
       </div>
 
-      <button onClick={startQuiz}
-        className="w-full py-4 bg-blue-500 text-white rounded-2xl font-bold text-base hover:bg-blue-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-200">
+      <button
+        onClick={startQuiz}
+        disabled={loadingMcqs || filteredMcqs.length === 0}
+        className="w-full py-4 bg-blue-500 text-white rounded-2xl font-bold text-base hover:bg-blue-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed">
         <Brain className="w-5 h-5" /> Start Quiz
       </button>
     </div>

@@ -1,0 +1,147 @@
+STOP using any internal database or DATABASE_URL.
+
+This project must use Firebase ONLY.
+
+REMOVE COMPLETELY:
+- Replit database usage
+- DATABASE_URL
+- any SQL / Prisma / Postgres logic
+- any backend API calls like /api/user
+- any fetch or axios calls to /api
+
+---
+
+USE ONLY:
+- Firebase Authentication
+- Firestore Database
+
+---
+
+GLOBAL RULE:
+Wherever any database is used in the project (user data, reports, notes, scores, tasks, analytics, anything),
+REPLACE ALL of it with Firestore.
+
+Firestore must be the ONLY database everywhere.
+
+---
+
+IMPLEMENT THIS STRUCTURE IN FIRESTORE:
+
+collections:
+
+1. users
+doc: user.uid
+fields:
+- uid
+- name
+- email
+- grade
+- createdAt
+- streak
+- totalStudyTime
+
+---
+
+2. reports
+doc: auto id
+fields:
+- userId
+- type (daily/weekly/monthly)
+- studyTime
+- tasksCompleted
+- date
+
+---
+
+3. notes
+doc: auto id
+fields:
+- userId
+- title
+- content
+- subject
+- createdAt
+
+---
+
+4. scores
+doc: auto id
+fields:
+- userId
+- subject
+- score
+- examType
+- createdAt
+
+---
+
+5. tasks
+doc: auto id
+fields:
+- userId
+- title
+- completed
+- createdAt
+
+---
+
+---
+
+AUTH FLOW (VERY IMPORTANT):
+
+After Google login:
+
+Check Firestore:
+
+If users/{uid} does NOT exist → redirect to /setup-profile  
+If EXISTS → redirect to /dashboard  
+
+DO NOT redirect directly to dashboard without checking Firestore.
+
+---
+
+---
+
+SETUP PROFILE:
+
+On clicking "Let's go":
+
+Use Firestore:
+
+import { doc, setDoc } from "firebase/firestore";
+
+await setDoc(doc(db, "users", user.uid), {
+  uid: user.uid,
+  name,
+  email: user.email,
+  grade,
+  createdAt: new Date(),
+  streak: 0,
+  totalStudyTime: 0
+});
+
+Then redirect to /dashboard
+
+---
+
+---
+
+ADMIN PANEL:
+
+Fetch users directly from Firestore (collection: users)
+
+---
+
+---
+
+FINAL RULES:
+
+- NO /api routes anywhere
+- NO backend server usage
+- NO Replit database
+- NO DATABASE_URL
+
+ONLY Firebase Firestore for ALL data
+ONLY Firebase Auth for login
+
+This must work perfectly on Vercel

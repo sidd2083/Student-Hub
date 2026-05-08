@@ -42,12 +42,7 @@ export default function Settings() {
     setProfile({ ...profile!, grade: g });
     setGradeSaving(true);
     try {
-      const res = await fetch(`/api/users/${user.uid}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ grade: g }),
-      });
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      await updateDoc(doc(db, "users", user.uid), { grade: g });
     } catch (err) {
       console.error("Grade update failed:", err);
     } finally {
@@ -63,14 +58,8 @@ export default function Settings() {
     setError("");
     setSuccess(false);
     try {
-      const res = await fetch(`/api/users/${user.uid}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() }),
-      });
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
-      const updated = await res.json();
-      setProfile({ ...profile!, name: updated.name ?? name.trim() });
+      await updateDoc(doc(db, "users", user.uid), { name: name.trim() });
+      setProfile({ ...profile!, name: name.trim() });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {

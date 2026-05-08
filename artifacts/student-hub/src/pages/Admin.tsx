@@ -1,31 +1,70 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import {
-  useListNotes, useCreateNote, useDeleteNote,
-  useListPyqs, useCreatePyq, useDeletePyq,
-  getListNotesQueryKey,
-  getListPyqsQueryKey,
-} from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
-import {
-  LayoutDashboard, BookOpen, FileText, Users,
-  Shield, Plus, Trash2, LogOut, Megaphone, Upload, X, Image,
-  CheckCircle, AlertCircle, Award, Search,
-} from "lucide-react";
-import {
-  collection, getDocs,
-  doc, query, setDoc, getDoc,
+  collection, getDocs, doc, query, where, orderBy,
+  setDoc, getDoc, addDoc, deleteDoc, updateDoc,
 } from "firebase/firestore";
 import {
   ref, uploadBytesResumable, getDownloadURL,
 } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
+import {
+  LayoutDashboard, BookOpen, FileText, Users,
+  Shield, Plus, Trash2, LogOut, Megaphone, Upload, X, Image,
+  CheckCircle, AlertCircle, Award, Search,
+} from "lucide-react";
 
 const ADMIN_SESSION = "admin_session_v1";
 type Section = "dashboard" | "notes" | "pyqs" | "announcements" | "users" | "reports" | "seo";
 
-// ─── File Upload Component ──────────────────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface FireUser {
+  uid: string;
+  name: string;
+  email: string;
+  grade: number;
+  role: string;
+  createdAt: string;
+  streak: number;
+  totalStudyTime: number;
+  todayStudyTime: number;
+  badges?: CustomBadge[];
+}
+
+interface FireNote {
+  id: string;
+  grade: number;
+  subject: string;
+  chapter: string;
+  title: string;
+  contentType: "text" | "pdf" | "image";
+  content: string;
+  createdAt: string;
+}
+
+interface FirePyq {
+  id: string;
+  grade: number;
+  subject: string;
+  title: string;
+  year: number;
+  pdfUrl: string;
+  fileType: "pdf" | "image";
+  createdAt: string;
+}
+
+interface FireAnnouncement {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: string;
+}
+
+interface CustomBadge { id: string; text: string; emoji: string; color: string; createdAt: string }
+
+// ─── File Upload Component ───────────────────────────────────────────────────
 
 interface FileUploadProps {
   accept: string;
@@ -45,15 +84,11 @@ function FileUpload({ accept, label, storagePath, onUploaded, disabled }: FileUp
     setError("");
     const isImage = file.type.startsWith("image/");
     const isPdf = file.type === "application/pdf";
-    if (!isImage && !isPdf) {
-      setError("Please upload a PDF or image file.");
-      return;
-    }
+    if (!isImage && !isPdf) { setError("Please upload a PDF or image file."); return; }
     const ext = file.name.split(".").pop();
     const path = `${storagePath}/${Date.now()}.${ext}`;
     const storageRef = ref(storage, path);
     const task = uploadBytesResumable(storageRef, file);
-
     task.on(
       "state_changed",
       (snap) => setProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
@@ -71,19 +106,12 @@ function FileUpload({ accept, label, storagePath, onUploaded, disabled }: FileUp
       <div
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          const file = e.dataTransfer.files[0];
-          if (file) upload(file);
-        }}
+        onDrop={(e) => { e.preventDefault(); setDragging(false); const file = e.dataTransfer.files[0]; if (file) upload(file); }}
         onClick={() => !disabled && inputRef.current?.click()}
         className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all select-none ${
-          dragging
-            ? "border-blue-400 bg-blue-50"
-            : disabled
-            ? "border-gray-200 bg-gray-50 cursor-not-allowed opacity-60"
-            : "border-gray-300 hover:border-blue-400 hover:bg-blue-50/50"
+          dragging ? "border-blue-400 bg-blue-50" :
+          disabled ? "border-gray-200 bg-gray-50 cursor-not-allowed opacity-60" :
+          "border-gray-300 hover:border-blue-400 hover:bg-blue-50/50"
         }`}
       >
         <Upload className="w-6 h-6 mx-auto mb-2 text-gray-400" />
@@ -103,19 +131,13 @@ function FileUpload({ accept, label, storagePath, onUploaded, disabled }: FileUp
         )}
       </div>
       {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
-      <input
-        ref={inputRef}
-        type="file"
-        accept={accept}
-        className="hidden"
-        disabled={disabled}
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }}
-      />
+      <input ref={inputRef} type="file" accept={accept} className="hidden" disabled={disabled}
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} />
     </div>
   );
 }
 
-// ─── Stat Card ─────────────────────────────────────────────────────────────
+// ─── Stat Card ───────────────────────────────────────────────────────────────
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -126,20 +148,19 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-// ─── Admin Overview ────────────────────────────────────────────────────────
-
-interface ApiUser { id: number; uid: string; name: string; email: string; grade: number; role: string; createdAt: string; streak: number; totalStudyTime: number; todayStudyTime: number; }
+// ─── Admin Overview ──────────────────────────────────────────────────────────
 
 function AdminOverview() {
-  const { data: noteStats } = useListNotes({}, { query: { queryKey: getListNotesQueryKey({}) } });
-  const { data: pyqStats }  = useListPyqs({},  { query: { queryKey: getListPyqsQueryKey({})  } });
-  const [users, setUsers]   = useState<ApiUser[]>([]);
+  const [users, setUsers] = useState<FireUser[]>([]);
+  const [noteCount, setNoteCount] = useState(0);
+  const [pyqCount, setPyqCount] = useState(0);
 
   useEffect(() => {
-    fetch("/api/users")
-      .then(r => r.json())
-      .then(data => { if (Array.isArray(data)) setUsers(data); })
-      .catch(console.error);
+    getDocs(collection(db, "users")).then(s => {
+      setUsers(s.docs.map(d => ({ uid: d.id, ...d.data() } as FireUser)));
+    }).catch(console.error);
+    getDocs(collection(db, "notes")).then(s => setNoteCount(s.size)).catch(console.error);
+    getDocs(collection(db, "pyqs")).then(s => setPyqCount(s.size)).catch(console.error);
   }, []);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -157,10 +178,10 @@ function AdminOverview() {
         <StatCard label="Total Users"  value={users.length} />
         <StatCard label="Admins"       value={admins}       />
         <StatCard label="New Today"    value={newToday}     />
-        <StatCard label="Notes in DB"  value={noteStats?.length || 0} />
+        <StatCard label="Notes in DB"  value={noteCount}    />
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="PYQs in DB"      value={pyqStats?.length || 0} />
+        <StatCard label="PYQs in DB"      value={pyqCount} />
         <StatCard label="Grades Active"   value={Object.keys(byGrade).length} />
         <StatCard label="Non-Admin Users" value={users.length - admins} />
       </div>
@@ -186,14 +207,13 @@ function AdminOverview() {
   );
 }
 
-// ─── Manage Notes ──────────────────────────────────────────────────────────
+// ─── Manage Notes ────────────────────────────────────────────────────────────
 
 function ManageNotes() {
-  const qc = useQueryClient();
-  const { data: notes, isLoading } = useListNotes({}, { query: { queryKey: getListNotesQueryKey({}) } });
-  const createNote = useCreateNote();
-  const deleteNote = useDeleteNote();
+  const [notes, setNotes] = useState<FireNote[]>([]);
+  const [loading, setLoading] = useState(true);
   const [show, setShow] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [saveMsg, setSaveMsg] = useState("");
   const [form, setForm] = useState({
@@ -201,14 +221,51 @@ function ManageNotes() {
     contentType: "text" as "text" | "pdf" | "image",
     content: "",
   });
-  const inv = () => qc.invalidateQueries({ queryKey: getListNotesQueryKey({}) });
-  const reset = () => { setShow(false); setForm({ grade: 10, subject: "", chapter: "", title: "", contentType: "text", content: "" }); setSaveStatus("idle"); };
+
+  const loadNotes = useCallback(() => {
+    setLoading(true);
+    getDocs(query(collection(db, "notes"), orderBy("createdAt", "desc")))
+      .then(s => setNotes(s.docs.map(d => ({ id: d.id, ...d.data() } as FireNote))))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { loadNotes(); }, [loadNotes]);
+
+  const reset = () => {
+    setShow(false);
+    setForm({ grade: 10, subject: "", chapter: "", title: "", contentType: "text", content: "" });
+    setSaveStatus("idle");
+  };
+
+  const handleSave = async () => {
+    if (!form.subject || !form.chapter || !form.title || !form.content) {
+      setSaveStatus("error"); setSaveMsg("Please fill in all required fields."); return;
+    }
+    setSaving(true); setSaveStatus("idle");
+    try {
+      await addDoc(collection(db, "notes"), { ...form, createdAt: new Date().toISOString() });
+      setSaveStatus("success"); setSaveMsg(`Note "${form.title}" saved successfully!`);
+      loadNotes();
+      setTimeout(() => reset(), 1800);
+    } catch (err: any) {
+      setSaveStatus("error"); setSaveMsg(err?.message || "Failed to save note.");
+    } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "notes", id));
+      setNotes(prev => prev.filter(n => n.id !== id));
+    } catch (e) { console.error("[Admin] Delete note failed:", e); }
+  };
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold text-gray-900">Manage Notes</h2>
-        <button onClick={() => setShow(s => !s)} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600 transition-all">
+        <button onClick={() => setShow(s => !s)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600 transition-all">
           <Plus className="w-4 h-4" /> Add Note
         </button>
       </div>
@@ -218,34 +275,36 @@ function ManageNotes() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Grade</label>
-              <select value={form.grade} onChange={e => setForm(f => ({ ...f, grade: Number(e.target.value) }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white">
+              <select value={form.grade} onChange={e => setForm(f => ({ ...f, grade: Number(e.target.value) }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white">
                 {[9, 10, 11, 12].map(g => <option key={g} value={g}>Grade {g}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Content Type</label>
-              <select value={form.contentType} onChange={e => setForm(f => ({ ...f, contentType: e.target.value as "text" | "pdf" | "image", content: "" }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white">
+              <select value={form.contentType}
+                onChange={e => setForm(f => ({ ...f, contentType: e.target.value as "text" | "pdf" | "image", content: "" }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white">
                 <option value="text">Text</option>
                 <option value="pdf">PDF</option>
                 <option value="image">Image</option>
               </select>
             </div>
           </div>
-
           {(["subject", "chapter", "title"] as const).map(f => (
             <div key={f}>
               <label className="block text-xs font-medium text-gray-600 mb-1 capitalize">{f}</label>
-              <input value={form[f]} onChange={e => setForm(p => ({ ...p, [f]: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" required />
+              <input value={form[f]} onChange={e => setForm(p => ({ ...p, [f]: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" required />
             </div>
           ))}
-
           {form.contentType === "text" && (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Content</label>
-              <textarea value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))} rows={5} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none" required />
+              <textarea value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
+                rows={5} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none" />
             </div>
           )}
-
           {(form.contentType === "pdf" || form.contentType === "image") && (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -269,59 +328,35 @@ function ManageNotes() {
               )}
             </div>
           )}
-
           {saveStatus === "success" && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm mb-2">
+            <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm">
               <CheckCircle className="w-4 h-4 flex-shrink-0" /> {saveMsg}
             </div>
           )}
           {saveStatus === "error" && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm mb-2">
+            <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
               <AlertCircle className="w-4 h-4 flex-shrink-0" /> {saveMsg}
             </div>
           )}
           <div className="flex gap-2">
-            <button
-              onClick={() => {
-                if (!form.subject || !form.chapter || !form.title || !form.content) {
-                  setSaveStatus("error"); setSaveMsg("Please fill in all required fields."); return;
-                }
-                setSaveStatus("idle");
-                createNote.mutate(
-                  { data: { ...form, content: form.content } },
-                  {
-                    onSuccess: () => {
-                      setSaveStatus("success");
-                      setSaveMsg(`Note "${form.title}" saved successfully!`);
-                      inv();
-                      setTimeout(() => reset(), 1800);
-                    },
-                    onError: (err: Error) => {
-                      setSaveStatus("error");
-                      setSaveMsg(err?.message || "Failed to save note. Please try again.");
-                    },
-                  }
-                );
-              }}
-              disabled={createNote.isPending || !form.content}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50"
-            >
-              {createNote.isPending ? "Saving…" : "Save Note"}
+            <button onClick={handleSave} disabled={saving || !form.content}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50">
+              {saving ? "Saving…" : "Save Note"}
             </button>
             <button onClick={reset} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
           </div>
         </div>
       )}
 
-      {isLoading
-        ? <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
-        : (Array.isArray(notes) ? notes : []).map(n => (
+      {loading
+        ? <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+        : notes.map(n => (
           <div key={n.id} className="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3 mb-2">
             <div>
               <p className="font-medium text-gray-900 text-sm">{n.title}</p>
               <p className="text-xs text-gray-500">Grade {n.grade} · {n.subject} · {n.chapter} · <span className="capitalize">{n.contentType}</span></p>
             </div>
-            <button onClick={() => deleteNote.mutate({ id: n.id }, { onSuccess: inv })} className="p-1.5 text-gray-400 hover:text-red-500">
+            <button onClick={() => handleDelete(n.id)} className="p-1.5 text-gray-400 hover:text-red-500">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
@@ -331,335 +366,50 @@ function ManageNotes() {
   );
 }
 
-// ─── Badge Manager ─────────────────────────────────────────────────────────
-
-interface CustomBadge { id: string; text: string; emoji: string; color: string; createdAt: string; }
-
-const STUDY_TIERS = [
-  { mins: 24000, emoji: "🏆", label: "Champion",   bg: "linear-gradient(135deg,#94a3b8,#e2e8f0,#94a3b8)" },
-  { mins: 12000, emoji: "🌟", label: "Master",     bg: "linear-gradient(135deg,#d97706,#fcd34d,#d97706)" },
-  { mins: 6000,  emoji: "👑", label: "Legend",     bg: "linear-gradient(135deg,#b45309,#fbbf24,#b45309)" },
-  { mins: 4500,  emoji: "💎", label: "Scholar",    bg: "linear-gradient(135deg,#6d28d9,#a78bfa,#6d28d9)" },
-  { mins: 3000,  emoji: "🔥", label: "Achiever",   bg: "linear-gradient(135deg,#c2410c,#fb923c,#c2410c)" },
-  { mins: 1500,  emoji: "⚡", label: "Explorer",   bg: "linear-gradient(135deg,#1d4ed8,#60a5fa,#1d4ed8)" },
-  { mins: 600,   emoji: "🌱", label: "Beginner",   bg: "linear-gradient(135deg,#15803d,#4ade80,#15803d)" },
-];
-
-const STREAK_TIERS = [
-  { days: 100, emoji: "🦁", label: "Elite",        bg: "linear-gradient(135deg,#1e1b4b,#4338ca,#1e1b4b)" },
-  { days: 60,  emoji: "⭐", label: "Legendary",    bg: "linear-gradient(135deg,#92400e,#fcd34d,#92400e)" },
-  { days: 30,  emoji: "🚀", label: "Unstoppable",  bg: "linear-gradient(135deg,#5b21b6,#c4b5fd,#5b21b6)" },
-  { days: 15,  emoji: "💪", label: "Dedicated",    bg: "linear-gradient(135deg,#991b1b,#f87171,#991b1b)" },
-  { days: 5,   emoji: "🎯", label: "Consistent",   bg: "linear-gradient(135deg,#164e63,#67e8f9,#164e63)" },
-];
-
-const EMOJI_OPTIONS = ["⭐","🔥","💎","👑","🌟","🚀","💪","🎯","🌱","⚡","🏆","🦁","✨","🎓","🌈","🎪","🏅","🥇","🛡️","🎉","🧠","🪄","🌸","🐉","☄️","🔮"];
-const COLOR_PRESETS = ["#6366f1","#ec4899","#f59e0b","#10b981","#3b82f6","#ef4444","#8b5cf6","#06b6d4","#84cc16","#f97316","#e11d48","#0ea5e9"];
-
-function getUnlockedStudyBadges(mins: number) { return STUDY_TIERS.filter(t => mins >= t.mins); }
-function getUnlockedStreakBadges(days: number) { return STREAK_TIERS.filter(t => days >= t.days); }
-const fmtTime = (mins: number) => mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
-
-function MicroBadge({ emoji, label, bg }: { emoji: string; label: string; bg: string }) {
-  return (
-    <span
-      style={{ background: bg }}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-white text-[10px] font-bold"
-    >
-      {emoji} {label}
-    </span>
-  );
-}
-
-function CustomBadgePill({ badge, onRemove }: { badge: CustomBadge; onRemove: () => void }) {
-  return (
-    <span
-      style={{ background: badge.color, boxShadow: `0 2px 10px ${badge.color}55` }}
-      className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-white text-[10px] font-bold"
-    >
-      {badge.emoji} {badge.text}
-      <button onClick={onRemove} className="ml-0.5 opacity-70 hover:opacity-100 rounded-full">
-        <X className="w-3 h-3" />
-      </button>
-    </span>
-  );
-}
-
-function BadgeManager() {
-  const [users, setUsers] = useState<ApiUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [gradeFilter, setGradeFilter] = useState<"all" | 9 | 10 | 11 | 12>("all");
-  const [openUid, setOpenUid] = useState<string | null>(null);
-  const [badgeText, setBadgeText] = useState("");
-  const [badgeEmoji, setBadgeEmoji] = useState("⭐");
-  const [badgeColor, setBadgeColor] = useState("#6366f1");
-  const [userBadges, setUserBadges] = useState<Record<string, CustomBadge[]>>({});
-
-  const loadUsers = async () => {
-    setLoading(true);
-    try {
-      const data = await fetch("/api/users").then(r => r.json());
-      const list: ApiUser[] = Array.isArray(data) ? data : [];
-      list.sort((a, b) => (b.totalStudyTime ?? 0) - (a.totalStudyTime ?? 0));
-      setUsers(list);
-      // Badges are now returned directly from the API response
-      const map: Record<string, CustomBadge[]> = {};
-      list.forEach(u => { map[u.uid] = (u as any).badges ?? []; });
-      setUserBadges(map);
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
-  };
-
-  useEffect(() => { loadUsers(); }, []);
-
-  const filtered = users.filter(u => {
-    if (gradeFilter !== "all" && u.grade !== gradeFilter) return false;
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
-  });
-
-  // Optimistic badge add — UI updates instantly, API writes in background
-  const addBadge = (uid: string) => {
-    if (!badgeText.trim()) return;
-    const newBadge: CustomBadge = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      text: badgeText.trim(),
-      emoji: badgeEmoji,
-      color: badgeColor,
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [...(userBadges[uid] ?? []), newBadge];
-    setUserBadges(prev => ({ ...prev, [uid]: updated }));
-    setBadgeText("");
-    setOpenUid(null);
-    fetch(`/api/users/${uid}/badges`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ badges: updated }),
-    }).catch(e => console.error("Badge save failed:", e));
-  };
-
-  // Optimistic badge remove — UI updates instantly, API writes in background
-  const removeBadge = (uid: string, badgeId: string) => {
-    const updated = (userBadges[uid] ?? []).filter(b => b.id !== badgeId);
-    setUserBadges(prev => ({ ...prev, [uid]: updated }));
-    fetch(`/api/users/${uid}/badges`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ badges: updated }),
-    }).catch(e => console.error("Badge remove failed:", e));
-  };
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">Badge Manager</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Assign custom badges · Auto badges earned by study time &amp; streak</p>
-        </div>
-        <button onClick={loadUsers} className="px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Refresh</button>
-      </div>
-
-      {/* Badge tier legend */}
-      <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 mb-6">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Auto Badge Tiers</p>
-        <div className="flex flex-wrap gap-3 mb-3">
-          <p className="text-xs text-gray-500 w-full font-medium">📚 Study Time:</p>
-          {STUDY_TIERS.map(t => (
-            <span key={t.label} style={{ background: t.bg }} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-xs font-bold">
-              {t.emoji} {t.label} <span className="opacity-70">({fmtTime(t.mins)}+)</span>
-            </span>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <p className="text-xs text-gray-500 w-full font-medium">🔥 Streak:</p>
-          {STREAK_TIERS.map(t => (
-            <span key={t.label} style={{ background: t.bg }} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-xs font-bold">
-              {t.emoji} {t.label} <span className="opacity-70">({t.days}+ days)</span>
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Search + Grade filter */}
-      <div className="flex flex-col sm:flex-row gap-2 mb-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name or email…"
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-          />
-        </div>
-        <div className="flex gap-1.5 items-center flex-shrink-0">
-          {(["all", 9, 10, 11, 12] as const).map(g => (
-            <button
-              key={g}
-              onClick={() => setGradeFilter(g)}
-              className={`px-3 py-2 text-xs font-semibold rounded-xl transition-all ${gradeFilter === g ? "bg-purple-500 text-white shadow-sm" : "bg-white border border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600"}`}
-            >
-              {g === "all" ? "All" : `G${g}`}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-2xl animate-pulse" />)}</div>
-      ) : filtered.length === 0 ? (
-        <p className="text-center text-gray-400 py-12">{search ? "No users match your search." : "No users yet."}</p>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map(u => {
-            const studyBadges = getUnlockedStudyBadges(u.totalStudyTime ?? 0);
-            const streakBadges = getUnlockedStreakBadges(u.streak ?? 0);
-            const custom = userBadges[u.uid] ?? [];
-            const isOpen = openUid === u.uid;
-
-            return (
-              <div key={u.uid} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                {/* User row */}
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                    {(u.name || "?").charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 text-sm truncate">{u.name || "(no name)"}</p>
-                    <p className="text-xs text-gray-400 truncate">{u.email} · Grade {u.grade}</p>
-                    <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
-                      <span>⏱ {fmtTime(u.totalStudyTime ?? 0)}</span>
-                      <span>🔥 {u.streak ?? 0} days</span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => { setOpenUid(isOpen ? null : u.uid); setBadgeText(""); setBadgeEmoji("⭐"); setBadgeColor("#6366f1"); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-600 text-xs font-semibold rounded-xl hover:bg-purple-100 transition-all flex-shrink-0"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Badge
-                  </button>
-                </div>
-
-                {/* Badges row */}
-                {(studyBadges.length > 0 || streakBadges.length > 0 || custom.length > 0) && (
-                  <div className="px-4 pb-3 flex flex-wrap gap-1.5">
-                    {studyBadges.map(b => <MicroBadge key={b.label} emoji={b.emoji} label={b.label} bg={b.bg} />)}
-                    {streakBadges.map(b => <MicroBadge key={b.label} emoji={b.emoji} label={b.label} bg={b.bg} />)}
-                    {custom.map(b => <CustomBadgePill key={b.id} badge={b} onRemove={() => removeBadge(u.uid, b.id)} />)}
-                  </div>
-                )}
-
-                {/* Add badge form */}
-                {isOpen && (
-                  <div className="border-t border-gray-100 bg-purple-50/60 px-4 py-4 space-y-3">
-                    <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide">New Custom Badge</p>
-
-                    {/* Badge text */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Badge Text</label>
-                      <input
-                        value={badgeText}
-                        onChange={e => setBadgeText(e.target.value)}
-                        placeholder="e.g. Top Performer, Most Dedicated…"
-                        maxLength={30}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-                      />
-                    </div>
-
-                    {/* Emoji picker */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Emoji</label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {EMOJI_OPTIONS.map(e => (
-                          <button
-                            key={e}
-                            onClick={() => setBadgeEmoji(e)}
-                            className={`w-8 h-8 rounded-lg text-base flex items-center justify-center transition-all ${badgeEmoji === e ? "bg-purple-200 ring-2 ring-purple-500 scale-110" : "bg-white border border-gray-200 hover:bg-purple-50"}`}
-                          >
-                            {e}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Color picker */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Badge Color</label>
-                      <div className="flex flex-wrap gap-2 items-center">
-                        {COLOR_PRESETS.map(c => (
-                          <button
-                            key={c}
-                            onClick={() => setBadgeColor(c)}
-                            style={{ background: c }}
-                            className={`w-7 h-7 rounded-full transition-all ${badgeColor === c ? "ring-2 ring-offset-2 ring-gray-400 scale-110" : "hover:scale-105"}`}
-                          />
-                        ))}
-                        <div className="flex items-center gap-2 ml-1">
-                          <input
-                            type="color"
-                            value={badgeColor}
-                            onChange={e => setBadgeColor(e.target.value)}
-                            className="w-7 h-7 rounded-full cursor-pointer border border-gray-200"
-                            title="Custom color"
-                          />
-                          <span className="text-xs text-gray-400">Custom</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Preview + save */}
-                    <div className="flex items-center gap-3 pt-1">
-                      {badgeText && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">Preview:</span>
-                          <span
-                            style={{ background: badgeColor, boxShadow: `0 4px 16px ${badgeColor}66` }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-white text-xs font-bold"
-                          >
-                            {badgeEmoji} {badgeText}
-                          </span>
-                        </div>
-                      )}
-                      <button
-                        onClick={() => addBadge(u.uid)}
-                        disabled={!badgeText.trim()}
-                        className="ml-auto px-4 py-2 bg-purple-500 text-white text-xs font-semibold rounded-xl hover:bg-purple-600 disabled:opacity-50 transition-all"
-                      >
-                        Assign Badge
-                      </button>
-                      <button onClick={() => setOpenUid(null)} className="px-3 py-2 bg-gray-100 text-gray-600 text-xs rounded-xl hover:bg-gray-200">
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Manage PYQs ───────────────────────────────────────────────────────────
+// ─── Manage PYQs ─────────────────────────────────────────────────────────────
 
 function ManagePyqs() {
-  const qc = useQueryClient();
-  const { data: pyqs, isLoading } = useListPyqs({}, { query: { queryKey: getListPyqsQueryKey({}) } });
-  const createPyq = useCreatePyq();
-  const deletePyq = useDeletePyq();
+  const [pyqs, setPyqs] = useState<FirePyq[]>([]);
+  const [loading, setLoading] = useState(true);
   const [show, setShow] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ grade: 10, subject: "", title: "", year: 2024, pdfUrl: "", fileType: "pdf" as "pdf" | "image" });
-  const inv = () => qc.invalidateQueries({ queryKey: getListPyqsQueryKey({}) });
+
+  const loadPyqs = useCallback(() => {
+    setLoading(true);
+    getDocs(query(collection(db, "pyqs"), orderBy("createdAt", "desc")))
+      .then(s => setPyqs(s.docs.map(d => ({ id: d.id, ...d.data() } as FirePyq))))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { loadPyqs(); }, [loadPyqs]);
+
+  const handleSave = async () => {
+    if (!form.subject || !form.title || !form.pdfUrl) return;
+    setSaving(true);
+    try {
+      await addDoc(collection(db, "pyqs"), { ...form, createdAt: new Date().toISOString() });
+      setShow(false);
+      setForm({ grade: 10, subject: "", title: "", year: 2024, pdfUrl: "", fileType: "pdf" });
+      loadPyqs();
+    } catch (e) { console.error("[Admin] Save PYQ failed:", e); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "pyqs", id));
+      setPyqs(prev => prev.filter(p => p.id !== id));
+    } catch (e) { console.error("[Admin] Delete PYQ failed:", e); }
+  };
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold text-gray-900">Manage PYQs</h2>
-        <button onClick={() => setShow(s => !s)} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600 transition-all">
+        <button onClick={() => setShow(s => !s)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600 transition-all">
           <Plus className="w-4 h-4" /> Add PYQ
         </button>
       </div>
@@ -669,33 +419,33 @@ function ManagePyqs() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Grade</label>
-              <select value={form.grade} onChange={e => setForm(f => ({ ...f, grade: Number(e.target.value) }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white">
+              <select value={form.grade} onChange={e => setForm(f => ({ ...f, grade: Number(e.target.value) }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white">
                 {[9, 10, 11, 12].map(g => <option key={g} value={g}>Grade {g}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Year</label>
-              <input type="number" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" required />
+              <input type="number" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
             </div>
           </div>
-
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Subject</label>
-            <input value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="e.g. Mathematics" required />
+            <input value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="e.g. Mathematics" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
-            <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="e.g. Bagmati Pradesh 2080" required />
+            <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="e.g. Bagmati Pradesh 2080" />
           </div>
-
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-2">File (PDF or Image)</label>
             {form.pdfUrl ? (
               <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-xl">
                 {form.fileType === "image" ? <Image className="w-4 h-4 text-green-600" /> : <FileText className="w-4 h-4 text-green-600" />}
-                <p className="text-sm text-green-700 flex-1">
-                  {form.fileType === "image" ? "Image" : "PDF"} uploaded ✓
-                </p>
+                <p className="text-sm text-green-700 flex-1">{form.fileType === "image" ? "Image" : "PDF"} uploaded ✓</p>
                 <button onClick={() => setForm(f => ({ ...f, pdfUrl: "", fileType: "pdf" }))} className="text-gray-400 hover:text-red-500">
                   <X className="w-4 h-4" />
                 </button>
@@ -709,34 +459,25 @@ function ManagePyqs() {
               />
             )}
           </div>
-
           <div className="flex gap-2">
-            <button
-              onClick={() => {
-                if (!form.subject || !form.title || !form.pdfUrl) return;
-                createPyq.mutate({
-                  data: { grade: form.grade, subject: form.subject, title: form.title, year: form.year, pdfUrl: form.pdfUrl, fileType: form.fileType }
-                }, { onSuccess: () => { setShow(false); setForm({ grade: 10, subject: "", title: "", year: 2024, pdfUrl: "", fileType: "pdf" }); inv(); } });
-              }}
-              disabled={createPyq.isPending || !form.pdfUrl}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50"
-            >
-              {createPyq.isPending ? "Saving…" : "Save PYQ"}
+            <button onClick={handleSave} disabled={saving || !form.pdfUrl}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50">
+              {saving ? "Saving…" : "Save PYQ"}
             </button>
             <button onClick={() => setShow(false)} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
           </div>
         </div>
       )}
 
-      {isLoading
-        ? <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
-        : (Array.isArray(pyqs) ? pyqs : []).map(p => (
+      {loading
+        ? <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+        : pyqs.map(p => (
           <div key={p.id} className="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3 mb-2">
             <div>
               <p className="font-medium text-gray-900 text-sm">{p.title}</p>
-              <p className="text-xs text-gray-500">Grade {p.grade} · {p.subject} · {p.year} · {(p as { fileType?: string | null }).fileType === "image" ? "Image" : "PDF"}</p>
+              <p className="text-xs text-gray-500">Grade {p.grade} · {p.subject} · {p.year} · {p.fileType === "image" ? "Image" : "PDF"}</p>
             </div>
-            <button onClick={() => deletePyq.mutate({ id: p.id }, { onSuccess: inv })} className="p-1.5 text-gray-400 hover:text-red-500">
+            <button onClick={() => handleDelete(p.id)} className="p-1.5 text-gray-400 hover:text-red-500">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
@@ -746,67 +487,47 @@ function ManagePyqs() {
   );
 }
 
-// ─── Announcements ─────────────────────────────────────────────────────────
-
-interface Announcement { id: number; title: string; body: string; createdAt: string }
+// ─── Announcements ───────────────────────────────────────────────────────────
 
 function ManageAnnouncements() {
-  const [list, setList] = useState<Announcement[]>([]);
+  const [list, setList] = useState<FireAnnouncement[]>([]);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoadingList(true);
     try {
-      const res = await fetch("/api/announcements");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json() as Announcement[];
-      setList(data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingList(false);
-    }
-  };
+      const snap = await getDocs(query(collection(db, "announcements"), orderBy("createdAt", "desc")));
+      setList(snap.docs.map(d => ({ id: d.id, ...d.data() } as FireAnnouncement)));
+    } catch (e) { console.error(e); }
+    finally { setLoadingList(false); }
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !body.trim()) return;
-    setSaving(true);
-    setErrorMsg("");
+    setSaving(true); setErrorMsg("");
     try {
-      const res = await fetch("/api/announcements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), body: body.trim() }),
+      await addDoc(collection(db, "announcements"), {
+        title: title.trim(), body: body.trim(), createdAt: new Date().toISOString(),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(err.error ?? `HTTP ${res.status}`);
-      }
       setTitle(""); setBody("");
       await load();
-    } catch (error) {
-      console.error(error);
-      setErrorMsg(error instanceof Error ? error.message : "Failed to post announcement.");
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to post announcement.");
+    } finally { setSaving(false); }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/announcements/${id}`, { method: "DELETE" });
-      if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+      await deleteDoc(doc(db, "announcements", id));
       setList(l => l.filter(x => x.id !== id));
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   return (
@@ -816,20 +537,23 @@ function ManageAnnouncements() {
         <h3 className="font-semibold text-gray-800 text-sm">Post New Announcement</h3>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
-          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Announcement title" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" required />
+          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Announcement title"
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" required />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Message</label>
-          <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Write your announcement…" rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none" required />
+          <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Write your announcement…"
+            rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none" required />
         </div>
         {errorMsg && <p className="text-red-500 text-xs">{errorMsg}</p>}
-        <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50">
+        <button type="submit" disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50">
           <Megaphone className="w-4 h-4" /> {saving ? "Posting…" : "Post Announcement"}
         </button>
       </form>
 
       {loadingList
-        ? <div className="space-y-2">{[1, 2].map(i => <div key={i} className="h-20 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+        ? <div className="space-y-2">{[1,2].map(i => <div key={i} className="h-20 bg-gray-100 rounded-xl animate-pulse" />)}</div>
         : list.length === 0
         ? <p className="text-center text-gray-400 py-8">No announcements yet.</p>
         : list.map(a => (
@@ -849,36 +573,27 @@ function ManageAnnouncements() {
   );
 }
 
-// ─── Manage Users (Backend API / PostgreSQL) ───────────────────────────────
+// ─── Manage Users ────────────────────────────────────────────────────────────
 
 function ManageUsers() {
-  const [users, setUsers] = useState<ApiUser[]>([]);
+  const [users, setUsers] = useState<FireUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingUid, setUpdatingUid] = useState<string | null>(null);
 
-  const loadUsers = () => {
+  const loadUsers = useCallback(() => {
     setLoading(true);
-    fetch("/api/users")
-      .then(r => r.json())
-      .then((data) => {
-        const list: ApiUser[] = Array.isArray(data) ? data : [];
-        list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-        setUsers(list);
-      })
+    getDocs(query(collection(db, "users"), orderBy("createdAt", "desc")))
+      .then(s => setUsers(s.docs.map(d => ({ uid: d.id, ...d.data() } as FireUser))))
       .catch(console.error)
       .finally(() => setLoading(false));
-  };
+  }, []);
 
-  useEffect(() => { loadUsers(); }, []);
+  useEffect(() => { loadUsers(); }, [loadUsers]);
 
   const handleRoleChange = async (uid: string, role: string) => {
     setUpdatingUid(uid);
     try {
-      await fetch(`/api/users/${uid}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role }),
-      });
+      await updateDoc(doc(db, "users", uid), { role });
       setUsers(prev => prev.map(u => u.uid === uid ? { ...u, role } : u));
     } catch (e) { console.error("[Admin] Role update failed:", e); }
     finally { setUpdatingUid(null); }
@@ -887,7 +602,7 @@ function ManageUsers() {
   const handleDelete = async (uid: string) => {
     if (!window.confirm("Delete this user's profile? They can still log in but will need to redo setup.")) return;
     try {
-      await fetch(`/api/users/${uid}`, { method: "DELETE" });
+      await deleteDoc(doc(db, "users", uid));
       setUsers(prev => prev.filter(u => u.uid !== uid));
     } catch (e) { console.error("[Admin] Delete failed:", e); }
   };
@@ -899,12 +614,10 @@ function ManageUsers() {
           <h2 className="text-xl font-bold text-gray-900">Manage Users</h2>
           <p className="text-sm text-gray-500 mt-0.5">{users.length} registered users</p>
         </div>
-        <button onClick={loadUsers} className="px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">
-          Refresh
-        </button>
+        <button onClick={loadUsers} className="px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Refresh</button>
       </div>
       {loading ? (
-        <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
       ) : users.length === 0 ? (
         <p className="text-center text-gray-400 py-12">No users found. Users appear here after completing setup.</p>
       ) : (
@@ -917,7 +630,7 @@ function ManageUsers() {
               <div className="min-w-0">
                 <p className="font-medium text-gray-900 text-sm truncate">{u.name || "(no name)"}</p>
                 <p className="text-xs text-gray-500 truncate">{u.email} · Grade {u.grade}</p>
-                <p className="text-xs text-gray-400">Joined {new Date(u.createdAt).toLocaleDateString()}</p>
+                <p className="text-xs text-gray-400">Joined {new Date(u.createdAt || Date.now()).toLocaleDateString()}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -941,14 +654,257 @@ function ManageUsers() {
   );
 }
 
+// ─── Badge Manager ───────────────────────────────────────────────────────────
 
-// ─── SEO Panel ─────────────────────────────────────────────────────────────
+const STUDY_TIERS = [
+  { mins: 24000, emoji: "🏆", label: "Champion",   bg: "linear-gradient(135deg,#94a3b8,#e2e8f0,#94a3b8)" },
+  { mins: 12000, emoji: "🌟", label: "Master",     bg: "linear-gradient(135deg,#d97706,#fcd34d,#d97706)" },
+  { mins: 6000,  emoji: "👑", label: "Legend",     bg: "linear-gradient(135deg,#b45309,#fbbf24,#b45309)" },
+  { mins: 4500,  emoji: "💎", label: "Scholar",    bg: "linear-gradient(135deg,#6d28d9,#a78bfa,#6d28d9)" },
+  { mins: 3000,  emoji: "🔥", label: "Achiever",   bg: "linear-gradient(135deg,#c2410c,#fb923c,#c2410c)" },
+  { mins: 1500,  emoji: "⚡", label: "Explorer",   bg: "linear-gradient(135deg,#1d4ed8,#60a5fa,#1d4ed8)" },
+  { mins: 600,   emoji: "🌱", label: "Beginner",   bg: "linear-gradient(135deg,#15803d,#4ade80,#15803d)" },
+];
+const STREAK_TIERS = [
+  { days: 100, emoji: "🦁", label: "Elite",        bg: "linear-gradient(135deg,#1e1b4b,#4338ca,#1e1b4b)" },
+  { days: 60,  emoji: "⭐", label: "Legendary",    bg: "linear-gradient(135deg,#92400e,#fcd34d,#92400e)" },
+  { days: 30,  emoji: "🚀", label: "Unstoppable",  bg: "linear-gradient(135deg,#5b21b6,#c4b5fd,#5b21b6)" },
+  { days: 15,  emoji: "💪", label: "Dedicated",    bg: "linear-gradient(135deg,#991b1b,#f87171,#991b1b)" },
+  { days: 5,   emoji: "🎯", label: "Consistent",   bg: "linear-gradient(135deg,#164e63,#67e8f9,#164e63)" },
+];
+const EMOJI_OPTIONS = ["⭐","🔥","💎","👑","🌟","🚀","💪","🎯","🌱","⚡","🏆","🦁","✨","🎓","🌈","🎪","🏅","🥇","🛡️","🎉","🧠","🪄","🌸","🐉","☄️","🔮"];
+const COLOR_PRESETS = ["#6366f1","#ec4899","#f59e0b","#10b981","#3b82f6","#ef4444","#8b5cf6","#06b6d4","#84cc16","#f97316","#e11d48","#0ea5e9"];
+
+const fmtTime = (mins: number) => mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+function getUnlockedStudyBadges(mins: number)  { return STUDY_TIERS.filter(t => mins >= t.mins); }
+function getUnlockedStreakBadges(days: number)  { return STREAK_TIERS.filter(t => days >= t.days); }
+
+function MicroBadge({ emoji, label, bg }: { emoji: string; label: string; bg: string }) {
+  return (
+    <span style={{ background: bg }}
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-white text-[10px] font-bold">
+      {emoji} {label}
+    </span>
+  );
+}
+
+function CustomBadgePill({ badge, onRemove }: { badge: CustomBadge; onRemove: () => void }) {
+  return (
+    <span style={{ background: badge.color, boxShadow: `0 2px 10px ${badge.color}55` }}
+      className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-white text-[10px] font-bold">
+      {badge.emoji} {badge.text}
+      <button onClick={onRemove} className="ml-0.5 opacity-70 hover:opacity-100 rounded-full">
+        <X className="w-3 h-3" />
+      </button>
+    </span>
+  );
+}
+
+function BadgeManager() {
+  const [users, setUsers] = useState<FireUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [gradeFilter, setGradeFilter] = useState<"all" | 9 | 10 | 11 | 12>("all");
+  const [openUid, setOpenUid] = useState<string | null>(null);
+  const [badgeText, setBadgeText] = useState("");
+  const [badgeEmoji, setBadgeEmoji] = useState("⭐");
+  const [badgeColor, setBadgeColor] = useState("#6366f1");
+  const [userBadges, setUserBadges] = useState<Record<string, CustomBadge[]>>({});
+
+  const loadUsers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const snap = await getDocs(query(collection(db, "users"), orderBy("totalStudyTime", "desc")));
+      const list = snap.docs.map(d => ({ uid: d.id, ...d.data() } as FireUser));
+      setUsers(list);
+      const map: Record<string, CustomBadge[]> = {};
+      list.forEach(u => { map[u.uid] = u.badges ?? []; });
+      setUserBadges(map);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { loadUsers(); }, [loadUsers]);
+
+  const filtered = users.filter(u => {
+    if (gradeFilter !== "all" && u.grade !== gradeFilter) return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
+  });
+
+  const addBadge = async (uid: string) => {
+    if (!badgeText.trim()) return;
+    const newBadge: CustomBadge = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      text: badgeText.trim(), emoji: badgeEmoji, color: badgeColor,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [...(userBadges[uid] ?? []), newBadge];
+    setUserBadges(prev => ({ ...prev, [uid]: updated }));
+    setBadgeText(""); setOpenUid(null);
+    updateDoc(doc(db, "users", uid), { badges: updated }).catch(e => console.error("Badge save failed:", e));
+  };
+
+  const removeBadge = (uid: string, badgeId: string) => {
+    const updated = (userBadges[uid] ?? []).filter(b => b.id !== badgeId);
+    setUserBadges(prev => ({ ...prev, [uid]: updated }));
+    updateDoc(doc(db, "users", uid), { badges: updated }).catch(e => console.error("Badge remove failed:", e));
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Badge Manager</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Assign custom badges · Auto badges earned by study time &amp; streak</p>
+        </div>
+        <button onClick={loadUsers} className="px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Refresh</button>
+      </div>
+
+      <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 mb-6">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Auto Badge Tiers</p>
+        <div className="flex flex-wrap gap-3 mb-3">
+          <p className="text-xs text-gray-500 w-full font-medium">📚 Study Time:</p>
+          {STUDY_TIERS.map(t => (
+            <span key={t.label} style={{ background: t.bg }} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-xs font-bold">
+              {t.emoji} {t.label} <span className="opacity-70">({fmtTime(t.mins)}+)</span>
+            </span>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <p className="text-xs text-gray-500 w-full font-medium">🔥 Streak:</p>
+          {STREAK_TIERS.map(t => (
+            <span key={t.label} style={{ background: t.bg }} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-xs font-bold">
+              {t.emoji} {t.label} <span className="opacity-70">({t.days}+ days)</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or email…"
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+        </div>
+        <div className="flex gap-1.5 items-center flex-shrink-0">
+          {(["all", 9, 10, 11, 12] as const).map(g => (
+            <button key={g} onClick={() => setGradeFilter(g)}
+              className={`px-3 py-2 text-xs font-semibold rounded-xl transition-all ${gradeFilter === g ? "bg-purple-500 text-white shadow-sm" : "bg-white border border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600"}`}>
+              {g === "all" ? "All" : `G${g}`}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-2xl animate-pulse" />)}</div>
+      ) : filtered.length === 0 ? (
+        <p className="text-center text-gray-400 py-12">{search ? "No users match your search." : "No users yet."}</p>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(u => {
+            const studyBadges  = getUnlockedStudyBadges(u.totalStudyTime ?? 0);
+            const streakBadges = getUnlockedStreakBadges(u.streak ?? 0);
+            const custom = userBadges[u.uid] ?? [];
+            const isOpen = openUid === u.uid;
+            return (
+              <div key={u.uid} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                    {(u.name || "?").charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm truncate">{u.name || "(no name)"}</p>
+                    <p className="text-xs text-gray-400 truncate">{u.email} · Grade {u.grade}</p>
+                    <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
+                      <span>⏱ {fmtTime(u.totalStudyTime ?? 0)}</span>
+                      <span>🔥 {u.streak ?? 0} days</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setOpenUid(isOpen ? null : u.uid); setBadgeText(""); setBadgeEmoji("⭐"); setBadgeColor("#6366f1"); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-600 text-xs font-semibold rounded-xl hover:bg-purple-100 transition-all flex-shrink-0">
+                    <Plus className="w-3.5 h-3.5" /> Add Badge
+                  </button>
+                </div>
+                {(studyBadges.length > 0 || streakBadges.length > 0 || custom.length > 0) && (
+                  <div className="px-4 pb-3 flex flex-wrap gap-1.5">
+                    {studyBadges.map(b => <MicroBadge key={b.label} emoji={b.emoji} label={b.label} bg={b.bg} />)}
+                    {streakBadges.map(b => <MicroBadge key={b.label} emoji={b.emoji} label={b.label} bg={b.bg} />)}
+                    {custom.map(b => <CustomBadgePill key={b.id} badge={b} onRemove={() => removeBadge(u.uid, b.id)} />)}
+                  </div>
+                )}
+                {isOpen && (
+                  <div className="border-t border-gray-100 bg-purple-50/60 px-4 py-4 space-y-3">
+                    <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide">New Custom Badge</p>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Badge Text</label>
+                      <input value={badgeText} onChange={e => setBadgeText(e.target.value)}
+                        placeholder="e.g. Top Performer, Most Dedicated…" maxLength={30}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Emoji</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {EMOJI_OPTIONS.map(e => (
+                          <button key={e} onClick={() => setBadgeEmoji(e)}
+                            className={`w-8 h-8 rounded-lg text-base flex items-center justify-center transition-all ${badgeEmoji === e ? "bg-purple-200 ring-2 ring-purple-500 scale-110" : "bg-white border border-gray-200 hover:bg-purple-50"}`}>
+                            {e}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Badge Color</label>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        {COLOR_PRESETS.map(c => (
+                          <button key={c} onClick={() => setBadgeColor(c)} style={{ background: c }}
+                            className={`w-7 h-7 rounded-full transition-all ${badgeColor === c ? "ring-2 ring-offset-2 ring-gray-400 scale-110" : "hover:scale-105"}`} />
+                        ))}
+                        <div className="flex items-center gap-2 ml-1">
+                          <input type="color" value={badgeColor} onChange={e => setBadgeColor(e.target.value)}
+                            className="w-7 h-7 rounded-full cursor-pointer border border-gray-200" title="Custom color" />
+                          <span className="text-xs text-gray-400">Custom</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 pt-1">
+                      {badgeText && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">Preview:</span>
+                          <span style={{ background: badgeColor, boxShadow: `0 4px 16px ${badgeColor}66` }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-white text-xs font-bold">
+                            {badgeEmoji} {badgeText}
+                          </span>
+                        </div>
+                      )}
+                      <button onClick={() => addBadge(u.uid)} disabled={!badgeText.trim()}
+                        className="ml-auto px-4 py-2 bg-purple-500 text-white text-xs font-semibold rounded-xl hover:bg-purple-600 disabled:opacity-50 transition-all">
+                        Assign Badge
+                      </button>
+                      <button onClick={() => setOpenUid(null)} className="px-3 py-2 bg-gray-100 text-gray-600 text-xs rounded-xl hover:bg-gray-200">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── SEO Panel ───────────────────────────────────────────────────────────────
 
 interface SeoMeta { seoTitle: string; description: string; keywords: string; slug: string; noIndex: boolean }
 const emptySeo = (): SeoMeta => ({ seoTitle: "", description: "", keywords: "", slug: "", noIndex: false });
-
 type SeoKind = "note" | "pyq";
-interface SeoEditTarget { id: number; defaultTitle: string; kind: SeoKind }
+interface SeoEditTarget { id: string; defaultTitle: string; kind: SeoKind }
 
 function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => void }) {
   const docId = `${target.kind}_${target.id}`;
@@ -959,9 +915,8 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
 
   useEffect(() => {
     let cancelled = false;
-    const load = async () => {
+    (async () => {
       try {
-        // Race against a 4s timeout so the modal never hangs blank
         const snap = await Promise.race([
           getDoc(doc(db, "seo_meta", docId)),
           new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 4000)),
@@ -969,30 +924,22 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
         if (cancelled) return;
         if (snap.exists()) setForm(snap.data() as SeoMeta);
         else setForm({ ...emptySeo(), seoTitle: target.defaultTitle });
-      } catch (e) {
-        if (cancelled) return;
-        console.warn("SEO load failed (using defaults):", e);
-        setForm({ ...emptySeo(), seoTitle: target.defaultTitle });
+      } catch {
+        if (!cancelled) setForm({ ...emptySeo(), seoTitle: target.defaultTitle });
       } finally {
         if (!cancelled) setLoading(false);
       }
-    };
-    load();
+    })();
     return () => { cancelled = true; };
   }, [docId, target.defaultTitle]);
 
   const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setSaved(false);
+    e.preventDefault(); setSaving(true); setSaved(false);
     try {
       await setDoc(doc(db, "seo_meta", docId), { ...form, updatedAt: new Date().toISOString() });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-    } catch (err) {
-      console.error("SEO save failed:", err);
-      alert("Save failed — check console.");
-    } finally { setSaving(false); }
+      setSaved(true); setTimeout(() => setSaved(false), 2500);
+    } catch (err) { console.error("SEO save failed:", err); alert("Save failed — check console."); }
+    finally { setSaving(false); }
   };
 
   const f = (k: keyof SeoMeta) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -1022,7 +969,8 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1.5">Meta Description</label>
-              <textarea value={form.description} onChange={f("description")} rows={3} placeholder="Brief description for search engines…"
+              <textarea value={form.description} onChange={f("description")} rows={3}
+                placeholder="Brief description for search engines…"
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-400" />
               <p className="text-xs text-gray-400 mt-1">{form.description.length}/160 chars recommended</p>
             </div>
@@ -1067,29 +1015,29 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
 function SeoPanel() {
   const [editing, setEditing] = useState<SeoEditTarget | null>(null);
   const [search, setSearch] = useState("");
-  const [noteItems, setNoteItems] = useState<Array<{ id: number; title: string; kind: SeoKind; url: string }>>([]);
-  const [pyqItems,  setPyqItems]  = useState<Array<{ id: number; title: string; kind: SeoKind; url: string }>>([]);
+  const [noteItems, setNoteItems] = useState<Array<{ id: string; title: string; grade: number; subject: string; kind: SeoKind; url: string }>>([]);
+  const [pyqItems,  setPyqItems]  = useState<Array<{ id: string; title: string; grade: number; subject: string; kind: SeoKind; url: string }>>([]);
   const [loadingItems, setLoadingItems] = useState(true);
   const [filterKind, setFilterKind] = useState<"all" | "note" | "pyq">("all");
   const [filterGrade, setFilterGrade] = useState<"all" | number>("all");
   const baseUrl = "https://studenthub.np";
 
-  // Fetch ALL notes and PYQs across all grades
   useEffect(() => {
     setLoadingItems(true);
     Promise.all([
-      Promise.all([9, 10, 11, 12].map(g =>
-        fetch(`/api/notes?grade=${g}`).then(r => r.json()).catch(() => [])
-      )),
-      Promise.all([9, 10, 11, 12].map(g =>
-        fetch(`/api/pyqs?grade=${g}`).then(r => r.json()).catch(() => [])
-      )),
-    ]).then(([notesPerGrade, pyqsPerGrade]) => {
-      const allNotes = notesPerGrade.flat();
-      const allPyqs  = pyqsPerGrade.flat();
-      setNoteItems(allNotes.map((n: any) => ({ id: n.id, title: n.title, grade: n.grade, subject: n.subject, kind: "note" as SeoKind, url: `${baseUrl}/notes/${n.id}` })));
-      setPyqItems(allPyqs.map((p: any)  => ({ id: p.id, title: p.title, grade: p.grade, subject: p.subject, kind: "pyq"  as SeoKind, url: `${baseUrl}/pyq/${p.id}`   })));
-    }).finally(() => setLoadingItems(false));
+      getDocs(collection(db, "notes")),
+      getDocs(collection(db, "pyqs")),
+    ]).then(([notesSnap, pyqsSnap]) => {
+      setNoteItems(notesSnap.docs.map(d => {
+        const data = d.data();
+        return { id: d.id, title: data.title, grade: data.grade, subject: data.subject, kind: "note" as SeoKind, url: `${baseUrl}/notes/${d.id}` };
+      }));
+      setPyqItems(pyqsSnap.docs.map(d => {
+        const data = d.data();
+        return { id: d.id, title: data.title, grade: data.grade, subject: data.subject, kind: "pyq" as SeoKind, url: `${baseUrl}/pyq/${d.id}` };
+      }));
+    }).catch(console.error)
+    .finally(() => setLoadingItems(false));
   }, []);
 
   const staticUrls = [
@@ -1102,11 +1050,11 @@ function SeoPanel() {
 
   const allItems = [
     ...noteItems.map(i => ({ ...i, kindLabel: "Note" })),
-    ...pyqItems.map(i => ({  ...i, kindLabel: "PYQ"  })),
+    ...pyqItems.map(i =>  ({ ...i, kindLabel: "PYQ"  })),
   ].filter(i => {
     if (search && !i.title.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterKind !== "all" && i.kind !== filterKind) return false;
-    if (filterGrade !== "all" && (i as any).grade !== filterGrade) return false;
+    if (filterGrade !== "all" && i.grade !== filterGrade) return false;
     return true;
   });
 
@@ -1123,14 +1071,12 @@ function SeoPanel() {
   return (
     <div>
       {editing && <SeoEditor target={editing} onClose={() => setEditing(null)} />}
-
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
           <h2 className="text-xl font-bold text-gray-900">SEO Panel</h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            Edit per-page SEO metadata stored in Firestore ·
-            {" "}<span className="text-purple-600 font-medium">{allItems.length} pages indexable</span>
+            Edit per-page SEO metadata stored in Firestore ·{" "}
+            <span className="text-purple-600 font-medium">{allItems.length} pages indexable</span>
           </p>
         </div>
         <button onClick={generateSitemap}
@@ -1139,7 +1085,6 @@ function SeoPanel() {
         </button>
       </div>
 
-      {/* SEO Quick Tips */}
       <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4 mb-6">
         <p className="text-xs font-semibold text-purple-700 mb-2">📌 SEO Tips</p>
         <ul className="text-xs text-purple-600 space-y-1">
@@ -1151,7 +1096,6 @@ function SeoPanel() {
         </ul>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
           { label: "Static Pages", count: staticUrls.length,  color: "bg-blue-50 text-blue-600"    },
@@ -1165,31 +1109,24 @@ function SeoPanel() {
         ))}
       </div>
 
-      {/* Notes + PYQs with Edit SEO button */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-4">
         <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex flex-wrap items-center gap-2">
           <p className="text-sm font-medium text-gray-700 mr-auto">Notes &amp; PYQs SEO</p>
-
-          {/* Kind filter */}
           {(["all", "note", "pyq"] as const).map(k => (
             <button key={k} onClick={() => setFilterKind(k)}
               className={`px-3 py-1 text-xs rounded-lg font-medium transition-all ${filterKind === k ? "bg-purple-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
               {k === "all" ? "All" : k === "note" ? "Notes" : "PYQs"}
             </button>
           ))}
-
-          {/* Grade filter */}
           {(["all", 9, 10, 11, 12] as const).map(g => (
             <button key={g} onClick={() => setFilterGrade(g)}
               className={`px-3 py-1 text-xs rounded-lg font-medium transition-all ${filterGrade === g ? "bg-indigo-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
               {g === "all" ? "All grades" : `G${g}`}
             </button>
           ))}
-
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search title…"
             className="px-3 py-1.5 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 w-36" />
         </div>
-
         {loadingItems ? (
           <div className="p-8 space-y-2">{[1,2,3,4].map(i => <div key={i} className="h-10 bg-gray-100 rounded-xl animate-pulse" />)}</div>
         ) : allItems.length === 0 ? (
@@ -1204,21 +1141,18 @@ function SeoPanel() {
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${item.kindLabel === "Note" ? "bg-green-50 text-green-600" : "bg-orange-50 text-orange-600"}`}>
                     {item.kindLabel}
                   </span>
-                  {(item as any).grade && (
-                    <span className="text-[9px] text-gray-400">G{(item as any).grade}</span>
-                  )}
+                  {item.grade && <span className="text-[9px] text-gray-400">G{item.grade}</span>}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-800 font-medium truncate">{item.title}</p>
-                  {(item as any).subject && <p className="text-xs text-gray-400 truncate">{(item as any).subject}</p>}
+                  {item.subject && <p className="text-xs text-gray-400 truncate">{item.subject}</p>}
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <a href={item.url} target="_blank" rel="noopener noreferrer"
                     className="text-xs text-blue-400 hover:text-blue-600 transition-colors">Open ↗</a>
                   <button
                     onClick={() => setEditing({ id: item.id, defaultTitle: item.title, kind: item.kind })}
-                    className="px-3 py-1.5 bg-purple-50 text-purple-600 text-xs font-semibold rounded-lg hover:bg-purple-100 transition-all"
-                  >
+                    className="px-3 py-1.5 bg-purple-50 text-purple-600 text-xs font-semibold rounded-lg hover:bg-purple-100 transition-all">
                     Edit SEO
                   </button>
                 </div>
@@ -1228,7 +1162,6 @@ function SeoPanel() {
         )}
       </div>
 
-      {/* Static pages list */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
           <p className="text-sm font-medium text-gray-700">Static Pages</p>
@@ -1244,15 +1177,12 @@ function SeoPanel() {
           ))}
         </div>
       </div>
-
-      <p className="text-xs text-gray-400 mt-4 text-center">
-        SEO data saved to Firestore · Changes apply immediately on the live site
-      </p>
+      <p className="text-xs text-gray-400 mt-4 text-center">SEO data saved to Firestore · Changes apply immediately on the live site</p>
     </div>
   );
 }
 
-// ─── Admin Shell ───────────────────────────────────────────────────────────
+// ─── Admin Shell ─────────────────────────────────────────────────────────────
 
 export default function Admin() {
   const { profile, signOut } = useAuth();
@@ -1289,34 +1219,27 @@ export default function Admin() {
             <p className="text-xs text-purple-500 mt-1">Firebase admin: {profile.name}</p>
           )}
         </div>
-
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {navItems.map(({ key, icon: Icon, label }) => (
-            <button
-              key={key}
-              onClick={() => setSection(key)}
+            <button key={key} onClick={() => setSection(key)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left ${
                 section === key ? "bg-purple-50 text-purple-600" : "text-gray-600 hover:bg-gray-50"
-              }`}
-            >
+              }`}>
               <Icon className="w-4 h-4" /> {label}
             </button>
           ))}
         </nav>
-
         <div className="p-4 border-t border-gray-100">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-all mb-1 w-full"
-          >
+          <Link href="/dashboard"
+            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-all mb-1 w-full">
             ← Back to App
           </Link>
-          <button onClick={handleSignOut} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all w-full">
+          <button onClick={handleSignOut}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all w-full">
             <LogOut className="w-4 h-4" /> Sign out
           </button>
         </div>
       </aside>
-
       <main className="flex-1 overflow-y-auto p-8">
         {section === "dashboard"     && <AdminOverview />}
         {section === "notes"         && <ManageNotes />}

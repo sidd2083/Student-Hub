@@ -1,15 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
+import { collection, query, where, getDocs, deleteDoc, doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Bookmark, BookOpen, FileText, Trash2, ExternalLink, Download } from "lucide-react";
 
 interface SavedItem {
-  id: number;
+  id: string;
   itemType: "note" | "pyq";
-  itemId: number;
-  createdAt: string;
+  itemId: string;
+  savedAt: string;
   title?: string;
   subject?: string;
   grade?: number;
@@ -25,31 +27,66 @@ function SavedContent() {
   const [items, setItems] = useState<SavedItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!user?.uid) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/saved?uid=${user.uid}`);
-      if (res.ok) {
-        const data = await res.json();
-        setItems(data);
-      }
+      const q = query(collection(db, "saved"), where("uid", "==", user.uid));
+      const snap = await getDocs(q);
+
+      const rawItems = snap.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+      } as { id: string; itemType: "note" | "pyq"; itemId: string; savedAt: string }));
+
+      // Fetch metadata for each saved item
+      const enriched: SavedItem[] = await Promise.all(rawItems.map(async (item) => {
+        try {
+          const collName = item.itemType === "note" ? "notes" : "pyqs";
+          const docSnap = await getDoc(doc(db, collName, item.itemId));
+          if (docSnap.exists()) {
+            const d = docSnap.data();
+            if (item.itemType === "note") {
+              return {
+                ...item,
+                title: d.title,
+                subject: d.subject,
+                grade: d.grade,
+                contentType: d.contentType,
+                content: d.content,
+              };
+            } else {
+              return {
+                ...item,
+                title: d.title,
+                subject: d.subject,
+                grade: d.grade,
+                year: d.year,
+                fileType: d.fileType,
+                pdfUrl: d.pdfUrl,
+              };
+            }
+          }
+        } catch {}
+        return item;
+      }));
+
+      setItems(enriched.sort((a, b) => (b.savedAt || "").localeCompare(a.savedAt || "")));
     } catch (e) {
-      console.error(e);
+      console.error("[Saved] Load failed:", e);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => { load(); }, [load]);
 
-  const remove = async (id: number) => {
-    if (!user?.uid) return;
+  const remove = async (id: string) => {
     try {
-      await fetch(`/api/saved/${id}?uid=${user.uid}`, { method: "DELETE" });
+      await deleteDoc(doc(db, "saved", id));
       setItems(prev => prev.filter(i => i.id !== id));
     } catch (e) {
-      console.error(e);
+      console.error("[Saved] Delete failed:", e);
     }
   };
 
@@ -103,7 +140,7 @@ function SavedContent() {
                     <div className="flex-1 min-w-0">
                       <Link href={`/notes/${item.itemId}`}>
                         <a className="text-sm font-semibold text-gray-900 hover:text-blue-600 transition-colors truncate block">
-                          {item.title || `Note #${item.itemId}`}
+                          {item.title || `Note ${item.itemId.slice(0, 8)}`}
                         </a>
                       </Link>
                       <p className="text-xs text-gray-400 mt-0.5">
@@ -141,7 +178,7 @@ function SavedContent() {
                     <div className="flex-1 min-w-0">
                       <Link href={`/pyq/${item.itemId}`}>
                         <a className="text-sm font-semibold text-gray-900 hover:text-blue-600 transition-colors truncate block">
-                          {item.title || `PYQ #${item.itemId}`}
+                          {item.title || `PYQ ${item.itemId.slice(0, 8)}`}
                         </a>
                       </Link>
                       <p className="text-xs text-gray-400 mt-0.5">
@@ -151,8 +188,7 @@ function SavedContent() {
                     <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                       {item.pdfUrl && (
                         <a href={item.pdfUrl} target="_blank" rel="noopener noreferrer" download
-                          className="p-1.5 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-500 transition-all"
-                          title="Download">
+                          className="p-1.5 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-500 transition-all">
                           <Download className="w-3.5 h-3.5" />
                         </a>
                       )}

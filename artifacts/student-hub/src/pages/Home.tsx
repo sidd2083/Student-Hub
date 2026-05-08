@@ -1,8 +1,10 @@
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
+import { collection, query, where, getDocs, limit, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { BookOpen, FileText, BarChart2, MessageCircle, Timer, CheckSquare, Trophy, ArrowRight, LogIn, Sparkles } from "lucide-react";
-import { useListNotes, useListPyqs } from "@workspace/api-client-react";
 
 const features = [
   { icon: BookOpen,      label: "Study Notes",       desc: "Notes by grade, subject & chapter",  href: "/notes",      color: "bg-blue-50 text-blue-600",    public: true  },
@@ -14,11 +16,22 @@ const features = [
   { icon: Trophy,        label: "Leaderboard",        desc: "Top students by study time & streak", href: "/leaderboard",color: "bg-amber-50 text-amber-600",   public: false },
 ];
 
+interface PreviewNote { id: string; title: string; subject: string; grade: number; contentType: string }
+interface PreviewPyq  { id: string; title: string; subject: string; grade: number; year: number }
+
 export default function Home() {
   const { user, loading, signInWithGoogle } = useAuth();
+  const [notes, setNotes] = useState<PreviewNote[]>([]);
+  const [pyqs, setPyqs] = useState<PreviewPyq[]>([]);
 
-  const { data: notes } = useListNotes({ grade: 10 }, { query: { queryKey: ["notes-preview"] } });
-  const { data: pyqs } = useListPyqs({ grade: 10 }, { query: { queryKey: ["pyqs-preview"] } });
+  useEffect(() => {
+    getDocs(query(collection(db, "notes"), where("grade", "==", 10), orderBy("createdAt", "desc"), limit(5)))
+      .then(s => setNotes(s.docs.map(d => ({ id: d.id, ...d.data() } as PreviewNote))))
+      .catch(console.error);
+    getDocs(query(collection(db, "pyqs"), where("grade", "==", 10), orderBy("createdAt", "desc"), limit(5)))
+      .then(s => setPyqs(s.docs.map(d => ({ id: d.id, ...d.data() } as PreviewPyq))))
+      .catch(console.error);
+  }, []);
 
   if (loading) {
     return (
@@ -43,7 +56,6 @@ export default function Home() {
         <meta property="og:description" content="Notes, PYQs, Nep AI and study tracking for Grade 9–12 students in Nepal. Free forever." />
       </Helmet>
 
-      {/* ── Hero ── */}
       <section className="relative overflow-hidden bg-gradient-to-b from-blue-50 to-white pt-16 pb-20 px-4">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 left-1/4 w-64 h-64 bg-blue-100 rounded-full blur-3xl opacity-40" />
@@ -79,7 +91,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Features grid ── */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6 py-14">
         <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">Everything you need to study</h2>
         <p className="text-gray-500 text-center mb-10 text-sm">Public content is free for everyone. Register to unlock tools.</p>
@@ -103,8 +114,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Recent Notes preview ── */}
-      {Array.isArray(notes) && notes.length > 0 && (
+      {notes.length > 0 && (
         <section className="bg-gray-50 py-12 px-4">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-6">
@@ -114,7 +124,7 @@ export default function Home() {
               </Link>
             </div>
             <div className="grid gap-2">
-              {(notes as any[]).slice(0, 5).map((note: any) => (
+              {notes.map(note => (
                 <Link key={note.id} href={`/notes/${note.id}`}>
                   <div className="flex items-center gap-4 bg-white rounded-2xl border border-gray-100 px-4 py-3.5 hover:border-blue-100 hover:shadow-sm transition-all">
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
@@ -137,8 +147,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* ── Recent PYQs preview ── */}
-      {Array.isArray(pyqs) && pyqs.length > 0 && (
+      {pyqs.length > 0 && (
         <section className="py-12 px-4">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-6">
@@ -148,7 +157,7 @@ export default function Home() {
               </Link>
             </div>
             <div className="grid gap-2">
-              {(pyqs as any[]).slice(0, 5).map((pyq: any) => (
+              {pyqs.map(pyq => (
                 <Link key={pyq.id} href={`/pyq/${pyq.id}`}>
                   <div className="flex items-center gap-4 bg-white rounded-2xl border border-gray-100 px-4 py-3.5 hover:border-orange-100 hover:shadow-sm transition-all">
                     <div className="w-9 h-9 bg-orange-50 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -167,7 +176,6 @@ export default function Home() {
         </section>
       )}
 
-      {/* ── Footer ── */}
       <footer className="py-8 px-4 border-t border-gray-100 bg-white">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-gray-400">© {new Date().getFullYear()} Student Hub · Free for every Nepali student</p>

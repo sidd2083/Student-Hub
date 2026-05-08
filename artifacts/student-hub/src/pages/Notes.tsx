@@ -1,22 +1,20 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { useListNotes, useListNoteSubjects, getListNotesQueryKey } from "@workspace/api-client-react";
+import { collection, query, where, getDocs, getDoc, doc, updateDoc, setDoc, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { BookOpen, ChevronRight, FileText, Image, Type, X, ExternalLink, ZoomIn, LogIn, Sparkles } from "lucide-react";
 
 type NoteView = {
-  id: number;
+  id: string;
   title: string;
   subject: string;
   chapter: string;
+  grade: number;
   contentType: string;
   content: string;
 };
-
-function toSlug(str: string) {
-  return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
 
 function ContentTypeBadge({ type }: { type: string }) {
   const map: Record<string, { icon: typeof FileText; label: string; cls: string }> = {
@@ -34,7 +32,7 @@ function ContentTypeBadge({ type }: { type: string }) {
   );
 }
 
-function NoteViewer({ note, onClose }: { note: NoteView; onClose: () => void }) {
+function NoteViewer({ note, onClose, uid }: { note: NoteView; onClose: () => void; uid?: string }) {
   const [, setLocation] = useLocation();
   const [imgZoomed, setImgZoomed] = useState(false);
   const [scrollPct, setScrollPct] = useState(0);
@@ -57,15 +55,30 @@ function NoteViewer({ note, onClose }: { note: NoteView; onClose: () => void }) 
     setLocation(`/ai?q=${encodeURIComponent(ctx)}`);
   };
 
+  // Log note view
+  useEffect(() => {
+    if (!uid) return;
+    (async () => {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const logId = `${uid}_${today}`;
+        const logRef = doc(db, "study_logs", logId);
+        const logSnap = await getDoc(logRef);
+        if (logSnap.exists()) {
+          await updateDoc(logRef, { notesViewed: (logSnap.data().notesViewed ?? 0) + 1 });
+        } else {
+          await setDoc(logRef, { uid, date: today, studyMinutes: 0, tasksCompleted: 0, notesViewed: 1 });
+        }
+      } catch {}
+    })();
+  }, [uid, note.id]);
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2 sm:p-4">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-        {/* Progress bar */}
         <div className="h-1 bg-gray-100 flex-shrink-0 rounded-t-3xl overflow-hidden">
           <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${scrollPct}%` }} />
         </div>
-
-        {/* Header */}
         <div className="flex items-start justify-between px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-100 flex-shrink-0">
           <div className="flex-1 min-w-0 mr-3">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -75,11 +88,9 @@ function NoteViewer({ note, onClose }: { note: NoteView; onClose: () => void }) 
             <h2 className="text-lg sm:text-xl font-bold text-gray-900 leading-snug">{note.title}</h2>
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {/* Ask AI button */}
             <button
               onClick={handleAskAi}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500 text-white text-xs font-semibold rounded-xl hover:bg-indigo-600 transition-all"
-              title="Ask Nep AI about this note"
             >
               <Sparkles className="w-3 h-3" /> Ask AI
             </button>
@@ -95,7 +106,6 @@ function NoteViewer({ note, onClose }: { note: NoteView; onClose: () => void }) 
             </button>
           </div>
         </div>
-        {/* Mobile bar */}
         <div className="sm:hidden flex items-center justify-between px-4 py-2 bg-blue-50 border-b border-blue-100 flex-shrink-0">
           <span className="text-xs text-blue-700">Reading preview</span>
           <Link href={`/notes/${note.id}`} onClick={onClose}
@@ -103,7 +113,6 @@ function NoteViewer({ note, onClose }: { note: NoteView; onClose: () => void }) 
             <ExternalLink className="w-3 h-3" /> View Full Note
           </Link>
         </div>
-
         <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto">
           {note.contentType === "text" && (
             <div className="max-w-2xl mx-auto px-4 sm:px-8 py-8 sm:py-10">
@@ -159,31 +168,29 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   const [grade, setGrade] = useState<number>(profile?.grade || 10);
   const [subject, setSubject] = useState<string>("");
   const [selectedNote, setSelectedNote] = useState<NoteView | null>(null);
+  const [notes, setNotes] = useState<NoteView[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const openNote = (note: NoteView) => {
-    setSelectedNote(note);
-    if (user?.uid) {
-      fetch("/api/study/log-note", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: user.uid }),
-      }).catch(console.error);
-    }
-  };
+  useEffect(() => {
+    setLoading(true);
+    setSubject("");
+    const q = query(collection(db, "notes"), where("grade", "==", grade), orderBy("createdAt", "desc"));
+    getDocs(q).then(snap => {
+      const list: NoteView[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as NoteView));
+      setNotes(list);
+    }).catch(e => {
+      console.error("[Notes] Load failed:", e);
+      setNotes([]);
+    }).finally(() => setLoading(false));
+  }, [grade]);
 
-  const { data: subjects, isLoading: loadingSubjects } = useListNoteSubjects(
-    { grade },
-    { query: { queryKey: getListNotesQueryKey({ grade }) } }
-  );
-  const { data: notes, isLoading: loadingNotes } = useListNotes(
-    { grade, ...(subject ? { subject } : {}) },
-    { query: { queryKey: getListNotesQueryKey({ grade, subject }) } }
-  );
+  const subjects = useMemo(() => [...new Set(notes.map(n => n.subject))].sort(), [notes]);
+  const filtered = useMemo(() => subject ? notes.filter(n => n.subject === subject) : notes, [notes, subject]);
 
   return (
     <>
       {selectedNote && (
-        <NoteViewer note={selectedNote} onClose={() => setSelectedNote(null)} />
+        <NoteViewer note={selectedNote} onClose={() => setSelectedNote(null)} uid={user?.uid} />
       )}
 
       <div className="p-4 sm:p-6 lg:p-8">
@@ -192,23 +199,19 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
           <p className="text-gray-500 text-sm">Study materials organised by grade and subject</p>
         </div>
 
-        {/* Login CTA for unauthenticated users */}
         {!isLoggedIn && (
           <div className="mb-5 bg-blue-50 border border-blue-100 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
               <p className="font-semibold text-blue-900 text-sm">Get full access — free</p>
               <p className="text-blue-700 text-xs mt-0.5">Nep AI, progress tracking, Pomodoro &amp; more</p>
             </div>
-            <Link
-              href="/login"
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-all flex-shrink-0 w-full sm:w-auto justify-center"
-            >
+            <Link href="/login"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-all flex-shrink-0 w-full sm:w-auto justify-center">
               <LogIn className="w-3.5 h-3.5" /> Login / Register
             </Link>
           </div>
         )}
 
-        {/* Filters */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-5 sm:mb-6">
           <select
             data-testid="select-grade-notes"
@@ -220,15 +223,13 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
           </select>
 
           <div className="flex flex-wrap gap-1.5 sm:gap-2">
-            <button
-              onClick={() => setSubject("")}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${!subject ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-            >
+            <button onClick={() => setSubject("")}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${!subject ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
               All
             </button>
-            {loadingSubjects
+            {loading
               ? [1, 2, 3].map(i => <div key={i} className="h-8 w-20 bg-gray-100 rounded-full animate-pulse" />)
-              : (Array.isArray(subjects) ? subjects : []).map((s) => (
+              : subjects.map((s) => (
                 <button key={s} data-testid={`filter-subject-${s}`} onClick={() => setSubject(s)}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${subject === s ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
                   {s}
@@ -238,12 +239,11 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
           </div>
         </div>
 
-        {/* Note list */}
-        {loadingNotes ? (
+        {loading ? (
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => <div key={i} className="h-20 bg-gray-100 rounded-2xl animate-pulse" />)}
           </div>
-        ) : (Array.isArray(notes) ? notes : []).length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p className="font-medium">No notes found for this selection</p>
@@ -251,11 +251,11 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
           </div>
         ) : (
           <div className="space-y-2">
-            {(Array.isArray(notes) ? notes : []).map((note) => (
+            {filtered.map((note) => (
               <div key={note.id} className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 hover:shadow-sm hover:border-blue-100 transition-all group">
                 <button
                   data-testid={`note-item-${note.id}`}
-                  onClick={() => openNote(note)}
+                  onClick={() => setSelectedNote(note)}
                   className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 text-left"
                 >
                   <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
@@ -272,7 +272,6 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
                 </button>
                 <div className="flex items-center gap-2 flex-shrink-0 ml-2 sm:ml-3">
                   <ContentTypeBadge type={note.contentType} />
-                  {/* Link to individual note page for SEO */}
                   <Link
                     href={`/notes/${note.id}`}
                     onClick={(e: React.MouseEvent) => e.stopPropagation()}

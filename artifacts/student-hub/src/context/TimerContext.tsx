@@ -1,9 +1,9 @@
 import {
   createContext, useCallback, useContext, useEffect, useRef, useState,
 } from "react";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useAuth } from "./AuthContext";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type Phase = "work" | "shortBreak" | "longBreak";
 
@@ -39,8 +39,6 @@ interface TimerContextType {
 
 const TimerContext = createContext<TimerContextType | null>(null);
 
-// ─── localStorage keys ────────────────────────────────────────────────────────
-
 const LS_KEY = "studenthub_timer_state";
 
 interface PersistedState {
@@ -52,7 +50,7 @@ interface PersistedState {
   savedMinutesToday: number;
   totalWorkSeconds: number;
   savedMinutes: number;
-  updatedAt: number; // timestamp for cross-tab sync
+  updatedAt: number;
 }
 
 function loadState(): PersistedState | null {
@@ -61,11 +59,8 @@ function loadState(): PersistedState | null {
     if (!raw) return null;
     const s = JSON.parse(raw) as PersistedState;
     if (!s.updatedAt) return null;
-
-    // Adjust seconds for elapsed time if timer was running
     const elapsed = Math.floor((Date.now() - s.updatedAt) / 1000);
     if (s.running && elapsed > 0 && elapsed < 3600) {
-      // Advance the timer state forward by elapsed seconds
       s.totalWorkSeconds = s.phase === "work" ? s.totalWorkSeconds + elapsed : s.totalWorkSeconds;
       s.seconds = Math.max(0, s.seconds - elapsed);
     }
@@ -80,8 +75,6 @@ function saveState(s: PersistedState) {
     localStorage.setItem(LS_KEY, JSON.stringify({ ...s, updatedAt: Date.now() }));
   } catch {}
 }
-
-// ─── Sound ───────────────────────────────────────────────────────────────────
 
 function playBeep(type: "work" | "break" = "work") {
   try {
@@ -100,17 +93,12 @@ function playBeep(type: "work" | "break" = "work") {
       osc.start(t + i * 0.18);
       osc.stop(t + i * 0.18 + 0.35);
     });
-  } catch {
-    // AudioContext not available (e.g. SSR)
-  }
+  } catch {}
 }
-
-// ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function TimerProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
 
-  // Load persisted state on mount
   const persisted = loadState();
 
   const [settings, setSettings] = useState<TimerSettings>(persisted?.settings ?? DEFAULT_SETTINGS);
@@ -131,11 +119,10 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { userRef.current = user?.uid ?? null; }, [user]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
 
-  // ── Persist state to localStorage on every tick ──────────────────────────────
   const persistState = useCallback(() => {
     saveState({
       phase: phaseRef.current,
-      seconds: 0, // will be overwritten by caller
+      seconds: 0,
       running: runningRef.current,
       sessionsCompleted: sessionsRef.current,
       settings: settingsRef.current,
@@ -146,19 +133,15 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // ── Cross-tab sync via storage event ─────────────────────────────────────────
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key !== LS_KEY || !e.newValue) return;
       try {
         const s = JSON.parse(e.newValue) as PersistedState;
-        // Only sync non-running state changes from other tabs (pause/reset)
-        // to avoid fighting over the tick
         if (!s.running && runningRef.current) {
           runningRef.current = false;
           setRunning(false);
         }
-        // Sync sessions / saved minutes
         if (s.sessionsCompleted !== sessionsRef.current) {
           sessionsRef.current = s.sessionsCompleted;
           setSessionsCompleted(s.sessionsCompleted);
@@ -172,35 +155,68 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
-  // ── Save work minutes to backend ─────────────────────────────────────────────
   const saveMinutes = useCallback(async (mins: number) => {
     const uid = userRef.current;
     if (!uid || mins < 1) return;
     try {
-      const res = await fetch("/api/study/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid, minutes: mins }),
-      });
-      if (res.ok) {
-        const data = await res.json();
+      const today = new Date().toISOString().slice(0, 10);
+      const userRef2 = doc(db, "users", uid);
+      const snap = await getDoc(userRef2);
+
+      if (snap.exists()) {
+        const data = snap.data();
+        const lastActive = data.lastActiveDate ?? "";
+        const prevToday = data.todayStudyTime ?? 0;
+        const prevTotal = data.totalStudyTime ?? 0;
+        const prevStreak = data.streak ?? 0;
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+        let newStreak = prevStreak;
+        let newToday = prevToday;
+
+        if (lastActive === today) {
+          newToday = prevToday + mins;
+        } else {
+          newToday = mins;
+          if (lastActive === yesterday) {
+            newStreak = prevStreak + 1;
+          } else if (lastActive !== today) {
+            newStreak = 1;
+          }
+        }
+
+        await updateDoc(userRef2, {
+          totalStudyTime: prevTotal + mins,
+          todayStudyTime: newToday,
+          streak: newStreak,
+          lastActiveDate: today,
+        });
+
         savedMinutesRef.current += mins;
-        setSavedMinutesToday(data.todayStudyTime ?? savedMinutesRef.current);
-        console.log(`[Timer] Saved ${mins} min. Total today: ${data.todayStudyTime}`);
+        setSavedMinutesToday(newToday);
+        console.log(`[Timer] Saved ${mins} min to Firestore. Total today: ${newToday}`);
+
+        // Update daily study log
+        const logId = `${uid}_${today}`;
+        const logRef = doc(db, "study_logs", logId);
+        const logSnap = await getDoc(logRef);
+        if (logSnap.exists()) {
+          await updateDoc(logRef, { studyMinutes: (logSnap.data().studyMinutes ?? 0) + mins });
+        } else {
+          await setDoc(logRef, { uid, date: today, studyMinutes: mins, tasksCompleted: 0, notesViewed: 0 });
+        }
       }
     } catch (err) {
-      console.error("[Timer] Save failed:", err);
+      console.error("[Timer] Firestore save failed:", err);
     }
   }, []);
 
-  // ── Phase durations ───────────────────────────────────────────────────────────
   const phaseSeconds = useCallback((p: Phase, s: TimerSettings) => {
     if (p === "work") return s.workMins * 60;
     if (p === "shortBreak") return s.shortBreakMins * 60;
     return s.longBreakMins * 60;
   }, []);
 
-  // ── Transition to next phase ──────────────────────────────────────────────────
   const nextPhase = useCallback((currentPhase: Phase, currentSessions: number, s: TimerSettings) => {
     if (currentPhase === "work") {
       const newSessions = currentSessions + 1;
@@ -221,7 +237,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [phaseSeconds]);
 
-  // ── Main tick ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!running) return;
 
@@ -238,7 +253,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       setSeconds(prev => {
         const next = prev <= 1 ? 0 : prev - 1;
 
-        // Persist every 5 seconds to avoid too much I/O
         if (totalWorkSecondsRef.current % 5 === 0) {
           saveState({
             phase: phaseRef.current,
@@ -273,8 +287,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
     return () => clearInterval(interval);
   }, [running, saveMinutes, nextPhase]);
-
-  // ── Actions ───────────────────────────────────────────────────────────────────
 
   const start = useCallback(() => {
     if (running) return;

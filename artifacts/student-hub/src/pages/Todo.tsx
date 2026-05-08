@@ -1,61 +1,102 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
 import {
-  useListTasks, useCreateTask, useUpdateTask, useDeleteTask,
-  getListTasksQueryKey
-} from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+  collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, orderBy,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { CheckSquare, Plus, Trash2, Check } from "lucide-react";
+
+interface Task {
+  id: string;
+  uid: string;
+  text: string;
+  completed: boolean;
+  createdAt: string;
+}
 
 function TodoContent() {
   const { user } = useAuth();
   const [newTask, setNewTask] = useState("");
-  const qc = useQueryClient();
-  const uid = user?.uid || "";
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
 
-  const { data: tasks, isLoading } = useListTasks(
-    { uid },
-    { query: { enabled: !!uid, queryKey: getListTasksQueryKey({ uid }) } }
-  );
-  const createTask = useCreateTask();
-  const updateTask = useUpdateTask();
-  const deleteTask = useDeleteTask();
+  const loadTasks = useCallback(async () => {
+    if (!user?.uid) return;
+    setLoading(true);
+    try {
+      const q = query(
+        collection(db, "tasks"),
+        where("uid", "==", user.uid),
+        orderBy("createdAt", "desc")
+      );
+      const snap = await getDocs(q);
+      const list: Task[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Task));
+      setTasks(list);
+    } catch (e) {
+      console.error("[Todo] Load failed:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: getListTasksQueryKey({ uid }) });
+  useEffect(() => { loadTasks(); }, [loadTasks]);
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTask.trim()) return;
-    createTask.mutate({ data: { uid, text: newTask.trim() } }, {
-      onSuccess: () => { setNewTask(""); invalidate(); }
-    });
+    if (!newTask.trim() || !user?.uid) return;
+    setAdding(true);
+    try {
+      const data = {
+        uid: user.uid,
+        text: newTask.trim(),
+        completed: false,
+        createdAt: new Date().toISOString(),
+      };
+      const ref = await addDoc(collection(db, "tasks"), data);
+      setTasks(prev => [{ id: ref.id, ...data }, ...prev]);
+      setNewTask("");
+    } catch (e) {
+      console.error("[Todo] Add failed:", e);
+    } finally {
+      setAdding(false);
+    }
   };
 
-  // One-way: only allow completing (not un-completing)
-  const handleComplete = (id: number) => {
-    updateTask.mutate({ id, data: { completed: true } }, {
-      onSuccess: () => {
-        invalidate();
-        if (uid) {
-          fetch("/api/study/log-task", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ uid }),
-          }).catch(console.error);
-        }
+  const handleComplete = async (id: string) => {
+    if (!user?.uid) return;
+    try {
+      await updateDoc(doc(db, "tasks", id), { completed: true });
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: true } : t));
+
+      // Log task completion to study_logs
+      const today = new Date().toISOString().slice(0, 10);
+      const logId = `${user.uid}_${today}`;
+      const logRef = doc(db, "study_logs", logId);
+      const logSnap = await getDoc(logRef);
+      if (logSnap.exists()) {
+        await updateDoc(logRef, { tasksCompleted: (logSnap.data().tasksCompleted ?? 0) + 1 });
+      } else {
+        await setDoc(logRef, { uid: user.uid, date: today, studyMinutes: 0, tasksCompleted: 1, notesViewed: 0 });
       }
-    });
+    } catch (e) {
+      console.error("[Todo] Complete failed:", e);
+    }
   };
 
-  const handleDelete = (id: number) => {
-    deleteTask.mutate({ id }, { onSuccess: invalidate });
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "tasks", id));
+      setTasks(prev => prev.filter(t => t.id !== id));
+    } catch (e) {
+      console.error("[Todo] Delete failed:", e);
+    }
   };
 
-  const taskList = Array.isArray(tasks) ? tasks : [];
-  const pending = taskList.filter(t => !t.completed);
-  const done = taskList.filter(t => t.completed);
+  const pending = tasks.filter(t => !t.completed);
+  const done = tasks.filter(t => t.completed);
 
   return (
     <div className="p-4 sm:p-8 max-w-2xl mx-auto">
@@ -75,14 +116,14 @@ function TodoContent() {
         <button
           data-testid="btn-add-task"
           type="submit"
-          disabled={!newTask.trim() || createTask.isPending}
+          disabled={!newTask.trim() || adding}
           className="w-12 h-12 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all disabled:opacity-50 flex items-center justify-center flex-shrink-0"
         >
           <Plus className="w-5 h-5" />
         </button>
       </form>
 
-      {isLoading ? (
+      {loading ? (
         <div className="space-y-2">{[1,2,3].map(i=><div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse"/>)}</div>
       ) : (
         <>
@@ -123,7 +164,6 @@ function TodoContent() {
               <div className="space-y-2">
                 {done.map(task => (
                   <div key={task.id} className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 group">
-                    {/* Completed tasks: non-interactive green check (no toggle back) */}
                     <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
                       <Check className="w-3 h-3 text-white" />
                     </div>

@@ -3,6 +3,8 @@ import { Helmet } from "react-helmet-async";
 import { Link } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
+import { collection, doc, getDoc, getDocs, query, where, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import {
   BarChart2, Flame, Trophy, Star, TrendingUp,
   CheckSquare, Clock, Calendar, Award, BookOpen,
@@ -31,8 +33,6 @@ function fmtTime(mins: number) {
   if (mins <= 0) return "0m";
   return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
 }
-
-// ─── Duolingo-style daily insights ──────────────────────────────────────────
 
 function buildInsights(stats: StudyStats, dailyLogs: DailyLog[]) {
   const insights: Array<{ icon: string; text: string; type: "positive" | "warning" | "info" }> = [];
@@ -83,8 +83,6 @@ function buildInsights(stats: StudyStats, dailyLogs: DailyLog[]) {
   return insights.slice(0, 4);
 }
 
-// ─── Bar chart ────────────────────────────────────────────────────────────────
-
 function StudyBar({ logs, period }: { logs: DailyLog[]; period: ViewPeriod }) {
   const days = useMemo(() => {
     const count = period === "day" ? 1 : period === "week" ? 7 : 30;
@@ -122,8 +120,6 @@ function StudyBar({ logs, period }: { logs: DailyLog[]; period: ViewPeriod }) {
   );
 }
 
-// ─── Daily Report (Spotify Recap style) ─────────────────────────────────────
-
 function DailyReport({ stats, logs }: { stats: StudyStats; logs: DailyLog[] }) {
   const today = new Date().toISOString().slice(0, 10);
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -138,16 +134,14 @@ function DailyReport({ stats, logs }: { stats: StudyStats; logs: DailyLog[] }) {
   const diff = todayMins - yesterdayMins;
   const diffPct = yesterdayMins > 0 ? Math.round((diff / yesterdayMins) * 100) : todayMins > 0 ? 100 : 0;
 
-  // Publish time check: 10 PM Nepal Time (NPT = UTC+5:45)
   const now = new Date();
-  const nptOffset = 5 * 60 + 45; // minutes
+  const nptOffset = 5 * 60 + 45;
   const nptMinutes = (now.getUTCHours() * 60 + now.getUTCMinutes() + nptOffset) % (24 * 60);
   const nptHour = Math.floor(nptMinutes / 60);
   const isAfter10pmNPT = nptHour >= 22;
 
   return (
     <div className="space-y-4">
-      {/* Daily Report header */}
       <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl p-5 text-white">
         <div className="flex items-center gap-2 mb-1">
           <BarChart2 className="w-4 h-4 opacity-80" />
@@ -158,7 +152,6 @@ function DailyReport({ stats, logs }: { stats: StudyStats; logs: DailyLog[] }) {
         <p className="text-2xl font-bold">{fmtTime(todayMins)}</p>
         <p className="text-sm opacity-80 mt-0.5">studied today</p>
 
-        {/* Comparison bar */}
         {yesterdayMins > 0 && (
           <div className="mt-4 bg-white/10 rounded-xl p-3 text-sm">
             <div className="flex items-center gap-2">
@@ -171,7 +164,6 @@ function DailyReport({ stats, logs }: { stats: StudyStats; logs: DailyLog[] }) {
         )}
       </div>
 
-      {/* Stats grid */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
           <p className="text-2xl font-bold text-blue-600">{fmtTime(todayMins)}</p>
@@ -187,7 +179,6 @@ function DailyReport({ stats, logs }: { stats: StudyStats; logs: DailyLog[] }) {
         </div>
       </div>
 
-      {/* Comparison with yesterday */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
         <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-blue-500" /> Today vs Yesterday
@@ -211,7 +202,6 @@ function DailyReport({ stats, logs }: { stats: StudyStats; logs: DailyLog[] }) {
         </div>
       </div>
 
-      {/* Streak callout */}
       <div className={`rounded-2xl p-4 flex items-center gap-3 ${stats.streak > 0 ? "bg-orange-50 border border-orange-100" : "bg-gray-50 border border-gray-100"}`}>
         <span className="text-2xl">🔥</span>
         <div>
@@ -233,8 +223,6 @@ function DailyReport({ stats, logs }: { stats: StudyStats; logs: DailyLog[] }) {
   );
 }
 
-// ─── Badges ──────────────────────────────────────────────────────────────────
-
 function getBadges(stats: StudyStats, logs: DailyLog[]) {
   const badges: { icon: string; label: string; color: string }[] = [];
   const totalTasks = logs.reduce((s, l) => s + l.tasksCompleted, 0);
@@ -252,8 +240,6 @@ function getBadges(stats: StudyStats, logs: DailyLog[]) {
   return badges;
 }
 
-// ─── Main Report Content ──────────────────────────────────────────────────────
-
 interface CustomBadge { id: string; text: string; emoji: string; color: string }
 
 function ReportContent() {
@@ -268,17 +254,31 @@ function ReportContent() {
     if (!user) return;
     setLoading(true);
     try {
-      const [statsRes, logsRes, userRes] = await Promise.all([
-        fetch(`/api/study/stats/${user.uid}`),
-        fetch(`/api/study/logs/${user.uid}`),
-        fetch(`/api/users/${user.uid}`),
+      const [userSnap, logsSnap] = await Promise.all([
+        getDoc(doc(db, "users", user.uid)),
+        getDocs(query(collection(db, "study_logs"), where("uid", "==", user.uid), orderBy("date", "desc"))),
       ]);
-      const s: StudyStats = statsRes.ok ? await statsRes.json() : { streak: 0, totalStudyTime: 0, todayStudyTime: 0, lastActiveDate: null };
-      const l: DailyLog[] = logsRes.ok ? await logsRes.json() : [];
-      const u = userRes.ok ? await userRes.json() : null;
-      setStats(s);
-      setDailyLogs(l);
-      if (u?.badges) setCustomBadges(u.badges);
+
+      if (userSnap.exists()) {
+        const d = userSnap.data();
+        setStats({
+          streak: d.streak ?? 0,
+          totalStudyTime: d.totalStudyTime ?? 0,
+          todayStudyTime: d.todayStudyTime ?? 0,
+          lastActiveDate: d.lastActiveDate ?? null,
+        });
+        setCustomBadges(d.badges ?? []);
+      } else {
+        setStats({ streak: 0, totalStudyTime: 0, todayStudyTime: 0, lastActiveDate: null });
+      }
+
+      const logs: DailyLog[] = logsSnap.docs.map(d => ({
+        date: d.data().date,
+        studyMinutes: d.data().studyMinutes ?? 0,
+        tasksCompleted: d.data().tasksCompleted ?? 0,
+        notesViewed: d.data().notesViewed ?? 0,
+      }));
+      setDailyLogs(logs);
     } catch {
       setStats({ streak: 0, totalStudyTime: 0, todayStudyTime: 0, lastActiveDate: null });
       setDailyLogs([]);
@@ -288,8 +288,6 @@ function ReportContent() {
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
-
-  // Auto-refresh every 2 minutes so data stays current
   useEffect(() => {
     const id = setInterval(load, 120_000);
     return () => clearInterval(id);
@@ -314,20 +312,18 @@ function ReportContent() {
   const prevCutoff = new Date(); prevCutoff.setDate(prevCutoff.getDate() - periodDays * 2);
   const periodLogs = dailyLogs.filter(l => new Date(l.date) >= cutoff);
   const prevLogs = dailyLogs.filter(l => new Date(l.date) >= prevCutoff && new Date(l.date) < cutoff);
-  const periodMins = periodLogs.reduce((s, l) => s + l.studyMinutes, 0);
-  const prevMins   = prevLogs.reduce((s, l) => s + l.studyMinutes, 0);
+  const periodMins  = periodLogs.reduce((s, l) => s + l.studyMinutes, 0);
+  const prevMins    = prevLogs.reduce((s, l) => s + l.studyMinutes, 0);
   const periodTasks = periodLogs.reduce((s, l) => s + l.tasksCompleted, 0);
   const periodNotes = periodLogs.reduce((s, l) => s + l.notesViewed, 0);
-  const improvePct = prevMins > 0 ? Math.round(((periodMins - prevMins) / prevMins) * 100) : periodMins > 0 ? 100 : 0;
-  const badges = getBadges(stats, dailyLogs);
-  const insights = buildInsights(stats, dailyLogs);
+  const improvePct  = prevMins > 0 ? Math.round(((periodMins - prevMins) / prevMins) * 100) : periodMins > 0 ? 100 : 0;
+  const badges      = getBadges(stats, dailyLogs);
+  const insights    = buildInsights(stats, dailyLogs);
 
-  // Build AI context string for report card
   const aiContextParam = encodeURIComponent(`I want to improve my study habits. Here is my data: streak ${stats.streak} days, total study time ${stats.totalStudyTime} minutes, studied today ${stats.todayStudyTime} minutes, weekly study ${periodMins} minutes. Please analyze this and give me specific personalized advice.`);
 
   return (
     <div className="p-4 sm:p-8 max-w-3xl mx-auto">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 mb-1 flex items-center gap-2">
@@ -340,7 +336,6 @@ function ReportContent() {
           <button onClick={load} className="p-2 text-gray-400 hover:text-blue-500 transition-colors">
             <RefreshCw className="w-4 h-4" />
           </button>
-          {/* Period picker */}
           <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
             {(["day", "week", "month"] as const).map(p => (
               <button key={p} onClick={() => setPeriod(p)}
@@ -352,18 +347,16 @@ function ReportContent() {
         </div>
       </div>
 
-      {/* Daily view */}
       {period === "day" ? (
         <DailyReport stats={stats} logs={dailyLogs} />
       ) : (
         <>
-          {/* Stats grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
             {[
-              { icon: Flame,       label: "Streak",               value: `${stats.streak}d`,        sub: "days active",           color: "bg-orange-100 text-orange-600" },
+              { icon: Flame,       label: "Streak",               value: `${stats.streak}d`,        sub: "days active",      color: "bg-orange-100 text-orange-600" },
               { icon: Clock,       label: period === "week" ? "This Week" : "This Month", value: fmtTime(periodMins), sub: "study time", color: "bg-blue-100 text-blue-600" },
-              { icon: CheckSquare, label: "Tasks Done",            value: String(periodTasks),       sub: "completed",             color: "bg-green-100 text-green-600"  },
-              { icon: BookOpen,    label: "Notes Read",            value: String(periodNotes),       sub: "this period",           color: "bg-indigo-100 text-indigo-600" },
+              { icon: CheckSquare, label: "Tasks Done",            value: String(periodTasks),       sub: "completed",        color: "bg-green-100 text-green-600"  },
+              { icon: BookOpen,    label: "Notes Read",            value: String(periodNotes),       sub: "this period",      color: "bg-indigo-100 text-indigo-600" },
             ].map(({ icon: Icon, label, value, sub, color }) => (
               <div key={label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
                 <div className={`w-9 h-9 rounded-xl ${color} flex items-center justify-center mb-3`}>
@@ -376,7 +369,6 @@ function ReportContent() {
             ))}
           </div>
 
-          {/* Insights */}
           {insights.length > 0 && (
             <div className="mb-5 space-y-2">
               {insights.map((ins, i) => (
@@ -393,7 +385,6 @@ function ReportContent() {
             </div>
           )}
 
-          {/* Bar chart */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-5">
             <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <Calendar className="w-4 h-4 text-blue-500" />
@@ -405,7 +396,6 @@ function ReportContent() {
             )}
           </div>
 
-          {/* Progress + All-Time */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
               <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
@@ -454,7 +444,6 @@ function ReportContent() {
         </>
       )}
 
-      {/* AI Insights button */}
       <Link
         href={`/ai?q=${aiContextParam}`}
         className="flex items-center justify-between w-full bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl px-5 py-4 mb-5 hover:from-indigo-100 hover:to-purple-100 transition-all group"
@@ -471,7 +460,6 @@ function ReportContent() {
         <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-indigo-500 transition-colors" />
       </Link>
 
-      {/* Badges */}
       {(badges.length > 0 || customBadges.length > 0) ? (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">

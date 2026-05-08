@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Trophy, Flame, Clock, Sun, RefreshCw } from "lucide-react";
 
 const SELECTED_BADGE_KEY = "studenthub_selected_leaderboard_badge";
@@ -57,20 +59,16 @@ function getTopBadge(entry: LeaderEntry) {
     ?? null;
 }
 
-// ─── My selected badge (from localStorage) ───────────────────────────────────
-
 function getMySelectedBadge(entry: LeaderEntry, myUid: string | undefined): { emoji: string; label: string; bg: string } | null {
   if (entry.uid !== myUid) return null;
   const key = localStorage.getItem(SELECTED_BADGE_KEY);
   if (!key) return null;
 
-  // Check auto badges by label
   const studyMatch = STUDY_TIERS.find(t => t.label === key);
   if (studyMatch) return studyMatch;
   const streakMatch = STREAK_TIERS.find(t => t.label === key);
   if (streakMatch) return streakMatch;
 
-  // Check custom badges by id
   if (entry.badges) {
     const custom = entry.badges.find(b => b.id === key);
     if (custom) return { emoji: custom.emoji, label: custom.text, bg: custom.color };
@@ -78,7 +76,6 @@ function getMySelectedBadge(entry: LeaderEntry, myUid: string | undefined): { em
   return null;
 }
 
-// Compact pill shown in the leaderboard row next to the name
 function RowBadge({ badge, custom }: {
   badge: { emoji: string; label: string; bg: string } | null;
   custom: CustomBadge | null;
@@ -108,29 +105,36 @@ function RowBadge({ badge, custom }: {
 
 function LeaderboardContent() {
   const { user } = useAuth();
-  const [entries, setEntries]       = useState<LeaderEntry[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [sortBy, setSortBy]         = useState<SortKey>("totalStudyTime");
+  const [entries, setEntries]         = useState<LeaderEntry[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [sortBy, setSortBy]           = useState<SortKey>("totalStudyTime");
   const [gradeFilter, setGradeFilter] = useState<number | "all">("all");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [customBadges, setCustomBadges] = useState<Record<string, CustomBadge>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data: LeaderEntry[] = await fetch("/api/users").then(r => r.json());
-      const valid = data.filter(e => e.name && e.grade && e.role !== "admin");
-      setEntries(valid);
+      const snap = await getDocs(collection(db, "users"));
+      const list: LeaderEntry[] = snap.docs.map(d => {
+        const data = d.data();
+        return {
+          uid: d.id,
+          name: data.name ?? "",
+          grade: data.grade ?? 0,
+          streak: data.streak ?? 0,
+          totalStudyTime: data.totalStudyTime ?? 0,
+          todayStudyTime: data.todayStudyTime ?? 0,
+          role: data.role ?? "user",
+          badges: data.badges ?? [],
+        };
+      }).filter(e => e.name && e.grade && e.role !== "admin");
+      setEntries(list);
       setLastUpdated(new Date());
-
-      // Extract custom badges directly from the API response
-      const map: Record<string, CustomBadge> = {};
-      valid.forEach(e => {
-        if (e.badges && e.badges.length > 0) map[e.uid] = e.badges[0];
-      });
-      setCustomBadges(map);
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    } catch (e) {
+      console.error("[Leaderboard] Load failed:", e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -156,7 +160,6 @@ function LeaderboardContent() {
 
   return (
     <div className="p-4 sm:p-8 max-w-2xl mx-auto">
-      {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Leaderboard</h1>
@@ -170,7 +173,6 @@ function LeaderboardContent() {
         </button>
       </div>
 
-      {/* Sort + grade filters */}
       <div className="flex flex-wrap gap-2 mb-5">
         {tabBtn("totalStudyTime", "All Time", <Clock className="w-3.5 h-3.5" />, "bg-blue-500 text-white shadow-sm", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
         {tabBtn("todayStudyTime", "Today",    <Sun   className="w-3.5 h-3.5" />, "bg-green-500 text-white shadow-sm", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
@@ -186,7 +188,6 @@ function LeaderboardContent() {
         ))}
       </div>
 
-      {/* Context label */}
       <div className="mb-3 text-xs text-gray-400 font-medium uppercase tracking-wide">
         {sortBy === "totalStudyTime" && "📚 All-time study time"}
         {sortBy === "todayStudyTime" && "☀️ Today's study time"}
@@ -194,7 +195,6 @@ function LeaderboardContent() {
         {gradeFilter !== "all" && ` · Grade ${gradeFilter} only`}
       </div>
 
-      {/* My rank callout */}
       {!loading && myRank >= 0 && (
         <div className="mb-4 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700 font-medium">
           You are ranked #{myRank + 1} {gradeFilter !== "all" ? `in Grade ${gradeFilter}` : "overall"} 🎯
@@ -214,11 +214,18 @@ function LeaderboardContent() {
       ) : (
         <div className="space-y-2">
           {filtered.map((entry, i) => {
-            const isMe    = entry.uid === user?.uid;
+            const isMe     = entry.uid === user?.uid;
             const topBadge = isMe
               ? (getMySelectedBadge(entry, user?.uid) ?? getTopBadge(entry))
               : getTopBadge(entry);
-            const custom   = isMe ? null : (customBadges[entry.uid] ?? null);
+
+            const selectedKey = localStorage.getItem(SELECTED_BADGE_KEY);
+            const custom = (!isMe && entry.badges && entry.badges.length > 0)
+              ? (selectedKey
+                  ? (entry.badges.find(b => b.id === selectedKey) ?? entry.badges[0])
+                  : entry.badges[0])
+              : null;
+
             const hasBadge = topBadge || custom;
 
             return (
@@ -227,26 +234,19 @@ function LeaderboardContent() {
                   isMe ? "border-blue-200 bg-blue-50 shadow-sm" : "border-gray-100 bg-white hover:border-gray-200"
                 }`}
               >
-                {/* Rank */}
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${medal(i)}`}>
                   {i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}
                 </div>
-
-                {/* Name + grade + badge */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className={`font-semibold text-sm sm:text-base leading-tight ${isMe ? "text-blue-700" : "text-gray-900"}`}>
                       {entry.name}
                       {isMe && <span className="text-xs font-normal text-blue-400 ml-1">(you)</span>}
                     </p>
-                    {hasBadge && (
-                      <RowBadge badge={topBadge} custom={custom} />
-                    )}
+                    {hasBadge && <RowBadge badge={topBadge} custom={custom} />}
                   </div>
                   <p className="text-xs text-gray-400 mt-0.5">Grade {entry.grade}</p>
                 </div>
-
-                {/* Stat */}
                 <div className="flex-shrink-0 text-right min-w-[60px]">
                   {sortBy === "totalStudyTime" && (
                     <>

@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useAuth, UserProfile } from "@/context/AuthContext";
 
 export default function Onboarding() {
@@ -22,49 +24,32 @@ export default function Onboarding() {
     setError("");
 
     const now = new Date().toISOString();
-    const data = {
+    const data: UserProfile = {
       uid: user.uid,
       name: name.trim(),
       email: user.email ?? "",
       grade: Number(grade),
-      role: "user" as const,
+      role: "user",
       createdAt: now,
     };
 
-    console.log("[Onboarding] Saving profile:", data.name, "grade:", data.grade);
+    console.log("[Onboarding] Saving profile to Firestore:", data.name, "grade:", data.grade);
 
     try {
-      // Save to backend (PostgreSQL) — this is the source of truth
-      const res = await fetch("/api/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+      await setDoc(doc(db, "users", user.uid), {
+        ...data,
+        streak: 0,
+        totalStudyTime: 0,
+        todayStudyTime: 0,
+        lastActiveDate: null,
+        badges: [],
       });
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Server error ${res.status}`);
-      }
+      console.log("[Onboarding] Firestore save ✅");
 
-      const saved = await res.json();
-      console.log("[Onboarding] Backend save ✅ id:", saved.id);
-
-      // Set profile in React state (no page reload — client-side nav)
-      const profileForState: UserProfile = {
-        id: saved.id ?? 0,
-        uid: saved.uid ?? data.uid,
-        name: saved.name ?? data.name,
-        email: saved.email ?? data.email,
-        grade: saved.grade ?? data.grade,
-        role: saved.role ?? "user",
-        createdAt: saved.createdAt ?? now,
-      };
-      setProfile(profileForState);
-
-      // Client-side navigation — no page reload, profile stays in React state
-      console.log("[Onboarding] Navigating to /dashboard (client-side)");
+      setProfile(data);
+      console.log("[Onboarding] Navigating to /dashboard");
       setLocation("/dashboard");
-
     } catch (err) {
       console.error("[Onboarding] Save failed:", err);
       setError(err instanceof Error ? err.message : "Failed to save your profile. Please try again.");

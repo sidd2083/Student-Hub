@@ -1,12 +1,13 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { useListPyqs, getListPyqsQueryKey } from "@workspace/api-client-react";
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { FileText, Image, Search, X, ExternalLink, Filter, LogIn } from "lucide-react";
 
 type Pyq = {
-  id: number;
+  id: string;
   grade: number;
   subject: string;
   title: string;
@@ -96,30 +97,41 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   const [yearFilter, setYearFilter] = useState<string>("");
   const [search, setSearch] = useState("");
   const [viewer, setViewer] = useState<Pyq | null>(null);
+  const [pyqs, setPyqs] = useState<Pyq[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const { data: pyqs, isLoading } = useListPyqs(
-    { grade, ...(subject ? { subject } : {}) },
-    { query: { queryKey: getListPyqsQueryKey({ grade, subject }) } }
-  );
+  useEffect(() => {
+    setLoading(true);
+    setSubject("");
+    setYearFilter("");
+    const q = query(collection(db, "pyqs"), where("grade", "==", grade), orderBy("year", "desc"));
+    getDocs(q).then(snap => {
+      const list: Pyq[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Pyq));
+      setPyqs(list);
+    }).catch(e => {
+      console.error("[Pyqs] Load failed:", e);
+      setPyqs([]);
+    }).finally(() => setLoading(false));
+  }, [grade]);
 
-  const pyqList = Array.isArray(pyqs) ? pyqs : [];
-  const subjects = useMemo(() => [...new Set(pyqList.map(p => p.subject))].sort(), [pyqList]);
+  const subjects = useMemo(() => [...new Set(pyqs.map(p => p.subject))].sort(), [pyqs]);
   const years = useMemo(
-    () => [...new Set(pyqList.map(p => String(p.year)))].sort((a, b) => Number(b) - Number(a)),
-    [pyqList]
+    () => [...new Set(pyqs.map(p => String(p.year)))].sort((a, b) => Number(b) - Number(a)),
+    [pyqs]
   );
 
   const filtered = useMemo(() => {
-    return pyqList.filter(p => {
+    return pyqs.filter(p => {
+      if (subject && p.subject !== subject) return false;
       if (yearFilter && String(p.year) !== yearFilter) return false;
       if (search && !p.title.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
-  }, [pyqs, yearFilter, search]);
+  }, [pyqs, subject, yearFilter, search]);
 
   return (
     <>
-      {viewer && <PyqViewer pyq={viewer as Pyq} onClose={() => setViewer(null)} />}
+      {viewer && <PyqViewer pyq={viewer} onClose={() => setViewer(null)} />}
 
       <div className="p-4 sm:p-6 lg:p-8">
         <div className="mb-5 sm:mb-6">
@@ -127,23 +139,19 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
           <p className="text-gray-500 text-sm">Past exam papers — click any card to view</p>
         </div>
 
-        {/* Login CTA for unauthenticated users */}
         {!isLoggedIn && (
           <div className="mb-5 bg-blue-50 border border-blue-100 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
               <p className="font-semibold text-blue-900 text-sm">Get full access — free</p>
               <p className="text-blue-700 text-xs mt-0.5">Nep AI, progress tracking, Pomodoro &amp; more</p>
             </div>
-            <Link
-              href="/login"
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-all flex-shrink-0 w-full sm:w-auto justify-center"
-            >
+            <Link href="/login"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-all flex-shrink-0 w-full sm:w-auto justify-center">
               <LogIn className="w-3.5 h-3.5" /> Login / Register
             </Link>
           </div>
         )}
 
-        {/* Filters row */}
         <div className="flex flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-5">
           <select data-testid="select-grade-pyq" value={grade}
             onChange={(e) => { setGrade(Number(e.target.value)); setSubject(""); setYearFilter(""); }}
@@ -170,7 +178,6 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
           </div>
         </div>
 
-        {/* Subject chips */}
         <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-4 sm:mb-5">
           <button onClick={() => setSubject("")}
             className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${!subject ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
@@ -184,7 +191,7 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
           ))}
         </div>
 
-        {!isLoading && (
+        {!loading && (
           <p className="text-xs text-gray-400 mb-4 flex items-center gap-1">
             <Filter className="w-3 h-3" />
             {filtered.length} paper{filtered.length !== 1 ? "s" : ""} found
@@ -192,8 +199,7 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
           </p>
         )}
 
-        {/* Cards */}
-        {isLoading ? (
+        {loading ? (
           <div className="space-y-3">
             {[1, 2, 3, 4].map(i => <div key={i} className="h-[72px] bg-gray-100 rounded-2xl animate-pulse" />)}
           </div>
@@ -211,7 +217,7 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
                 <div key={pyq.id} className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 hover:shadow-md hover:border-blue-100 transition-all group w-full">
                   <button
                     data-testid={`pyq-item-${pyq.id}`}
-                    onClick={() => setViewer(pyq as Pyq)}
+                    onClick={() => setViewer(pyq)}
                     className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 text-left"
                   >
                     <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${isImage ? "bg-purple-50" : "bg-orange-50"}`}>

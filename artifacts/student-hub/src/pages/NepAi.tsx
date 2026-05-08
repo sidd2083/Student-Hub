@@ -4,6 +4,8 @@ import { SoftGate } from "@/components/SoftGate";
 import { useAuth } from "@/context/AuthContext";
 import { Send, MessageCircle, Sparkles, BookOpen, BarChart2, ListChecks } from "lucide-react";
 import { useSearch } from "wouter";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface Message { role: "user" | "assistant"; content: string }
 
@@ -40,6 +42,42 @@ function getLocalFallback(msg: string): string {
   return "I'm having trouble connecting. Try asking about Newton's laws, photosynthesis, or quadratic equations!";
 }
 
+async function loadStudyContext(uid: string): Promise<StudyContext> {
+  const [userSnap, tasksSnap, logsSnap] = await Promise.all([
+    getDoc(doc(db, "users", uid)),
+    getDocs(query(collection(db, "tasks"), where("uid", "==", uid))),
+    getDocs(query(collection(db, "study_logs"), where("uid", "==", uid))),
+  ]);
+
+  let stats: StudyContext["stats"] | undefined;
+  if (userSnap.exists()) {
+    const d = userSnap.data();
+    stats = {
+      streak: d.streak ?? 0,
+      totalStudyTime: d.totalStudyTime ?? 0,
+      todayStudyTime: d.todayStudyTime ?? 0,
+      lastActiveDate: d.lastActiveDate ?? null,
+    };
+  }
+
+  const tasks = tasksSnap.docs.map(d => ({
+    text: d.data().text,
+    completed: d.data().completed,
+  }));
+
+  const logs = logsSnap.docs.map(d => ({
+    date: d.data().date,
+    studyMinutes: d.data().studyMinutes ?? 0,
+  }));
+
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+  const weeklyMins = logs
+    .filter(l => new Date(l.date) >= weekAgo)
+    .reduce((s, l) => s + l.studyMinutes, 0);
+
+  return { stats, tasks, weeklyMins };
+}
+
 function NepAiContent() {
   const { user } = useAuth();
   const search = useSearch();
@@ -57,30 +95,17 @@ function NepAiContent() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // Auto-send if navigated from ReportCard with a ?q= param
   useEffect(() => {
     if (!initialQ || autoSentRef.current || !user) return;
     autoSentRef.current = true;
-    // Load context first, then send
     (async () => {
       setLoadingCtx(true);
       let ctx: StudyContext | null = null;
       try {
-        const [statsRes, tasksRes, logsRes] = await Promise.all([
-          fetch(`/api/study/stats/${user.uid}`),
-          fetch(`/api/tasks?uid=${user.uid}`),
-          fetch(`/api/study/logs/${user.uid}`),
-        ]);
-        const stats = statsRes.ok ? await statsRes.json() : undefined;
-        const tasks = tasksRes.ok ? await tasksRes.json() : undefined;
-        const logs: Array<{ studyMinutes: number }> = logsRes.ok ? await logsRes.json() : [];
-        const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
-        const weeklyMins = logs.filter((l: any) => new Date(l.date) >= weekAgo).reduce((s: number, l: any) => s + (l.studyMinutes || 0), 0);
-        ctx = { stats, tasks: Array.isArray(tasks) ? tasks : undefined, weeklyMins };
+        ctx = await loadStudyContext(user.uid);
         setContext(ctx);
-      } catch { /* ignore */ } finally { setLoadingCtx(false); }
+      } catch { } finally { setLoadingCtx(false); }
 
-      // Now send the message with context
       const msg = initialQ;
       setMessages([{ role: "user", content: msg }]);
       setLoading(true);
@@ -99,26 +124,11 @@ function NepAiContent() {
     })();
   }, [initialQ, user]);
 
-  // Load context (tasks + study stats) when user is present
-  const loadContext = useCallback(async () => {
+  const loadContextManual = useCallback(async () => {
     if (!user?.uid) return;
     setLoadingCtx(true);
     try {
-      const [statsRes, tasksRes, logsRes] = await Promise.all([
-        fetch(`/api/study/stats/${user.uid}`),
-        fetch(`/api/tasks?uid=${user.uid}`),
-        fetch(`/api/study/logs/${user.uid}`),
-      ]);
-      const stats = statsRes.ok ? await statsRes.json() : undefined;
-      const tasks = tasksRes.ok ? await tasksRes.json() : undefined;
-      const logs: Array<{ studyMinutes: number }> = logsRes.ok ? await logsRes.json() : [];
-
-      const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
-      const weeklyMins = logs
-        .filter((l: any) => new Date(l.date) >= weekAgo)
-        .reduce((s: number, l: any) => s + (l.studyMinutes || 0), 0);
-
-      const ctx: StudyContext = { stats, tasks: Array.isArray(tasks) ? tasks : undefined, weeklyMins };
+      const ctx = await loadStudyContext(user.uid);
       setContext(ctx);
       setShowCtxBanner(true);
     } catch (err) {
@@ -141,11 +151,7 @@ function NepAiContent() {
       const res = await fetch(`${BASE}/api/ai/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: msg,
-          history: messages,
-          context: context ?? undefined,
-        }),
+        body: JSON.stringify({ message: msg, history: messages, context: context ?? undefined }),
       });
       if (!res.ok) throw new Error(`Status ${res.status}`);
       const data = await res.json() as { reply?: string };
@@ -171,7 +177,6 @@ function NepAiContent() {
 
   return (
     <div className="flex flex-col flex-1 h-full">
-      {/* Header */}
       <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-white flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -184,14 +189,13 @@ function NepAiContent() {
             </div>
           </div>
           <button
-            onClick={loadContext}
+            onClick={loadContextManual}
             disabled={loadingCtx || !user}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
               context
                 ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
                 : "bg-gray-100 text-gray-500 hover:bg-indigo-50 hover:text-indigo-600"
             } disabled:opacity-50`}
-            title="Load your tasks & study stats into context"
           >
             {loadingCtx ? (
               <span className="w-3.5 h-3.5 border border-current border-t-transparent rounded-full animate-spin" />
@@ -202,7 +206,6 @@ function NepAiContent() {
           </button>
         </div>
 
-        {/* Context banner */}
         {showCtxBanner && context && (
           <div className="mt-3 flex items-start gap-2 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2.5 text-xs text-indigo-700">
             <Sparkles className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
@@ -217,7 +220,6 @@ function NepAiContent() {
         )}
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
         {messages.length === 0 && (
           <div className="text-center py-12">
@@ -229,7 +231,6 @@ function NepAiContent() {
               I explain concepts, solve problems, and give personalized study advice based on your progress
             </p>
 
-            {/* Quick prompts */}
             <div className="space-y-2">
               <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Quick questions</p>
               <div className="flex flex-wrap gap-2 justify-center">
@@ -246,7 +247,6 @@ function NepAiContent() {
                 ))}
               </div>
 
-              {/* Contextual prompts (only if context loaded) */}
               {context && (
                 <div className="mt-4">
                   <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Based on your data</p>
@@ -311,7 +311,6 @@ function NepAiContent() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       <div className="px-4 py-4 border-t border-gray-100 bg-white flex-shrink-0">
         <form onSubmit={sendMessage} className="flex gap-3 max-w-4xl mx-auto">
           <input
