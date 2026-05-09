@@ -51,17 +51,38 @@ const queryClient = new QueryClient({
   },
 });
 
+// Butter-smooth transition config
+// popLayout: new page renders instantly underneath while old fades out
+// Pure opacity cross-fade — no positional jump, GPU-accelerated
+const pageVariants = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit:    { opacity: 0 },
+};
+
+const pageTransition = {
+  duration: 0.22,
+  ease: [0.4, 0.0, 0.2, 1], // Material Design "standard" easing — buttery
+};
+
 function AnimatedRoutes() {
   const [location] = useLocation();
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    <AnimatePresence mode="popLayout" initial={false}>
       <motion.div
         key={location}
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -6 }}
-        transition={{ duration: 0.16, ease: "easeOut" }}
-        style={{ minHeight: "100%" }}
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={pageTransition}
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          minHeight: "100%",
+          willChange: "opacity",
+        }}
       >
         <Switch>
           <Route path="/" component={Home} />
@@ -121,7 +142,6 @@ function Router() {
 }
 
 function App() {
-  // Persist dark mode across sessions
   useEffect(() => {
     const saved = localStorage.getItem("theme");
     if (saved === "dark") {
