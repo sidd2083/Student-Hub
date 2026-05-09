@@ -158,56 +158,73 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const saveMinutes = useCallback(async (mins: number) => {
     const uid = userRef.current;
     if (!uid || mins < 1) return;
+
     try {
-      const today = new Date().toISOString().slice(0, 10);
-      const userRef2 = doc(db, "users", uid);
-      const snap = await getDoc(userRef2);
+      const res = await fetch("/api/study/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid, minutes: mins }),
+      });
 
-      if (snap.exists()) {
-        const data = snap.data();
-        const lastActive = data.lastActiveDate ?? "";
-        const prevToday = data.todayStudyTime ?? 0;
-        const prevTotal = data.totalStudyTime ?? 0;
-        const prevStreak = data.streak ?? 0;
-        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-
-        let newStreak = prevStreak;
-        let newToday = prevToday;
-
-        if (lastActive === today) {
-          newToday = prevToday + mins;
-        } else {
-          newToday = mins;
-          if (lastActive === yesterday) {
-            newStreak = prevStreak + 1;
-          } else if (lastActive !== today) {
-            newStreak = 1;
-          }
-        }
-
-        await updateDoc(userRef2, {
-          totalStudyTime: prevTotal + mins,
-          todayStudyTime: newToday,
-          streak: newStreak,
-          lastActiveDate: today,
-        });
-
+      if (res.ok) {
+        const data = await res.json() as { todayMinutes?: number };
+        const newToday = data.todayMinutes ?? (savedMinutesRef.current + mins);
         savedMinutesRef.current += mins;
         setSavedMinutesToday(newToday);
-        console.log(`[Timer] Saved ${mins} min to Firestore. Total today: ${newToday}`);
+        console.log(`[Timer] Saved ${mins} min via backend. Total today: ${newToday}`);
+        return;
+      }
 
-        // Update daily study log
-        const logId = `${uid}_${today}`;
-        const logRef = doc(db, "study_logs", logId);
-        const logSnap = await getDoc(logRef);
-        if (logSnap.exists()) {
-          await updateDoc(logRef, { studyMinutes: (logSnap.data().studyMinutes ?? 0) + mins });
-        } else {
-          await setDoc(logRef, { uid, date: today, studyMinutes: mins, tasksCompleted: 0, notesViewed: 0 });
-        }
+      const errData = await res.json().catch(() => ({})) as { error?: string };
+      console.warn("[Timer] Backend save failed, falling back to direct Firestore:", errData.error);
+    } catch (networkErr) {
+      console.warn("[Timer] Backend unreachable, falling back to direct Firestore:", networkErr);
+    }
+
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const userDocRef = doc(db, "users", uid);
+      const snap = await getDoc(userDocRef);
+
+      const data = snap.exists() ? snap.data() : {};
+      const lastActive: string = data.lastActiveDate ?? "";
+      const prevToday: number = data.todayStudyTime ?? 0;
+      const prevTotal: number = data.totalStudyTime ?? 0;
+      const prevStreak: number = data.streak ?? 0;
+
+      let newStreak = prevStreak;
+      let newToday = prevToday;
+
+      if (lastActive === today) {
+        newToday = prevToday + mins;
+      } else {
+        newToday = mins;
+        newStreak = lastActive === yesterday ? prevStreak + 1 : 1;
+      }
+
+      await setDoc(userDocRef, {
+        totalStudyTime: prevTotal + mins,
+        todayStudyTime: newToday,
+        streak: newStreak,
+        lastActiveDate: today,
+      }, { merge: true });
+
+      savedMinutesRef.current += mins;
+      setSavedMinutesToday(newToday);
+      console.log(`[Timer] Saved ${mins} min to Firestore directly. Total today: ${newToday}`);
+
+      const logId = `${uid}_${today}`;
+      const logRef = doc(db, "study_logs", logId);
+      const logSnap = await getDoc(logRef);
+      if (logSnap.exists()) {
+        await updateDoc(logRef, { studyMinutes: (logSnap.data().studyMinutes ?? 0) + mins });
+      } else {
+        await setDoc(logRef, { uid, date: today, studyMinutes: mins, tasksCompleted: 0, notesViewed: 0 });
       }
     } catch (err) {
-      console.error("[Timer] Firestore save failed:", err);
+      console.error("[Timer] All save methods failed:", err);
+      console.error("[Timer] ⚠️ Fix your Firestore security rules OR set FIREBASE_SERVICE_ACCOUNT_JSON in your backend secrets to enable study time saving.");
     }
   }, []);
 
