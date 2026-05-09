@@ -73,32 +73,31 @@ async function callOpenAI(
   ctx: StudyContext | null,
 ): Promise<string> {
   const apiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined;
-  if (!apiKey) {
-    return getLocalFallback(message);
+
+  if (apiKey) {
+    const messages = [
+      { role: "system" as const, content: buildSystemContent(ctx) },
+      ...history.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+      { role: "user" as const, content: message },
+    ];
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: "gpt-4o-mini", messages, max_tokens: 1200 }),
+    });
+    if (!res.ok) throw new Error(`OpenAI ${res.status}`);
+    const data = await res.json() as { choices?: { message?: { content?: string } }[] };
+    return data.choices?.[0]?.message?.content ?? "I couldn't generate a response. Please try again.";
   }
 
-  const messages = [
-    { role: "system" as const, content: buildSystemContent(ctx) },
-    ...history.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
-    { role: "user" as const, content: message },
-  ];
-
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  const res = await fetch("/api/ai/chat", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({ model: "gpt-4o-mini", messages, max_tokens: 1200 }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, history, context: ctx }),
   });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`OpenAI ${res.status}: ${text}`);
-  }
-
-  const data = await res.json() as { choices?: { message?: { content?: string } }[] };
-  return data.choices?.[0]?.message?.content ?? "I couldn't generate a response. Please try again.";
+  if (!res.ok) throw new Error(`AI service ${res.status}`);
+  const data = await res.json() as { reply?: string };
+  return data.reply ?? "I couldn't generate a response. Please try again.";
 }
 
 const STUDY_FALLBACKS: [RegExp, string][] = [
