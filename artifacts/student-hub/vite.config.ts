@@ -39,6 +39,17 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    target: "es2020",
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-react":    ["react", "react-dom"],
+          "vendor-firebase": ["firebase/app", "firebase/auth", "firebase/firestore", "firebase/storage"],
+          "vendor-ui":       ["@radix-ui/react-dialog", "@radix-ui/react-tooltip", "@radix-ui/react-select", "@radix-ui/react-tabs", "framer-motion"],
+          "vendor-router":   ["wouter", "@tanstack/react-query"],
+        },
+      },
+    },
   },
   server: {
     port,
