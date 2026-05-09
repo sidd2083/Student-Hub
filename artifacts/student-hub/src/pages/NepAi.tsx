@@ -208,8 +208,15 @@ function NepAiContent() {
       const reply = await callOpenAI(msg, messages, context);
       setMessages(prev => [...prev, { role: "assistant", content: reply }]);
     } catch (err) {
-      console.warn("[NepAI] OpenAI call failed, using fallback:", err);
-      setMessages(prev => [...prev, { role: "assistant", content: getLocalFallback(msg) }]);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.warn("[NepAI] call failed:", errMsg);
+      const isConfig = errMsg.includes("not configured") || errMsg.includes("API key") || errMsg.includes("503");
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: isConfig
+          ? "⚠️ Nep AI isn't connected yet. Please ask the site admin to set the OPENAI_API_KEY in Vercel environment variables."
+          : `Sorry, I hit a temporary issue (${errMsg}). Please try again in a moment!`,
+      }]);
     } finally {
       setLoading(false);
     }

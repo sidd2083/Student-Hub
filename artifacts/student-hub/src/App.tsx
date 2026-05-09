@@ -13,69 +13,42 @@ import { AppShell } from "@/components/AppShell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { InstallBanner } from "@/components/InstallBanner";
 
-// Lazy-loaded pages — chunks split for smaller initial bundle
-const Home          = lazy(() => import("@/pages/Home"));
-const Login         = lazy(() => import("@/pages/Login"));
-const Onboarding    = lazy(() => import("@/pages/Onboarding"));
-const Dashboard     = lazy(() => import("@/pages/Dashboard"));
-const Notes         = lazy(() => import("@/pages/Notes"));
-const NotePage      = lazy(() => import("@/pages/NotePage"));
-const Pyqs          = lazy(() => import("@/pages/Pyqs"));
-const PyqPage       = lazy(() => import("@/pages/PyqPage"));
-const Todo          = lazy(() => import("@/pages/Todo"));
-const Pomodoro      = lazy(() => import("@/pages/Pomodoro"));
-const NepAi         = lazy(() => import("@/pages/NepAi"));
-const Leaderboard   = lazy(() => import("@/pages/Leaderboard"));
-const ReportCard    = lazy(() => import("@/pages/ReportCard"));
-const Settings      = lazy(() => import("@/pages/Settings"));
+// ── Eager imports (zero load delay on navigation) ──────────────────────────
+import Home        from "@/pages/Home";
+import Login       from "@/pages/Login";
+import Onboarding  from "@/pages/Onboarding";
+import Dashboard   from "@/pages/Dashboard";
+import Notes       from "@/pages/Notes";
+import NotePage    from "@/pages/NotePage";
+import Pyqs        from "@/pages/Pyqs";
+import PyqPage     from "@/pages/PyqPage";
+import Todo        from "@/pages/Todo";
+import Pomodoro    from "@/pages/Pomodoro";
+import NepAi       from "@/pages/NepAi";
+import Leaderboard from "@/pages/Leaderboard";
+import ReportCard  from "@/pages/ReportCard";
+import Settings    from "@/pages/Settings";
+import About       from "@/pages/About";
+import Contact     from "@/pages/Contact";
+import Saved       from "@/pages/Saved";
+import McqPractice from "@/pages/McqPractice";
+
+// ── Lazy-only for rarely visited pages ─────────────────────────────────────
 const AdminLogin    = lazy(() => import("@/pages/AdminLogin"));
 const Admin         = lazy(() => import("@/pages/Admin"));
-const About         = lazy(() => import("@/pages/About"));
-const Contact       = lazy(() => import("@/pages/Contact"));
-const Saved         = lazy(() => import("@/pages/Saved"));
-const McqPractice   = lazy(() => import("@/pages/McqPractice"));
 const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
 const Terms         = lazy(() => import("@/pages/Terms"));
 const NotFound      = lazy(() => import("@/pages/not-found"));
-
-// Preload all chunks immediately after first render so navigation is instant
-function preloadAllPages() {
-  import("@/pages/Dashboard");
-  import("@/pages/Notes");
-  import("@/pages/Pyqs");
-  import("@/pages/NepAi");
-  import("@/pages/Todo");
-  import("@/pages/Pomodoro");
-  import("@/pages/ReportCard");
-  import("@/pages/Leaderboard");
-  import("@/pages/Settings");
-  import("@/pages/NotePage");
-  import("@/pages/PyqPage");
-  import("@/pages/Saved");
-  import("@/pages/McqPractice");
-  import("@/pages/Login");
-  import("@/pages/Onboarding");
-  import("@/pages/About");
-  import("@/pages/Contact");
-  import("@/pages/PrivacyPolicy");
-  import("@/pages/Terms");
-  import("@/pages/AdminLogin");
-  import("@/pages/Admin");
-  import("@/pages/not-found");
-}
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      staleTime: 60_000,
-      gcTime: 5 * 60_000,
+      staleTime: 5 * 60_000,
+      gcTime: 10 * 60_000,
     },
   },
 });
-
-// Tiny invisible fallback — no spinner flash during navigation
-const NavFallback = () => <div style={{ minHeight: "60vh" }} />;
 
 function Router() {
   return (
@@ -92,37 +65,35 @@ function Router() {
 
         <Route>
           <AppShell>
-            <Suspense fallback={<NavFallback />}>
-              <Switch>
-                <Route path="/" component={Home} />
+            <Switch>
+              <Route path="/" component={Home} />
 
-                <Route path="/notes/:id" component={NotePage} />
-                <Route path="/pyq/:id" component={PyqPage} />
-                <Route path="/notes" component={Notes} />
-                <Route path="/pyqs" component={Pyqs} />
-                <Route path="/about" component={About} />
-                <Route path="/contact" component={Contact} />
-                <Route path="/privacy" component={PrivacyPolicy} />
-                <Route path="/terms" component={Terms} />
+              <Route path="/notes/:id" component={NotePage} />
+              <Route path="/pyq/:id" component={PyqPage} />
+              <Route path="/notes" component={Notes} />
+              <Route path="/pyqs" component={Pyqs} />
+              <Route path="/about" component={About} />
+              <Route path="/contact" component={Contact} />
+              <Route path="/privacy" component={PrivacyPolicy} />
+              <Route path="/terms" component={Terms} />
 
-                <Route path="/ai" component={NepAi} />
-                <Route path="/report" component={ReportCard} />
-                <Route path="/todo" component={Todo} />
-                <Route path="/pomodoro" component={Pomodoro} />
-                <Route path="/leaderboard" component={Leaderboard} />
-                <Route path="/saved" component={Saved} />
-                <Route path="/mcq" component={McqPractice} />
+              <Route path="/ai" component={NepAi} />
+              <Route path="/report" component={ReportCard} />
+              <Route path="/todo" component={Todo} />
+              <Route path="/pomodoro" component={Pomodoro} />
+              <Route path="/leaderboard" component={Leaderboard} />
+              <Route path="/saved" component={Saved} />
+              <Route path="/mcq" component={McqPractice} />
 
-                <Route path="/dashboard">
-                  <PrivateRoute><Dashboard /></PrivateRoute>
-                </Route>
-                <Route path="/settings">
-                  <PrivateRoute><Settings /></PrivateRoute>
-                </Route>
+              <Route path="/dashboard">
+                <PrivateRoute><Dashboard /></PrivateRoute>
+              </Route>
+              <Route path="/settings">
+                <PrivateRoute><Settings /></PrivateRoute>
+              </Route>
 
-                <Route component={NotFound} />
-              </Switch>
-            </Suspense>
+              <Route component={NotFound} />
+            </Switch>
           </AppShell>
         </Route>
       </Switch>
@@ -131,11 +102,12 @@ function Router() {
 }
 
 function App() {
-  // Preload all page chunks 800ms after first render
-  // By the time users click any link, chunks are already in browser cache
+  // Persist dark mode across sessions
   useEffect(() => {
-    const t = setTimeout(preloadAllPages, 800);
-    return () => clearTimeout(t);
+    const saved = localStorage.getItem("theme");
+    if (saved === "dark") {
+      document.documentElement.classList.add("dark");
+    }
   }, []);
 
   return (

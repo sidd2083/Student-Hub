@@ -88,7 +88,7 @@
   --border: 214.3 31.8% 91.4%;
   --input: 214.3 31.8% 91.4%;
   --ring: 221 83% 53%;
-  
+
   --sidebar: 0 0% 100%;
   --sidebar-foreground: 222.2 84% 4.9%;
   --sidebar-border: 214.3 31.8% 91.4%;
@@ -108,6 +108,12 @@
   --app-font-serif: Georgia, serif;
   --app-font-mono: Menlo, monospace;
   --radius: 0.75rem;
+
+  /* Dark mode surface colors (used by JS overrides) */
+  --dk-base:    9 9% 9%;
+  --dk-surface: 0 0% 12%;
+  --dk-raised:  0 0% 16%;
+  --dk-border:  0 0% 22%;
 }
 
 .dark {
@@ -152,3 +158,51 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Global dark-mode overrides
+   These cover all the hardcoded Tailwind colors used throughout the app so
+   every page goes dark without needing individual dark: classes on each file.
+───────────────────────────────────────────────────────────────────────────── */
+
+/* Backgrounds */
+.dark .bg-white          { background-color: hsl(222 47% 8%)  !important; }
+.dark .bg-gray-50        { background-color: hsl(222 47% 6%)  !important; }
+.dark .bg-gray-100       { background-color: hsl(220 30% 14%) !important; }
+.dark .bg-gray-200       { background-color: hsl(220 25% 18%) !important; }
+
+/* Text */
+.dark .text-gray-900     { color: hsl(210 40% 96%)  !important; }
+.dark .text-gray-800     { color: hsl(210 35% 90%)  !important; }
+.dark .text-gray-700     { color: hsl(210 30% 82%)  !important; }
+.dark .text-gray-600     { color: hsl(215 20% 72%)  !important; }
+.dark .text-gray-500     { color: hsl(215 18% 60%)  !important; }
+.dark .text-gray-400     { color: hsl(215 15% 50%)  !important; }
+
+/* Borders */
+.dark .border-gray-100   { border-color: hsl(220 30% 18%) !important; }
+.dark .border-gray-200   { border-color: hsl(220 25% 22%) !important; }
+
+/* Hover backgrounds */
+.dark .hover\:bg-gray-50:hover  { background-color: hsl(220 30% 16%) !important; }
+.dark .hover\:bg-gray-100:hover { background-color: hsl(220 25% 20%) !important; }
+
+/* Inputs & form elements */
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: hsl(222 47% 10%) !important;
+  border-color:     hsl(220 30% 22%) !important;
+  color:            hsl(210 40% 96%) !important;
+}
+.dark input::placeholder,
+.dark textarea::placeholder { color: hsl(215 18% 45%) !important; }
+
+/* Cards / raised surfaces */
+.dark .shadow-sm { box-shadow: 0 1px 3px 0 rgba(0,0,0,.4) !important; }
+.dark .shadow-md { box-shadow: 0 4px 8px 0 rgba(0,0,0,.5) !important; }
+.dark .shadow-lg { box-shadow: 0 8px 20px 0 rgba(0,0,0,.6) !important; }
+
+/* Scrollbar (optional quality-of-life) */
+.dark ::-webkit-scrollbar-track { background: hsl(222 47% 8%); }
+.dark ::-webkit-scrollbar-thumb { background: hsl(220 25% 28%); border-radius: 4px; }
