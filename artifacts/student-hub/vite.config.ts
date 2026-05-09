@@ -40,13 +40,29 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
     target: "es2020",
+    cssMinify: true,
+    reportCompressedSize: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          "vendor-react":    ["react", "react-dom"],
-          "vendor-firebase": ["firebase/app", "firebase/auth", "firebase/firestore", "firebase/storage"],
-          "vendor-ui":       ["@radix-ui/react-dialog", "@radix-ui/react-tooltip", "@radix-ui/react-select", "@radix-ui/react-tabs", "framer-motion"],
-          "vendor-router":   ["wouter", "@tanstack/react-query"],
+        manualChunks(id) {
+          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/")) {
+            return "vendor-react";
+          }
+          if (id.includes("node_modules/firebase/")) {
+            return "vendor-firebase";
+          }
+          if (id.includes("node_modules/lucide-react/")) {
+            return "vendor-icons";
+          }
+          if (id.includes("node_modules/framer-motion/")) {
+            return "vendor-motion";
+          }
+          if (id.includes("node_modules/@radix-ui/")) {
+            return "vendor-radix";
+          }
+          if (id.includes("node_modules/wouter/") || id.includes("node_modules/@tanstack/")) {
+            return "vendor-router";
+          }
         },
       },
     },
