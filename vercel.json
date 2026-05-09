@@ -7,9 +7,14 @@
     "api/index.mjs": {
       "memory": 512,
       "maxDuration": 30
+    },
+    "api/ai/chat.mjs": {
+      "memory": 512,
+      "maxDuration": 30
     }
   },
   "rewrites": [
+    { "source": "/api/ai/chat", "destination": "/api/ai/chat" },
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]

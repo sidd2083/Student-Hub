@@ -115,12 +115,12 @@ export function PublicLayout({ children }: PublicLayoutProps) {
       {/* Page content */}
       <main className="pb-20 md:pb-0">{children}</main>
 
-      {/* Desktop CTA + footer */}
-      <div className="hidden md:block bg-blue-600 py-10 mt-16">
+      {/* CTA section */}
+      <div className="bg-blue-600 py-10 mt-16">
         <div className="max-w-2xl mx-auto px-4 text-center">
           <h2 className="text-xl font-bold text-white mb-2">Get Full Access — Free</h2>
           <p className="text-blue-100 text-sm mb-5">
-            AI study assistant, progress tracking, leaderboard, and more — all free.
+            AI study assistant, progress tracking, leaderboard, and more — all free for Nepal students.
           </p>
           <Link
             href="/login"
@@ -132,22 +132,87 @@ export function PublicLayout({ children }: PublicLayoutProps) {
         </div>
       </div>
 
-      <footer className="hidden md:block bg-gray-900 py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-blue-500 rounded-md flex items-center justify-center">
-              <BookOpen className="w-3 h-3 text-white" />
+      <footer className="bg-gray-900 pb-20 md:pb-0">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+            <div className="col-span-2 md:col-span-1">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-7 h-7 bg-blue-500 rounded-lg flex items-center justify-center">
+                  <BookOpen className="w-3.5 h-3.5 text-white" />
+                </div>
+                <span className="text-white font-semibold text-sm">Student Hub</span>
+              </div>
+              <p className="text-gray-400 text-xs leading-relaxed">
+                Free study platform for Grade 9–12 students in Nepal. Notes, PYQs, AI tutor, and progress tracking — all in one place.
+              </p>
             </div>
-            <span className="text-white font-medium text-sm">Student Hub</span>
+
+            <div>
+              <h4 className="text-white text-xs font-semibold uppercase tracking-wider mb-3">Study</h4>
+              <ul className="space-y-2">
+                {[
+                  { href: "/notes",       label: "Study Notes" },
+                  { href: "/pyqs",        label: "PYQ Papers"  },
+                  { href: "/mcq",         label: "MCQ Practice"},
+                  { href: "/ai",          label: "Nep AI"      },
+                  { href: "/leaderboard", label: "Leaderboard" },
+                ].map(({ href, label }) => (
+                  <li key={href}>
+                    <Link href={href} className="text-gray-400 text-xs hover:text-white transition-colors">
+                      {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="text-white text-xs font-semibold uppercase tracking-wider mb-3">Tools</h4>
+              <ul className="space-y-2">
+                {[
+                  { href: "/pomodoro", label: "Pomodoro Timer" },
+                  { href: "/todo",     label: "To-Do List"     },
+                  { href: "/report",   label: "Report Card"    },
+                  { href: "/saved",    label: "Saved Items"    },
+                ].map(({ href, label }) => (
+                  <li key={href}>
+                    <Link href={href} className="text-gray-400 text-xs hover:text-white transition-colors">
+                      {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="text-white text-xs font-semibold uppercase tracking-wider mb-3">Company</h4>
+              <ul className="space-y-2">
+                {[
+                  { href: "/about",   label: "About Us" },
+                  { href: "/contact", label: "Contact"  },
+                  { href: "/privacy", label: "Privacy Policy" },
+                  { href: "/terms",   label: "Terms of Service" },
+                ].map(({ href, label }) => (
+                  <li key={href}>
+                    <Link href={href} className="text-gray-400 text-xs hover:text-white transition-colors">
+                      {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-          <nav className="flex gap-5 text-xs text-gray-400">
-            <Link href="/"        className="hover:text-white transition-colors">Home</Link>
-            <Link href="/notes"   className="hover:text-white transition-colors">Notes</Link>
-            <Link href="/pyqs"    className="hover:text-white transition-colors">PYQ</Link>
-            <Link href="/about"   className="hover:text-white transition-colors">About</Link>
-            <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
-          </nav>
-          <p className="text-xs text-gray-500">© {new Date().getFullYear()} Student Hub. Built by Siddhant Lamichhane.</p>
+
+          <div className="border-t border-gray-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-gray-500">
+              © {new Date().getFullYear()} Student Hub. Built by Siddhant Lamichhane. All rights reserved.
+            </p>
+            <div className="flex items-center gap-4">
+              <Link href="/privacy" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">Privacy</Link>
+              <Link href="/terms"   className="text-xs text-gray-500 hover:text-gray-300 transition-colors">Terms</Link>
+              <Link href="/contact" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">Contact</Link>
+            </div>
+          </div>
         </div>
       </footer>
 

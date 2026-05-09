@@ -11,6 +11,7 @@ import {
 } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/AppShell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { InstallBanner } from "@/components/InstallBanner";
 
 const Home         = lazy(() => import("@/pages/Home"));
 const Login        = lazy(() => import("@/pages/Login"));
@@ -122,6 +123,7 @@ function App() {
             </AuthProvider>
           </WouterRouter>
           <Toaster />
+          <InstallBanner />
         </TooltipProvider>
       </QueryClientProvider>
     </ErrorBoundary>
