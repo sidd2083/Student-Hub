@@ -961,8 +961,16 @@ function BadgeManager() {
 
 // ─── SEO Panel ───────────────────────────────────────────────────────────────
 
-interface SeoMeta { seoTitle: string; description: string; keywords: string; slug: string; noIndex: boolean }
-const emptySeo = (): SeoMeta => ({ seoTitle: "", description: "", keywords: "", slug: "", noIndex: false });
+interface SeoMeta {
+  seoTitle: string; description: string; keywords: string; slug: string; noIndex: boolean;
+  ogImage: string; ogType: string; twitterCard: string; twitterImage: string;
+  canonicalUrl: string; gscVerification: string; structuredData: string;
+}
+const emptySeo = (): SeoMeta => ({
+  seoTitle: "", description: "", keywords: "", slug: "", noIndex: false,
+  ogImage: "", ogType: "article", twitterCard: "summary_large_image", twitterImage: "",
+  canonicalUrl: "", gscVerification: "", structuredData: "",
+});
 type SeoKind = "note" | "pyq";
 interface SeoEditTarget { id: string; defaultTitle: string; kind: SeoKind }
 
@@ -972,6 +980,7 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [tab, setTab] = useState<"basic" | "social" | "advanced">("basic");
 
   useEffect(() => {
     let cancelled = false;
@@ -982,7 +991,7 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
           new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 4000)),
         ]);
         if (cancelled) return;
-        if (snap.exists()) setForm(snap.data() as SeoMeta);
+        if (snap.exists()) setForm({ ...emptySeo(), ...(snap.data() as SeoMeta) });
         else setForm({ ...emptySeo(), seoTitle: target.defaultTitle });
       } catch {
         if (!cancelled) setForm({ ...emptySeo(), seoTitle: target.defaultTitle });
@@ -1002,61 +1011,196 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
     finally { setSaving(false); }
   };
 
-  const f = (k: keyof SeoMeta) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+  const f = (k: keyof SeoMeta) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm(p => ({ ...p, [k]: e.target.value }));
+
+  const autoJsonLd = () => {
+    const baseUrl = "https://studenthub.np";
+    const ld = {
+      "@context": "https://schema.org",
+      "@type": target.kind === "note" ? "Article" : "Course",
+      "name": form.seoTitle || target.defaultTitle,
+      "description": form.description,
+      "url": form.canonicalUrl || `${baseUrl}/${target.kind}s/${target.id}`,
+      "publisher": { "@type": "Organization", "name": "Student Hub", "url": baseUrl },
+      "educationalLevel": "High School",
+      "inLanguage": "en-NP",
+    };
+    setForm(p => ({ ...p, structuredData: JSON.stringify(ld, null, 2) }));
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
           <div>
             <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{target.kind.toUpperCase()} SEO</p>
-            <h3 className="text-base font-bold text-gray-900 truncate">{target.defaultTitle}</h3>
+            <h3 className="text-base font-bold text-gray-900 truncate max-w-xs">{target.defaultTitle}</h3>
           </div>
           <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-all">
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-gray-100 px-6 pt-3">
+          {(["basic", "social", "advanced"] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              className={`pb-2.5 px-3 text-xs font-semibold capitalize border-b-2 transition-all ${tab === t ? "border-purple-500 text-purple-600" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
+              {t === "basic" ? "Basic SEO" : t === "social" ? "Social / OG" : "Advanced"}
+            </button>
+          ))}
+        </div>
+
         {loading ? (
           <div className="p-8 space-y-3">{[1,2,3,4].map(i => <div key={i} className="h-10 bg-gray-100 rounded-xl animate-pulse" />)}</div>
         ) : (
           <form onSubmit={handleSave} className="p-6 space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">SEO Title</label>
-              <input value={form.seoTitle} onChange={f("seoTitle")} placeholder={target.defaultTitle}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
-              <p className="text-xs text-gray-400 mt-1">{form.seoTitle.length}/60 chars recommended</p>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Meta Description</label>
-              <textarea value={form.description} onChange={f("description")} rows={3}
-                placeholder="Brief description for search engines…"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-400" />
-              <p className="text-xs text-gray-400 mt-1">{form.description.length}/160 chars recommended</p>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Keywords</label>
-              <input value={form.keywords} onChange={f("keywords")} placeholder="keyword1, keyword2, keyword3"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">URL Slug</label>
-              <input value={form.slug} onChange={f("slug")} placeholder="auto-generated-from-title"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
-            </div>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <div
-                onClick={() => setForm(p => ({ ...p, noIndex: !p.noIndex }))}
-                className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer ${form.noIndex ? "bg-red-500 border-red-500" : "border-gray-300 hover:border-red-400"}`}
-              >
-                {form.noIndex && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+            {/* ── Basic Tab ── */}
+            {tab === "basic" && (<>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">SEO Title <span className="text-gray-400 font-normal">(shown in Google)</span></label>
+                <input value={form.seoTitle} onChange={f("seoTitle")} placeholder={target.defaultTitle}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                <div className="flex justify-between mt-1">
+                  <p className="text-xs text-gray-400">Keep under 60 chars</p>
+                  <p className={`text-xs font-medium ${form.seoTitle.length > 60 ? "text-red-500" : "text-gray-400"}`}>{form.seoTitle.length}/60</p>
+                </div>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-700">No Index</p>
-                <p className="text-xs text-gray-400">Exclude this page from search engines</p>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Meta Description</label>
+                <textarea value={form.description} onChange={f("description")} rows={3}
+                  placeholder="Brief description for search engines…"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                <div className="flex justify-between mt-1">
+                  <p className="text-xs text-gray-400">120–160 chars ideal</p>
+                  <p className={`text-xs font-medium ${form.description.length > 160 ? "text-red-500" : form.description.length >= 120 ? "text-green-500" : "text-gray-400"}`}>{form.description.length}/160</p>
+                </div>
               </div>
-            </label>
-            <div className="flex gap-3 pt-2">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Focus Keywords</label>
+                <input value={form.keywords} onChange={f("keywords")} placeholder="grade 10 science notes, SEE notes Nepal"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                <p className="text-xs text-gray-400 mt-1">Comma-separated keywords</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Canonical URL</label>
+                <input value={form.canonicalUrl} onChange={f("canonicalUrl")} placeholder="https://studenthub.np/notes/grade-10-science"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                <p className="text-xs text-gray-400 mt-1">Prevents duplicate content issues</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">URL Slug</label>
+                <input value={form.slug} onChange={f("slug")} placeholder="grade-10-science-notes-nepal"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+              </div>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <div
+                  onClick={() => setForm(p => ({ ...p, noIndex: !p.noIndex }))}
+                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer ${form.noIndex ? "bg-red-500 border-red-500" : "border-gray-300 hover:border-red-400"}`}
+                >
+                  {form.noIndex && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700">No Index</p>
+                  <p className="text-xs text-gray-400">Exclude this page from search engines</p>
+                </div>
+              </label>
+            </>)}
+
+            {/* ── Social / OG Tab ── */}
+            {tab === "social" && (<>
+              <div className="bg-blue-50 rounded-2xl p-3 text-xs text-blue-700">
+                Open Graph tags control how links look when shared on Facebook, WhatsApp, LinkedIn, and other platforms.
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">OG Image URL</label>
+                <input value={form.ogImage} onChange={f("ogImage")} placeholder="https://studenthub.np/og-images/grade10-science.jpg"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                <p className="text-xs text-gray-400 mt-1">Recommended: 1200×630px image (upload to Firebase Storage first)</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">OG Type</label>
+                <select value={form.ogType} onChange={f("ogType")}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                  <option value="article">article</option>
+                  <option value="website">website</option>
+                  <option value="book">book</option>
+                </select>
+              </div>
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-xs font-semibold text-gray-600 mb-3">Twitter / X Card</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1.5">Card Type</label>
+                    <select value={form.twitterCard} onChange={f("twitterCard")}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                      <option value="summary_large_image">summary_large_image (big preview)</option>
+                      <option value="summary">summary (small thumbnail)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1.5">Twitter Image URL <span className="text-gray-400">(leave blank to use OG image)</span></label>
+                    <input value={form.twitterImage} onChange={f("twitterImage")} placeholder="https://studenthub.np/twitter-card.jpg"
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                  </div>
+                </div>
+              </div>
+              {form.ogImage && (
+                <div className="border border-gray-200 rounded-2xl overflow-hidden">
+                  <p className="text-xs font-semibold text-gray-500 px-4 py-2 border-b bg-gray-50">OG Preview</p>
+                  <div className="p-3">
+                    <img src={form.ogImage} alt="OG Preview" className="w-full h-32 object-cover rounded-xl" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    <p className="text-xs font-semibold text-gray-800 mt-2 truncate">{form.seoTitle || target.defaultTitle}</p>
+                    <p className="text-xs text-gray-400 truncate">{form.description}</p>
+                  </div>
+                </div>
+              )}
+            </>)}
+
+            {/* ── Advanced Tab ── */}
+            {tab === "advanced" && (<>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Google Search Console Verification Code</label>
+                <input value={form.gscVerification} onChange={f("gscVerification")} placeholder="abc123xyz (meta tag content value)"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                <p className="text-xs text-gray-400 mt-1">Paste the value from &lt;meta name="google-site-verification" content="..."&gt;</p>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-gray-600">Structured Data (JSON-LD)</label>
+                  <button type="button" onClick={autoJsonLd}
+                    className="text-xs px-3 py-1 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-all font-medium">
+                    Auto-Generate
+                  </button>
+                </div>
+                <textarea value={form.structuredData} onChange={f("structuredData")} rows={8}
+                  placeholder={'{\n  "@context": "https://schema.org",\n  "@type": "Article",\n  "name": "..."\n}'}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-xs font-mono resize-y focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                <p className="text-xs text-gray-400 mt-1">Valid JSON-LD. Test at <span className="text-blue-400">search.google.com/test/rich-results</span></p>
+              </div>
+              {form.structuredData && (() => {
+                try {
+                  JSON.parse(form.structuredData);
+                  return <p className="text-xs text-green-600 font-medium">✓ Valid JSON</p>;
+                } catch {
+                  return <p className="text-xs text-red-500 font-medium">✗ Invalid JSON — check syntax</p>;
+                }
+              })()}
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                <p className="text-xs font-semibold text-amber-700 mb-2">🔒 Firestore Rules — Action Required</p>
+                <p className="text-xs text-amber-600 mb-2">
+                  For notes and PYQs to be visible to non-logged-in visitors, your Firestore security rules must allow public reads.
+                </p>
+                <ol className="text-xs text-amber-600 space-y-1 list-decimal ml-4">
+                  <li>Go to <strong>Firebase Console → Firestore → Rules</strong></li>
+                  <li>Replace the existing rules with the contents of your <code>firestore.rules</code> file</li>
+                  <li>Click <strong>Publish</strong></li>
+                </ol>
+              </div>
+            </>)}
+
+            <div className="flex gap-3 pt-2 border-t border-gray-100">
               <button type="submit" disabled={saving}
                 className="flex-1 py-2.5 bg-purple-500 text-white font-semibold rounded-xl hover:bg-purple-600 disabled:opacity-50 transition-all text-sm">
                 {saving ? "Saving…" : saved ? "✓ Saved!" : "Save SEO"}
@@ -1120,7 +1264,7 @@ function SeoPanel() {
 
   const generateSitemap = () => {
     const all = [...staticUrls, ...noteItems.map(n => ({ url: n.url, label: n.title, kind: "Note" })), ...pyqItems.map(p => ({ url: p.url, label: p.title, kind: "PYQ" }))];
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${all.map(u => `  <url>\n    <loc>${u.url}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>${u.kind === "Static" ? "0.9" : "0.7"}</priority>\n  </url>`).join("\n")}\n</urlset>`;
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${all.map(u => `  <url>\n    <loc>${u.url}</loc>\n    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>${u.kind === "Static" ? "0.9" : "0.7"}</priority>\n  </url>`).join("\n")}\n</urlset>`;
     const blob = new Blob([xml], { type: "application/xml" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -1128,31 +1272,101 @@ function SeoPanel() {
     link.click();
   };
 
+  const generateRobotsTxt = () => {
+    const txt = `User-agent: *\nAllow: /\nAllow: /notes/\nAllow: /pyqs/\nAllow: /about\nAllow: /contact\nDisallow: /dashboard\nDisallow: /admin\nDisallow: /settings\nDisallow: /todo\nDisallow: /report\nDisallow: /saved\nDisallow: /pomodoro\n\nSitemap: ${baseUrl}/sitemap.xml\n`;
+    const blob = new Blob([txt], { type: "text/plain" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "robots.txt";
+    link.click();
+  };
+
   return (
     <div>
       {editing && <SeoEditor target={editing} onClose={() => setEditing(null)} />}
+
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
           <h2 className="text-xl font-bold text-gray-900">SEO Panel</h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            Edit per-page SEO metadata stored in Firestore ·{" "}
+            Advanced SEO management ·{" "}
             <span className="text-purple-600 font-medium">{allItems.length} pages indexable</span>
           </p>
         </div>
-        <button onClick={generateSitemap}
-          className="px-4 py-2 bg-purple-500 text-white rounded-xl text-sm font-medium hover:bg-purple-600 transition-all flex items-center gap-2">
-          ⬇ Download sitemap.xml
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={generateRobotsTxt}
+            className="px-4 py-2 bg-gray-800 text-white rounded-xl text-sm font-medium hover:bg-gray-900 transition-all flex items-center gap-2">
+            ⬇ robots.txt
+          </button>
+          <button onClick={generateSitemap}
+            className="px-4 py-2 bg-purple-500 text-white rounded-xl text-sm font-medium hover:bg-purple-600 transition-all flex items-center gap-2">
+            ⬇ sitemap.xml
+          </button>
+        </div>
       </div>
 
+      {/* Firestore Rules Banner */}
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6">
+        <p className="text-xs font-bold text-amber-800 mb-1.5">⚠️ Required: Deploy Firestore Rules for Public Notes Access</p>
+        <p className="text-xs text-amber-700 mb-2">
+          Notes and PYQs are invisible to guest visitors until you deploy the updated security rules. This is a one-time step.
+        </p>
+        <ol className="text-xs text-amber-700 space-y-1 list-decimal ml-4">
+          <li>Open <strong>Firebase Console</strong> → your project → <strong>Firestore Database → Rules</strong></li>
+          <li>Replace ALL existing rules with the content of your <code className="bg-amber-100 px-1 rounded">firestore.rules</code> file in this project</li>
+          <li>Click <strong>Publish</strong> — notes will become visible to everyone instantly</li>
+        </ol>
+      </div>
+
+      {/* Quick stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        {[
+          { label: "Static Pages",        count: staticUrls.length,  color: "bg-blue-50 text-blue-600"    },
+          { label: "Note Pages",           count: noteItems.length,   color: "bg-green-50 text-green-600"  },
+          { label: "PYQ Pages",            count: pyqItems.length,    color: "bg-orange-50 text-orange-600"},
+          { label: "Total Indexable",      count: staticUrls.length + noteItems.length + pyqItems.length, color: "bg-purple-50 text-purple-600" },
+        ].map(({ label, count, color }) => (
+          <div key={label} className={`${color.split(" ")[0]} rounded-2xl p-4 border border-gray-100`}>
+            <p className={`text-2xl font-bold ${color.split(" ")[1]}`}>{count}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Google Search Console guide */}
+      <div className="bg-white border border-gray-100 rounded-2xl p-5 mb-6">
+        <p className="text-sm font-bold text-gray-900 mb-3">Google Search Console Setup</p>
+        <div className="space-y-2 text-xs text-gray-600">
+          <div className="flex items-start gap-2">
+            <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 font-bold text-[10px] flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+            <p>Go to <strong>search.google.com/search-console</strong> and add your property (e.g. <code className="bg-gray-100 px-1 rounded">studenthub.np</code>)</p>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 font-bold text-[10px] flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+            <p>Choose <strong>HTML tag</strong> verification → copy the <code className="bg-gray-100 px-1 rounded">content="..."</code> value</p>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 font-bold text-[10px] flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+            <p>Paste it in the <strong>GSC Verification Code</strong> field when editing a page's SEO (Advanced tab)</p>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 font-bold text-[10px] flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
+            <p>Download <strong>sitemap.xml</strong> above, upload it to your hosting root, then submit the URL in GSC</p>
+          </div>
+        </div>
+      </div>
+
+      {/* SEO tips */}
       <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4 mb-6">
-        <p className="text-xs font-semibold text-purple-700 mb-2">📌 SEO Tips</p>
+        <p className="text-xs font-semibold text-purple-700 mb-2">📌 Advanced SEO Tips</p>
         <ul className="text-xs text-purple-600 space-y-1">
-          <li>• <strong>SEO Title:</strong> Keep under 60 characters. Include keywords like "Grade 10 Science Notes Nepal".</li>
-          <li>• <strong>Meta Description:</strong> 120–160 characters. Describe what the page contains clearly.</li>
-          <li>• <strong>Keywords:</strong> Comma-separated. E.g. "SEE notes, grade 10 science, NEB notes Nepal"</li>
-          <li>• <strong>No Index:</strong> Check this to hide low-quality or duplicate pages from Google.</li>
-          <li>• Download sitemap.xml and submit it to Google Search Console after adding content.</li>
+          <li>• <strong>SEO Title:</strong> Keep under 60 chars. E.g. "Grade 10 Science Notes — NEB Nepal | Student Hub"</li>
+          <li>• <strong>Meta Description:</strong> 120–160 chars. Natural language that matches what the student is searching.</li>
+          <li>• <strong>OG Image:</strong> 1200×630px image makes your links look great on WhatsApp and Facebook shares.</li>
+          <li>• <strong>Canonical URL:</strong> Always set this for note/PYQ pages to avoid duplicate content penalties.</li>
+          <li>• <strong>JSON-LD:</strong> Use the Auto-Generate button — structured data helps Google show rich results.</li>
+          <li>• <strong>No Index:</strong> Mark empty or duplicate pages to avoid wasting your crawl budget.</li>
         </ul>
       </div>
 

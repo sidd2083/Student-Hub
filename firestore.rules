@@ -36,28 +36,34 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
-    // ── Notes ────────────────────────────────────────────────────────────────
+    // ── Notes — public read so guests can browse ──────────────────────────────
     match /notes/{noteId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create, update, delete: if isAdmin();
     }
 
-    // ── PYQs ─────────────────────────────────────────────────────────────────
+    // ── PYQs — public read so guests can browse ───────────────────────────────
     match /pyqs/{pyqId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create, update, delete: if isAdmin();
     }
 
-    // ── MCQs ─────────────────────────────────────────────────────────────────
+    // ── MCQs — public read so guests can browse ───────────────────────────────
     match /mcqs/{mcqId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create, update, delete: if isAdmin();
     }
 
-    // ── Announcements ────────────────────────────────────────────────────────
+    // ── Announcements — public read ───────────────────────────────────────────
     match /announcements/{announcementId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create, update, delete: if isAdmin();
+    }
+
+    // ── SEO Meta — public read ────────────────────────────────────────────────
+    match /seo_meta/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // ── Saved Items ──────────────────────────────────────────────────────────
