@@ -1,9 +1,16 @@
 {
-  "buildCommand": "pnpm --filter @workspace/student-hub run build",
+  "buildCommand": "pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/student-hub run build",
   "outputDirectory": "artifacts/student-hub/dist/public",
   "installCommand": "pnpm install",
   "framework": null,
+  "functions": {
+    "api/index.mjs": {
+      "memory": 512,
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

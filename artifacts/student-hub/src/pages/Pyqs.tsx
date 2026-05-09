@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { FileText, Image, Search, X, ExternalLink, Filter, LogIn } from "lucide-react";
 
@@ -104,9 +104,11 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
     setLoading(true);
     setSubject("");
     setYearFilter("");
-    const q = query(collection(db, "pyqs"), where("grade", "==", grade), orderBy("year", "desc"));
+    const q = query(collection(db, "pyqs"), where("grade", "==", grade));
     getDocs(q).then(snap => {
-      const list: Pyq[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Pyq));
+      const list: Pyq[] = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as Pyq))
+        .sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
       setPyqs(list);
     }).catch(e => {
       console.error("[Pyqs] Load failed:", e);

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { collection, query, where, getDocs, limit, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { BookOpen, FileText, BarChart2, MessageCircle, Timer, CheckSquare, Trophy, ArrowRight, LogIn, Sparkles } from "lucide-react";
 
@@ -25,13 +25,22 @@ export default function Home() {
   const [pyqs, setPyqs] = useState<PreviewPyq[]>([]);
 
   useEffect(() => {
-    getDocs(query(collection(db, "notes"), where("grade", "==", 10), orderBy("createdAt", "desc"), limit(5)))
-      .then(s => setNotes(s.docs.map(d => ({ id: d.id, ...d.data() } as PreviewNote))))
+    if (!user) return;
+    getDocs(query(collection(db, "notes"), where("grade", "==", 10)))
+      .then(s => {
+        const all = s.docs.map(d => ({ id: d.id, ...d.data() } as PreviewNote));
+        all.sort((a: any, b: any) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+        setNotes(all.slice(0, 5));
+      })
       .catch(console.error);
-    getDocs(query(collection(db, "pyqs"), where("grade", "==", 10), orderBy("createdAt", "desc"), limit(5)))
-      .then(s => setPyqs(s.docs.map(d => ({ id: d.id, ...d.data() } as PreviewPyq))))
+    getDocs(query(collection(db, "pyqs"), where("grade", "==", 10)))
+      .then(s => {
+        const all = s.docs.map(d => ({ id: d.id, ...d.data() } as PreviewPyq));
+        all.sort((a: any, b: any) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+        setPyqs(all.slice(0, 5));
+      })
       .catch(console.error);
-  }, []);
+  }, [user]);
 
   if (loading) {
     return (

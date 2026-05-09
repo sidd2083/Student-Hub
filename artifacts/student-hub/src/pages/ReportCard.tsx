@@ -3,7 +3,7 @@ import { Helmet } from "react-helmet-async";
 import { Link } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
-import { collection, doc, getDoc, getDocs, query, where, orderBy } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   BarChart2, Flame, Trophy, Star, TrendingUp,
@@ -256,7 +256,7 @@ function ReportContent() {
     try {
       const [userSnap, logsSnap] = await Promise.all([
         getDoc(doc(db, "users", user.uid)),
-        getDocs(query(collection(db, "study_logs"), where("uid", "==", user.uid), orderBy("date", "desc"))),
+        getDocs(query(collection(db, "study_logs"), where("uid", "==", user.uid))),
       ]);
 
       if (userSnap.exists()) {
@@ -272,12 +272,14 @@ function ReportContent() {
         setStats({ streak: 0, totalStudyTime: 0, todayStudyTime: 0, lastActiveDate: null });
       }
 
-      const logs: DailyLog[] = logsSnap.docs.map(d => ({
-        date: d.data().date,
-        studyMinutes: d.data().studyMinutes ?? 0,
-        tasksCompleted: d.data().tasksCompleted ?? 0,
-        notesViewed: d.data().notesViewed ?? 0,
-      }));
+      const logs: DailyLog[] = logsSnap.docs
+        .map(d => ({
+          date: d.data().date,
+          studyMinutes: d.data().studyMinutes ?? 0,
+          tasksCompleted: d.data().tasksCompleted ?? 0,
+          notesViewed: d.data().notesViewed ?? 0,
+        }))
+        .sort((a, b) => b.date.localeCompare(a.date));
       setDailyLogs(logs);
     } catch {
       setStats({ streak: 0, totalStudyTime: 0, todayStudyTime: 0, lastActiveDate: null });

@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { collection, query, where, getDocs, getDoc, doc, updateDoc, setDoc, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, getDoc, doc, updateDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { BookOpen, ChevronRight, FileText, Image, Type, X, ExternalLink, ZoomIn, LogIn, Sparkles } from "lucide-react";
 
@@ -174,9 +174,15 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   useEffect(() => {
     setLoading(true);
     setSubject("");
-    const q = query(collection(db, "notes"), where("grade", "==", grade), orderBy("createdAt", "desc"));
+    const q = query(collection(db, "notes"), where("grade", "==", grade));
     getDocs(q).then(snap => {
-      const list: NoteView[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as NoteView));
+      const list: NoteView[] = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as NoteView))
+        .sort((a, b) => {
+          const aTime = (a as any).createdAt ?? "";
+          const bTime = (b as any).createdAt ?? "";
+          return bTime.localeCompare(aTime);
+        });
       setNotes(list);
     }).catch(e => {
       console.error("[Notes] Load failed:", e);

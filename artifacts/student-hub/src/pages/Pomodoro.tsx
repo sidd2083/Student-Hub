@@ -88,6 +88,16 @@ function PomodoroContent() {
       .catch(console.error);
   }, [user?.uid]);
 
+  useEffect(() => {
+    if (!running) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "Your Pomodoro timer is still running. If you leave, your current session progress may not be saved.";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [running]);
+
   const totalSecs = (() => {
     if (phase === "work") return settings.workMins * 60;
     if (phase === "shortBreak") return settings.shortBreakMins * 60;
