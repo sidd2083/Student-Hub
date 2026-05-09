@@ -1,11 +1,12 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { useTimer } from "@/context/TimerContext";
+import { usePwaInstall } from "@/hooks/usePwaInstall";
 import {
   BookOpen, FileText, CheckSquare, Timer,
   MessageCircle, Trophy, LayoutDashboard, LogOut,
   Shield, Settings, User, Home, Wrench, ArrowLeft, X, BarChart2,
-  Pause, Play, Bookmark,
+  Pause, Play, Bookmark, Download,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -75,6 +76,7 @@ export function Layout({ children }: LayoutProps) {
   const [location, setLocation] = useLocation();
   const { user, profile, signOut } = useAuth();
   const [toolsOpen, setToolsOpen] = useState(false);
+  const { isInstallable, installApp } = usePwaInstall();
 
   const isActive = (href: string) =>
     location === href || (href !== "/dashboard" && location.startsWith(href));
@@ -147,6 +149,15 @@ export function Layout({ children }: LayoutProps) {
               <Settings className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-600 flex-shrink-0" />
             </div>
           </Link>
+          {isInstallable && (
+            <button
+              onClick={installApp}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-all mb-1"
+            >
+              <Download className="w-4 h-4" />
+              Install App
+            </button>
+          )}
           <button
             data-testid="btn-signout"
             onClick={signOut}
@@ -182,11 +193,22 @@ export function Layout({ children }: LayoutProps) {
               </Link>
             )}
           </div>
-          <Link href="/settings">
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm cursor-pointer">
-              {profile?.name?.charAt(0)?.toUpperCase() || "?"}
-            </div>
-          </Link>
+          <div className="flex items-center gap-2">
+            {isInstallable && (
+              <button
+                onClick={installApp}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-all"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Install
+              </button>
+            )}
+            <Link href="/settings">
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm cursor-pointer">
+                {profile?.name?.charAt(0)?.toUpperCase() || "?"}
+              </div>
+            </Link>
+          </div>
         </header>
 
         {/* Page content */}
