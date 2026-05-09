@@ -198,9 +198,18 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
       if (lastActive === today) {
         newToday = prevToday + mins;
+        if (prevToday < 5 && newToday >= 5) {
+          newStreak = prevStreak + 1;
+        }
       } else {
         newToday = mins;
-        newStreak = lastActive === yesterday ? prevStreak + 1 : 1;
+        if (lastActive === yesterday) {
+          if (newToday >= 5) {
+            newStreak = prevStreak + 1;
+          }
+        } else {
+          newStreak = newToday >= 5 ? 1 : 0;
+        }
       }
 
       await setDoc(userDocRef, {

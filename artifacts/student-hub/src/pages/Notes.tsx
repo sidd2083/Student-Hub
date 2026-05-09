@@ -4,7 +4,7 @@ import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { collection, query, where, getDocs, getDoc, doc, updateDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { BookOpen, ChevronRight, FileText, Image, Type, X, ExternalLink, ZoomIn, LogIn, Sparkles } from "lucide-react";
+import { BookOpen, ChevronRight, FileText, Image, Type, X, ExternalLink, ZoomIn, LogIn, Sparkles, Maximize2, Minimize2 } from "lucide-react";
 
 type NoteView = {
   id: string;
@@ -36,7 +36,9 @@ function NoteViewer({ note, onClose, uid }: { note: NoteView; onClose: () => voi
   const [, setLocation] = useLocation();
   const [imgZoomed, setImgZoomed] = useState(false);
   const [scrollPct, setScrollPct] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -45,6 +47,20 @@ function NoteViewer({ note, onClose, uid }: { note: NoteView; onClose: () => voi
       ? 100
       : Math.round((el.scrollTop / (el.scrollHeight - el.clientHeight)) * 100);
     setScrollPct(pct);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
   const handleAskAi = () => {
@@ -75,7 +91,7 @@ function NoteViewer({ note, onClose, uid }: { note: NoteView; onClose: () => voi
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2 sm:p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div ref={containerRef} className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
         <div className="h-1 bg-gray-100 flex-shrink-0 rounded-t-3xl overflow-hidden">
           <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${scrollPct}%` }} />
         </div>
@@ -101,6 +117,15 @@ function NoteViewer({ note, onClose, uid }: { note: NoteView; onClose: () => voi
             >
               <ExternalLink className="w-3 h-3" /> Full page
             </Link>
+            <button
+              onClick={toggleFullscreen}
+              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              className="p-2 rounded-xl hover:bg-gray-100 transition-all"
+            >
+              {isFullscreen
+                ? <Minimize2 className="w-4 h-4 text-gray-500" />
+                : <Maximize2 className="w-4 h-4 text-gray-500" />}
+            </button>
             <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-all">
               <X className="w-5 h-5 text-gray-500" />
             </button>
@@ -116,9 +141,16 @@ function NoteViewer({ note, onClose, uid }: { note: NoteView; onClose: () => voi
         <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto">
           {note.contentType === "text" && (
             <div className="max-w-2xl mx-auto px-4 sm:px-8 py-8 sm:py-10">
-              <article className="text-gray-800 text-[16px] leading-[1.85] space-y-4 whitespace-pre-wrap">
-                {note.content}
-              </article>
+              {note.content.trimStart().startsWith("<") ? (
+                <article
+                  className="text-gray-800 text-[16px] leading-[1.85] prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: note.content }}
+                />
+              ) : (
+                <article className="text-gray-800 text-[16px] leading-[1.85] space-y-4 whitespace-pre-wrap">
+                  {note.content}
+                </article>
+              )}
             </div>
           )}
           {note.contentType === "pdf" && (

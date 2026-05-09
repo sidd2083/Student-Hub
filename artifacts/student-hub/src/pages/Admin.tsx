@@ -137,6 +137,67 @@ function FileUpload({ accept, label, storagePath, onUploaded, disabled }: FileUp
   );
 }
 
+// ─── Rich Text Editor ─────────────────────────────────────────────────────────
+
+function RichTextEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const isComposing = useRef(false);
+
+  useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const exec = (cmd: string, arg?: string) => {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, arg ?? undefined);
+    if (editorRef.current) onChange(editorRef.current.innerHTML);
+  };
+
+  const toolbarBtn = (label: string, cmd: string, arg?: string, title?: string) => (
+    <button
+      type="button"
+      title={title ?? label}
+      onMouseDown={(e) => { e.preventDefault(); exec(cmd, arg); }}
+      className="px-2 py-1 text-xs font-medium rounded hover:bg-gray-200 transition-all text-gray-700"
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-300">
+      <div className="flex flex-wrap gap-0.5 px-2 py-1.5 bg-gray-50 border-b border-gray-200">
+        {toolbarBtn("H1", "formatBlock", "<h1>", "Heading 1")}
+        {toolbarBtn("H2", "formatBlock", "<h2>", "Heading 2")}
+        {toolbarBtn("H3", "formatBlock", "<h3>", "Heading 3")}
+        <span className="w-px bg-gray-300 mx-1 self-stretch" />
+        {toolbarBtn("B", "bold", undefined, "Bold")}
+        {toolbarBtn("I", "italic", undefined, "Italic")}
+        {toolbarBtn("U", "underline", undefined, "Underline")}
+        <span className="w-px bg-gray-300 mx-1 self-stretch" />
+        {toolbarBtn("• List", "insertUnorderedList", undefined, "Bullet list")}
+        {toolbarBtn("1. List", "insertOrderedList", undefined, "Numbered list")}
+        <span className="w-px bg-gray-300 mx-1 self-stretch" />
+        {toolbarBtn("P", "formatBlock", "<p>", "Paragraph")}
+      </div>
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        onCompositionStart={() => { isComposing.current = true; }}
+        onCompositionEnd={() => { isComposing.current = false; if (editorRef.current) onChange(editorRef.current.innerHTML); }}
+        onInput={() => { if (!isComposing.current && editorRef.current) onChange(editorRef.current.innerHTML); }}
+        className="min-h-[160px] px-3 py-3 text-sm text-gray-800 focus:outline-none leading-relaxed [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mb-2 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:mb-1.5 [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mb-1 [&_ul]:list-disc [&_ul]:ml-5 [&_ol]:list-decimal [&_ol]:ml-5 [&_li]:mb-0.5 [&_p]:mb-2"
+        data-placeholder="Write note content here…"
+        style={{ caretColor: "#3b82f6" }}
+      />
+    </div>
+  );
+}
+
 // ─── Stat Card ───────────────────────────────────────────────────────────────
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
@@ -301,8 +362,7 @@ function ManageNotes() {
           {form.contentType === "text" && (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Content</label>
-              <textarea value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
-                rows={5} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none" />
+              <RichTextEditor value={form.content} onChange={v => setForm(f => ({ ...f, content: v }))} />
             </div>
           )}
           {(form.contentType === "pdf" || form.contentType === "image") && (

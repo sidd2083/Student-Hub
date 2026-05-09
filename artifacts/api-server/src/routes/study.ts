@@ -36,12 +36,21 @@ router.post("/study/save", async (req: Request, res: Response) => {
 
       if (lastActive === today) {
         newToday = prevToday + minutes;
+        // First time crossing 5-minute threshold today — qualify for streak
+        if (prevToday < 5 && newToday >= 5) {
+          newStreak = prevStreak + 1;
+        }
       } else {
         newToday = minutes;
         if (lastActive === yesterday) {
-          newStreak = prevStreak + 1;
+          // Only maintain/extend streak if today reaches 5+ minutes
+          if (newToday >= 5) {
+            newStreak = prevStreak + 1;
+          }
+          // else: streak stays unchanged until user hits 5 min today
         } else {
-          newStreak = 1;
+          // Missed days — start fresh only if 5+ min today
+          newStreak = newToday >= 5 ? 1 : 0;
         }
       }
 

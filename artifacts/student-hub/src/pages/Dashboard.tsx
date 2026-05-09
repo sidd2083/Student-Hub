@@ -310,6 +310,7 @@ export default function Dashboard() {
             <p className="text-2xl sm:text-3xl font-bold text-orange-500">
               {streak}<span className="text-xs sm:text-base font-normal text-gray-400 ml-1">days</span>
             </p>
+            <p className="text-[10px] text-gray-400 mt-1 leading-tight">Study ≥5 min/day to keep streak</p>
           </div>
         </div>
 

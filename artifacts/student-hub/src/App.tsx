@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { AnimatePresence, motion } from "framer-motion";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -50,6 +51,52 @@ const queryClient = new QueryClient({
   },
 });
 
+function AnimatedRoutes() {
+  const [location] = useLocation();
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={location}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -6 }}
+        transition={{ duration: 0.16, ease: "easeOut" }}
+        style={{ minHeight: "100%" }}
+      >
+        <Switch>
+          <Route path="/" component={Home} />
+
+          <Route path="/notes/:id" component={NotePage} />
+          <Route path="/pyq/:id" component={PyqPage} />
+          <Route path="/notes" component={Notes} />
+          <Route path="/pyqs" component={Pyqs} />
+          <Route path="/about" component={About} />
+          <Route path="/contact" component={Contact} />
+          <Route path="/privacy" component={PrivacyPolicy} />
+          <Route path="/terms" component={Terms} />
+
+          <Route path="/ai" component={NepAi} />
+          <Route path="/report" component={ReportCard} />
+          <Route path="/todo" component={Todo} />
+          <Route path="/pomodoro" component={Pomodoro} />
+          <Route path="/leaderboard" component={Leaderboard} />
+          <Route path="/saved" component={Saved} />
+          <Route path="/mcq" component={McqPractice} />
+
+          <Route path="/dashboard">
+            <PrivateRoute><Dashboard /></PrivateRoute>
+          </Route>
+          <Route path="/settings">
+            <PrivateRoute><Settings /></PrivateRoute>
+          </Route>
+
+          <Route component={NotFound} />
+        </Switch>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 function Router() {
   return (
     <Suspense fallback={null}>
@@ -65,35 +112,7 @@ function Router() {
 
         <Route>
           <AppShell>
-            <Switch>
-              <Route path="/" component={Home} />
-
-              <Route path="/notes/:id" component={NotePage} />
-              <Route path="/pyq/:id" component={PyqPage} />
-              <Route path="/notes" component={Notes} />
-              <Route path="/pyqs" component={Pyqs} />
-              <Route path="/about" component={About} />
-              <Route path="/contact" component={Contact} />
-              <Route path="/privacy" component={PrivacyPolicy} />
-              <Route path="/terms" component={Terms} />
-
-              <Route path="/ai" component={NepAi} />
-              <Route path="/report" component={ReportCard} />
-              <Route path="/todo" component={Todo} />
-              <Route path="/pomodoro" component={Pomodoro} />
-              <Route path="/leaderboard" component={Leaderboard} />
-              <Route path="/saved" component={Saved} />
-              <Route path="/mcq" component={McqPractice} />
-
-              <Route path="/dashboard">
-                <PrivateRoute><Dashboard /></PrivateRoute>
-              </Route>
-              <Route path="/settings">
-                <PrivateRoute><Settings /></PrivateRoute>
-              </Route>
-
-              <Route component={NotFound} />
-            </Switch>
+            <AnimatedRoutes />
           </AppShell>
         </Route>
       </Switch>

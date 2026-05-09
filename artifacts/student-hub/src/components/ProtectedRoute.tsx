@@ -13,6 +13,7 @@ export function LoadingScreen() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
       <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
       <p className="text-sm text-gray-400">Checking your session…</p>
+      <p className="text-xs text-gray-300 tracking-wide">By Tufan Production</p>
     </div>
   );
 }

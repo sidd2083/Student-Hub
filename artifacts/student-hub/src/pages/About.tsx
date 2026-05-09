@@ -77,9 +77,9 @@ export default function About() {
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Built by</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">About Us</h2>
             <p className="text-gray-600">
-              Student Hub was built by <strong>Siddhant Lamichhane</strong> to help Nepali students access
+              Student Hub is a product of <strong>Tufan Production</strong>, built to help Nepali students access
               quality study materials without any barriers.
             </p>
           </div>

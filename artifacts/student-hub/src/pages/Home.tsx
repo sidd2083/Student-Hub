@@ -25,7 +25,6 @@ export default function Home() {
   const [pyqs, setPyqs] = useState<PreviewPyq[]>([]);
 
   useEffect(() => {
-    if (!user) return;
     getDocs(query(collection(db, "notes"), where("grade", "==", 10)))
       .then(s => {
         const all = s.docs.map(d => ({ id: d.id, ...d.data() } as PreviewNote));
@@ -40,7 +39,7 @@ export default function Home() {
         setPyqs(all.slice(0, 5));
       })
       .catch(console.error);
-  }, [user]);
+  }, []);
 
   if (loading) {
     return (
