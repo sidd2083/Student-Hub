@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { getNepaliDate, getNepaliYesterday } from "@/lib/nepaliDate";
 import {
   BarChart2, Flame, Trophy, Star, TrendingUp,
   CheckSquare, Clock, Calendar, Award, BookOpen,
@@ -86,14 +87,14 @@ function buildInsights(stats: StudyStats, dailyLogs: DailyLog[]) {
 function StudyBar({ logs, period }: { logs: DailyLog[]; period: ViewPeriod }) {
   const days = useMemo(() => {
     const count = period === "day" ? 1 : period === "week" ? 7 : 30;
-    const today = new Date();
+    const NPT_MS = (5 * 60 + 45) * 60 * 1000;
+    const todayNpt = new Date(Date.now() + NPT_MS);
     return Array.from({ length: count }, (_, i) => {
-      const d = new Date(today);
-      d.setDate(today.getDate() - (count - 1 - i));
+      const d = new Date(todayNpt.getTime() - (count - 1 - i) * 86400000);
       const key = d.toISOString().slice(0, 10);
       const log = logs.find(l => l.date === key);
       return {
-        label: period === "week" ? DAYS[d.getDay()] : String(d.getDate()),
+        label: period === "week" ? DAYS[d.getUTCDay()] : String(d.getUTCDate()),
         minutes: log?.studyMinutes ?? 0,
         isToday: i === count - 1,
       };
@@ -121,8 +122,8 @@ function StudyBar({ logs, period }: { logs: DailyLog[]; period: ViewPeriod }) {
 }
 
 function DailyReport({ stats, logs }: { stats: StudyStats; logs: DailyLog[] }) {
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const today = getNepaliDate();
+  const yesterday = getNepaliYesterday();
 
   const todayLog = logs.find(l => l.date === today);
   const yesterdayLog = logs.find(l => l.date === yesterday);

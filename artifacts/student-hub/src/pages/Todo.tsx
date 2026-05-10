@@ -3,8 +3,9 @@ import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
 import {
-  collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, orderBy,
+  collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc,
 } from "firebase/firestore";
+import { getNepaliDate } from "@/lib/nepaliDate";
 import { db } from "@/lib/firebase";
 import { CheckSquare, Plus, Trash2, Check } from "lucide-react";
 
@@ -29,11 +30,12 @@ function TodoContent() {
     try {
       const q = query(
         collection(db, "tasks"),
-        where("uid", "==", user.uid),
-        orderBy("createdAt", "desc")
+        where("uid", "==", user.uid)
       );
       const snap = await getDocs(q);
-      const list: Task[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Task));
+      const list: Task[] = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as Task))
+        .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
       setTasks(list);
     } catch (e) {
       console.error("[Todo] Load failed:", e);
@@ -72,7 +74,7 @@ function TodoContent() {
       setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: true } : t));
 
       // Log task completion to study_logs
-      const today = new Date().toISOString().slice(0, 10);
+      const today = getNepaliDate();
       const logId = `${user.uid}_${today}`;
       const logRef = doc(db, "study_logs", logId);
       const logSnap = await getDoc(logRef);

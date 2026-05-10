@@ -34,6 +34,7 @@ const toolsMenu = [
   { href: "/ai",          icon: MessageCircle, label: "Nep AI",      color: "text-indigo-600 bg-indigo-50" },
   { href: "/pomodoro",    icon: Timer,         label: "Pomodoro",    color: "text-orange-600 bg-orange-50" },
   { href: "/todo",        icon: CheckSquare,   label: "To-do",       color: "text-green-600  bg-green-50"  },
+  { href: "/saved",       icon: Bookmark,      label: "Saved",       color: "text-teal-600   bg-teal-50"   },
   { href: "/report",      icon: BarChart2,     label: "Report Card", color: "text-blue-600   bg-blue-50"   },
   { href: "/leaderboard", icon: Trophy,        label: "Leaderboard", color: "text-yellow-600 bg-yellow-50" },
 ];

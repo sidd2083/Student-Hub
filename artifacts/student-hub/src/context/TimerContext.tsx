@@ -4,6 +4,7 @@ import {
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "./AuthContext";
+import { getNepaliDate, getNepaliYesterday } from "@/lib/nepaliDate";
 
 export type Phase = "work" | "shortBreak" | "longBreak";
 
@@ -182,8 +183,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const today = new Date().toISOString().slice(0, 10);
-      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const today = getNepaliDate();
+      const yesterday = getNepaliYesterday();
       const userDocRef = doc(db, "users", uid);
       const snap = await getDoc(userDocRef);
 
@@ -223,13 +224,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       setSavedMinutesToday(newToday);
       console.log(`[Timer] Saved ${mins} min to Firestore directly. Total today: ${newToday}`);
 
-      const logId = `${uid}_${today}`;
+      const todayLog = getNepaliDate();
+      const logId = `${uid}_${todayLog}`;
       const logRef = doc(db, "study_logs", logId);
       const logSnap = await getDoc(logRef);
       if (logSnap.exists()) {
         await updateDoc(logRef, { studyMinutes: (logSnap.data().studyMinutes ?? 0) + mins });
       } else {
-        await setDoc(logRef, { uid, date: today, studyMinutes: mins, tasksCompleted: 0, notesViewed: 0 });
+        await setDoc(logRef, { uid, date: todayLog, studyMinutes: mins, tasksCompleted: 0, notesViewed: 0 });
       }
     } catch (err) {
       console.error("[Timer] All save methods failed:", err);

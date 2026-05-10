@@ -3,10 +3,10 @@ import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { User, Sun, Moon, Shield, Check } from "lucide-react";
+import { User, Sun, Moon, Shield, Check, LogOut } from "lucide-react";
 
 export default function Settings() {
-  const { profile, setProfile, user } = useAuth();
+  const { profile, setProfile, user, signOut } = useAuth();
   const [name, setName] = useState(profile?.name || "");
   const [grade, setGrade] = useState<number>(profile?.grade || 10);
   const [saving, setSaving] = useState(false);
@@ -181,6 +181,13 @@ export default function Settings() {
                 <span className="text-gray-900 font-medium capitalize">{profile?.role || "user"}</span>
               </div>
             </div>
+            <button
+              onClick={signOut}
+              className="mt-5 flex items-center gap-2 w-full px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl transition-all border border-red-100"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign out
+            </button>
           </div>
         </div>
     </>

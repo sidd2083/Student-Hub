@@ -10,6 +10,7 @@ import {
   getDoc, doc, setDoc, updateDoc, deleteDoc,
 } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
+import { getNepaliDate } from "@/lib/nepaliDate";
 
 const NOTE_VIEWED_KEY = "studenthub_viewed_notes_session";
 
@@ -85,13 +86,23 @@ function FocusReaderOverlay({ note, onClose, onAskAi }: {
         </button>
       </div>
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
-        {note.contentType === "text" && (
-          <div className="max-w-2xl mx-auto px-5 sm:px-10 py-10">
-            <article className="prose prose-gray max-w-none text-gray-800 text-[16px] leading-[1.9] whitespace-pre-wrap">
-              {note.content}
-            </article>
-          </div>
-        )}
+        {note.contentType === "text" && (() => {
+          const isHtml = note.content.trim().startsWith("<");
+          return (
+            <div className="max-w-2xl mx-auto px-5 sm:px-10 py-10">
+              {isHtml ? (
+                <article
+                  className="prose prose-gray max-w-none text-gray-800 text-[16px] leading-[1.9]"
+                  dangerouslySetInnerHTML={{ __html: note.content }}
+                />
+              ) : (
+                <article className="prose prose-gray max-w-none text-gray-800 text-[16px] leading-[1.9] whitespace-pre-wrap">
+                  {note.content}
+                </article>
+              )}
+            </div>
+          );
+        })()}
         {note.contentType === "pdf" && (
           <div className="h-full p-4 flex flex-col gap-3">
             <div className="flex justify-end">
@@ -223,7 +234,7 @@ export default function NotePage() {
         sessionStorage.setItem(NOTE_VIEWED_KEY, JSON.stringify(viewed));
         (async () => {
           try {
-            const today = new Date().toISOString().slice(0, 10);
+            const today = getNepaliDate();
             const logId = `${user.uid}_${today}`;
             const logRef = doc(db, "study_logs", logId);
             const logSnap = await getDoc(logRef);
@@ -399,13 +410,23 @@ export default function NotePage() {
             )}
 
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-              {note.contentType === "text" && (
-                <div className="max-w-2xl mx-auto px-6 sm:px-10 py-10">
-                  <article className="prose prose-gray max-w-none text-gray-800 text-[16px] leading-[1.9] whitespace-pre-wrap">
-                    {note.content}
-                  </article>
-                </div>
-              )}
+              {note.contentType === "text" && (() => {
+                const isHtml = note.content.trim().startsWith("<");
+                return (
+                  <div className="max-w-2xl mx-auto px-6 sm:px-10 py-10">
+                    {isHtml ? (
+                      <article
+                        className="prose prose-gray max-w-none text-gray-800 text-[16px] leading-[1.9]"
+                        dangerouslySetInnerHTML={{ __html: note.content }}
+                      />
+                    ) : (
+                      <article className="prose prose-gray max-w-none text-gray-800 text-[16px] leading-[1.9] whitespace-pre-wrap">
+                        {note.content}
+                      </article>
+                    )}
+                  </div>
+                );
+              })()}
               {note.contentType === "pdf" && (
                 <div className="p-5 space-y-3">
                   <div className="flex items-center justify-between">

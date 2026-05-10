@@ -18,8 +18,9 @@ router.post("/study/save", async (req: Request, res: Response) => {
       return res.status(503).json({ error: "Firestore Admin not available — set FIREBASE_SERVICE_ACCOUNT_JSON" });
     }
 
-    const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const NPT_OFFSET_MS = (5 * 60 + 45) * 60 * 1000;
+    const today = new Date(Date.now() + NPT_OFFSET_MS).toISOString().slice(0, 10);
+    const yesterday = new Date(Date.now() - 86400000 + NPT_OFFSET_MS).toISOString().slice(0, 10);
     const userRef = db.collection("users").doc(uid);
 
     const newTodayMinutes = await db.runTransaction(async (tx) => {
@@ -71,6 +72,7 @@ router.post("/study/save", async (req: Request, res: Response) => {
     });
 
     const logId = `${uid}_${today}`;
+
     const logRef = db.collection("study_logs").doc(logId);
     const logSnap = await logRef.get();
 

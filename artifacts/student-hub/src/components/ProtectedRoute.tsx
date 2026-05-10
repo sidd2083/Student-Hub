@@ -9,9 +9,18 @@
 import { useAuth } from "@/context/AuthContext";
 
 export function LoadingScreen() {
+  const isDesktop = typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches;
+
+  if (isDesktop) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen relative flex flex-col items-center justify-center bg-white">
-      {/* Center: logo + spinner */}
       <div className="flex flex-col items-center gap-4">
         <div className="w-14 h-14 bg-blue-500 rounded-2xl flex items-center justify-center shadow-lg">
           <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -21,8 +30,6 @@ export function LoadingScreen() {
         <p className="text-lg font-semibold text-gray-800 tracking-tight">Student Hub</p>
         <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mt-1" />
       </div>
-
-      {/* Bottom: "By Tufan Production" like Instagram's "from Meta" */}
       <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-1">
         <p className="text-[11px] text-gray-400 tracking-widest uppercase font-medium">By</p>
         <p className="text-sm font-semibold text-gray-500 tracking-wide">Tufan Production</p>
