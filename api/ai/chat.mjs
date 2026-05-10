@@ -9,7 +9,6 @@ Your capabilities:
 - Explain academic concepts clearly for grades 9-12
 - Help solve problems step by step across all subjects
 - Give personalized study advice based on the student's actual progress data
-- Analyze study habits and suggest improvements
 - Cover the Nepal NEB/SEE curriculum: Math, Science, English, Nepali, Social Studies, Computer Science, Accounts, Economics, Biology, Physics, Chemistry
 
 Guidelines:
@@ -25,18 +24,65 @@ function buildSystemContent(context) {
   const parts = ["\n\n--- STUDENT'S CURRENT DATA ---"];
   if (context.stats) {
     const s = context.stats;
-    parts.push(`Study Stats:\n- Streak: ${s.streak} days\n- Total study time: ${s.totalStudyTime} minutes\n- Studied today: ${s.todayStudyTime} minutes\n- Last active: ${s.lastActiveDate ?? "unknown"}`);
+    parts.push(`Study Stats:\n- Streak: ${s.streak} days\n- Total: ${s.totalStudyTime} min\n- Today: ${s.todayStudyTime} min\n- Last active: ${s.lastActiveDate ?? "unknown"}`);
   }
   if (context.tasks && context.tasks.length > 0) {
     const pending = context.tasks.filter(t => !t.completed);
     const done = context.tasks.filter(t => t.completed);
-    parts.push(`Tasks:\n- Pending (${pending.length}): ${pending.map(t => t.text).join(", ") || "none"}\n- Completed (${done.length}): ${done.map(t => t.text).join(", ") || "none"}`);
+    parts.push(`Tasks:\n- Pending (${pending.length}): ${pending.map(t => t.text).join(", ") || "none"}\n- Done (${done.length}): ${done.map(t => t.text).join(", ") || "none"}`);
   }
   if (context.weeklyMins !== undefined) {
-    parts.push(`Weekly study: ${context.weeklyMins} minutes this week`);
+    parts.push(`Weekly study: ${context.weeklyMins} min`);
   }
-  parts.push("--- END OF STUDENT DATA ---");
+  parts.push("--- END ---");
   return SYSTEM_PROMPT + parts.join("\n");
+}
+
+async function callOpenAI(apiKey, baseURL, messages) {
+  const endpoint = baseURL
+    ? `${baseURL.replace(/\/$/, "")}/chat/completions`
+    : "https://api.openai.com/v1/chat/completions";
+
+  // Try up to 2 times — wait 4 seconds before retry on rate limit
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages,
+        max_tokens: 800,
+        temperature: 0.7,
+      }),
+    });
+
+    if (response.status === 429 && attempt === 0) {
+      // Rate limited — wait and retry once
+      await new Promise(r => setTimeout(r, 4000));
+      continue;
+    }
+
+    if (!response.ok) {
+      const errBody = await response.json().catch(() => ({}));
+      const errMsg = errBody?.error?.message ?? `status ${response.status}`;
+      if (response.status === 429) {
+        throw Object.assign(new Error("rate_limit"), { statusCode: 429 });
+      }
+      if (response.status === 401 || response.status === 403) {
+        throw Object.assign(new Error("invalid_key"), { statusCode: response.status });
+      }
+      throw new Error(errMsg);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content ?? "I couldn't generate a response. Please try again.";
+  }
+
+  // Both attempts rate-limited
+  throw Object.assign(new Error("rate_limit"), { statusCode: 429 });
 }
 
 export default async function handler(req, res) {
@@ -44,13 +90,8 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
     const { message, history = [], context } = req.body ?? {};
@@ -59,13 +100,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "message is required" });
     }
 
-    const apiKey =
-      process.env.OPENAI_API_KEY ??
-      process.env.AI_INTEGRATIONS_OPENAI_API_KEY ??
-      process.env.VITE_OPENAI_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY ?? process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+    const baseURL = process.env.OPENAI_BASE_URL ?? null;
 
     if (!apiKey) {
-      return res.status(503).json({ error: "AI service not configured — set OPENAI_API_KEY in Vercel environment variables" });
+      return res.status(503).json({
+        error: "AI not configured — set OPENAI_API_KEY in Vercel environment variables."
+      });
     }
 
     const messages = [
@@ -76,32 +117,21 @@ export default async function handler(req, res) {
       { role: "user", content: message },
     ];
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages,
-        max_tokens: 1200,
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text().catch(() => "unknown error");
-      console.error("[AI] OpenAI error:", response.status, errText);
-      return res.status(502).json({ error: `OpenAI error: ${response.status}` });
-    }
-
-    const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content ?? "I couldn't generate a response. Please try again.";
+    const reply = await callOpenAI(apiKey, baseURL, messages);
     return res.json({ reply });
 
   } catch (err) {
-    console.error("[AI] Handler error:", err);
-    return res.status(500).json({ error: "AI service error" });
+    console.error("[AI] Error:", err?.message);
+    if (err?.statusCode === 429 || err?.message === "rate_limit") {
+      return res.status(429).json({
+        error: "I'm a little busy right now — too many requests! Please wait a few seconds and try again."
+      });
+    }
+    if (err?.message === "invalid_key") {
+      return res.status(503).json({
+        error: "AI not configured — the OPENAI_API_KEY in Vercel is invalid or missing."
+      });
+    }
+    return res.status(500).json({ error: "AI service error. Please try again." });
   }
 }

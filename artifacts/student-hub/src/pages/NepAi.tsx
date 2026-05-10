@@ -210,15 +210,16 @@ function NepAiContent() {
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.warn("[NepAI] call failed:", errMsg);
-      const isConfig    = errMsg.includes("not configured") || errMsg.includes("API key") || errMsg.includes("503");
-      const isRateLimit = errMsg.includes("rate limit") || errMsg.includes("busy") || errMsg.includes("429");
+      const isConfig = errMsg.includes("not configured") || errMsg.includes("API key");
+      // Use backend's user-friendly message when it looks like one (10–300 chars, not a raw code)
+      const isUserFriendly = errMsg.length >= 10 && errMsg.length <= 300 && !errMsg.match(/^(AI service|status |fetch)/i);
       setMessages(prev => [...prev, {
         role: "assistant",
         content: isConfig
-          ? "⚠️ Nep AI isn't connected yet. Please ask the site admin to set the OPENAI_API_KEY in Vercel environment variables."
-          : isRateLimit
-          ? "I'm a little busy right now — too many students are asking at once! Please wait 10–15 seconds and try again."
-          : `Sorry, I hit a temporary issue. Please try again in a moment!`,
+          ? "⚠️ Nep AI isn't connected yet. Please ask the site admin to set OPENAI_API_KEY in Vercel environment variables."
+          : isUserFriendly
+          ? errMsg
+          : "Sorry, I ran into a temporary issue. Please try again in a moment!",
       }]);
     } finally {
       setLoading(false);

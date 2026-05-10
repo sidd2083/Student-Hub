@@ -500,13 +500,17 @@ function ManagePyqs() {
     setSaveStatus("idle");
     try {
       const ext = file.name.split(".").pop() ?? "jpg";
-      const path = `pyqs/content/${Date.now()}.${ext}`;
+      const path = `pyqs/${Date.now()}_content.${ext}`;
       const storageRef = ref(storage, path);
+      let uploadedRef: ReturnType<typeof ref>;
       await new Promise<void>((resolve, reject) => {
         const task = uploadBytesResumable(storageRef, file);
-        task.on("state_changed", null, reject, () => resolve());
+        task.on("state_changed", null,
+          (err) => reject(err),
+          () => { uploadedRef = task.snapshot.ref; resolve(); }
+        );
       });
-      const url = await getDownloadURL(ref(storage, path));
+      const url = await getDownloadURL(uploadedRef!);
       restoreSelection();
       document.execCommand("insertHTML", false,
         `<img src="${url}" alt="question image" style="max-width:100%;border-radius:8px;margin:8px 0;display:block;" />`);
@@ -640,7 +644,7 @@ function ManagePyqs() {
                 <FileUpload
                   accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
                   label="Upload PDF or image (drag & drop or click)"
-                  storagePath="pyqs/files"
+                  storagePath="pyqs"
                   onUploaded={(url, type) => setForm(f => ({ ...f, pdfUrl: url, fileType: type }))}
                 />
               )}
