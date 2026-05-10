@@ -77,7 +77,7 @@ export default function Settings() {
         <title>Settings — Student Hub</title>
         <meta name="description" content="Manage your Student Hub profile, grade, and appearance settings." />
       </Helmet>
-      <div className="p-4 sm:p-8 max-w-2xl mx-auto">
+      <div className="px-4 pt-4 pb-36 sm:p-8 max-w-2xl mx-auto">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Settings</h1>
             <p className="text-gray-500 text-sm">Manage your account and preferences</p>
