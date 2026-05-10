@@ -12,7 +12,7 @@ import { db, storage } from "@/lib/firebase";
 import {
   LayoutDashboard, BookOpen, FileText, Users,
   Shield, Plus, Trash2, LogOut, Megaphone, Upload, X, Image,
-  CheckCircle, AlertCircle, Award, Search,
+  CheckCircle, AlertCircle, Award, Search, Type,
 } from "lucide-react";
 
 const ADMIN_SESSION = "admin_session_v1";
@@ -51,7 +51,9 @@ interface FirePyq {
   title: string;
   year: number;
   pdfUrl: string;
-  fileType: "pdf" | "image";
+  fileType: "pdf" | "image" | "rich";
+  contentType?: "file" | "rich";
+  content?: string;
   createdAt: string;
 }
 
@@ -433,7 +435,22 @@ function ManagePyqs() {
   const [loading, setLoading] = useState(true);
   const [show, setShow] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ grade: 10, subject: "", title: "", year: 2024, pdfUrl: "", fileType: "pdf" as "pdf" | "image" });
+  const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
+  const [saveMsg, setSaveMsg] = useState("");
+  const [imgUploading, setImgUploading] = useState(false);
+  const richEditorRef = useRef<HTMLDivElement>(null);
+  const imgInputRef = useRef<HTMLInputElement>(null);
+  const savedRangeRef = useRef<Range | null>(null);
+
+  const [form, setForm] = useState({
+    grade: 10,
+    subject: "",
+    title: "",
+    year: new Date().getFullYear(),
+    pdfUrl: "",
+    fileType: "pdf" as "pdf" | "image" | "rich",
+    contentType: "file" as "file" | "rich",
+  });
 
   const loadPyqs = useCallback(() => {
     setLoading(true);
@@ -445,16 +462,101 @@ function ManagePyqs() {
 
   useEffect(() => { loadPyqs(); }, [loadPyqs]);
 
-  const handleSave = async () => {
-    if (!form.subject || !form.title || !form.pdfUrl) return;
-    setSaving(true);
+  const reset = () => {
+    setShow(false);
+    setForm({ grade: 10, subject: "", title: "", year: new Date().getFullYear(), pdfUrl: "", fileType: "pdf", contentType: "file" });
+    setSaveStatus("idle");
+    setSaveMsg("");
+    if (richEditorRef.current) richEditorRef.current.innerHTML = "";
+  };
+
+  // Rich-text toolbar helper
+  const execCmd = (cmd: string, value?: string) => {
+    richEditorRef.current?.focus();
+    document.execCommand(cmd, false, value ?? "");
+  };
+
+  // Save cursor position before file dialog opens (so we can restore it)
+  const saveSelection = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+  };
+
+  const restoreSelection = () => {
+    if (!savedRangeRef.current) return;
+    richEditorRef.current?.focus();
+    const sel = window.getSelection();
+    if (sel) { sel.removeAllRanges(); sel.addRange(savedRangeRef.current); }
+  };
+
+  // Upload an image and insert it at the saved cursor position
+  const handleInlineImageFile = async (file: File) => {
+    if (!file) return;
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowed.includes(file.type)) {
+      setSaveStatus("error"); setSaveMsg("Only JPEG, PNG, WebP or GIF images are allowed."); return;
+    }
+    setImgUploading(true);
+    setSaveStatus("idle");
     try {
-      await addDoc(collection(db, "pyqs"), { ...form, createdAt: new Date().toISOString() });
-      setShow(false);
-      setForm({ grade: 10, subject: "", title: "", year: 2024, pdfUrl: "", fileType: "pdf" });
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const path = `pyqs/content/${Date.now()}.${ext}`;
+      const storageRef = ref(storage, path);
+      await new Promise<void>((resolve, reject) => {
+        const task = uploadBytesResumable(storageRef, file);
+        task.on("state_changed", null, reject, () => resolve());
+      });
+      const url = await getDownloadURL(ref(storage, path));
+      restoreSelection();
+      document.execCommand("insertHTML", false,
+        `<img src="${url}" alt="question image" style="max-width:100%;border-radius:8px;margin:8px 0;display:block;" />`);
+    } catch (e: any) {
+      setSaveStatus("error");
+      const msg: string = e?.message ?? "unknown error";
+      if (msg.includes("unauthorized") || msg.includes("permission")) {
+        setSaveMsg("Upload blocked by Firebase Storage rules — please allow authenticated writes in Firebase Console → Storage → Rules.");
+      } else {
+        setSaveMsg("Image upload failed: " + msg);
+      }
+    } finally {
+      setImgUploading(false);
+      if (imgInputRef.current) imgInputRef.current.value = "";
+    }
+  };
+
+  const handleSave = async () => {
+    if (!form.subject.trim() || !form.title.trim()) {
+      setSaveStatus("error"); setSaveMsg("Subject and title are required."); return;
+    }
+    if (form.contentType === "file" && !form.pdfUrl) {
+      setSaveStatus("error"); setSaveMsg("Please upload a PDF or image file."); return;
+    }
+    const richContent = richEditorRef.current?.innerHTML ?? "";
+    if (form.contentType === "rich" && (!richContent || richContent.replace(/<[^>]*>/g, "").trim() === "")) {
+      setSaveStatus("error"); setSaveMsg("Please add some content in the editor."); return;
+    }
+
+    setSaving(true); setSaveStatus("idle");
+    try {
+      const base = {
+        grade: form.grade,
+        subject: form.subject.trim(),
+        title: form.title.trim(),
+        year: form.year,
+        contentType: form.contentType,
+        createdAt: new Date().toISOString(),
+      };
+      if (form.contentType === "file") {
+        await addDoc(collection(db, "pyqs"), { ...base, pdfUrl: form.pdfUrl, fileType: form.fileType });
+      } else {
+        await addDoc(collection(db, "pyqs"), { ...base, content: richContent, pdfUrl: "", fileType: "rich" });
+      }
+      setSaveStatus("success"); setSaveMsg(`PYQ "${form.title.trim()}" saved successfully!`);
       loadPyqs();
-    } catch (e) { console.error("[Admin] Save PYQ failed:", e); }
-    finally { setSaving(false); }
+      setTimeout(() => reset(), 1800);
+    } catch (e: any) {
+      setSaveStatus("error"); setSaveMsg(e?.message || "Failed to save PYQ.");
+    } finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
@@ -476,6 +578,7 @@ function ManagePyqs() {
 
       {show && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6 space-y-4">
+          {/* Row 1: Grade + Year */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Grade</label>
@@ -490,6 +593,8 @@ function ManagePyqs() {
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
             </div>
           </div>
+
+          {/* Subject + Title */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Subject</label>
             <input value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))}
@@ -500,31 +605,111 @@ function ManagePyqs() {
             <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="e.g. Bagmati Pradesh 2080" />
           </div>
+
+          {/* Content type toggle */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">File (PDF or Image)</label>
-            {form.pdfUrl ? (
-              <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-xl">
-                {form.fileType === "image" ? <Image className="w-4 h-4 text-green-600" /> : <FileText className="w-4 h-4 text-green-600" />}
-                <p className="text-sm text-green-700 flex-1">{form.fileType === "image" ? "Image" : "PDF"} uploaded ✓</p>
-                <button onClick={() => setForm(f => ({ ...f, pdfUrl: "", fileType: "pdf" }))} className="text-gray-400 hover:text-red-500">
-                  <X className="w-4 h-4" />
+            <label className="block text-xs font-medium text-gray-600 mb-2">Content Type</label>
+            <div className="flex gap-2">
+              {(["file", "rich"] as const).map(t => (
+                <button key={t} type="button"
+                  onClick={() => { setForm(f => ({ ...f, contentType: t })); setSaveStatus("idle"); }}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm border transition-all ${
+                    form.contentType === t
+                      ? "bg-blue-500 text-white border-blue-500"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
+                  }`}>
+                  {t === "file" ? <><Upload className="w-3.5 h-3.5" /> File (PDF / Image)</> : <><Type className="w-3.5 h-3.5" /> Rich Text + Images</>}
                 </button>
-              </div>
-            ) : (
-              <FileUpload
-                accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
-                label="Upload PDF or image"
-                storagePath="pyqs"
-                onUploaded={(url, type) => setForm(f => ({ ...f, pdfUrl: url, fileType: type }))}
-              />
-            )}
+              ))}
+            </div>
           </div>
+
+          {/* FILE upload */}
+          {form.contentType === "file" && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-2">Upload PDF or Image</label>
+              {form.pdfUrl ? (
+                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-xl">
+                  {form.fileType === "image" ? <Image className="w-4 h-4 text-green-600" /> : <FileText className="w-4 h-4 text-green-600" />}
+                  <p className="text-sm text-green-700 flex-1">{form.fileType === "image" ? "Image" : "PDF"} uploaded ✓</p>
+                  <button onClick={() => setForm(f => ({ ...f, pdfUrl: "", fileType: "pdf" }))} className="text-gray-400 hover:text-red-500">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <FileUpload
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+                  label="Upload PDF or image (drag & drop or click)"
+                  storagePath="pyqs/files"
+                  onUploaded={(url, type) => setForm(f => ({ ...f, pdfUrl: url, fileType: type }))}
+                />
+              )}
+            </div>
+          )}
+
+          {/* RICH TEXT editor */}
+          {form.contentType === "rich" && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-2">Content</label>
+              <div className="border border-gray-200 rounded-2xl overflow-hidden">
+                {/* Toolbar */}
+                <div className="flex flex-wrap items-center gap-1 px-3 py-2 bg-gray-50 border-b border-gray-200 select-none">
+                  <button type="button" onMouseDown={e => { e.preventDefault(); execCmd("formatBlock", "h2"); }}
+                    className="px-2.5 py-1 text-xs font-bold rounded hover:bg-gray-200 text-gray-700">H1</button>
+                  <button type="button" onMouseDown={e => { e.preventDefault(); execCmd("formatBlock", "h3"); }}
+                    className="px-2.5 py-1 text-xs font-bold rounded hover:bg-gray-200 text-gray-700">H2</button>
+                  <button type="button" onMouseDown={e => { e.preventDefault(); execCmd("formatBlock", "h4"); }}
+                    className="px-2.5 py-1 text-xs font-bold rounded hover:bg-gray-200 text-gray-700">H3</button>
+                  <div className="w-px h-4 bg-gray-300 mx-1" />
+                  <button type="button" onMouseDown={e => { e.preventDefault(); execCmd("bold"); }}
+                    className="px-2.5 py-1 text-xs font-bold rounded hover:bg-gray-200 text-gray-700">B</button>
+                  <button type="button" onMouseDown={e => { e.preventDefault(); execCmd("italic"); }}
+                    className="px-2.5 py-1 text-xs italic rounded hover:bg-gray-200 text-gray-700">I</button>
+                  <button type="button" onMouseDown={e => { e.preventDefault(); execCmd("underline"); }}
+                    className="px-2.5 py-1 text-xs underline rounded hover:bg-gray-200 text-gray-700">U</button>
+                  <div className="w-px h-4 bg-gray-300 mx-1" />
+                  <button type="button"
+                    onMouseDown={e => { e.preventDefault(); saveSelection(); imgInputRef.current?.click(); }}
+                    disabled={imgUploading}
+                    className="flex items-center gap-1 px-2.5 py-1 text-xs rounded hover:bg-gray-200 text-gray-700 disabled:opacity-50">
+                    <Image className="w-3 h-3" />
+                    {imgUploading ? "Uploading…" : "Image"}
+                  </button>
+                </div>
+                {/* Editor area */}
+                <div
+                  ref={richEditorRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  data-placeholder="Write PYQ content here — questions, answers, diagrams. Use toolbar for headings, bold, and inline images."
+                  className="pyq-editor min-h-[220px] max-h-[500px] overflow-y-auto p-4 text-sm focus:outline-none prose prose-sm max-w-none"
+                />
+              </div>
+              {/* Hidden image input */}
+              <input ref={imgInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleInlineImageFile(f); }} />
+              <p className="text-xs text-gray-400 mt-1.5">Click the Image button in the toolbar to insert photos inline.</p>
+            </div>
+          )}
+
+          {/* Status messages */}
+          {saveStatus === "success" && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm">
+              <CheckCircle className="w-4 h-4 flex-shrink-0" /> {saveMsg}
+            </div>
+          )}
+          {saveStatus === "error" && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" /> {saveMsg}
+            </div>
+          )}
+
           <div className="flex gap-2">
-            <button onClick={handleSave} disabled={saving || !form.pdfUrl}
+            <button onClick={handleSave} disabled={saving}
               className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50">
               {saving ? "Saving…" : "Save PYQ"}
             </button>
-            <button onClick={() => setShow(false)} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
+            <button onClick={reset} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
           </div>
         </div>
       )}
@@ -535,7 +720,9 @@ function ManagePyqs() {
           <div key={p.id} className="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3 mb-2">
             <div>
               <p className="font-medium text-gray-900 text-sm">{p.title}</p>
-              <p className="text-xs text-gray-500">Grade {p.grade} · {p.subject} · {p.year} · {p.fileType === "image" ? "Image" : "PDF"}</p>
+              <p className="text-xs text-gray-500">Grade {p.grade} · {p.subject} · {p.year} · {
+                p.contentType === "rich" ? "Rich Text" : p.fileType === "image" ? "Image" : "PDF"
+              }</p>
             </div>
             <button onClick={() => handleDelete(p.id)} className="p-1.5 text-gray-400 hover:text-red-500">
               <Trash2 className="w-4 h-4" />

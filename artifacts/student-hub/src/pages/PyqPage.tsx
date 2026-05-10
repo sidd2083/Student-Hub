@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
-import { collection, doc, getDoc, setDoc, deleteDoc, query, where, getDocs } from "firebase/firestore";
+import { collection, doc, getDoc, setDoc, deleteDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { ArrowLeft, FileText, Image, ExternalLink, X, BookOpen, Bookmark, Download } from "lucide-react";
+import { ArrowLeft, FileText, ImageIcon, ExternalLink, X, BookOpen, Bookmark, Download, ChevronRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 function toSlug(str: string) {
@@ -18,6 +18,8 @@ interface FirePyq {
   year: number;
   pdfUrl: string;
   fileType?: string;
+  contentType?: "file" | "rich";
+  content?: string;
   createdAt: string;
 }
 
@@ -74,6 +76,74 @@ function SaveButton({ pyqId, uid }: { pyqId: string; uid: string }) {
   );
 }
 
+// ─── Suggested Papers ─────────────────────────────────────────────────────────
+
+function SuggestedPyqs({ current }: { current: FirePyq }) {
+  const [suggestions, setSuggestions] = useState<FirePyq[]>([]);
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    getDocs(collection(db, "pyqs"))
+      .then(snap => {
+        const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as FirePyq));
+        const scored = all
+          .filter(p => p.id !== current.id)
+          .map(p => ({
+            pyq: p,
+            score:
+              (p.year    === current.year    ? 3 : 0) +
+              (p.subject === current.subject ? 2 : 0) +
+              (p.grade   === current.grade   ? 1 : 0),
+          }))
+          .filter(x => x.score > 0)
+          .sort((a, b) => b.score - a.score || b.pyq.year - a.pyq.year)
+          .slice(0, 5)
+          .map(x => x.pyq);
+        setSuggestions(scored);
+      })
+      .catch(console.error);
+  }, [current.id, current.year, current.subject, current.grade]);
+
+  if (suggestions.length === 0) return null;
+
+  return (
+    <div className="mt-6">
+      <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-3">Related Papers</h2>
+      <div className="space-y-2">
+        {suggestions.map(p => {
+          const isImg  = p.contentType === "rich" ? false : p.fileType === "image";
+          const isRich = p.contentType === "rich";
+          return (
+            <button
+              key={p.id}
+              onClick={() => setLocation(`/pyq/${p.id}`)}
+              className="w-full flex items-center gap-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-3 hover:border-blue-300 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 transition-all text-left"
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                isRich ? "bg-indigo-50 dark:bg-indigo-950" : isImg ? "bg-purple-50 dark:bg-purple-950" : "bg-orange-50 dark:bg-orange-950"
+              }`}>
+                {isRich
+                  ? <BookOpen className="w-4 h-4 text-indigo-500" />
+                  : isImg
+                    ? <ImageIcon className="w-4 h-4 text-purple-500" />
+                    : <FileText className="w-4 h-4 text-orange-500" />
+                }
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{p.title}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{p.subject} · Grade {p.grade} · {p.year}</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function PyqPage() {
   const params = useParams<{ id: string }>();
   const id = params.id || "";
@@ -94,7 +164,8 @@ export default function PyqPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const isImage = pyq?.fileType === "image";
+  const isRich  = pyq?.contentType === "rich";
+  const isImage = !isRich && pyq?.fileType === "image";
   const canonicalSlug = pyq
     ? `grade-${pyq.grade}-${toSlug(pyq.subject)}-${toSlug(pyq.title)}-${pyq.year}`
     : "";
@@ -113,20 +184,22 @@ export default function PyqPage() {
       )}
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-sm text-gray-400 mb-6 flex-wrap">
           <Link href="/pyqs" className="hover:text-blue-600 transition-colors">Previous Year Questions</Link>
           {pyq && (
             <>
               <span>/</span>
-              <span className="text-gray-600">Grade {pyq.grade}</span>
+              <span className="text-gray-600 dark:text-gray-400">Grade {pyq.grade}</span>
               <span>/</span>
-              <span className="text-gray-600">{pyq.subject}</span>
+              <span className="text-gray-600 dark:text-gray-400">{pyq.subject}</span>
               <span>/</span>
-              <span className="text-gray-900 font-medium truncate">{pyq.title}</span>
+              <span className="text-gray-900 dark:text-gray-100 font-medium truncate">{pyq.title}</span>
             </>
           )}
         </nav>
 
+        {/* Loading skeleton */}
         {loading && (
           <div className="space-y-4 animate-pulse">
             <div className="h-8 bg-gray-100 rounded-xl w-3/4" />
@@ -135,6 +208,7 @@ export default function PyqPage() {
           </div>
         )}
 
+        {/* Not found */}
         {!loading && !pyq && (
           <div className="text-center py-16 text-gray-400">
             <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -147,43 +221,63 @@ export default function PyqPage() {
 
         {pyq && (
           <>
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
+            {/* Header card */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5 mb-6">
               <div className="flex items-start gap-3">
-                <Link href="/pyqs" className="p-2 rounded-xl hover:bg-gray-100 transition-all flex-shrink-0 mt-0.5">
+                <Link href="/pyqs" className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all flex-shrink-0 mt-0.5">
                   <ArrowLeft className="w-4 h-4 text-gray-500" />
                 </Link>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
-                      isImage ? "bg-purple-50 text-purple-600" : "bg-orange-50 text-orange-600"
+                      isRich  ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400" :
+                      isImage ? "bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400" :
+                               "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400"
                     }`}>
-                      {isImage ? <Image className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
-                      {isImage ? "Image" : "PDF"}
+                      {isRich  ? <BookOpen className="w-3 h-3" /> :
+                       isImage ? <ImageIcon className="w-3 h-3" /> :
+                                 <FileText  className="w-3 h-3" />}
+                      {isRich ? "Text" : isImage ? "Image" : "PDF"}
                     </span>
-                    <span className="text-xs text-gray-400">{pyq.subject} · {pyq.year} · Grade {pyq.grade}</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">{pyq.subject} · {pyq.year} · Grade {pyq.grade}</span>
                   </div>
-                  <h1 className="text-lg sm:text-xl font-bold text-gray-900">{pyq.title}</h1>
+                  <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">{pyq.title}</h1>
                 </div>
+
+                {/* Action buttons */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {user && <SaveButton pyqId={id} uid={user.uid} />}
-                  {isImage && (
+                  {isImage && pyq.pdfUrl && (
                     <a href={pyq.pdfUrl} download
                       className="flex items-center gap-1.5 px-3 py-2 text-sm text-green-600 border border-green-200 rounded-xl hover:bg-green-50 transition-all">
                       <Download className="w-3.5 h-3.5" />
                       <span className="hidden sm:inline">Download</span>
                     </a>
                   )}
-                  <a href={pyq.pdfUrl} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-2 text-sm text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-50 transition-all">
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Open</span>
-                  </a>
+                  {!isRich && pyq.pdfUrl && (
+                    <a href={pyq.pdfUrl} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-2 text-sm text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-50 transition-all">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Open</span>
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-              {isImage ? (
+            {/* Content area */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden mb-6">
+
+              {/* Rich text content */}
+              {isRich && pyq.content && (
+                <div
+                  className="prose prose-sm sm:prose max-w-none p-6 dark:prose-invert"
+                  dangerouslySetInnerHTML={{ __html: pyq.content }}
+                />
+              )}
+
+              {/* Image content */}
+              {isImage && pyq.pdfUrl && (
                 <div className="flex flex-col items-center gap-4 p-8">
                   <img
                     src={pyq.pdfUrl}
@@ -212,7 +306,10 @@ export default function PyqPage() {
                     </div>
                   )}
                 </div>
-              ) : (
+              )}
+
+              {/* PDF content */}
+              {!isRich && !isImage && pyq.pdfUrl && (
                 <div className="p-6 space-y-3">
                   <iframe
                     src={`https://docs.google.com/viewer?url=${encodeURIComponent(pyq.pdfUrl)}&embedded=true`}
@@ -229,16 +326,22 @@ export default function PyqPage() {
               )}
             </div>
 
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-center">
-              <h2 className="text-lg font-bold text-white mb-1">Get full access — it's free</h2>
-              <p className="text-blue-100 text-sm mb-4">Access Nep AI, Pomodoro timer, progress tracking, and more — all free.</p>
-              <Link
-                href="/login"
-                className="inline-flex items-center gap-2 px-6 py-2.5 bg-white text-blue-600 rounded-xl font-semibold text-sm hover:bg-blue-50 transition-all"
-              >
-                Login / Register — It's Free
-              </Link>
-            </div>
+            {/* Suggested papers */}
+            <SuggestedPyqs current={pyq} />
+
+            {/* CTA for logged-out users */}
+            {!user && (
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-center mt-6">
+                <h2 className="text-lg font-bold text-white mb-1">Get full access — it's free</h2>
+                <p className="text-blue-100 text-sm mb-4">Access Nep AI, Pomodoro timer, progress tracking, and more.</p>
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-white text-blue-600 rounded-xl font-semibold text-sm hover:bg-blue-50 transition-all"
+                >
+                  Login / Register — It's Free
+                </Link>
+              </div>
+            )}
           </>
         )}
       </div>

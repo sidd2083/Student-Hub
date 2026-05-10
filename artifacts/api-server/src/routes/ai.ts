@@ -90,18 +90,28 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
       { role: "user" as const, content: message },
     ];
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({ model: "gpt-4o-mini", messages, max_tokens: 1200, temperature: 0.7 }),
-    });
+    // Retry once on 429 (rate limit) after a short wait
+    let response!: Response;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ model: "gpt-4o-mini", messages, max_tokens: 800, temperature: 0.7 }),
+      });
+      if (response.status !== 429 || attempt === 1) break;
+      // Wait 3 seconds then retry
+      await new Promise(r => setTimeout(r, 3000));
+    }
 
     if (!response.ok) {
       const errText = await response.text().catch(() => "unknown");
       logger.error({ status: response.status, body: errText }, "AI upstream error");
+      if (response.status === 429) {
+        return res.status(429).json({ error: "The AI is busy right now (rate limit). Please wait a moment and try again." });
+      }
       return res.status(502).json({ error: `AI error ${response.status} — check your API key.` });
     }
 

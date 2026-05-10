@@ -206,3 +206,23 @@
 /* Scrollbar (optional quality-of-life) */
 .dark ::-webkit-scrollbar-track { background: hsl(222 47% 8%); }
 .dark ::-webkit-scrollbar-thumb { background: hsl(220 25% 28%); border-radius: 4px; }
+
+/* ── Rich text (PYQ) editor placeholder ── */
+.pyq-editor:empty::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+/* ── Rich text content rendered on PyqPage ── */
+.prose img { border-radius: 0.75rem; margin: 1rem 0; max-width: 100%; }
+.prose h2  { font-size: 1.25rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+.prose h3  { font-size: 1.1rem;  font-weight: 700; margin-top: 1.25rem; margin-bottom: 0.5rem; }
+.prose h4  { font-size: 1rem;    font-weight: 600; margin-top: 1rem;    margin-bottom: 0.25rem; }
+.dark .prose,
+.dark .prose p,
+.dark .prose li { color: hsl(210 35% 88%); }
+.dark .prose h2,
+.dark .prose h3,
+.dark .prose h4 { color: hsl(210 40% 96%); }
+.dark .prose strong { color: hsl(210 40% 96%); }

@@ -210,12 +210,15 @@ function NepAiContent() {
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.warn("[NepAI] call failed:", errMsg);
-      const isConfig = errMsg.includes("not configured") || errMsg.includes("API key") || errMsg.includes("503");
+      const isConfig    = errMsg.includes("not configured") || errMsg.includes("API key") || errMsg.includes("503");
+      const isRateLimit = errMsg.includes("rate limit") || errMsg.includes("busy") || errMsg.includes("429");
       setMessages(prev => [...prev, {
         role: "assistant",
         content: isConfig
           ? "⚠️ Nep AI isn't connected yet. Please ask the site admin to set the OPENAI_API_KEY in Vercel environment variables."
-          : `Sorry, I hit a temporary issue (${errMsg}). Please try again in a moment!`,
+          : isRateLimit
+          ? "I'm a little busy right now — too many students are asking at once! Please wait 10–15 seconds and try again."
+          : `Sorry, I hit a temporary issue. Please try again in a moment!`,
       }]);
     } finally {
       setLoading(false);
