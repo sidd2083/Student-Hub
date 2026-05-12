@@ -10,6 +10,7 @@ import aiRouter from "./ai";
 import studyRouter from "./study";
 import announcementsRouter from "./announcements";
 import savedRouter from "./saved";
+import uploadRouter from "./upload";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(aiRouter);
 router.use(studyRouter);
 router.use(announcementsRouter);
 router.use(savedRouter);
+router.use(uploadRouter);
 
 export default router;

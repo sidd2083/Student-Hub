@@ -1,6 +1,16 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Admin upload paths — allow authenticated writes (including anonymous auth)
+    match /pyqs/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /notes/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    // Everything else requires Firebase Auth
     match /{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;

@@ -5,10 +5,11 @@ import {
   collection, getDocs, doc, query, where, orderBy,
   setDoc, getDoc, addDoc, deleteDoc, updateDoc,
 } from "firebase/firestore";
+import { signInWithPopup } from "firebase/auth";
 import {
   ref, uploadBytesResumable, getDownloadURL,
 } from "firebase/storage";
-import { db, storage } from "@/lib/firebase";
+import { db, storage, auth, googleProvider } from "@/lib/firebase";
 import {
   LayoutDashboard, BookOpen, FileText, Users,
   Shield, Plus, Trash2, LogOut, Megaphone, Upload, X, Image,
@@ -82,11 +83,17 @@ function FileUpload({ accept, label, storagePath, onUploaded, disabled }: FileUp
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState("");
 
-  const upload = (file: File) => {
+  const upload = async (file: File) => {
     setError("");
     const isImage = file.type.startsWith("image/");
-    const isPdf = file.type === "application/pdf";
+    const isPdf   = file.type === "application/pdf";
     if (!isImage && !isPdf) { setError("Please upload a PDF or image file."); return; }
+
+    if (!auth.currentUser) {
+      try { await signInWithPopup(auth, googleProvider); }
+      catch { setError("Google sign-in required to upload files. Please sign in with your Google account."); return; }
+    }
+
     const ext = file.name.split(".").pop();
     const path = `${storagePath}/${Date.now()}.${ext}`;
     const storageRef = ref(storage, path);
@@ -499,6 +506,9 @@ function ManagePyqs() {
     setImgUploading(true);
     setSaveStatus("idle");
     try {
+      if (!auth.currentUser) {
+        await signInWithPopup(auth, googleProvider);
+      }
       const ext = file.name.split(".").pop() ?? "jpg";
       const path = `pyqs/${Date.now()}_content.${ext}`;
       const storageRef = ref(storage, path);
@@ -517,8 +527,8 @@ function ManagePyqs() {
     } catch (e: any) {
       setSaveStatus("error");
       const msg: string = e?.message ?? "unknown error";
-      if (msg.includes("unauthorized") || msg.includes("permission")) {
-        setSaveMsg("Upload blocked by Firebase Storage rules — please allow authenticated writes in Firebase Console → Storage → Rules.");
+      if (msg.includes("unauthorized") || msg.includes("permission") || msg.includes("cancel")) {
+        setSaveMsg("Google sign-in required for image uploads. Please allow the sign-in popup and try again.");
       } else {
         setSaveMsg("Image upload failed: " + msg);
       }

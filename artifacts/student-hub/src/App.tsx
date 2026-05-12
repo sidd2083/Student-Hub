@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { AnimatePresence, motion } from "framer-motion";
+import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -51,70 +50,37 @@ const queryClient = new QueryClient({
   },
 });
 
-// Butter-smooth transition config
-// popLayout: new page renders instantly underneath while old fades out
-// Pure opacity cross-fade — no positional jump, GPU-accelerated
-const pageVariants = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1 },
-  exit:    { opacity: 0 },
-};
-
-const pageTransition = {
-  duration: 0.22,
-  ease: [0.4, 0.0, 0.2, 1], // Material Design "standard" easing — buttery
-};
-
-function AnimatedRoutes() {
-  const [location] = useLocation();
+function AppRoutes() {
   return (
-    <AnimatePresence mode="popLayout" initial={false}>
-      <motion.div
-        key={location}
-        variants={pageVariants}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        transition={pageTransition}
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          minHeight: "100%",
-          willChange: "opacity",
-        }}
-      >
-        <Switch>
-          <Route path="/" component={Home} />
+    <Switch>
+      <Route path="/" component={Home} />
 
-          <Route path="/notes/:id" component={NotePage} />
-          <Route path="/pyq/:id" component={PyqPage} />
-          <Route path="/notes" component={Notes} />
-          <Route path="/pyqs" component={Pyqs} />
-          <Route path="/about" component={About} />
-          <Route path="/contact" component={Contact} />
-          <Route path="/privacy" component={PrivacyPolicy} />
-          <Route path="/terms" component={Terms} />
+      <Route path="/notes/:id" component={NotePage} />
+      <Route path="/pyq/:id" component={PyqPage} />
+      <Route path="/notes" component={Notes} />
+      <Route path="/pyqs" component={Pyqs} />
+      <Route path="/about" component={About} />
+      <Route path="/contact" component={Contact} />
+      <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/terms" component={Terms} />
 
-          <Route path="/ai" component={NepAi} />
-          <Route path="/report" component={ReportCard} />
-          <Route path="/todo" component={Todo} />
-          <Route path="/pomodoro" component={Pomodoro} />
-          <Route path="/leaderboard" component={Leaderboard} />
-          <Route path="/saved" component={Saved} />
-          <Route path="/mcq" component={McqPractice} />
+      <Route path="/ai" component={NepAi} />
+      <Route path="/report" component={ReportCard} />
+      <Route path="/todo" component={Todo} />
+      <Route path="/pomodoro" component={Pomodoro} />
+      <Route path="/leaderboard" component={Leaderboard} />
+      <Route path="/saved" component={Saved} />
+      <Route path="/mcq" component={McqPractice} />
 
-          <Route path="/dashboard">
-            <PrivateRoute><Dashboard /></PrivateRoute>
-          </Route>
-          <Route path="/settings">
-            <PrivateRoute><Settings /></PrivateRoute>
-          </Route>
+      <Route path="/dashboard">
+        <PrivateRoute><Dashboard /></PrivateRoute>
+      </Route>
+      <Route path="/settings">
+        <PrivateRoute><Settings /></PrivateRoute>
+      </Route>
 
-          <Route component={NotFound} />
-        </Switch>
-      </motion.div>
-    </AnimatePresence>
+      <Route component={NotFound} />
+    </Switch>
   );
 }
 
@@ -133,7 +99,7 @@ function Router() {
 
         <Route>
           <AppShell>
-            <AnimatedRoutes />
+            <AppRoutes />
           </AppShell>
         </Route>
       </Switch>

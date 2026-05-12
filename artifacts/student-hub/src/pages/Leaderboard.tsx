@@ -5,6 +5,7 @@ import { SoftGate } from "@/components/SoftGate";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Trophy, Flame, Clock, Sun, RefreshCw } from "lucide-react";
+import { getNepaliDate } from "@/lib/nepaliDate";
 
 const SELECTED_BADGE_KEY = "studenthub_selected_leaderboard_badge";
 
@@ -17,6 +18,7 @@ interface LeaderEntry {
   streak: number;
   totalStudyTime: number;
   todayStudyTime: number;
+  lastActiveDate: string;
   role: string;
   badges?: CustomBadge[];
 }
@@ -61,7 +63,7 @@ function getTopBadge(entry: LeaderEntry) {
 
 function getMySelectedBadge(entry: LeaderEntry, myUid: string | undefined): { emoji: string; label: string; bg: string } | null {
   if (entry.uid !== myUid) return null;
-  const key = localStorage.getItem(SELECTED_BADGE_KEY);
+  const key = localStorage.getItem(`${SELECTED_BADGE_KEY}_${myUid}`);
   if (!key) return null;
 
   const studyMatch = STUDY_TIERS.find(t => t.label === key);
@@ -114,16 +116,20 @@ function LeaderboardContent() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const snap = await getDocs(collection(db, "users"));
+      const today = getNepaliDate();
+      const snap  = await getDocs(collection(db, "users"));
       const list: LeaderEntry[] = snap.docs.map(d => {
         const data = d.data();
+        const lastActive: string = data.lastActiveDate ?? "";
+        const actualToday = lastActive === today ? (data.todayStudyTime ?? 0) : 0;
         return {
           uid: d.id,
           name: data.name ?? "",
           grade: data.grade ?? 0,
           streak: data.streak ?? 0,
           totalStudyTime: data.totalStudyTime ?? 0,
-          todayStudyTime: data.todayStudyTime ?? 0,
+          todayStudyTime: actualToday,
+          lastActiveDate: lastActive,
           role: data.role ?? "user",
           badges: data.badges ?? [],
         };
@@ -190,7 +196,7 @@ function LeaderboardContent() {
 
       <div className="mb-3 text-xs text-gray-400 font-medium uppercase tracking-wide">
         {sortBy === "totalStudyTime" && "📚 All-time study time"}
-        {sortBy === "todayStudyTime" && "☀️ Today's study time"}
+        {sortBy === "todayStudyTime" && "☀️ Today's study time (NPT)"}
         {sortBy === "streak"         && "🔥 Study streak (days)"}
         {gradeFilter !== "all" && ` · Grade ${gradeFilter} only`}
       </div>
@@ -219,11 +225,8 @@ function LeaderboardContent() {
               ? (getMySelectedBadge(entry, user?.uid) ?? getTopBadge(entry))
               : getTopBadge(entry);
 
-            const selectedKey = localStorage.getItem(SELECTED_BADGE_KEY);
             const custom = (!isMe && entry.badges && entry.badges.length > 0)
-              ? (selectedKey
-                  ? (entry.badges.find(b => b.id === selectedKey) ?? entry.badges[0])
-                  : entry.badges[0])
+              ? entry.badges[0]
               : null;
 
             const hasBadge = topBadge || custom;
