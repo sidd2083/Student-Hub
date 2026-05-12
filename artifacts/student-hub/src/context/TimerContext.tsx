@@ -60,6 +60,18 @@ function loadState(): PersistedState | null {
     if (!raw) return null;
     const s = JSON.parse(raw) as PersistedState;
     if (!s.updatedAt) return null;
+
+    const NPT_OFFSET_MS = (5 * 60 + 45) * 60 * 1000;
+    const savedNptDay = new Date(s.updatedAt + NPT_OFFSET_MS).toISOString().slice(0, 10);
+    const todayNptDay = new Date(Date.now() + NPT_OFFSET_MS).toISOString().slice(0, 10);
+
+    if (savedNptDay !== todayNptDay) {
+      s.savedMinutesToday = 0;
+      s.savedMinutes = 0;
+      s.totalWorkSeconds = 0;
+      s.running = false;
+    }
+
     const elapsed = Math.floor((Date.now() - s.updatedAt) / 1000);
     if (s.running && elapsed > 0 && elapsed < 3600) {
       s.totalWorkSeconds = s.phase === "work" ? s.totalWorkSeconds + elapsed : s.totalWorkSeconds;

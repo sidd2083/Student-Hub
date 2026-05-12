@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
+import OpenAI from "openai";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -22,9 +23,15 @@ Guidelines:
 - Keep responses concise, clear, and encouraging
 - Use simple language appropriate for high school students
 - For math/science: show clear step-by-step working
+- When the student shares their study stats or tasks: analyze them and give SPECIFIC, actionable advice
 - Be motivating and positive — like a personal tutor who genuinely cares
 - Format answers with bullet points, numbered steps, or sections where helpful
-- Current year is 2026`;
+- Current year is 2026
+
+When you receive study context (tasks, stats), use it actively:
+- Comment on their streak, study time, or tasks specifically
+- Suggest which subjects to prioritize based on pending tasks
+- Give daily/weekly study targets based on their current performance`;
 
 interface ChatMessage { role: string; content: string }
 interface ChatContext {
@@ -35,35 +42,29 @@ interface ChatContext {
 
 function buildSystemContent(context?: ChatContext): string {
   if (!context) return SYSTEM_PROMPT;
-  const parts: string[] = ["\n\n--- STUDENT'S CURRENT DATA ---"];
+  const parts: string[] = ["\n\n--- STUDENT'S CURRENT DATA (use this to personalize your response) ---"];
   if (context.stats) {
     const s = context.stats;
-    parts.push(`Study Stats:\n- Streak: ${s.streak} days\n- Total: ${s.totalStudyTime} min\n- Today: ${s.todayStudyTime} min\n- Last active: ${s.lastActiveDate ?? "unknown"}`);
+    parts.push(`Study Stats:\n- Streak: ${s.streak} days\n- Total study time: ${s.totalStudyTime} minutes (${Math.floor(s.totalStudyTime / 60)}h ${s.totalStudyTime % 60}m)\n- Studied today: ${s.todayStudyTime} minutes\n- Last active: ${s.lastActiveDate ?? "unknown"}`);
   }
   if (context.tasks?.length) {
     const pending = context.tasks.filter(t => !t.completed);
     const done    = context.tasks.filter(t => t.completed);
     parts.push(`Tasks:\n- Pending (${pending.length}): ${pending.map(t => t.text).join(", ") || "none"}\n- Done (${done.length}): ${done.map(t => t.text).join(", ") || "none"}`);
   }
-  if (context.weeklyMins !== undefined) parts.push(`Weekly study: ${context.weeklyMins} min`);
-  parts.push("--- END ---");
+  if (context.weeklyMins !== undefined) parts.push(`Weekly study: ${context.weeklyMins} minutes this week`);
+  parts.push("--- END OF STUDENT DATA ---");
   return SYSTEM_PROMPT + parts.join("\n");
 }
 
-function getApiConfig(): { apiKey: string; endpoint: string } {
-  // Replit dev: AI integration provides a local proxy
-  const replitKey  = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-  const replitBase = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-  if (replitKey && replitBase && replitBase.startsWith("http://localhost")) {
-    return {
-      apiKey:   replitKey,
-      endpoint: `${replitBase.replace(/\/$/, "")}/chat/completions`,
-    };
-  }
-  // Standard OpenAI (Vercel / other deployments)
-  const apiKey  = process.env.OPENAI_API_KEY ?? process.env.VITE_OPENAI_API_KEY ?? "";
-  const baseURL = (process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, "");
-  return { apiKey, endpoint: `${baseURL}/chat/completions` };
+function getOpenAIClient(): OpenAI | null {
+  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
+  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ?? process.env.OPENAI_BASE_URL;
+  return new OpenAI({
+    apiKey,
+    ...(baseURL ? { baseURL } : {}),
+  });
 }
 
 router.post("/ai/chat", async (req: Request, res: Response) => {
@@ -76,48 +77,49 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
 
     if (!message) return res.status(400).json({ error: "message is required" });
 
-    const { apiKey, endpoint } = getApiConfig();
-
-    if (!apiKey) {
+    const client = getOpenAIClient();
+    if (!client) {
       return res.status(503).json({ error: "AI not configured — set OPENAI_API_KEY in environment variables." });
     }
 
-    const messages = [
-      { role: "system" as const, content: buildSystemContent(context) },
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      { role: "system", content: buildSystemContent(context) },
       ...history
         .filter(h => h.role === "user" || h.role === "assistant")
         .map(h => ({ role: h.role as "user" | "assistant", content: h.content })),
-      { role: "user" as const, content: message },
+      { role: "user", content: message },
     ];
 
-    // Retry once on 429 (rate limit) after a short wait
-    let response!: Response;
+    let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt++) {
-      response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({ model: "gpt-4o-mini", messages, max_tokens: 800, temperature: 0.7 }),
-      });
-      if (response.status !== 429 || attempt === 1) break;
-      // Wait 3 seconds then retry
-      await new Promise(r => setTimeout(r, 3000));
-    }
+      try {
+        const completion = await client.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages,
+          max_tokens: 800,
+          temperature: 0.7,
+        });
 
-    if (!response.ok) {
-      const errText = await response.text().catch(() => "unknown");
-      logger.error({ status: response.status, body: errText }, "AI upstream error");
-      if (response.status === 429) {
-        return res.status(429).json({ error: "The AI is busy right now (rate limit). Please wait a moment and try again." });
+        const reply = completion.choices[0]?.message?.content ?? "I couldn't generate a response. Please try again.";
+        return res.json({ reply });
+
+      } catch (err: unknown) {
+        lastError = err;
+        const status = (err as { status?: number })?.status;
+        if (status === 429 && attempt === 0) {
+          await new Promise(r => setTimeout(r, 3000));
+          continue;
+        }
+        break;
       }
-      return res.status(502).json({ error: `AI error ${response.status} — check your API key.` });
     }
 
-    const data = await response.json() as { choices?: { message?: { content?: string } }[] };
-    const reply = data.choices?.[0]?.message?.content ?? "I couldn't generate a response. Please try again.";
-    return res.json({ reply });
+    const status = (lastError as { status?: number })?.status;
+    logger.error({ status, err: lastError }, "AI upstream error");
+    if (status === 429) {
+      return res.status(429).json({ error: "The AI is busy right now (rate limit). Please wait a moment and try again." });
+    }
+    return res.status(502).json({ error: "AI service error. Please try again in a moment." });
 
   } catch (err) {
     logger.error(err, "AI handler error");

@@ -164,11 +164,8 @@ export default function PyqPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const isRich  = pyq?.contentType === "rich";
+  const isRich  = pyq?.contentType === "rich" || pyq?.fileType === "rich";
   const isImage = !isRich && pyq?.fileType === "image";
-  const canonicalSlug = pyq
-    ? `grade-${pyq.grade}-${toSlug(pyq.subject)}-${toSlug(pyq.title)}-${pyq.year}`
-    : "";
 
   return (
     <>
@@ -179,7 +176,7 @@ export default function PyqPage() {
           <meta name="keywords" content={`${pyq.subject} PYQ, grade ${pyq.grade} past paper, ${pyq.year} exam paper, Nepal SEE NEB question paper`} />
           <meta property="og:title" content={`${pyq.title} — Student Hub`} />
           <meta property="og:description" content={`${pyq.subject} | Grade ${pyq.grade} | ${pyq.year}`} />
-          <link rel="canonical" href={`https://studenthub.np/pyq/${id}-${canonicalSlug}`} />
+          <link rel="canonical" href={`https://studenthub.np/pyq/${id}`} />
         </Helmet>
       )}
 

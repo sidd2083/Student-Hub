@@ -11,6 +11,7 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db, googleProvider, isConfigured } from "@/lib/firebase";
+import { getNepaliDate, getNepaliYesterday } from "@/lib/nepaliDate";
 
 export interface UserProfile {
   uid: string;
@@ -62,6 +63,35 @@ async function fetchProfile(uid: string): Promise<ProfileResult> {
   } catch (err) {
     console.error("[Auth] Firestore READ error:", err);
     return { status: "error", code: "firestore_error" };
+  }
+}
+
+async function checkAndBreakStreak(uid: string): Promise<void> {
+  try {
+    const today = getNepaliDate();
+    const yesterday = getNepaliYesterday();
+    const snap = await getDoc(doc(db, "users", uid));
+    if (!snap.exists()) return;
+    const d = snap.data();
+    const lastActive: string = d.lastActiveDate ?? "";
+    const currentStreak: number = d.streak ?? 0;
+
+    const updates: Record<string, unknown> = {};
+
+    if (currentStreak > 0 && lastActive !== today && lastActive !== yesterday) {
+      updates.streak = 0;
+      console.log("[Auth] Streak broken — missed a day. Was:", currentStreak);
+    }
+
+    if (lastActive && lastActive !== today && (d.todayStudyTime ?? 0) > 0) {
+      updates.todayStudyTime = 0;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await updateDoc(doc(db, "users", uid), updates);
+    }
+  } catch (err) {
+    console.warn("[Auth] checkAndBreakStreak failed:", err);
   }
 }
 
@@ -158,6 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!mounted) return;
         applyProfile(patched);
         setLoading(false);
+        checkAndBreakStreak(firebaseUser.uid);
         if (currentPath === "/" || currentPath === "/login") {
           window.location.replace("/dashboard");
         }

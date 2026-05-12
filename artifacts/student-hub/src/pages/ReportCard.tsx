@@ -37,12 +37,14 @@ function fmtTime(mins: number) {
 
 function buildInsights(stats: StudyStats, dailyLogs: DailyLog[]) {
   const insights: Array<{ icon: string; text: string; type: "positive" | "warning" | "info" }> = [];
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const today = getNepaliDate();
+  const yesterday = getNepaliYesterday();
 
   const todayLog = dailyLogs.find(l => l.date === today);
   const yesterdayLog = dailyLogs.find(l => l.date === yesterday);
-  const todayMins = stats.todayStudyTime || todayLog?.studyMinutes || 0;
+  const todayMins = stats.lastActiveDate === today
+    ? (stats.todayStudyTime || todayLog?.studyMinutes || 0)
+    : (todayLog?.studyMinutes || 0);
   const yesterdayMins = yesterdayLog?.studyMinutes || 0;
 
   if (stats.streak >= 7)
@@ -127,7 +129,9 @@ function DailyReport({ stats, logs }: { stats: StudyStats; logs: DailyLog[] }) {
 
   const todayLog = logs.find(l => l.date === today);
   const yesterdayLog = logs.find(l => l.date === yesterday);
-  const todayMins = stats.todayStudyTime || todayLog?.studyMinutes || 0;
+  const todayMins = stats.lastActiveDate === today
+    ? (stats.todayStudyTime || todayLog?.studyMinutes || 0)
+    : (todayLog?.studyMinutes || 0);
   const yesterdayMins = yesterdayLog?.studyMinutes || 0;
   const tasksToday = todayLog?.tasksCompleted || 0;
   const notesToday = todayLog?.notesViewed || 0;
@@ -434,7 +438,7 @@ function ReportContent() {
                 {[
                   { label: "Total Study Time", value: fmtTime(stats.totalStudyTime) },
                   { label: "Current Streak",   value: `${stats.streak} days 🔥` },
-                  { label: "Studied Today",    value: fmtTime(stats.todayStudyTime) },
+                  { label: "Studied Today",    value: fmtTime(stats.lastActiveDate === getNepaliDate() ? stats.todayStudyTime : 0) },
                 ].map(r => (
                   <div key={r.label} className="flex justify-between items-center">
                     <span className="text-sm text-gray-500">{r.label}</span>
