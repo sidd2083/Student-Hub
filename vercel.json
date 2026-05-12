@@ -11,6 +11,10 @@
     "api/ai/chat.mjs": {
       "memory": 512,
       "maxDuration": 30
+    },
+    "api/ping.mjs": {
+      "memory": 128,
+      "maxDuration": 5
     }
   },
   "rewrites": [

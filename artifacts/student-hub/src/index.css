@@ -226,3 +226,12 @@
 .dark .prose h3,
 .dark .prose h4 { color: hsl(210 40% 96%); }
 .dark .prose strong { color: hsl(210 40% 96%); }
+
+/* ── Page transition ───────────────────────────────────────────────────── */
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+.page-fade {
+  animation: pageFadeIn 0.14s ease-out both;
+}

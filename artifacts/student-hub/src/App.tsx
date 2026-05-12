@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -51,7 +51,9 @@ const queryClient = new QueryClient({
 });
 
 function AppRoutes() {
+  const [location] = useLocation();
   return (
+    <div key={location} className="page-fade">
     <Switch>
       <Route path="/" component={Home} />
 
@@ -81,6 +83,7 @@ function AppRoutes() {
 
       <Route component={NotFound} />
     </Switch>
+    </div>
   );
 }
 

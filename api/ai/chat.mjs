@@ -94,7 +94,13 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const { message, history = [], context } = req.body ?? {};
+    // Vercel may pass body as a string — ensure it's parsed
+    let bodyData = req.body;
+    if (typeof bodyData === "string") {
+      try { bodyData = JSON.parse(bodyData); } catch { bodyData = {}; }
+    }
+    if (!bodyData || typeof bodyData !== "object") bodyData = {};
+    const { message, history = [], context } = bodyData;
 
     if (!message || typeof message !== "string") {
       return res.status(400).json({ error: "message is required" });

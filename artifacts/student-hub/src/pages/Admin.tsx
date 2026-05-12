@@ -496,42 +496,31 @@ function ManagePyqs() {
     if (sel) { sel.removeAllRanges(); sel.addRange(savedRangeRef.current); }
   };
 
-  // Upload an image and insert it at the saved cursor position
+  // Insert an image inline using base64 — no Firebase Storage auth required
   const handleInlineImageFile = async (file: File) => {
     if (!file) return;
     const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
     if (!allowed.includes(file.type)) {
       setSaveStatus("error"); setSaveMsg("Only JPEG, PNG, WebP or GIF images are allowed."); return;
     }
+    if (file.size > 500 * 1024) {
+      setSaveStatus("error"); setSaveMsg("Image too large — please use an image under 500 KB."); return;
+    }
     setImgUploading(true);
     setSaveStatus("idle");
     try {
-      if (!auth.currentUser) {
-        await signInWithPopup(auth, googleProvider);
-      }
-      const ext = file.name.split(".").pop() ?? "jpg";
-      const path = `pyqs/${Date.now()}_content.${ext}`;
-      const storageRef = ref(storage, path);
-      let uploadedRef: ReturnType<typeof ref>;
-      await new Promise<void>((resolve, reject) => {
-        const task = uploadBytesResumable(storageRef, file);
-        task.on("state_changed", null,
-          (err) => reject(err),
-          () => { uploadedRef = task.snapshot.ref; resolve(); }
-        );
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
       });
-      const url = await getDownloadURL(uploadedRef!);
       restoreSelection();
       document.execCommand("insertHTML", false,
-        `<img src="${url}" alt="question image" style="max-width:100%;border-radius:8px;margin:8px 0;display:block;" />`);
+        `<img src="${base64}" alt="question image" style="max-width:100%;border-radius:8px;margin:8px 0;display:block;" />`);
     } catch (e: any) {
       setSaveStatus("error");
-      const msg: string = e?.message ?? "unknown error";
-      if (msg.includes("unauthorized") || msg.includes("permission") || msg.includes("cancel")) {
-        setSaveMsg("Google sign-in required for image uploads. Please allow the sign-in popup and try again.");
-      } else {
-        setSaveMsg("Image upload failed: " + msg);
-      }
+      setSaveMsg("Image insert failed: " + (e?.message ?? "unknown error"));
     } finally {
       setImgUploading(false);
       if (imgInputRef.current) imgInputRef.current.value = "";
