@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -10,7 +11,7 @@ const SYSTEM_PROMPT = `You are Nep AI, a friendly and highly knowledgeable study
 Your identity:
 - You are a product of Tufan Production.
 - When asked "who built you?", "who made you?", "who created you?", or "who are you?", always respond: "I'm Nep AI — a product of Tufan Production, your AI study assistant for Grade 9–12 students in Nepal!"
-- Never claim to be ChatGPT, GPT, OpenAI, or any other AI brand.
+- Never claim to be ChatGPT, GPT, OpenAI, Gemini, Google, or any other AI brand.
 
 Your capabilities:
 - Explain academic concepts clearly for grades 9-12
@@ -57,14 +58,60 @@ function buildSystemContent(context?: ChatContext): string {
   return SYSTEM_PROMPT + parts.join("\n");
 }
 
-function getOpenAIClient(): OpenAI | null {
-  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ?? process.env.OPENAI_BASE_URL;
-  return new OpenAI({
-    apiKey,
-    ...(baseURL ? { baseURL } : {}),
+async function askGemini(
+  systemContent: string,
+  history: ChatMessage[],
+  message: string
+): Promise<string> {
+  const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+  const model = gemini.getGenerativeModel({
+    model: "gemini-1.5-flash",
+    systemInstruction: systemContent,
   });
+
+  const geminiHistory = history
+    .filter(h => h.role === "user" || h.role === "assistant")
+    .map(h => ({
+      role: h.role === "assistant" ? "model" : "user",
+      parts: [{ text: h.content }],
+    }));
+
+  const chat = model.startChat({
+    history: geminiHistory,
+    generationConfig: { maxOutputTokens: 800, temperature: 0.7 },
+  });
+
+  const result = await chat.sendMessage(message);
+  return result.response.text() || "I couldn't generate a response. Please try again.";
+}
+
+async function askOpenAI(
+  systemContent: string,
+  history: ChatMessage[],
+  message: string
+): Promise<string> {
+  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("No OpenAI key");
+
+  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ?? process.env.OPENAI_BASE_URL;
+  const client = new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
+
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    { role: "system", content: systemContent },
+    ...history
+      .filter(h => h.role === "user" || h.role === "assistant")
+      .map(h => ({ role: h.role as "user" | "assistant", content: h.content })),
+    { role: "user", content: message },
+  ];
+
+  const completion = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages,
+    max_tokens: 800,
+    temperature: 0.7,
+  });
+
+  return completion.choices[0]?.message?.content ?? "I couldn't generate a response. Please try again.";
 }
 
 router.post("/ai/chat", async (req: Request, res: Response) => {
@@ -77,36 +124,36 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
 
     if (!message) return res.status(400).json({ error: "message is required" });
 
-    const client = getOpenAIClient();
-    if (!client) {
-      return res.status(503).json({ error: "AI not configured — set OPENAI_API_KEY in environment variables." });
+    const systemContent = buildSystemContent(context);
+    const useGemini = !!process.env.GEMINI_API_KEY;
+    const hasOpenAI  = !!(process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY);
+
+    if (!useGemini && !hasOpenAI) {
+      return res.status(503).json({
+        error: "AI not configured. Please set GEMINI_API_KEY (free) or OPENAI_API_KEY in your Vercel environment variables.",
+      });
     }
 
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      { role: "system", content: buildSystemContent(context) },
-      ...history
-        .filter(h => h.role === "user" || h.role === "assistant")
-        .map(h => ({ role: h.role as "user" | "assistant", content: h.content })),
-      { role: "user", content: message },
-    ];
-
     let lastError: unknown;
+
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const completion = await client.chat.completions.create({
-          model: "gpt-5-mini",
-          messages,
-          max_tokens: 800,
-          temperature: 0.7,
-        });
+        let reply: string;
 
-        const reply = completion.choices[0]?.message?.content ?? "I couldn't generate a response. Please try again.";
+        if (useGemini) {
+          reply = await askGemini(systemContent, history, message);
+        } else {
+          reply = await askOpenAI(systemContent, history, message);
+        }
+
         return res.json({ reply });
 
       } catch (err: unknown) {
         lastError = err;
         const status = (err as { status?: number })?.status;
-        if (status === 429 && attempt < 2) {
+        const isRate = status === 429 || String(err).includes("429");
+
+        if (isRate && attempt < 2) {
           await new Promise(r => setTimeout(r, (attempt + 1) * 4000));
           continue;
         }
@@ -116,8 +163,9 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
 
     const status = (lastError as { status?: number })?.status;
     logger.error({ status, err: lastError }, "AI upstream error");
-    if (status === 429) {
-      return res.status(429).json({ error: "The AI is busy right now (rate limit). Please wait a moment and try again." });
+
+    if (status === 429 || String(lastError).includes("429")) {
+      return res.status(429).json({ error: "The AI is busy right now. Please wait a moment and try again." });
     }
     return res.status(502).json({ error: "AI service error. Please try again in a moment." });
 
