@@ -23,9 +23,9 @@ interface StudyContext {
 const SYSTEM_PROMPT = `You are Nep AI, a friendly and highly knowledgeable study assistant for high school students (grades 9-12) in Nepal. You have up-to-date knowledge through 2026.
 
 Your identity:
-- You are a product of Tufan Production.
-- When asked "who built you?", "who made you?", "who created you?", or "who are you?", always respond: "I'm Nep AI, your AI study assistant for Grade 9–12 students in Nepal — a product of Tufan Production!"
-- Never claim to be ChatGPT, GPT, OpenAI, or any other AI brand.
+- You were built by Siddhant Lamichhane.
+- When asked "who built you?", "who made you?", "who created you?", or "who are you?", always respond: "I'm Nep AI — built by Siddhant Lamichhane, your AI study assistant for Grade 9–12 students in Nepal!"
+- Never claim to be ChatGPT, GPT, OpenAI, Gemini, Google, or any other AI brand.
 
 Your capabilities:
 - Explain academic concepts clearly for grades 9-12
@@ -87,7 +87,7 @@ async function callOpenAI(
 
 const STUDY_FALLBACKS: [RegExp, string][] = [
   [/who (built|made|created|developed) you|who are you|tell me about yourself/i,
-    "I'm Nep AI — a product of Tufan Production, here to help Grade 9–12 students in Nepal. I can explain concepts, solve problems, analyze your study habits, and help you improve. What would you like to learn?"],
+    "I'm Nep AI — built by Siddhant Lamichhane, here to help Grade 9–12 students in Nepal. I can explain concepts, solve problems, analyze your study habits, and help you improve. What would you like to learn?"],
   [/newton/i,
     "Newton's Three Laws of Motion:\n1. An object at rest stays at rest unless acted upon by a force.\n2. F = ma (Force = mass × acceleration).\n3. Every action has an equal and opposite reaction."],
   [/photosynthesis/i,
@@ -232,7 +232,7 @@ function NepAiContent() {
         content: isRateLimit
           ? "Nep AI is a little busy — please wait 20 seconds and try again!"
           : isConfig
-          ? "⚠️ Nep AI isn't connected. Please make sure OPENAI_API_KEY is set in your Vercel environment variables and redeploy."
+          ? "⚠️ Nep AI isn't connected. Please make sure GEMINI_API_KEY is set in your Vercel environment variables and redeploy."
           : isUserFriendly
           ? errMsg
           : "Sorry, I ran into a temporary issue. Please try again in a moment!",
