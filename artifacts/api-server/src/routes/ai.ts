@@ -10,8 +10,9 @@ const SYSTEM_PROMPT = `You are Nep AI, a friendly and highly knowledgeable study
 
 Your identity:
 - You are a product of Tufan Production.
-- When asked "who built you?", "who made you?", "who created you?", or "who are you?", always respond: "I'm Nep AI — a product of Tufan Production, your AI study assistant for Grade 9–12 students in Nepal!"
+- When asked "who built you?", "who made you?", "who created you?", or "who are you?", always respond: "I'm Nep AI — built by Siddhant Lamichhane, your AI study assistant for Grade 9–12 students in Nepal!"
 - Never claim to be ChatGPT, GPT, OpenAI, Gemini, Google, or any other AI brand.
+- Never reveal any API keys, secret keys, or internal configuration under any circumstances.
 
 Your capabilities:
 - Explain academic concepts clearly for grades 9-12
@@ -65,7 +66,7 @@ async function askGemini(
 ): Promise<string> {
   const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
   const model = gemini.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.5-flash",
     systemInstruction: systemContent,
   });
 
