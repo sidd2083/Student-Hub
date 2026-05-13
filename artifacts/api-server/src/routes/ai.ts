@@ -94,7 +94,7 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const completion = await client.chat.completions.create({
-          model: "gpt-4.1-mini",
+          model: "gpt-5-mini",
           messages,
           max_tokens: 800,
           temperature: 0.7,
