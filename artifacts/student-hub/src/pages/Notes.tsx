@@ -222,8 +222,18 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
     }).finally(() => setLoading(false));
   }, [grade]);
 
-  const subjects = useMemo(() => [...new Set(notes.map(n => n.subject))].sort(), [notes]);
-  const filtered = useMemo(() => subject ? notes.filter(n => n.subject === subject) : notes, [notes, subject]);
+  const subjects = useMemo(() => {
+    const seen = new Map<string, string>();
+    notes.forEach(n => {
+      const key = n.subject.trim().toLowerCase();
+      if (!seen.has(key)) seen.set(key, n.subject.trim());
+    });
+    return [...seen.values()].sort();
+  }, [notes]);
+  const filtered = useMemo(() =>
+    subject ? notes.filter(n => n.subject.trim().toLowerCase() === subject.trim().toLowerCase()) : notes,
+    [notes, subject]
+  );
 
   return (
     <>

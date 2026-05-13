@@ -89,11 +89,6 @@ function FileUpload({ accept, label, storagePath, onUploaded, disabled }: FileUp
     const isPdf   = file.type === "application/pdf";
     if (!isImage && !isPdf) { setError("Please upload a PDF or image file."); return; }
 
-    if (!auth.currentUser) {
-      try { await signInWithPopup(auth, googleProvider); }
-      catch { setError("Google sign-in required to upload files. Please sign in with your Google account."); return; }
-    }
-
     const ext = file.name.split(".").pop();
     const path = `${storagePath}/${Date.now()}.${ext}`;
     const storageRef = ref(storage, path);
@@ -101,7 +96,15 @@ function FileUpload({ accept, label, storagePath, onUploaded, disabled }: FileUp
     task.on(
       "state_changed",
       (snap) => setProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
-      (err) => { setError(err.message); setProgress(null); },
+      (err) => {
+        const code = (err as { code?: string }).code ?? "";
+        if (code === "storage/unauthorized" || code === "storage/unknown") {
+          setError("Upload blocked by Firebase Storage rules. Run: firebase deploy --only storage");
+        } else {
+          setError(err.message);
+        }
+        setProgress(null);
+      },
       async () => {
         const url = await getDownloadURL(task.snapshot.ref);
         setProgress(null);
@@ -496,28 +499,42 @@ function ManagePyqs() {
     if (sel) { sel.removeAllRanges(); sel.addRange(savedRangeRef.current); }
   };
 
-  // Insert an image inline using base64 — no Firebase Storage auth required
+  // Compress any image to JPEG base64 — handles 3MB+ by resizing to max 1400px
+  const compressImage = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new window.Image();
+      img.onload = () => {
+        const MAX = 1400;
+        let { width, height } = img;
+        const ratio = Math.min(1, MAX / Math.max(width, height));
+        width  = Math.round(width  * ratio);
+        height = Math.round(height * ratio);
+        const canvas = document.createElement("canvas");
+        canvas.width  = width;
+        canvas.height = height;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image load failed")); };
+      img.src = url;
+    });
+
+  // Insert an image inline — compresses any size image to JPEG base64, no Firebase Storage needed
   const handleInlineImageFile = async (file: File) => {
     if (!file) return;
     const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
     if (!allowed.includes(file.type)) {
       setSaveStatus("error"); setSaveMsg("Only JPEG, PNG, WebP or GIF images are allowed."); return;
     }
-    if (file.size > 500 * 1024) {
-      setSaveStatus("error"); setSaveMsg("Image too large — please use an image under 500 KB."); return;
-    }
     setImgUploading(true);
     setSaveStatus("idle");
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error("Failed to read file"));
-        reader.readAsDataURL(file);
-      });
+      const base64 = await compressImage(file);
       restoreSelection();
       document.execCommand("insertHTML", false,
-        `<img src="${base64}" alt="question image" style="max-width:100%;border-radius:8px;margin:8px 0;display:block;" />`);
+        `<img src="${base64}" alt="question image" style="max-width:100%;border-radius:8px;margin:8px 0;display:block;cursor:zoom-in;" />`);
     } catch (e: any) {
       setSaveStatus("error");
       setSaveMsg("Image insert failed: " + (e?.message ?? "unknown error"));
@@ -676,7 +693,7 @@ function ManagePyqs() {
                     disabled={imgUploading}
                     className="flex items-center gap-1 px-2.5 py-1 text-xs rounded hover:bg-gray-200 text-gray-700 disabled:opacity-50">
                     <Image className="w-3 h-3" />
-                    {imgUploading ? "Uploading…" : "Image"}
+                    {imgUploading ? "Inserting…" : "Image"}
                   </button>
                 </div>
                 {/* Editor area */}
@@ -686,6 +703,15 @@ function ManagePyqs() {
                   suppressContentEditableWarning
                   data-placeholder="Write PYQ content here — questions, answers, diagrams. Use toolbar for headings, bold, and inline images."
                   className="pyq-editor min-h-[220px] max-h-[500px] overflow-y-auto p-4 text-sm focus:outline-none prose prose-sm max-w-none"
+                  onPaste={(e) => {
+                    const items = Array.from(e.clipboardData?.items ?? []);
+                    const imgItem = items.find(i => i.type.startsWith("image/"));
+                    if (imgItem) {
+                      e.preventDefault();
+                      const file = imgItem.getAsFile();
+                      if (file) handleInlineImageFile(file);
+                    }
+                  }}
                 />
               </div>
               {/* Hidden image input */}

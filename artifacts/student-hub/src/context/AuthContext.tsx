@@ -184,11 +184,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const currentPath = window.location.pathname;
 
       if (result.status === "found") {
-        const patched = await patchProfileFromFirebase(firebaseUser.uid, firebaseUser, result.profile);
+        // Break streak BEFORE displaying profile so the user sees the corrected value
+        await checkAndBreakStreak(firebaseUser.uid);
+        // Re-fetch to pick up any streak reset that just happened
+        const freshResult = await fetchProfile(firebaseUser.uid);
+        const freshProfile = freshResult.status === "found" ? freshResult.profile : result.profile;
+        const patched = await patchProfileFromFirebase(firebaseUser.uid, firebaseUser, freshProfile);
         if (!mounted) return;
         applyProfile(patched);
         setLoading(false);
-        checkAndBreakStreak(firebaseUser.uid);
         if (currentPath === "/" || currentPath === "/login") {
           window.location.replace("/dashboard");
         }

@@ -151,8 +151,21 @@ function NepAiContent() {
   const [context, setContext] = useState<StudyContext | null>(null);
   const [loadingCtx, setLoadingCtx] = useState(false);
   const [showCtxBanner, setShowCtxBanner] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoSentRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const startCooldown = (seconds: number) => {
+    setCooldown(seconds);
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    cooldownRef.current = setInterval(() => {
+      setCooldown(prev => {
+        if (prev <= 1) { clearInterval(cooldownRef.current!); cooldownRef.current = null; return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -210,13 +223,16 @@ function NepAiContent() {
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.warn("[NepAI] call failed:", errMsg);
-      const isConfig = errMsg.includes("not configured") || errMsg.includes("API key");
-      // Use backend's user-friendly message when it looks like one (10–300 chars, not a raw code)
+      const isRateLimit = errMsg.includes("busy") || errMsg.includes("too many") || errMsg.includes("rate") || errMsg.includes("429");
+      const isConfig    = errMsg.includes("not configured") || errMsg.includes("API key");
       const isUserFriendly = errMsg.length >= 10 && errMsg.length <= 300 && !errMsg.match(/^(AI service|status |fetch)/i);
+      if (isRateLimit) startCooldown(20);
       setMessages(prev => [...prev, {
         role: "assistant",
-        content: isConfig
-          ? "⚠️ Nep AI isn't connected yet. Please ask the site admin to set OPENAI_API_KEY in Vercel environment variables."
+        content: isRateLimit
+          ? "Nep AI is a little busy — please wait 20 seconds and try again!"
+          : isConfig
+          ? "⚠️ Nep AI isn't connected. Please make sure OPENAI_API_KEY is set in your Vercel environment variables and redeploy."
           : isUserFriendly
           ? errMsg
           : "Sorry, I ran into a temporary issue. Please try again in a moment!",
@@ -380,16 +396,20 @@ function NepAiContent() {
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder="Ask Nep AI a question…"
-            className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+            disabled={cooldown > 0}
+            placeholder={cooldown > 0 ? `Please wait ${cooldown}s…` : "Ask Nep AI a question…"}
+            className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all disabled:bg-gray-50"
           />
           <button
             data-testid="btn-send-ai"
             type="submit"
-            disabled={loading || !input.trim()}
-            className="w-12 h-12 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-all disabled:opacity-50 flex items-center justify-center flex-shrink-0"
+            disabled={loading || !input.trim() || cooldown > 0}
+            className="w-12 h-12 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-all disabled:opacity-50 flex items-center justify-center flex-shrink-0 flex-col gap-0"
           >
-            <Send className="w-4 h-4" />
+            {cooldown > 0
+              ? <span className="text-[10px] font-bold leading-none">{cooldown}s</span>
+              : <Send className="w-4 h-4" />
+            }
           </button>
         </form>
       </div>

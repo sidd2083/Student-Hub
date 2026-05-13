@@ -148,6 +148,7 @@ export default function PyqPage() {
   const params = useParams<{ id: string }>();
   const id = params.id || "";
   const [imgZoomed, setImgZoomed] = useState(false);
+  const [zoomedSrc, setZoomedSrc] = useState<string | null>(null);
   const [pyq, setPyq] = useState<FirePyq | null>(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -169,6 +170,22 @@ export default function PyqPage() {
 
   return (
     <>
+      {/* Image lightbox — for both standalone images and images inside rich text */}
+      {zoomedSrc && (
+        <div
+          className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center"
+          onClick={() => setZoomedSrc(null)}
+        >
+          <img src={zoomedSrc} alt="" className="max-w-full max-h-full object-contain p-6 select-none" />
+          <button
+            className="absolute top-4 right-4 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-all"
+            onClick={(e) => { e.stopPropagation(); setZoomedSrc(null); }}
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
+        </div>
+      )}
+
       {pyq && (
         <Helmet>
           <title>{`${pyq.title} — Grade ${pyq.grade} ${pyq.subject} PYQ ${pyq.year} | Student Hub`}</title>
@@ -265,11 +282,16 @@ export default function PyqPage() {
             {/* Content area */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden mb-6">
 
-              {/* Rich text content */}
+              {/* Rich text content — clicking any image zooms it */}
               {isRich && pyq.content && (
                 <div
                   className="prose prose-sm sm:prose max-w-none p-6 dark:prose-invert"
                   dangerouslySetInnerHTML={{ __html: pyq.content }}
+                  onClick={(e) => {
+                    const t = e.target as HTMLElement;
+                    if (t.tagName === "IMG") setZoomedSrc((t as HTMLImageElement).src);
+                  }}
+                  style={{ cursor: "default" }}
                 />
               )}
 
