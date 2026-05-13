@@ -145,7 +145,7 @@ function SaveButton({ noteId, uid }: { noteId: string; uid: string }) {
   const savedDocId = `${uid}_note_${noteId}`;
 
   useEffect(() => {
-    getDoc(doc(db, "saved", savedDocId))
+    getDoc(doc(db, "saved_items", savedDocId))
       .then(snap => setSaved(snap.exists()))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -156,10 +156,10 @@ function SaveButton({ noteId, uid }: { noteId: string; uid: string }) {
     setToggling(true);
     try {
       if (saved) {
-        await deleteDoc(doc(db, "saved", savedDocId));
+        await deleteDoc(doc(db, "saved_items", savedDocId));
         setSaved(false);
       } else {
-        await setDoc(doc(db, "saved", savedDocId), {
+        await setDoc(doc(db, "saved_items", savedDocId), {
           uid,
           itemType: "note",
           itemId: noteId,

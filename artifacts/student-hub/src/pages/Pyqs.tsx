@@ -2,9 +2,9 @@ import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { FileText, Image, Search, X, ExternalLink, Filter, LogIn } from "lucide-react";
+import { FileText, Image, Search, X, ExternalLink, Filter, LogIn, Bookmark } from "lucide-react";
 
 type Pyq = {
   id: string;
@@ -31,9 +31,41 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
   );
 }
 
-function PyqViewer({ pyq, onClose }: { pyq: Pyq; onClose: () => void }) {
+function PyqViewer({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?: string }) {
   const isImage = pyq.fileType === "image";
   const [imgZoomed, setImgZoomed] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [savingToggle, setSavingToggle] = useState(false);
+
+  const savedDocId = uid ? `${uid}_pyq_${pyq.id}` : null;
+
+  useEffect(() => {
+    if (!savedDocId) return;
+    getDoc(doc(db, "saved_items", savedDocId))
+      .then(snap => setSaved(snap.exists()))
+      .catch(() => {});
+  }, [savedDocId]);
+
+  const toggleSave = async () => {
+    if (!uid || !savedDocId || savingToggle) return;
+    setSavingToggle(true);
+    try {
+      if (saved) {
+        await deleteDoc(doc(db, "saved_items", savedDocId));
+        setSaved(false);
+      } else {
+        await setDoc(doc(db, "saved_items", savedDocId), {
+          uid, itemType: "pyq", itemId: pyq.id,
+          savedAt: new Date().toISOString(),
+        });
+        setSaved(true);
+      }
+    } catch (e) {
+      console.error("[PyqViewer save]", e);
+    } finally {
+      setSavingToggle(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4">
@@ -50,6 +82,17 @@ function PyqViewer({ pyq, onClose }: { pyq: Pyq; onClose: () => void }) {
             <h2 className="text-lg sm:text-xl font-bold text-gray-900">{pyq.title}</h2>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {uid && (
+              <button
+                onClick={toggleSave}
+                disabled={savingToggle}
+                title={saved ? "Remove from saved" : "Save this paper"}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-xl transition-all disabled:opacity-50 ${saved ? "bg-blue-500 text-white hover:bg-blue-600" : "border border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+              >
+                <Bookmark className={`w-3.5 h-3.5 ${saved ? "fill-white" : ""}`} />
+                <span className="hidden sm:inline">{saved ? "Saved" : "Save"}</span>
+              </button>
+            )}
             <a href={pyq.pdfUrl} target="_blank" rel="noopener noreferrer"
                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-all">
               <ExternalLink className="w-3.5 h-3.5" /> Open
@@ -91,7 +134,7 @@ function PyqViewer({ pyq, onClose }: { pyq: Pyq; onClose: () => void }) {
 }
 
 function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [grade, setGrade] = useState<number>(profile?.grade || 10);
   const [subject, setSubject] = useState("");
   const [yearFilter, setYearFilter] = useState<string>("");
@@ -133,7 +176,7 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
 
   return (
     <>
-      {viewer && <PyqViewer pyq={viewer} onClose={() => setViewer(null)} />}
+      {viewer && <PyqViewer pyq={viewer} onClose={() => setViewer(null)} uid={user?.uid} />}
 
       <div className="p-4 sm:p-6 lg:p-8">
         <div className="mb-5 sm:mb-6">

@@ -2,9 +2,9 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { collection, query, where, getDocs, getDoc, doc, updateDoc, setDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, getDoc, doc, updateDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { BookOpen, ChevronRight, FileText, Image, Type, X, ExternalLink, ZoomIn, LogIn, Sparkles, Maximize2, Minimize2 } from "lucide-react";
+import { BookOpen, ChevronRight, FileText, Image, Type, X, ExternalLink, ZoomIn, LogIn, Sparkles, Maximize2, Minimize2, Bookmark } from "lucide-react";
 
 type NoteView = {
   id: string;
@@ -37,8 +37,40 @@ function NoteViewer({ note, onClose, uid }: { note: NoteView; onClose: () => voi
   const [imgZoomed, setImgZoomed] = useState(false);
   const [scrollPct, setScrollPct] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [savingToggle, setSavingToggle] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const savedDocId = uid ? `${uid}_note_${note.id}` : null;
+
+  useEffect(() => {
+    if (!savedDocId) return;
+    getDoc(doc(db, "saved_items", savedDocId))
+      .then(snap => setSaved(snap.exists()))
+      .catch(() => {});
+  }, [savedDocId]);
+
+  const toggleSave = async () => {
+    if (!uid || !savedDocId || savingToggle) return;
+    setSavingToggle(true);
+    try {
+      if (saved) {
+        await deleteDoc(doc(db, "saved_items", savedDocId));
+        setSaved(false);
+      } else {
+        await setDoc(doc(db, "saved_items", savedDocId), {
+          uid, itemType: "note", itemId: note.id,
+          savedAt: new Date().toISOString(),
+        });
+        setSaved(true);
+      }
+    } catch (e) {
+      console.error("[NoteViewer save]", e);
+    } finally {
+      setSavingToggle(false);
+    }
+  };
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -110,6 +142,16 @@ function NoteViewer({ note, onClose, uid }: { note: NoteView; onClose: () => voi
             >
               <Sparkles className="w-3 h-3" /> Ask AI
             </button>
+            {uid && (
+              <button
+                onClick={toggleSave}
+                disabled={savingToggle}
+                title={saved ? "Remove from saved" : "Save this note"}
+                className={`p-1.5 rounded-xl transition-all disabled:opacity-50 ${saved ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+              >
+                <Bookmark className={`w-4 h-4 ${saved ? "fill-white" : ""}`} />
+              </button>
+            )}
             <Link
               href={`/notes/${note.id}`}
               onClick={onClose}

@@ -53,8 +53,8 @@ function getHighestStreakBadge(days: number) { return STREAK_TIERS.find(t => day
 const SELECTED_BADGE_KEY = "studenthub_selected_leaderboard_badge";
 
 function AchievementsCard({
-  studyMins, streak, customBadges,
-}: { studyMins: number; streak: number; customBadges: CustomBadge[] }) {
+  studyMins, streak, customBadges, uid,
+}: { studyMins: number; streak: number; customBadges: CustomBadge[]; uid: string }) {
   const studyBadge  = getHighestStudyBadge(studyMins);
   const streakBadge = getHighestStreakBadge(streak);
   const autoBadges: AutoBadge[]  = [
@@ -62,14 +62,15 @@ function AchievementsCard({
     ...(streakBadge ? [{ ...streakBadge, type: "streak" as const }] : []),
   ];
   const total = autoBadges.length + customBadges.length;
-  const [selectedKey, setSelectedKey] = useState<string>(() => localStorage.getItem(SELECTED_BADGE_KEY) || "");
+  const storageKey = `${SELECTED_BADGE_KEY}_${uid}`;
+  const [selectedKey, setSelectedKey] = useState<string>(() => localStorage.getItem(storageKey) || "");
   const [showPicker, setShowPicker] = useState(false);
 
   if (total === 0) return null;
 
   const handleSelect = (key: string) => {
     setSelectedKey(key);
-    localStorage.setItem(SELECTED_BADGE_KEY, key);
+    localStorage.setItem(storageKey, key);
     setShowPicker(false);
   };
 
@@ -319,6 +320,7 @@ export default function Dashboard() {
             studyMins={studyMins}
             streak={streak}
             customBadges={customBadges}
+            uid={user?.uid ?? ""}
           />
         )}
 

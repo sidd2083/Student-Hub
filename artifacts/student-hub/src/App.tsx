@@ -51,9 +51,8 @@ const queryClient = new QueryClient({
 });
 
 function AppRoutes() {
-  const [location] = useLocation();
   return (
-    <div key={location} className="page-fade">
+    <div className="page-fade">
     <Switch>
       <Route path="/" component={Home} />
 

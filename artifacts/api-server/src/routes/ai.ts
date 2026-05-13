@@ -91,10 +91,10 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
     ];
 
     let lastError: unknown;
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const completion = await client.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gpt-4.1-mini",
           messages,
           max_tokens: 800,
           temperature: 0.7,
@@ -106,8 +106,8 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
       } catch (err: unknown) {
         lastError = err;
         const status = (err as { status?: number })?.status;
-        if (status === 429 && attempt === 0) {
-          await new Promise(r => setTimeout(r, 3000));
+        if (status === 429 && attempt < 2) {
+          await new Promise(r => setTimeout(r, (attempt + 1) * 4000));
           continue;
         }
         break;

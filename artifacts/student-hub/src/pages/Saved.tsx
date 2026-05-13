@@ -31,7 +31,7 @@ function SavedContent() {
     if (!user?.uid) return;
     setLoading(true);
     try {
-      const q = query(collection(db, "saved"), where("uid", "==", user.uid));
+      const q = query(collection(db, "saved_items"), where("uid", "==", user.uid));
       const snap = await getDocs(q);
 
       const rawItems = snap.docs.map(d => ({
@@ -83,7 +83,7 @@ function SavedContent() {
 
   const remove = async (id: string) => {
     try {
-      await deleteDoc(doc(db, "saved", id));
+      await deleteDoc(doc(db, "saved_items", id));
       setItems(prev => prev.filter(i => i.id !== id));
     } catch (e) {
       console.error("[Saved] Delete failed:", e);
