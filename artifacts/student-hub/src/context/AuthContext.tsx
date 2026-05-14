@@ -58,6 +58,18 @@ function getCachedProfile(uid: string): UserProfile | null {
   }
 }
 
+/** Read cached profile without needing a uid — used for instant startup */
+function getEarlyProfile(): UserProfile | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as { uid: string; profile: UserProfile };
+    return data.profile ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function setCachedProfile(uid: string, profile: UserProfile) {
   try {
     localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ uid, profile }));
@@ -133,8 +145,10 @@ async function patchProfileFromFirebase(uid: string, firebaseUser: FirebaseUser,
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [profile, setProfileState] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Seed profile from localStorage immediately — avoids LoadingScreen flash on PWA launch
+  const [profile, setProfileState] = useState<UserProfile | null>(() => getEarlyProfile());
+  // Skip loading state if we have a cached profile (Firebase will verify in background)
+  const [loading, setLoading] = useState(() => !getEarlyProfile());
 
   const profileRef = useRef<UserProfile | null>(null);
 

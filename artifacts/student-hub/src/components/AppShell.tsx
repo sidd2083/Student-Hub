@@ -8,9 +8,9 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
 
-  if (loading) return <LoadingScreen />;
-  if (user) return <Layout>{children}</Layout>;
+  if (loading && !profile) return <LoadingScreen />;
+  if (user || profile) return <Layout>{children}</Layout>;
   return <PublicLayout>{children}</PublicLayout>;
 }

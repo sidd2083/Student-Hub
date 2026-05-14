@@ -11,9 +11,10 @@ interface Message { role: "user" | "assistant"; content: string }
 
 function markdownToHtml(text: string): string {
   const renderInline = (s: string) =>
-    s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    s.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
+     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
      .replace(/\*(.+?)\*/g, "<em>$1</em>")
-     .replace(/`(.+?)`/g, '<code style="background:#f3f4f6;padding:1px 5px;border-radius:4px;font-size:0.85em;font-family:monospace">$1</code>');
+     .replace(/`(.+?)`/g, '<code style="background:#f3f4f6;padding:1px 6px;border-radius:4px;font-size:0.85em;font-family:monospace;color:#1e40af">$1</code>');
 
   const lines = text.split("\n");
   const out: string[] = [];
@@ -26,26 +27,52 @@ function markdownToHtml(text: string): string {
 
   for (const line of lines) {
     const t = line.trim();
-    if (!t) { closeList(); continue; }
+    if (!t) { closeList(); out.push('<div style="height:6px"></div>'); continue; }
 
-    if (t.startsWith("### ")) { closeList(); out.push(`<p style="font-weight:700;margin:8px 0 2px">${renderInline(t.slice(4))}</p>`); continue; }
-    if (t.startsWith("## "))  { closeList(); out.push(`<p style="font-weight:700;margin:8px 0 2px">${renderInline(t.slice(3))}</p>`); continue; }
-    if (t.startsWith("# "))   { closeList(); out.push(`<p style="font-weight:700;margin:8px 0 2px">${renderInline(t.slice(2))}</p>`); continue; }
+    // Headers — match any number of leading # chars followed by space or word char
+    const heading = t.match(/^(#{1,6})\s*(.*)/);
+    if (heading) {
+      closeList();
+      const level = heading[1].length;
+      const content = renderInline(heading[2]);
+      if (level === 1) {
+        out.push(`<p style="font-size:1.1em;font-weight:800;margin:10px 0 4px;color:#111">${content}</p>`);
+      } else if (level === 2) {
+        out.push(`<p style="font-size:1em;font-weight:700;margin:9px 0 3px;color:#1e3a8a;border-bottom:1px solid #e5e7eb;padding-bottom:2px">${content}</p>`);
+      } else {
+        out.push(`<p style="font-weight:700;margin:7px 0 2px;color:#374151">${content}</p>`);
+      }
+      continue;
+    }
 
-    const bullet = t.match(/^[*\-] (.+)/);
+    // Horizontal rule
+    if (t.match(/^[-*_]{3,}$/)) { closeList(); out.push('<hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0"/>'); continue; }
+
+    // Unordered list
+    const bullet = t.match(/^[-*+] (.+)/);
     if (bullet) {
-      if (!inUl) { closeList(); out.push('<ul style="margin:4px 0;padding-left:18px;list-style:disc">'); inUl = true; }
-      out.push(`<li style="margin:2px 0">${renderInline(bullet[1])}</li>`);
+      if (!inUl) { closeList(); out.push('<ul style="margin:4px 0 4px 2px;padding-left:18px;list-style:disc">'); inUl = true; }
+      out.push(`<li style="margin:3px 0;line-height:1.5">${renderInline(bullet[1])}</li>`);
       continue;
     }
-    const num = t.match(/^(\d+)\. (.+)/);
+
+    // Ordered list
+    const num = t.match(/^(\d+)[.)]\s(.+)/);
     if (num) {
-      if (!inOl) { closeList(); out.push('<ol style="margin:4px 0;padding-left:18px;list-style:decimal">'); inOl = true; }
-      out.push(`<li style="margin:2px 0">${renderInline(num[2])}</li>`);
+      if (!inOl) { closeList(); out.push('<ol style="margin:4px 0 4px 2px;padding-left:20px;list-style:decimal">'); inOl = true; }
+      out.push(`<li style="margin:3px 0;line-height:1.5">${renderInline(num[2])}</li>`);
       continue;
     }
+
+    // Blockquote
+    if (t.startsWith("> ")) {
+      closeList();
+      out.push(`<div style="border-left:3px solid #6366f1;padding:3px 10px;margin:4px 0;color:#4b5563;font-style:italic">${renderInline(t.slice(2))}</div>`);
+      continue;
+    }
+
     closeList();
-    out.push(`<p style="margin:3px 0;line-height:1.55">${renderInline(t)}</p>`);
+    out.push(`<p style="margin:3px 0;line-height:1.6">${renderInline(t)}</p>`);
   }
   closeList();
   return out.join("");
@@ -202,6 +229,7 @@ function NepAiContent() {
   const [cooldown, setCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoSentRef = useRef(false);
+  const prevInitialQRef = useRef<string>("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const startCooldown = (seconds: number) => {
@@ -220,7 +248,13 @@ function NepAiContent() {
   }, [messages, loading]);
 
   useEffect(() => {
-    if (!initialQ || autoSentRef.current || !user) return;
+    if (!initialQ || !user) return;
+    // Reset autoSentRef when the query changes (e.g. coming from a different note)
+    if (initialQ !== prevInitialQRef.current) {
+      prevInitialQRef.current = initialQ;
+      autoSentRef.current = false;
+    }
+    if (autoSentRef.current) return;
     autoSentRef.current = true;
     (async () => {
       setLoadingCtx(true);
