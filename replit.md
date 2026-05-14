@@ -35,7 +35,7 @@ A study platform for high-school students (grades 9–12) in Nepal, featuring no
 - **Frontend:** React 19 + Vite 7, Wouter (routing), TanStack Query, Tailwind CSS v4, Radix UI, Framer Motion
 - **Auth:** Firebase Auth (Google Sign-In)
 - **Database:** Firestore (all user data — `users`, `tasks`, `study_logs`, `announcements`, `notes`, `pyqs`, `mcqs`)
-- **AI:** `/api/ai/chat` proxied through Express backend → OpenAI `gpt-4o-mini`
+- **AI:** `/api/ai/chat` proxied through Express backend → Gemini `gemini-2.5-flash`
 - **Monorepo:** pnpm workspaces
 
 ## Architecture
