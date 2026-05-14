@@ -278,8 +278,8 @@ export default function NotePage() {
   const handleAskAi = () => {
     if (!note) return;
     const ctx = note.contentType === "text"
-      ? `I am reading a note titled "${note.title}" (${note.subject}, Grade ${note.grade}, Chapter: ${note.chapter}). Here is the content:\n\n${note.content.slice(0, 1500)}\n\nPlease explain this to me clearly and help me understand the key concepts.`
-      : `I am reading a ${note.contentType} note titled "${note.title}" (${note.subject}, Grade ${note.grade}, Chapter: ${note.chapter}). Please explain this topic to me and tell me what key things I should know about it.`;
+      ? `I'm studying this note for my Grade ${note.grade} ${note.subject} exam (Chapter: ${note.chapter}, Topic: "${note.title}"). Here is the note content:\n\n${note.content.slice(0, 2000)}\n\nI need you to be my personal tutor for this topic. Please:\n1. Explain the core ideas in simple language with real-world analogies (don't just repeat the note)\n2. Break down every key concept with its own explanation\n3. Show worked examples for any formulas or processes\n4. Give me memory tricks or mnemonics to remember this\n5. Write 4–5 practice questions I can use to test myself\n6. Tell me how this connects to other topics in ${note.subject}`
+      : `I'm studying "${note.title}" for Grade ${note.grade} ${note.subject} (Chapter: ${note.chapter}). The note is in ${note.contentType} format. Please be my personal tutor for this topic:\n1. Explain what this topic is about and why it matters\n2. Cover all the key concepts and definitions I need to know\n3. Give real examples and worked problems\n4. Share memory tricks\n5. Give me 4–5 practice questions to test myself\n6. Explain how this connects to the rest of the ${note.subject} syllabus`;
     setLocation(`/ai?q=${encodeURIComponent(ctx)}`);
   };
 

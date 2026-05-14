@@ -327,7 +327,36 @@ function ReportContent() {
   const badges      = getBadges(stats, dailyLogs);
   const insights    = buildInsights(stats, dailyLogs);
 
-  const aiContextParam = encodeURIComponent(`I want to improve my study habits. Here is my data: streak ${stats.streak} days, total study time ${stats.totalStudyTime} minutes, studied today ${stats.todayStudyTime} minutes, weekly study ${periodMins} minutes. Please analyze this and give me specific personalized advice.`);
+  const badgeNames = badges.map(b => b.label).join(", ") || "none yet";
+  const bestDay = dailyLogs.length > 0 ? Math.max(...dailyLogs.map(l => l.studyMinutes)) : 0;
+  const activeDays = dailyLogs.filter(l => l.studyMinutes > 0).length;
+  const avgDaily = activeDays > 0 ? Math.round(periodMins / Math.max(periodDays, 1)) : 0;
+  const aiContextParam = encodeURIComponent(
+`Do a DEEP, MOTIVATIONAL analysis of my study performance. Here is ALL my data:
+
+**My Study Stats:**
+- Current streak: ${stats.streak} days
+- Total study time ever: ${Math.floor(stats.totalStudyTime / 60)}h ${stats.totalStudyTime % 60}m
+- Studied today: ${stats.todayStudyTime} min
+- This ${period}: ${periodMins} min (${Math.round(periodMins/60*10)/10}h)
+- Last ${period}: ${prevMins} min — so I ${improvePct >= 0 ? "improved" : "dropped"} by ${Math.abs(improvePct)}%
+- Average per day this period: ${avgDaily} min
+- My best single day: ${bestDay} min
+- Active days in logs: ${activeDays}
+- Tasks completed this period: ${periodTasks}
+- Notes viewed this period: ${periodNotes}
+- Badges earned: ${badgeNames}
+
+**What I need from you:**
+1. Give me an HONEST assessment — what's going well and what needs work
+2. Compare my current pace to what's needed for NEB board exam success
+3. Calculate how many hours/week I should be doing and how far I am from that
+4. Point out any patterns (e.g. inconsistency, good streaks, etc.)
+5. Give me a specific daily study plan for the next week
+6. End with a powerful motivational message about why consistent effort now = results later
+
+Be real with me. Don't sugarcoat — but keep me motivated.`
+  );
 
   return (
     <div className="p-4 sm:p-8 max-w-3xl mx-auto">
