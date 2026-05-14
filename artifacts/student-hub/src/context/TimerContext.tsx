@@ -72,10 +72,22 @@ function loadState(): PersistedState | null {
       s.running = false;
     }
 
-    const elapsed = Math.floor((Date.now() - s.updatedAt) / 1000);
-    if (s.running && elapsed > 0 && elapsed < 3600) {
-      s.totalWorkSeconds = s.phase === "work" ? s.totalWorkSeconds + elapsed : s.totalWorkSeconds;
-      s.seconds = Math.max(0, s.seconds - elapsed);
+    // If was running when app closed, advance using wall-clock elapsed time
+    if (s.running) {
+      const elapsed = (Date.now() - s.updatedAt) / 1000;
+      if (elapsed > 0 && elapsed < 3600) {
+        if (s.phase === "work") {
+          s.totalWorkSeconds += elapsed;
+        }
+        s.seconds = Math.max(0, s.seconds - Math.floor(elapsed));
+        // If timer ran out while app was closed, mark it as stopped
+        if (s.seconds <= 0) {
+          s.running = false;
+          s.seconds = 0;
+        }
+      } else {
+        s.running = false;
+      }
     }
     return s;
   } catch {
@@ -121,13 +133,24 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const [sessionsCompleted, setSessionsCompleted] = useState(persisted?.sessionsCompleted ?? 0);
   const [savedMinutesToday, setSavedMinutesToday] = useState(persisted?.savedMinutesToday ?? 0);
 
+  // Accumulated work seconds (used for minute tracking)
   const totalWorkSecondsRef = useRef(persisted?.totalWorkSeconds ?? 0);
+  // How many whole minutes we've already dispatched to the server
   const savedMinutesRef = useRef(persisted?.savedMinutes ?? 0);
-  const phaseRef = useRef<Phase>(persisted?.phase ?? "work");
-  const runningRef = useRef(persisted?.running ?? false);
-  const userRef = useRef<string | null>(null);
+
+  // Wall-clock references — set when running starts, cleared on pause/phase change
+  // These allow accurate time measurement even when the browser throttles setInterval
+  const workWallStartRef   = useRef<number | null>(null); // Date.now() when work phase last resumed
+  const workBaseSecsRef    = useRef(0);                   // totalWorkSecondsRef.current at that moment
+  const displayWallStartRef = useRef<number | null>(null); // Date.now() when phase last resumed (display)
+  const displayBaseSecsRef  = useRef(0);                  // display seconds at that moment
+
+  const phaseRef    = useRef<Phase>(persisted?.phase ?? "work");
+  const runningRef  = useRef(persisted?.running ?? false);
+  const userRef     = useRef<string | null>(null);
   const settingsRef = useRef(persisted?.settings ?? DEFAULT_SETTINGS);
   const sessionsRef = useRef(persisted?.sessionsCompleted ?? 0);
+  const secondsRef  = useRef(persisted?.seconds ?? (DEFAULT_SETTINGS.workMins * 60));
 
   useEffect(() => { userRef.current = user?.uid ?? null; }, [user]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
@@ -135,7 +158,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const persistState = useCallback(() => {
     saveState({
       phase: phaseRef.current,
-      seconds: 0,
+      seconds: secondsRef.current,
       running: runningRef.current,
       sessionsCompleted: sessionsRef.current,
       settings: settingsRef.current,
@@ -168,9 +191,20 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
+  /**
+   * Save study minutes to the backend.
+   *
+   * IMPORTANT: savedMinutesRef is updated IMMEDIATELY (before the async calls)
+   * to prevent race conditions where two ticks fire before the first API call
+   * responds, causing the same minutes to be sent twice.
+   */
   const saveMinutes = useCallback(async (mins: number) => {
     const uid = userRef.current;
     if (!uid || mins < 1) return;
+
+    // Update immediately — prevents double-counting if ticks fire before API responds
+    savedMinutesRef.current += mins;
+    setSavedMinutesToday(prev => prev + mins);
 
     try {
       const res = await fetch("/api/study/save", {
@@ -181,10 +215,11 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
       if (res.ok) {
         const data = await res.json() as { todayMinutes?: number };
-        const newToday = data.todayMinutes ?? (savedMinutesRef.current + mins);
-        savedMinutesRef.current += mins;
-        setSavedMinutesToday(newToday);
-        console.log(`[Timer] Saved ${mins} min via backend. Total today: ${newToday}`);
+        // Sync UI to the server's authoritative total if available
+        if (data.todayMinutes !== undefined) {
+          setSavedMinutesToday(data.todayMinutes);
+        }
+        console.log(`[Timer] Saved ${mins} min via backend.`);
         return;
       }
 
@@ -194,6 +229,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       console.warn("[Timer] Backend unreachable, falling back to direct Firestore:", networkErr);
     }
 
+    // Firestore direct fallback
     try {
       const today = getNepaliDate();
       const yesterday = getNepaliYesterday();
@@ -232,8 +268,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         lastActiveDate: today,
       }, { merge: true });
 
-      savedMinutesRef.current += mins;
-      setSavedMinutesToday(newToday);
+      if (newToday !== undefined) setSavedMinutesToday(newToday);
       console.log(`[Timer] Saved ${mins} min to Firestore directly. Total today: ${newToday}`);
 
       const todayLog = getNepaliDate();
@@ -247,7 +282,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error("[Timer] All save methods failed:", err);
-      console.error("[Timer] ⚠️ Fix your Firestore security rules OR set FIREBASE_SERVICE_ACCOUNT_JSON in your backend secrets to enable study time saving.");
     }
   }, []);
 
@@ -258,6 +292,10 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const nextPhase = useCallback((currentPhase: Phase, currentSessions: number, s: TimerSettings) => {
+    // Clear wall-clock tracking for the completed phase
+    workWallStartRef.current   = null;
+    displayWallStartRef.current = null;
+
     if (currentPhase === "work") {
       const newSessions = currentSessions + 1;
       setSessionsCompleted(newSessions);
@@ -265,14 +303,18 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
       const isLongBreak = newSessions % s.sessionsBeforeLongBreak === 0;
       const nextP: Phase = isLongBreak ? "longBreak" : "shortBreak";
+      const nextSecs = phaseSeconds(nextP, s);
       phaseRef.current = nextP;
+      secondsRef.current = nextSecs;
       setPhase(nextP);
-      setSeconds(phaseSeconds(nextP, s));
+      setSeconds(nextSecs);
       playBeep("break");
     } else {
+      const nextSecs = phaseSeconds("work", s);
       phaseRef.current = "work";
+      secondsRef.current = nextSecs;
       setPhase("work");
-      setSeconds(phaseSeconds("work", s));
+      setSeconds(nextSecs);
       playBeep("work");
     }
   }, [phaseSeconds]);
@@ -281,8 +323,25 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     if (!running) return;
 
     const interval = setInterval(() => {
+      // ── Compute wall-clock elapsed time ──────────────────────────────────
+      const now = Date.now();
+
+      // Update totalWorkSeconds using actual wall-clock time (not tick count)
+      // This is accurate even if the browser throttles setInterval (background tab)
+      if (phaseRef.current === "work" && workWallStartRef.current !== null) {
+        const wallElapsed = (now - workWallStartRef.current) / 1000;
+        totalWorkSecondsRef.current = workBaseSecsRef.current + wallElapsed;
+      }
+
+      // Compute remaining display seconds from wall clock
+      let newDisplaySecs = secondsRef.current;
+      if (displayWallStartRef.current !== null) {
+        const wallElapsed = Math.floor((now - displayWallStartRef.current) / 1000);
+        newDisplaySecs = Math.max(0, displayBaseSecsRef.current - wallElapsed);
+      }
+
+      // ── Check if a new whole minute of work has been completed ───────────
       if (phaseRef.current === "work") {
-        totalWorkSecondsRef.current += 1;
         const earnedMinutes = Math.floor(totalWorkSecondsRef.current / 60);
         const toSave = earnedMinutes - savedMinutesRef.current;
         if (toSave >= 1) {
@@ -290,70 +349,103 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      setSeconds(prev => {
-        const next = prev <= 1 ? 0 : prev - 1;
+      // ── Persist state every 5 seconds ────────────────────────────────────
+      if (Math.floor(totalWorkSecondsRef.current) % 5 === 0) {
+        saveState({
+          phase: phaseRef.current,
+          seconds: newDisplaySecs,
+          running: runningRef.current,
+          sessionsCompleted: sessionsRef.current,
+          settings: settingsRef.current,
+          savedMinutesToday: savedMinutesRef.current,
+          totalWorkSeconds: totalWorkSecondsRef.current,
+          savedMinutes: savedMinutesRef.current,
+          updatedAt: now,
+        });
+      }
 
-        if (totalWorkSecondsRef.current % 5 === 0) {
-          saveState({
-            phase: phaseRef.current,
-            seconds: next,
-            running: runningRef.current,
-            sessionsCompleted: sessionsRef.current,
-            settings: settingsRef.current,
-            savedMinutesToday: savedMinutesRef.current,
-            totalWorkSeconds: totalWorkSecondsRef.current,
-            savedMinutes: savedMinutesRef.current,
-            updatedAt: Date.now(),
-          });
-        }
+      // ── Advance display ──────────────────────────────────────────────────
+      if (newDisplaySecs <= 0 && secondsRef.current > 0) {
+        // Phase just completed
+        secondsRef.current = 0;
+        setSeconds(0);
+        runningRef.current = false;
+        setRunning(false);
 
-        if (prev <= 1) {
-          runningRef.current = false;
-          setRunning(false);
-
-          if (phaseRef.current === "work") {
-            const remainingWorkSecs = totalWorkSecondsRef.current % 60;
-            if (remainingWorkSecs >= 30) {
+        // Save any remaining fractional work time
+        if (phaseRef.current === "work") {
+          const finalEarned = Math.floor(totalWorkSecondsRef.current / 60);
+          const remaining = finalEarned - savedMinutesRef.current;
+          if (remaining >= 1) {
+            saveMinutes(remaining);
+          } else {
+            // Save a partial final minute if >= 30 seconds remain uncounted
+            const fractional = totalWorkSecondsRef.current - savedMinutesRef.current * 60;
+            if (fractional >= 30) {
               saveMinutes(1);
             }
           }
-
-          nextPhase(phaseRef.current, sessionsRef.current, settingsRef.current);
-          return 0;
         }
-        return next;
-      });
-    }, 1000);
+
+        nextPhase(phaseRef.current, sessionsRef.current, settingsRef.current);
+      } else if (newDisplaySecs !== secondsRef.current) {
+        secondsRef.current = newDisplaySecs;
+        setSeconds(newDisplaySecs);
+      }
+    }, 500); // Run every 500ms for more responsive display
 
     return () => clearInterval(interval);
   }, [running, saveMinutes, nextPhase]);
 
   const start = useCallback(() => {
     if (running) return;
+    const now = Date.now();
+    // Capture wall-clock start for accurate time measurement
+    workWallStartRef.current    = now;
+    workBaseSecsRef.current     = totalWorkSecondsRef.current;
+    displayWallStartRef.current = now;
+    displayBaseSecsRef.current  = secondsRef.current;
     runningRef.current = true;
     setRunning(true);
     persistState();
   }, [running, persistState]);
 
   const pause = useCallback(() => {
+    // Snapshot the accumulated time before pausing
+    if (phaseRef.current === "work" && workWallStartRef.current !== null) {
+      const elapsed = (Date.now() - workWallStartRef.current) / 1000;
+      totalWorkSecondsRef.current = workBaseSecsRef.current + elapsed;
+    }
+    if (displayWallStartRef.current !== null) {
+      const elapsed = Math.floor((Date.now() - displayWallStartRef.current) / 1000);
+      const newSecs = Math.max(0, displayBaseSecsRef.current - elapsed);
+      secondsRef.current = newSecs;
+      setSeconds(newSecs);
+    }
+    workWallStartRef.current    = null;
+    displayWallStartRef.current = null;
     runningRef.current = false;
     setRunning(false);
     persistState();
   }, [persistState]);
 
   const reset = useCallback(() => {
+    workWallStartRef.current    = null;
+    displayWallStartRef.current = null;
     runningRef.current = false;
     setRunning(false);
     totalWorkSecondsRef.current = 0;
     savedMinutesRef.current = 0;
     phaseRef.current = "work";
     sessionsRef.current = 0;
+    const resetSecs = settingsRef.current.workMins * 60;
+    secondsRef.current = resetSecs;
     setPhase("work");
     setSessionsCompleted(0);
-    setSeconds(settingsRef.current.workMins * 60);
+    setSeconds(resetSecs);
     saveState({
       phase: "work",
-      seconds: settingsRef.current.workMins * 60,
+      seconds: resetSecs,
       running: false,
       sessionsCompleted: 0,
       settings: settingsRef.current,
@@ -366,6 +458,11 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
   const skipPhase = useCallback(() => {
     if (phaseRef.current === "work") {
+      // Snapshot current wall time before saving
+      if (workWallStartRef.current !== null) {
+        const elapsed = (Date.now() - workWallStartRef.current) / 1000;
+        totalWorkSecondsRef.current = workBaseSecsRef.current + elapsed;
+      }
       const toSave = Math.floor(totalWorkSecondsRef.current / 60) - savedMinutesRef.current;
       if (toSave > 0) saveMinutes(toSave);
     }
@@ -379,7 +476,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       const next = { ...prev, ...partial };
       settingsRef.current = next;
       if (!runningRef.current && phaseRef.current === "work") {
-        setSeconds(next.workMins * 60);
+        const newSecs = next.workMins * 60;
+        secondsRef.current = newSecs;
+        setSeconds(newSecs);
       }
       return next;
     });

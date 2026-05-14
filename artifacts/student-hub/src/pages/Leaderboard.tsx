@@ -5,7 +5,7 @@ import { SoftGate } from "@/components/SoftGate";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Trophy, Flame, Clock, Sun, RefreshCw } from "lucide-react";
-import { getNepaliDate } from "@/lib/nepaliDate";
+import { getNepaliDate, getNepaliYesterday } from "@/lib/nepaliDate";
 
 const SELECTED_BADGE_KEY = "studenthub_selected_leaderboard_badge";
 
@@ -116,17 +116,22 @@ function LeaderboardContent() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const today = getNepaliDate();
+      const today     = getNepaliDate();
+      const yesterday = getNepaliYesterday();
       const snap  = await getDocs(collection(db, "users"));
       const list: LeaderEntry[] = snap.docs.map(d => {
         const data = d.data();
         const lastActive: string = data.lastActiveDate ?? "";
         const actualToday = lastActive === today ? (data.todayStudyTime ?? 0) : 0;
+        // Only show streak if the user was active today or yesterday
+        // (prevents users who never logged in from having stale streaks)
+        const isStreakAlive = lastActive === today || lastActive === yesterday;
+        const effectiveStreak = isStreakAlive ? (data.streak ?? 0) : 0;
         return {
           uid: d.id,
           name: data.name ?? "",
           grade: data.grade ?? 0,
-          streak: data.streak ?? 0,
+          streak: effectiveStreak,
           totalStudyTime: data.totalStudyTime ?? 0,
           todayStudyTime: actualToday,
           lastActiveDate: lastActive,
