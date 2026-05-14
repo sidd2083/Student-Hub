@@ -275,13 +275,23 @@ html {
   overscroll-behavior: contain;
 }
 
+/* ── Body background — match the page so no white ever shows through ─────── */
+html, body, #root {
+  background-color: #f9fafb;
+  min-height: 100%;
+}
+.dark html, .dark body, .dark #root,
+html.dark, body.dark, #root.dark {
+  background-color: #030712;
+}
+
 /* ── Page transition — enter only, no exit delay ─────────────────────── */
 @keyframes pageIn {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0);    }
 }
 .page-enter {
-  animation: pageIn 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  animation: pageIn 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
   will-change: opacity, transform;
 }
 
