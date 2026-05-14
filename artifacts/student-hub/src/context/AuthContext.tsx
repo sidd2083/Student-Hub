@@ -41,14 +41,39 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// ─── Profile Cache ────────────────────────────────────────────────────────────
+// Caches the user profile in localStorage so the app can show content
+// immediately on startup without waiting for Firestore to respond.
+const PROFILE_CACHE_KEY = "studenthub_profile_v2";
+
+function getCachedProfile(uid: string): UserProfile | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as { uid: string; profile: UserProfile };
+    if (data.uid !== uid) return null;
+    return data.profile;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedProfile(uid: string, profile: UserProfile) {
+  try {
+    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ uid, profile }));
+  } catch {}
+}
+
+function clearProfileCache() {
+  try { localStorage.removeItem(PROFILE_CACHE_KEY); } catch {}
+}
+
+// ─── Firestore helpers ────────────────────────────────────────────────────────
+
 async function fetchProfile(uid: string): Promise<ProfileResult> {
   try {
-    console.log("[Auth] Firestore READ — users/" + uid);
     const snap = await getDoc(doc(db, "users", uid));
-    if (!snap.exists()) {
-      console.log("[Auth] Firestore READ — not found");
-      return { status: "not_found" };
-    }
+    if (!snap.exists()) return { status: "not_found" };
     const d = snap.data();
     const profile: UserProfile = {
       uid: d.uid ?? uid,
@@ -58,7 +83,6 @@ async function fetchProfile(uid: string): Promise<ProfileResult> {
       role: d.role === "admin" ? "admin" : "user",
       createdAt: d.createdAt ?? new Date().toISOString(),
     };
-    console.log("[Auth] Firestore READ — found:", profile.name, "grade:", profile.grade);
     return { status: "found", profile };
   } catch (err) {
     console.error("[Auth] Firestore READ error:", err);
@@ -66,6 +90,7 @@ async function fetchProfile(uid: string): Promise<ProfileResult> {
   }
 }
 
+/** Reset streak if user missed a day — runs in background, non-blocking */
 async function checkAndBreakStreak(uid: string): Promise<void> {
   try {
     const today = getNepaliDate();
@@ -75,18 +100,14 @@ async function checkAndBreakStreak(uid: string): Promise<void> {
     const d = snap.data();
     const lastActive: string = d.lastActiveDate ?? "";
     const currentStreak: number = d.streak ?? 0;
-
     const updates: Record<string, unknown> = {};
-
     if (currentStreak > 0 && lastActive !== today && lastActive !== yesterday) {
       updates.streak = 0;
       console.log("[Auth] Streak broken — missed a day. Was:", currentStreak);
     }
-
     if (lastActive && lastActive !== today && (d.todayStudyTime ?? 0) > 0) {
       updates.todayStudyTime = 0;
     }
-
     if (Object.keys(updates).length > 0) {
       await updateDoc(doc(db, "users", uid), updates);
     }
@@ -101,13 +122,14 @@ async function patchProfileFromFirebase(uid: string, firebaseUser: FirebaseUser,
   if (!profile.email && firebaseUser.email) updates.email = firebaseUser.email;
   if (Object.keys(updates).length === 0) return profile;
   try {
-    console.log("[Auth] Auto-patching missing profile fields:", Object.keys(updates));
     await updateDoc(doc(db, "users", uid), updates);
     return { ...profile, name: (updates.name as string) ?? profile.name, email: (updates.email as string) ?? profile.email };
   } catch {
     return profile;
   }
 }
+
+// ─── AuthProvider ─────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -119,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const applyProfile = useCallback((p: UserProfile | null) => {
     profileRef.current = p;
     setProfileState(p);
+    if (p) setCachedProfile(p.uid, p);
   }, []);
 
   useEffect(() => {
@@ -130,25 +153,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    console.log("[Auth] Initialising auth listener…");
-
+    // Handle Google redirect sign-in result
     getRedirectResult(auth)
       .then(async (result: UserCredential | null) => {
-        if (result?.user) {
-          console.log("[Auth] REDIRECT RESULT:", result.user.email);
-          const isNewUser = getAdditionalUserInfo(result)?.isNewUser ?? false;
-          if (isNewUser) {
-            window.location.replace("/setup-profile");
+        if (!result?.user) return;
+        const isNewUser = getAdditionalUserInfo(result)?.isNewUser ?? false;
+        if (isNewUser) {
+          window.location.replace("/setup-profile");
+        } else {
+          const pr = await fetchProfile(result.user.uid);
+          if (pr.status === "found") {
+            applyProfile(pr.profile);
+            window.location.replace("/dashboard");
           } else {
-            const pr = await fetchProfile(result.user.uid);
-            if (pr.status === "found") {
-              applyProfile(pr.profile);
-              window.location.replace("/dashboard");
-            } else if (pr.status === "not_found") {
-              window.location.replace("/setup-profile");
-            } else {
-              window.location.replace("/dashboard");
-            }
+            window.location.replace("/setup-profile");
           }
         }
       })
@@ -159,13 +177,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!mounted) return;
 
+      // ── Not logged in ──────────────────────────────────────────────────────
       if (!firebaseUser) {
         setUser(null);
         applyProfile(null);
+        clearProfileCache();
         setLoading(false);
         const path = window.location.pathname;
-        const isProtected = /^\/dashboard|^\/settings/.test(path);
-        if (isProtected) {
+        if (/^\/dashboard|^\/settings/.test(path)) {
           window.location.replace("/login");
         }
         return;
@@ -173,39 +192,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(firebaseUser);
 
-      if (profileRef.current) {
+      // ── Fast path: use localStorage cache for instant startup ──────────────
+      const cached = getCachedProfile(firebaseUser.uid);
+      const alreadyHasProfile = profileRef.current;
+
+      if (cached || alreadyHasProfile) {
+        // Show immediately from cache — user sees content in <200ms
+        if (cached && !alreadyHasProfile) {
+          applyProfile(cached);
+        }
         setLoading(false);
+
+        // Verify with Firestore in background (non-blocking)
+        fetchProfile(firebaseUser.uid).then(async result => {
+          if (!mounted) return;
+          if (result.status === "found") {
+            const patched = await patchProfileFromFirebase(firebaseUser.uid, firebaseUser, result.profile);
+            if (!mounted) return;
+            applyProfile(patched);
+            // Run streak check in background — don't block UI
+            checkAndBreakStreak(firebaseUser.uid).then(async () => {
+              if (!mounted) return;
+              const fresh = await fetchProfile(firebaseUser.uid);
+              if (!mounted) return;
+              if (fresh.status === "found") applyProfile(fresh.profile);
+            }).catch(() => {});
+          }
+        }).catch(() => {});
         return;
       }
 
+      // ── First login: fetch from Firestore then show ────────────────────────
       const result = await fetchProfile(firebaseUser.uid);
       if (!mounted) return;
 
       const currentPath = window.location.pathname;
 
       if (result.status === "found") {
-        // Break streak BEFORE displaying profile so the user sees the corrected value
-        await checkAndBreakStreak(firebaseUser.uid);
-        // Re-fetch to pick up any streak reset that just happened
-        const freshResult = await fetchProfile(firebaseUser.uid);
-        const freshProfile = freshResult.status === "found" ? freshResult.profile : result.profile;
-        const patched = await patchProfileFromFirebase(firebaseUser.uid, firebaseUser, freshProfile);
+        const patched = await patchProfileFromFirebase(firebaseUser.uid, firebaseUser, result.profile);
         if (!mounted) return;
         applyProfile(patched);
         setLoading(false);
+
         if (currentPath === "/" || currentPath === "/login") {
           window.location.replace("/dashboard");
         }
+
+        // Streak check runs in background after content is visible
+        checkAndBreakStreak(firebaseUser.uid).then(async () => {
+          if (!mounted) return;
+          const fresh = await fetchProfile(firebaseUser.uid);
+          if (!mounted) return;
+          if (fresh.status === "found") applyProfile(fresh.profile);
+        }).catch(() => {});
+
       } else if (result.status === "not_found") {
         applyProfile(null);
         setLoading(false);
         const safePages = ["/setup-profile", "/onboarding"];
         if (!safePages.some(p => currentPath.startsWith(p))) {
-          console.log("[Auth] no profile → /setup-profile");
           window.location.replace("/setup-profile");
         }
       } else {
         console.warn("[Auth] Firestore error:", result.code);
+        // On error, still show loading=false so the app doesn't hang forever
         setLoading(false);
       }
     });
@@ -234,7 +284,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const cred = await signInWithPopup(auth, googleProvider);
       const isNewUser = getAdditionalUserInfo(cred)?.isNewUser ?? false;
-      console.log("[Auth] LOGIN:", cred.user.email, "isNewUser:", isNewUser);
 
       if (isNewUser) {
         window.location.replace("/setup-profile");
@@ -246,8 +295,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const patched = await patchProfileFromFirebase(cred.user.uid, cred.user, pr.profile);
         applyProfile(patched);
         window.location.replace("/dashboard");
-      } else if (pr.status === "not_found") {
-        window.location.replace("/setup-profile");
       } else {
         window.location.replace("/setup-profile");
       }
@@ -271,6 +318,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await firebaseSignOut(auth);
     setUser(null);
     applyProfile(null);
+    clearProfileCache();
     setLoading(false);
     window.location.replace("/");
   };

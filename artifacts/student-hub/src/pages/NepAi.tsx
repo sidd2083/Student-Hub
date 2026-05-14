@@ -224,7 +224,7 @@ function NepAiContent() {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.warn("[NepAI] call failed:", errMsg);
       const isRateLimit = errMsg.includes("busy") || errMsg.includes("too many") || errMsg.includes("rate") || errMsg.includes("429");
-      const isConfig    = errMsg.includes("not configured") || errMsg.includes("API key");
+      const isConfig    = errMsg.includes("not configured") || errMsg.includes("GEMINI_API_KEY") || errMsg.includes("API key") || errMsg.includes("503");
       const isUserFriendly = errMsg.length >= 10 && errMsg.length <= 300 && !errMsg.match(/^(AI service|status |fetch)/i);
       if (isRateLimit) startCooldown(20);
       setMessages(prev => [...prev, {
@@ -232,7 +232,7 @@ function NepAiContent() {
         content: isRateLimit
           ? "Nep AI is a little busy — please wait 20 seconds and try again!"
           : isConfig
-          ? "⚠️ Nep AI isn't connected. Please make sure GEMINI_API_KEY is set in your Vercel environment variables and redeploy."
+          ? "⚠️ Nep AI isn't connected.\n\nTo fix this on Vercel:\n1. Go to your Vercel project → Settings → Environment Variables\n2. Add **GEMINI_API_KEY** with your Google AI key\n3. Make sure it's enabled for **Production** environment\n4. Click **Redeploy** (not just save — you must redeploy!)\n\nGet a free key at: https://aistudio.google.com/apikey"
           : isUserFriendly
           ? errMsg
           : "Sorry, I ran into a temporary issue. Please try again in a moment!",

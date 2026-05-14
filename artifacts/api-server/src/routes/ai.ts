@@ -1,6 +1,5 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 import { logger } from "../lib/logger";
 
@@ -59,31 +58,55 @@ function buildSystemContent(context?: ChatContext): string {
   return SYSTEM_PROMPT + parts.join("\n");
 }
 
+/** Call Gemini via direct REST API — avoids SDK version issues and cold-start overhead */
 async function askGemini(systemContent: string, history: ChatMessage[], message: string): Promise<string> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("NO_GEMINI_KEY");
 
-  const gemini = new GoogleGenerativeAI(key);
-  const model = gemini.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    systemInstruction: systemContent,
+  const contents = [
+    ...history
+      .filter(h => h.role === "user" || h.role === "assistant")
+      .map(h => ({
+        role: h.role === "assistant" ? "model" : "user",
+        parts: [{ text: h.content }],
+      })),
+    { role: "user", parts: [{ text: message }] },
+  ];
+
+  const body = {
+    system_instruction: { parts: [{ text: systemContent }] },
+    contents,
     generationConfig: {
       maxOutputTokens: 800,
       temperature: 0.7,
-      // @ts-ignore — thinkingConfig is supported but not yet in all type definitions
-      thinkingConfig: { thinkingBudget: 0 },
     },
-  });
+  };
 
-  const geminiHistory = history
-    .filter(h => h.role === "user" || h.role === "assistant")
-    .map(h => ({ role: h.role === "assistant" ? "model" : "user", parts: [{ text: h.content }] }));
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(25000),
+    }
+  );
 
-  const chat = model.startChat({ history: geminiHistory });
-  const result = await chat.sendMessage(message);
-  return result.response.text() || "I couldn't generate a response. Please try again.";
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({})) as { error?: { message?: string; code?: number } };
+    const msg = errBody?.error?.message ?? `HTTP ${res.status}`;
+    if (res.status === 400 && msg.toLowerCase().includes("api key")) throw new Error("NO_GEMINI_KEY");
+    throw new Error(`Gemini ${res.status}: ${msg}`);
+  }
+
+  const data = await res.json() as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  return text ?? "I couldn't generate a response. Please try again.";
 }
 
+/** OpenAI fallback (uses Replit AI integration key or user-set OPENAI_API_KEY) */
 async function askOpenAI(systemContent: string, history: ChatMessage[], message: string): Promise<string> {
   const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("NO_OPENAI_KEY");
@@ -108,6 +131,18 @@ async function askOpenAI(systemContent: string, history: ChatMessage[], message:
   return completion.choices[0]?.message?.content ?? "I couldn't generate a response. Please try again.";
 }
 
+/** Health check: tells client which AI backend is active */
+router.get("/ai/status", (_req: Request, res: Response) => {
+  const hasGemini = !!process.env.GEMINI_API_KEY;
+  const hasOpenAI = !!(process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY);
+  res.json({
+    ok: hasGemini || hasOpenAI,
+    gemini: hasGemini,
+    openai: hasOpenAI,
+    backend: hasGemini ? "gemini" : hasOpenAI ? "openai" : "none",
+  });
+});
+
 router.post("/ai/chat", async (req: Request, res: Response) => {
   try {
     const { message, history = [], context } = req.body as {
@@ -123,13 +158,13 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
 
     if (!hasGemini && !hasOpenAI) {
       return res.status(503).json({
-        error: "AI not configured — set GEMINI_API_KEY in your Vercel environment variables and redeploy.",
+        error: "Nep AI is not configured. Please set GEMINI_API_KEY in your Vercel environment variables and redeploy.",
       });
     }
 
     const systemContent = buildSystemContent(context);
 
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 2; attempt++) {
       try {
         let reply: string;
 
@@ -137,10 +172,9 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
           try {
             reply = await askGemini(systemContent, history, message);
           } catch (geminiErr) {
-            const gErr = String(geminiErr);
-            if (!hasOpenAI || gErr.includes("NO_GEMINI_KEY")) throw geminiErr;
-            // Gemini failed — fallback to OpenAI
-            logger.warn({ err: gErr }, "Gemini failed, trying OpenAI fallback");
+            const gStr = String(geminiErr);
+            if (!hasOpenAI) throw geminiErr;
+            logger.warn({ err: gStr }, "Gemini failed, trying OpenAI fallback");
             reply = await askOpenAI(systemContent, history, message);
           }
         } else {
@@ -152,8 +186,8 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
       } catch (err: unknown) {
         const errStr = String(err);
         const isRate = errStr.includes("429") || errStr.toLowerCase().includes("quota") || errStr.toLowerCase().includes("rate");
-        if (isRate && attempt < 2) {
-          await new Promise(r => setTimeout(r, (attempt + 1) * 3000));
+        if (isRate && attempt < 1) {
+          await new Promise(r => setTimeout(r, 3000));
           continue;
         }
         throw err;
