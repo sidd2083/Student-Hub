@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { collection, doc, getDoc, setDoc, deleteDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { ArrowLeft, FileText, ImageIcon, ExternalLink, X, BookOpen, Bookmark, Download, ChevronRight } from "lucide-react";
+import { ArrowLeft, FileText, ImageIcon, ExternalLink, X, BookOpen, Bookmark, Download, ChevronRight, Plus, Minus, RotateCcw } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 function toSlug(str: string) {
@@ -149,6 +149,58 @@ export default function PyqPage() {
   const id = params.id || "";
   const [imgZoomed, setImgZoomed] = useState(false);
   const [zoomedSrc, setZoomedSrc] = useState<string | null>(null);
+
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const lastTouchDist = useRef<number | null>(null);
+  const lastPanPos = useRef<{ x: number; y: number } | null>(null);
+  const isDragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0, px: 0, py: 0 });
+
+  const openLightbox = () => { setImgZoomed(true); setZoom(1); setPan({ x: 0, y: 0 }); };
+  const closeLightbox = () => { setImgZoomed(false); setZoom(1); setPan({ x: 0, y: 0 }); };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setZoom(prev => Math.max(1, Math.min(5, prev * (e.deltaY < 0 ? 1.12 : 0.89))));
+  };
+
+  const handleDblClick = () => setZoom(prev => prev > 1.2 ? 1 : 2.5);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoom <= 1) return;
+    isDragging.current = true;
+    dragStart.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y };
+  };
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current) return;
+    setPan({ x: dragStart.current.px + e.clientX - dragStart.current.x, y: dragStart.current.py + e.clientY - dragStart.current.y });
+  };
+  const handleMouseUp = () => { isDragging.current = false; };
+
+  const getTouchDist = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) return null;
+    return Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  };
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) { lastTouchDist.current = getTouchDist(e); lastPanPos.current = null; }
+    else if (e.touches.length === 1) { lastPanPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }
+  };
+  const handleTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault();
+    if (e.touches.length === 2) {
+      const d = getTouchDist(e);
+      if (d && lastTouchDist.current) setZoom(prev => Math.max(1, Math.min(5, prev * d / lastTouchDist.current!)));
+      lastTouchDist.current = d;
+    } else if (e.touches.length === 1 && lastPanPos.current && zoom > 1) {
+      const dx = e.touches[0].clientX - lastPanPos.current.x;
+      const dy = e.touches[0].clientY - lastPanPos.current.y;
+      setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+      lastPanPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  };
+  const handleTouchEnd = () => { lastTouchDist.current = null; lastPanPos.current = null; };
   const [pyq, setPyq] = useState<FirePyq | null>(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -301,27 +353,75 @@ export default function PyqPage() {
                   <img
                     src={pyq.pdfUrl}
                     alt={pyq.title}
-                    onClick={() => setImgZoomed(true)}
+                    onClick={openLightbox}
                     className="max-w-full rounded-2xl shadow-sm cursor-zoom-in hover:opacity-95 transition-opacity"
                     style={{ maxHeight: "70vh", objectFit: "contain" }}
                   />
-                  <p className="text-xs text-gray-400">Click to zoom · Use the Download button to save the image</p>
+                  <p className="text-xs text-gray-400">Click to open · Scroll or pinch to zoom · Drag to pan</p>
                   {imgZoomed && (
                     <div
-                      className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center cursor-zoom-out"
-                      onClick={() => setImgZoomed(false)}
+                      className="fixed inset-0 bg-black/92 z-[60] flex items-center justify-center select-none"
+                      style={{ cursor: zoom > 1 ? "grab" : "default" }}
+                      onWheel={handleWheel}
+                      onMouseDown={handleMouseDown}
+                      onMouseMove={handleMouseMove}
+                      onMouseUp={handleMouseUp}
+                      onMouseLeave={handleMouseUp}
+                      onTouchStart={handleTouchStart}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={handleTouchEnd}
                     >
-                      <img src={pyq.pdfUrl} alt={pyq.title} className="max-w-full max-h-full object-contain p-4" />
+                      <img
+                        src={pyq.pdfUrl}
+                        alt={pyq.title}
+                        onDoubleClick={handleDblClick}
+                        draggable={false}
+                        style={{
+                          maxWidth: "90vw",
+                          maxHeight: "88vh",
+                          objectFit: "contain",
+                          transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                          transformOrigin: "center center",
+                          transition: isDragging.current ? "none" : "transform 0.12s ease-out",
+                          touchAction: "none",
+                          userSelect: "none",
+                        }}
+                      />
+
+                      {/* Top bar */}
+                      <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5">
+                        <button onClick={e => { e.stopPropagation(); setZoom(prev => Math.max(1, +(prev / 1.3).toFixed(2))); }}
+                          className="w-7 h-7 flex items-center justify-center text-white hover:text-gray-300 transition-colors">
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="text-white text-xs font-medium w-10 text-center">{Math.round(zoom * 100)}%</span>
+                        <button onClick={e => { e.stopPropagation(); setZoom(prev => Math.min(5, +(prev * 1.3).toFixed(2))); }}
+                          className="w-7 h-7 flex items-center justify-center text-white hover:text-gray-300 transition-colors">
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                        <div className="w-px h-4 bg-white/20 mx-0.5" />
+                        <button onClick={e => { e.stopPropagation(); setZoom(1); setPan({ x: 0, y: 0 }); }}
+                          className="w-7 h-7 flex items-center justify-center text-white hover:text-gray-300 transition-colors">
+                          <RotateCcw className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      {/* Close */}
                       <button
-                        className="absolute top-4 right-4 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30"
-                        onClick={() => setImgZoomed(false)}
+                        className="absolute top-4 right-4 w-9 h-9 bg-white/15 rounded-full flex items-center justify-center hover:bg-white/25 transition-colors"
+                        onClick={e => { e.stopPropagation(); closeLightbox(); }}
                       >
                         <X className="w-4 h-4 text-white" />
                       </button>
+
+                      {/* Download */}
                       <a href={pyq.pdfUrl} download onClick={e => e.stopPropagation()}
-                        className="absolute bottom-4 right-4 flex items-center gap-1.5 px-3 py-2 bg-white/20 text-white rounded-xl text-sm hover:bg-white/30 transition-all">
+                        className="absolute bottom-4 right-4 flex items-center gap-1.5 px-3 py-2 bg-white/15 text-white rounded-xl text-sm hover:bg-white/25 transition-colors backdrop-blur-sm">
                         <Download className="w-3.5 h-3.5" /> Download
                       </a>
+
+                      {/* Hint */}
+                      <p className="absolute bottom-4 left-4 text-white/40 text-xs">Double-tap to zoom · Pinch to zoom on mobile</p>
                     </div>
                   )}
                 </div>

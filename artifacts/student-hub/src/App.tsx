@@ -14,27 +14,27 @@ import { AppShell } from "@/components/AppShell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { InstallBanner } from "@/components/InstallBanner";
 
-// ── Eager imports (zero load delay on navigation) ──────────────────────────
-import Home        from "@/pages/Home";
-import Login       from "@/pages/Login";
-import Onboarding  from "@/pages/Onboarding";
-import Dashboard   from "@/pages/Dashboard";
-import Notes       from "@/pages/Notes";
-import NotePage    from "@/pages/NotePage";
-import Pyqs        from "@/pages/Pyqs";
-import PyqPage     from "@/pages/PyqPage";
-import Todo        from "@/pages/Todo";
-import Pomodoro    from "@/pages/Pomodoro";
-import NepAi       from "@/pages/NepAi";
-import Leaderboard from "@/pages/Leaderboard";
-import ReportCard  from "@/pages/ReportCard";
-import Settings    from "@/pages/Settings";
-import About       from "@/pages/About";
-import Contact     from "@/pages/Contact";
-import Saved       from "@/pages/Saved";
-import McqPractice from "@/pages/McqPractice";
+// ── Eager: only the shell pages that must be instant ───────────────────────
+import Home       from "@/pages/Home";
+import Login      from "@/pages/Login";
+import Dashboard  from "@/pages/Dashboard";
+import Onboarding from "@/pages/Onboarding";
 
-// ── Lazy-only for rarely visited pages ─────────────────────────────────────
+// ── Lazy: everything else — loaded on demand, cached by SW ─────────────────
+const Notes       = lazy(() => import("@/pages/Notes"));
+const NotePage    = lazy(() => import("@/pages/NotePage"));
+const Pyqs        = lazy(() => import("@/pages/Pyqs"));
+const PyqPage     = lazy(() => import("@/pages/PyqPage"));
+const Todo        = lazy(() => import("@/pages/Todo"));
+const Pomodoro    = lazy(() => import("@/pages/Pomodoro"));
+const NepAi       = lazy(() => import("@/pages/NepAi"));
+const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
+const ReportCard  = lazy(() => import("@/pages/ReportCard"));
+const Settings    = lazy(() => import("@/pages/Settings"));
+const About       = lazy(() => import("@/pages/About"));
+const Contact     = lazy(() => import("@/pages/Contact"));
+const Saved       = lazy(() => import("@/pages/Saved"));
+const McqPractice = lazy(() => import("@/pages/McqPractice"));
 const AdminLogin    = lazy(() => import("@/pages/AdminLogin"));
 const Admin         = lazy(() => import("@/pages/Admin"));
 const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
@@ -53,8 +53,8 @@ const queryClient = new QueryClient({
 
 const pageVariants = {
   initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.2, ease: "easeOut" } },
-  exit:    { opacity: 0, transition: { duration: 0.12, ease: "easeIn" } },
+  animate: { opacity: 1, transition: { duration: 0.16, ease: "easeOut" } },
+  exit:    { opacity: 0, transition: { duration: 0.06, ease: "easeIn" } },
 };
 
 function AppRoutes() {
@@ -67,7 +67,7 @@ function AppRoutes() {
         initial="initial"
         animate="animate"
         exit="exit"
-        style={{ minHeight: "100%" }}
+        style={{ minHeight: "100%", display: "flex", flexDirection: "column" }}
       >
         <Switch>
           <Route path="/" component={Home} />

@@ -9,6 +9,48 @@ import { db } from "@/lib/firebase";
 
 interface Message { role: "user" | "assistant"; content: string }
 
+function markdownToHtml(text: string): string {
+  const renderInline = (s: string) =>
+    s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+     .replace(/\*(.+?)\*/g, "<em>$1</em>")
+     .replace(/`(.+?)`/g, '<code style="background:#f3f4f6;padding:1px 5px;border-radius:4px;font-size:0.85em;font-family:monospace">$1</code>');
+
+  const lines = text.split("\n");
+  const out: string[] = [];
+  let inUl = false, inOl = false;
+
+  const closeList = () => {
+    if (inUl) { out.push("</ul>"); inUl = false; }
+    if (inOl) { out.push("</ol>"); inOl = false; }
+  };
+
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) { closeList(); continue; }
+
+    if (t.startsWith("### ")) { closeList(); out.push(`<p style="font-weight:700;margin:8px 0 2px">${renderInline(t.slice(4))}</p>`); continue; }
+    if (t.startsWith("## "))  { closeList(); out.push(`<p style="font-weight:700;margin:8px 0 2px">${renderInline(t.slice(3))}</p>`); continue; }
+    if (t.startsWith("# "))   { closeList(); out.push(`<p style="font-weight:700;margin:8px 0 2px">${renderInline(t.slice(2))}</p>`); continue; }
+
+    const bullet = t.match(/^[*\-] (.+)/);
+    if (bullet) {
+      if (!inUl) { closeList(); out.push('<ul style="margin:4px 0;padding-left:18px;list-style:disc">'); inUl = true; }
+      out.push(`<li style="margin:2px 0">${renderInline(bullet[1])}</li>`);
+      continue;
+    }
+    const num = t.match(/^(\d+)\. (.+)/);
+    if (num) {
+      if (!inOl) { closeList(); out.push('<ol style="margin:4px 0;padding-left:18px;list-style:decimal">'); inOl = true; }
+      out.push(`<li style="margin:2px 0">${renderInline(num[2])}</li>`);
+      continue;
+    }
+    closeList();
+    out.push(`<p style="margin:3px 0;line-height:1.55">${renderInline(t)}</p>`);
+  }
+  closeList();
+  return out.join("");
+}
+
 interface StudyContext {
   stats?: {
     streak: number;
@@ -359,16 +401,20 @@ function NepAiContent() {
                 <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
               </div>
             )}
-            <div
-              data-testid={`msg-${msg.role}-${i}`}
-              className={`max-w-[78%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                msg.role === "user"
-                  ? "bg-blue-500 text-white rounded-br-sm"
-                  : "bg-white border border-gray-100 text-gray-800 shadow-sm rounded-bl-sm"
-              }`}
-            >
-              {msg.content}
-            </div>
+            {msg.role === "user" ? (
+              <div
+                data-testid={`msg-${msg.role}-${i}`}
+                className="max-w-[78%] px-4 py-3 rounded-2xl rounded-br-sm text-sm leading-relaxed bg-blue-500 text-white"
+              >
+                {msg.content}
+              </div>
+            ) : (
+              <div
+                data-testid={`msg-${msg.role}-${i}`}
+                className="max-w-[82%] px-4 py-3 rounded-2xl rounded-bl-sm text-sm text-gray-800 bg-white border border-gray-100 shadow-sm"
+                dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content) }}
+              />
+            )}
           </div>
         ))}
 
