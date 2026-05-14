@@ -285,14 +285,21 @@ html.dark, body.dark, #root.dark {
   background-color: #030712;
 }
 
-/* ── Page transition — smooth opacity crossfade, no movement ─────────── */
+/* ── Page transition — swipe in from right, expo-out easing ──────────── */
 @keyframes pageIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 .page-enter {
-  animation: pageIn 0.15s ease-out both;
-  will-change: opacity;
+  /* cubic-bezier(0.16,1,0.3,1) = expo-out — same curve iOS uses for push nav */
+  animation: pageIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform;
 }
 
 /* ── Card hover lift ─────────────────────────────────────────────────── */
