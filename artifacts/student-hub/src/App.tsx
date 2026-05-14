@@ -138,6 +138,16 @@ function Router() {
 
 function App() {
   useEffect(() => {
+    // Remove the inline splash screen now that React has mounted
+    const splash = document.getElementById("app-loading");
+    if (splash) {
+      splash.style.opacity = "0";
+      const t = setTimeout(() => splash.remove(), 260);
+      return () => clearTimeout(t);
+    }
+  }, []);
+
+  useEffect(() => {
     const saved = localStorage.getItem("theme");
     if (saved === "dark") {
       document.documentElement.classList.add("dark");

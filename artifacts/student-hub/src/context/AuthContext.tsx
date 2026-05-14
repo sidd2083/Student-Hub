@@ -41,10 +41,19 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// ─── Profile Cache ────────────────────────────────────────────────────────────
-// Caches the user profile in localStorage so the app can show content
-// immediately on startup without waiting for Firestore to respond.
+// ─── Profile Cache + Auth Hint ────────────────────────────────────────────────
+// The profile cache stores full user data; the auth hint is a lightweight flag
+// that tells AppShell "someone was logged in on this device" so it can show the
+// authenticated layout instantly — even before the profile cache is available.
 const PROFILE_CACHE_KEY = "studenthub_profile_v2";
+const AUTH_HINT_KEY = "sh_authed";
+
+function setAuthHint(authed: boolean) {
+  try {
+    if (authed) localStorage.setItem(AUTH_HINT_KEY, "1");
+    else localStorage.removeItem(AUTH_HINT_KEY);
+  } catch {}
+}
 
 function getCachedProfile(uid: string): UserProfile | null {
   try {
@@ -155,7 +164,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const applyProfile = useCallback((p: UserProfile | null) => {
     profileRef.current = p;
     setProfileState(p);
-    if (p) setCachedProfile(p.uid, p);
+    if (p) {
+      setCachedProfile(p.uid, p);
+      setAuthHint(true);   // user is logged in — set hint for instant layout on next open
+    } else {
+      setAuthHint(false);  // user logged out — clear hint immediately
+    }
   }, []);
 
   useEffect(() => {
