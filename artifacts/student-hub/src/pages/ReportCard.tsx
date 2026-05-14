@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { Helmet } from "react-helmet-async";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { setAiContext } from "@/lib/aiContext";
 import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
@@ -249,6 +250,7 @@ interface CustomBadge { id: string; text: string; emoji: string; color: string }
 
 function ReportContent() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [stats, setStats] = useState<StudyStats | null>(null);
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -331,7 +333,7 @@ function ReportContent() {
   const bestDay = dailyLogs.length > 0 ? Math.max(...dailyLogs.map(l => l.studyMinutes)) : 0;
   const activeDays = dailyLogs.filter(l => l.studyMinutes > 0).length;
   const avgDaily = activeDays > 0 ? Math.round(periodMins / Math.max(periodDays, 1)) : 0;
-  const aiContextParam = encodeURIComponent(
+  const aiContextRaw =
 `Do a DEEP, MOTIVATIONAL analysis of my study performance. Here is ALL my data:
 
 **My Study Stats:**
@@ -355,8 +357,7 @@ function ReportContent() {
 5. Give me a specific daily study plan for the next week
 6. End with a powerful motivational message about why consistent effort now = results later
 
-Be real with me. Don't sugarcoat — but keep me motivated.`
-  );
+Be real with me. Don't sugarcoat — but keep me motivated.`;
 
   return (
     <div className="p-4 sm:p-8 max-w-3xl mx-auto">
@@ -480,8 +481,8 @@ Be real with me. Don't sugarcoat — but keep me motivated.`
         </>
       )}
 
-      <Link
-        href={`/ai?q=${aiContextParam}`}
+      <button
+        onClick={() => { setAiContext(aiContextRaw); setLocation("/ai"); }}
         className="flex items-center justify-between w-full bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl px-5 py-4 mb-5 hover:from-indigo-100 hover:to-purple-100 transition-all group"
       >
         <div className="flex items-center gap-3">
@@ -494,7 +495,7 @@ Be real with me. Don't sugarcoat — but keep me motivated.`
           </div>
         </div>
         <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-indigo-500 transition-colors" />
-      </Link>
+      </button>
 
       {(badges.length > 0 || customBadges.length > 0) ? (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">

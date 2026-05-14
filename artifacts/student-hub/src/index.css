@@ -285,14 +285,14 @@ html.dark, body.dark, #root.dark {
   background-color: #030712;
 }
 
-/* ── Page transition — enter only, no exit delay ─────────────────────── */
+/* ── Page transition — smooth opacity crossfade, no movement ─────────── */
 @keyframes pageIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0);    }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 .page-enter {
-  animation: pageIn 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
-  will-change: opacity, transform;
+  animation: pageIn 0.15s ease-out both;
+  will-change: opacity;
 }
 
 /* ── Card hover lift ─────────────────────────────────────────────────── */

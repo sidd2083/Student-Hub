@@ -3,7 +3,8 @@ import { Helmet } from "react-helmet-async";
 import { SoftGate } from "@/components/SoftGate";
 import { useAuth } from "@/context/AuthContext";
 import { Send, MessageCircle, Sparkles, BookOpen, BarChart2, ListChecks } from "lucide-react";
-import { useSearch } from "wouter";
+import { useSearch, useLocation } from "wouter";
+import { consumeAiContext } from "@/lib/aiContext";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -219,7 +220,7 @@ async function loadStudyContext(uid: string): Promise<StudyContext> {
 function NepAiContent() {
   const { user } = useAuth();
   const search = useSearch();
-  const initialQ = new URLSearchParams(search).get("q") || "";
+  const [location] = useLocation();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -230,6 +231,7 @@ function NepAiContent() {
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoSentRef = useRef(false);
   const prevInitialQRef = useRef<string>("");
+  const lastCtxIdRef = useRef<string>("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const startCooldown = (seconds: number) => {
@@ -248,25 +250,41 @@ function NepAiContent() {
   }, [messages, loading]);
 
   useEffect(() => {
-    if (!initialQ || !user) return;
-    // Reset autoSentRef when the query changes (e.g. coming from a different note)
-    if (initialQ !== prevInitialQRef.current) {
-      prevInitialQRef.current = initialQ;
-      autoSentRef.current = false;
-    }
-    if (autoSentRef.current) return;
-    autoSentRef.current = true;
-    (async () => {
-      setLoadingCtx(true);
-      let ctx: StudyContext | null = null;
-      try {
-        ctx = await loadStudyContext(user.uid);
-        setContext(ctx);
-      } catch { } finally { setLoadingCtx(false); }
+    if (!user) return;
 
-      const msg = initialQ;
+    // 1. Check sessionStorage for context set by Notes / ReportCard
+    const pending = consumeAiContext();
+    if (pending && pending.id !== lastCtxIdRef.current) {
+      lastCtxIdRef.current = pending.id;
+      const msg = pending.context;
       setMessages([{ role: "user", content: msg }]);
       setLoading(true);
+      setLoadingCtx(true);
+      (async () => {
+        let ctx: StudyContext | null = null;
+        try { ctx = await loadStudyContext(user.uid); setContext(ctx); } catch { }
+        finally { setLoadingCtx(false); }
+        try {
+          const reply = await callOpenAI(msg, [], ctx);
+          setMessages(prev => [...prev, { role: "assistant", content: reply }]);
+        } catch {
+          setMessages(prev => [...prev, { role: "assistant", content: getLocalFallback(msg) }]);
+        } finally { setLoading(false); }
+      })();
+      return;
+    }
+
+    // 2. Fall back to URL query string (direct links / bookmarks)
+    const urlQ = new URLSearchParams(search).get("q") || "";
+    if (!urlQ || urlQ === prevInitialQRef.current) return;
+    prevInitialQRef.current = urlQ;
+    autoSentRef.current = true;
+    const msg = urlQ;
+    setMessages([{ role: "user", content: msg }]);
+    setLoading(true);
+    (async () => {
+      let ctx: StudyContext | null = null;
+      try { ctx = await loadStudyContext(user.uid); setContext(ctx); } catch { }
       try {
         const reply = await callOpenAI(msg, [], ctx);
         setMessages(prev => [...prev, { role: "assistant", content: reply }]);
@@ -274,7 +292,7 @@ function NepAiContent() {
         setMessages(prev => [...prev, { role: "assistant", content: getLocalFallback(msg) }]);
       } finally { setLoading(false); }
     })();
-  }, [initialQ, user]);
+  }, [location, user]);
 
   const loadContextManual = useCallback(async () => {
     if (!user?.uid) return;
