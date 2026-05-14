@@ -68,7 +68,7 @@ export default function Contact() {
                     type="text"
                     value={form.name}
                     onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                    placeholder="Aarav Sharma"
+                    placeholder="Harka Saha"
                     required
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -79,7 +79,7 @@ export default function Contact() {
                     type="email"
                     value={form.email}
                     onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                    placeholder="aarav@example.com"
+                    placeholder="balen.sampang@example.com"
                     required
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />

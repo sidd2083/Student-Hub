@@ -295,23 +295,37 @@ export default function Dashboard() {
         <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-5 sm:mb-6">
           <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
             <p className="text-xs sm:text-sm text-gray-500 mb-1">Pending Tasks</p>
-            <p className="text-2xl sm:text-3xl font-bold text-gray-900">{pendingTasks}</p>
+            {!statsLoaded ? (
+              <div className="skeleton h-8 w-12 mt-1" />
+            ) : (
+              <p className="text-2xl sm:text-3xl font-bold text-gray-900">{pendingTasks}</p>
+            )}
           </div>
           <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
             <p className="text-xs sm:text-sm text-gray-500 mb-1">Study Time</p>
-            <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-              {!statsLoaded ? "—" : studyMins > 0 ? fmtStudy(studyMins) : "0m"}
-            </p>
+            {!statsLoaded ? (
+              <div className="skeleton h-8 w-16 mt-1" />
+            ) : (
+              <p className="text-2xl sm:text-3xl font-bold text-gray-900">
+                {studyMins > 0 ? fmtStudy(studyMins) : "0m"}
+              </p>
+            )}
           </div>
           <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
             <div className="flex items-center gap-1 sm:gap-1.5 mb-1">
               <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />
               <p className="text-xs sm:text-sm text-gray-500">Streak</p>
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-orange-500">
-              {streak}<span className="text-xs sm:text-base font-normal text-gray-400 ml-1">days</span>
-            </p>
-            <p className="text-[10px] text-gray-400 mt-1 leading-tight">Study ≥5 min/day to keep streak</p>
+            {!statsLoaded ? (
+              <div className="skeleton h-8 w-14 mt-1" />
+            ) : (
+              <>
+                <p className="text-2xl sm:text-3xl font-bold text-orange-500">
+                  {streak}<span className="text-xs sm:text-base font-normal text-gray-400 ml-1">days</span>
+                </p>
+                <p className="text-[10px] text-gray-400 mt-1 leading-tight">Study ≥5 min/day to keep streak</p>
+              </>
+            )}
           </div>
         </div>
 

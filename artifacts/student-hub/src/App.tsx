@@ -52,22 +52,22 @@ const queryClient = new QueryClient({
 });
 
 const pageVariants = {
-  initial: { opacity: 0, y: 14 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] } },
-  exit:    { opacity: 0,       transition: { duration: 0.08 } },
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] } },
+  exit:    { opacity: 0,       transition: { duration: 0.1,  ease: "easeIn" } },
 };
 
 function AppRoutes() {
   const [location] = useLocation();
   return (
-    <AnimatePresence initial={false}>
+    <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={location}
         variants={pageVariants}
         initial="initial"
         animate="animate"
         exit="exit"
-        style={{ willChange: "opacity, transform" }}
+        style={{ willChange: "opacity, transform", minHeight: "100%" }}
       >
         <Switch>
           <Route path="/" component={Home} />

@@ -1,3 +1,40 @@
+async function callGemini(systemContent, history, message) {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new Error("NO_GEMINI_KEY");
+
+  const contents = [
+    ...history
+      .filter(h => h.role === "user" || h.role === "assistant")
+      .map(h => ({
+        role: h.role === "assistant" ? "model" : "user",
+        parts: [{ text: h.content }],
+      })),
+    { role: "user", parts: [{ text: message }] },
+  ];
+
+  const body = {
+    system_instruction: { parts: [{ text: systemContent }] },
+    contents,
+    generationConfig: { maxOutputTokens: 800, temperature: 0.7 },
+  };
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(25000) }
+  );
+
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    const msg = errBody?.error?.message ?? `HTTP ${res.status}`;
+    if (res.status === 400 && msg.toLowerCase().includes("api key")) throw new Error("NO_GEMINI_KEY");
+    throw new Error(`Gemini ${res.status}: ${msg}`);
+  }
+
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  return text ?? "I couldn't generate a response. Please try again.";
+}
+
 const SYSTEM_PROMPT = `You are Nep AI, a friendly and highly knowledgeable study assistant for high school students (grades 9-12) in Nepal. You have up-to-date knowledge through 2026.
 
 Your identity:
@@ -106,24 +143,40 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "message is required" });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY ?? process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-    const baseURL = process.env.OPENAI_BASE_URL ?? null;
+    const hasGemini = !!process.env.GEMINI_API_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY ?? process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+    const hasOpenAI = !!openaiKey;
 
-    if (!apiKey) {
+    if (!hasGemini && !hasOpenAI) {
       return res.status(503).json({
-        error: "AI not configured — set OPENAI_API_KEY in Vercel environment variables."
+        error: "Nep AI is not configured. Please add GEMINI_API_KEY in your Vercel project settings under Settings → Environment Variables, then redeploy."
       });
     }
 
-    const messages = [
-      { role: "system", content: buildSystemContent(context) },
-      ...history
-        .filter(m => m && (m.role === "user" || m.role === "assistant") && m.content)
-        .map(m => ({ role: m.role, content: m.content })),
-      { role: "user", content: message },
-    ];
+    const systemContent = buildSystemContent(context);
+    let reply;
 
-    const reply = await callOpenAI(apiKey, baseURL, messages);
+    if (hasGemini) {
+      try {
+        reply = await callGemini(systemContent, history, message);
+      } catch (geminiErr) {
+        if (!hasOpenAI) throw geminiErr;
+        const openaiMessages = [
+          { role: "system", content: systemContent },
+          ...history.filter(m => m && (m.role === "user" || m.role === "assistant") && m.content).map(m => ({ role: m.role, content: m.content })),
+          { role: "user", content: message },
+        ];
+        reply = await callOpenAI(openaiKey, process.env.OPENAI_BASE_URL ?? null, openaiMessages);
+      }
+    } else {
+      const openaiMessages = [
+        { role: "system", content: systemContent },
+        ...history.filter(m => m && (m.role === "user" || m.role === "assistant") && m.content).map(m => ({ role: m.role, content: m.content })),
+        { role: "user", content: message },
+      ];
+      reply = await callOpenAI(openaiKey, process.env.OPENAI_BASE_URL ?? null, openaiMessages);
+    }
+
     return res.json({ reply });
 
   } catch (err) {
