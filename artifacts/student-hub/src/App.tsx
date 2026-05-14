@@ -52,9 +52,9 @@ const queryClient = new QueryClient({
 });
 
 const pageVariants = {
-  initial: { opacity: 0, y: 6 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] } },
-  exit:    { opacity: 0,       transition: { duration: 0.1,  ease: "easeIn" } },
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.2, ease: "easeOut" } },
+  exit:    { opacity: 0, transition: { duration: 0.12, ease: "easeIn" } },
 };
 
 function AppRoutes() {
@@ -67,7 +67,7 @@ function AppRoutes() {
         initial="initial"
         animate="animate"
         exit="exit"
-        style={{ willChange: "opacity, transform", minHeight: "100%" }}
+        style={{ minHeight: "100%" }}
       >
         <Switch>
           <Route path="/" component={Home} />
