@@ -1,6 +1,5 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import OpenAI from "openai";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -58,10 +57,9 @@ function buildSystemContent(context?: ChatContext): string {
   return SYSTEM_PROMPT + parts.join("\n");
 }
 
-/** Call Gemini via direct REST API — avoids SDK version issues and cold-start overhead */
 async function askGemini(systemContent: string, history: ChatMessage[], message: string): Promise<string> {
   const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new Error("NO_GEMINI_KEY");
+  if (!key) throw new Error("GEMINI_API_KEY is not set. Please add it in your environment variables.");
 
   const contents = [
     ...history
@@ -95,8 +93,7 @@ async function askGemini(systemContent: string, history: ChatMessage[], message:
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({})) as { error?: { message?: string; code?: number } };
     const msg = errBody?.error?.message ?? `HTTP ${res.status}`;
-    if (res.status === 400 && msg.toLowerCase().includes("api key")) throw new Error("NO_GEMINI_KEY");
-    throw new Error(`Gemini ${res.status}: ${msg}`);
+    throw new Error(`Gemini error: ${msg}`);
   }
 
   const data = await res.json() as {
@@ -106,41 +103,9 @@ async function askGemini(systemContent: string, history: ChatMessage[], message:
   return text ?? "I couldn't generate a response. Please try again.";
 }
 
-/** OpenAI fallback (uses Replit AI integration key or user-set OPENAI_API_KEY) */
-async function askOpenAI(systemContent: string, history: ChatMessage[], message: string): Promise<string> {
-  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("NO_OPENAI_KEY");
-
-  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ?? process.env.OPENAI_BASE_URL;
-  const client = new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
-
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: systemContent },
-    ...history
-      .filter(h => h.role === "user" || h.role === "assistant")
-      .map(h => ({ role: h.role as "user" | "assistant", content: h.content })),
-    { role: "user", content: message },
-  ];
-
-  const completion = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages,
-    max_tokens: 800,
-    temperature: 0.7,
-  });
-  return completion.choices[0]?.message?.content ?? "I couldn't generate a response. Please try again.";
-}
-
-/** Health check: tells client which AI backend is active */
 router.get("/ai/status", (_req: Request, res: Response) => {
   const hasGemini = !!process.env.GEMINI_API_KEY;
-  const hasOpenAI = !!(process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY);
-  res.json({
-    ok: hasGemini || hasOpenAI,
-    gemini: hasGemini,
-    openai: hasOpenAI,
-    backend: hasGemini ? "gemini" : hasOpenAI ? "openai" : "none",
-  });
+  res.json({ ok: hasGemini, gemini: hasGemini, backend: hasGemini ? "gemini" : "none" });
 });
 
 router.post("/ai/chat", async (req: Request, res: Response) => {
@@ -153,56 +118,23 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
 
     if (!message) return res.status(400).json({ error: "message is required" });
 
-    const hasGemini = !!process.env.GEMINI_API_KEY;
-    const hasOpenAI = !!(process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY);
-
-    if (!hasGemini && !hasOpenAI) {
+    if (!process.env.GEMINI_API_KEY) {
       return res.status(503).json({
         error: "Nep AI is not configured. Please set GEMINI_API_KEY in your Vercel environment variables and redeploy.",
       });
     }
 
     const systemContent = buildSystemContent(context);
-
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        let reply: string;
-
-        if (hasGemini) {
-          try {
-            reply = await askGemini(systemContent, history, message);
-          } catch (geminiErr) {
-            const gStr = String(geminiErr);
-            if (!hasOpenAI) throw geminiErr;
-            logger.warn({ err: gStr }, "Gemini failed, trying OpenAI fallback");
-            reply = await askOpenAI(systemContent, history, message);
-          }
-        } else {
-          reply = await askOpenAI(systemContent, history, message);
-        }
-
-        return res.json({ reply });
-
-      } catch (err: unknown) {
-        const errStr = String(err);
-        const isRate = errStr.includes("429") || errStr.toLowerCase().includes("quota") || errStr.toLowerCase().includes("rate");
-        if (isRate && attempt < 1) {
-          await new Promise(r => setTimeout(r, 3000));
-          continue;
-        }
-        throw err;
-      }
-    }
-
-    return res.status(429).json({ error: "The AI is busy right now. Please wait a moment and try again." });
+    const reply = await askGemini(systemContent, history, message);
+    return res.json({ reply });
 
   } catch (err) {
     const errStr = String(err);
     logger.error({ err }, "AI handler error");
-    if (errStr.includes("429") || errStr.toLowerCase().includes("quota")) {
-      return res.status(429).json({ error: "The AI is busy right now. Please wait a moment and try again." });
+    if (errStr.includes("429") || errStr.toLowerCase().includes("quota") || errStr.toLowerCase().includes("rate")) {
+      return res.status(429).json({ error: "Nep AI is a bit busy right now. Please wait a moment and try again." });
     }
-    return res.status(500).json({ error: "AI service error. Please try again." });
+    return res.status(500).json({ error: "Nep AI ran into an issue. Please try again." });
   }
 });
 
