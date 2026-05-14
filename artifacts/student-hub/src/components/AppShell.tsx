@@ -1,16 +1,16 @@
 import { useAuth } from "@/context/AuthContext";
 import { Layout } from "@/components/Layout";
 import { PublicLayout } from "@/components/PublicLayout";
-import { LoadingScreen } from "@/components/ProtectedRoute";
 
 interface AppShellProps {
   children: React.ReactNode;
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile } = useAuth();
 
-  if (loading && !profile) return <LoadingScreen />;
+  // Never block public pages with a loading screen.
+  // PrivateRoute handles auth-gating for protected pages.
   if (user || profile) return <Layout>{children}</Layout>;
   return <PublicLayout>{children}</PublicLayout>;
 }

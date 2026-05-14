@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { AnimatePresence, motion } from "framer-motion";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,20 +13,20 @@ import { AppShell } from "@/components/AppShell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { InstallBanner } from "@/components/InstallBanner";
 
-// ── Eager: only the shell pages that must be instant ───────────────────────
+// ── Eager: shell pages that must be instant ─────────────────────────────────
 import Home       from "@/pages/Home";
 import Login      from "@/pages/Login";
 import Dashboard  from "@/pages/Dashboard";
 import Onboarding from "@/pages/Onboarding";
+import Notes      from "@/pages/Notes";
+import NepAi      from "@/pages/NepAi";
 
-// ── Lazy: everything else — loaded on demand, cached by SW ─────────────────
-const Notes       = lazy(() => import("@/pages/Notes"));
+// ── Lazy: loaded on demand ───────────────────────────────────────────────────
 const NotePage    = lazy(() => import("@/pages/NotePage"));
 const Pyqs        = lazy(() => import("@/pages/Pyqs"));
 const PyqPage     = lazy(() => import("@/pages/PyqPage"));
 const Todo        = lazy(() => import("@/pages/Todo"));
 const Pomodoro    = lazy(() => import("@/pages/Pomodoro"));
-const NepAi       = lazy(() => import("@/pages/NepAi"));
 const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
 const ReportCard  = lazy(() => import("@/pages/ReportCard"));
 const Settings    = lazy(() => import("@/pages/Settings"));
@@ -51,55 +50,53 @@ const queryClient = new QueryClient({
   },
 });
 
-const pageVariants = {
-  initial: { opacity: 0, y: 14 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] } },
-  exit:    { opacity: 0, y: -6, transition: { duration: 0.12, ease: "easeIn" } },
-};
-
-function AppRoutes() {
+// Pure-CSS page transition — enter only, zero sequential delay
+function PageWrapper({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={location}
-        variants={pageVariants}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        style={{ minHeight: "100%", display: "flex", flexDirection: "column" }}
-      >
-        <Switch>
-          <Route path="/" component={Home} />
+    <div
+      key={location}
+      className="page-enter"
+      style={{ minHeight: "100%", display: "flex", flexDirection: "column" }}
+    >
+      {children}
+    </div>
+  );
+}
 
-          <Route path="/notes/:id" component={NotePage} />
-          <Route path="/pyq/:id" component={PyqPage} />
-          <Route path="/notes" component={Notes} />
-          <Route path="/pyqs" component={Pyqs} />
-          <Route path="/about" component={About} />
-          <Route path="/contact" component={Contact} />
-          <Route path="/privacy" component={PrivacyPolicy} />
-          <Route path="/terms" component={Terms} />
+function AppRoutes() {
+  return (
+    <PageWrapper>
+      <Switch>
+        <Route path="/" component={Home} />
 
-          <Route path="/ai" component={NepAi} />
-          <Route path="/report" component={ReportCard} />
-          <Route path="/todo" component={Todo} />
-          <Route path="/pomodoro" component={Pomodoro} />
-          <Route path="/leaderboard" component={Leaderboard} />
-          <Route path="/saved" component={Saved} />
-          <Route path="/mcq" component={McqPractice} />
+        <Route path="/notes/:id" component={NotePage} />
+        <Route path="/pyq/:id" component={PyqPage} />
+        <Route path="/notes" component={Notes} />
+        <Route path="/pyqs" component={Pyqs} />
+        <Route path="/about" component={About} />
+        <Route path="/contact" component={Contact} />
+        <Route path="/privacy" component={PrivacyPolicy} />
+        <Route path="/terms" component={Terms} />
 
-          <Route path="/dashboard">
-            <PrivateRoute><Dashboard /></PrivateRoute>
-          </Route>
-          <Route path="/settings">
-            <PrivateRoute><Settings /></PrivateRoute>
-          </Route>
+        <Route path="/ai" component={NepAi} />
+        <Route path="/report" component={ReportCard} />
+        <Route path="/todo" component={Todo} />
+        <Route path="/pomodoro" component={Pomodoro} />
+        <Route path="/leaderboard" component={Leaderboard} />
+        <Route path="/saved" component={Saved} />
+        <Route path="/mcq" component={McqPractice} />
 
-          <Route component={NotFound} />
-        </Switch>
-      </motion.div>
-    </AnimatePresence>
+        <Route path="/dashboard">
+          <PrivateRoute><Dashboard /></PrivateRoute>
+        </Route>
+        <Route path="/settings">
+          <PrivateRoute><Settings /></PrivateRoute>
+        </Route>
+
+        <Route component={NotFound} />
+      </Switch>
+    </PageWrapper>
   );
 }
 

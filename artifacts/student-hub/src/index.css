@@ -275,6 +275,16 @@ html {
   overscroll-behavior: contain;
 }
 
+/* ── Page transition — enter only, no exit delay ─────────────────────── */
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+.page-enter {
+  animation: pageIn 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  will-change: opacity, transform;
+}
+
 /* ── Card hover lift ─────────────────────────────────────────────────── */
 .card-hover {
   transition: transform 120ms ease, box-shadow 120ms ease;
