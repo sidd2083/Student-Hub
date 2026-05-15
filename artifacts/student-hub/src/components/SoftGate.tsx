@@ -7,10 +7,16 @@ interface SoftGateProps {
 }
 
 export function SoftGate({ children, feature = "this feature" }: SoftGateProps) {
-  const { user, loading, signInWithGoogle } = useAuth();
+  const { user, profile, loading, signInWithGoogle } = useAuth();
 
-  if (loading) return null;
-  if (user) return <>{children}</>;
+  // While Firebase is still initialising, show nothing rather than the gate.
+  // This prevents the 1-2 s flash of "Login to unlock" for logged-in users
+  // whose Firebase user object hasn't resolved yet.
+  if (loading && !profile) return null;
+
+  // Accept either the Firebase user object OR the cached Firestore profile —
+  // profile is available instantly from localStorage, user arrives ~1 s later.
+  if (user || profile) return <>{children}</>;
 
   return (
     <div className="relative flex-1 overflow-hidden">
