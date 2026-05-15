@@ -1,10 +1,13 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { FileText, Image, Search, X, ExternalLink, Filter, LogIn, Bookmark } from "lucide-react";
+import {
+  FileText, Image, Search, X, ExternalLink, Filter, LogIn,
+  Bookmark, ZoomIn, ZoomOut,
+} from "lucide-react";
 
 type Pyq = {
   id: string;
@@ -15,6 +18,16 @@ type Pyq = {
   pdfUrl: string;
   fileType?: string | null;
 };
+
+function detectIsImage(pyq: Pyq): boolean {
+  if (pyq.fileType === "image") return true;
+  if (pyq.fileType === "pdf" || pyq.fileType === "rich") return false;
+  if (pyq.pdfUrl) {
+    const clean = pyq.pdfUrl.split("?")[0].toLowerCase();
+    return /\.(jpg|jpeg|png|webp|gif|bmp|svg)$/.test(clean);
+  }
+  return false;
+}
 
 function HighlightedText({ text, query }: { text: string; query: string }) {
   if (!query.trim()) return <>{text}</>;
@@ -31,13 +44,33 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
   );
 }
 
-function PyqViewer({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?: string }) {
-  const isImage = pyq.fileType === "image";
-  const [imgZoomed, setImgZoomed] = useState(false);
+function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?: string }) {
+  const isImage = detectIsImage(pyq);
+
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savingToggle, setSavingToggle] = useState(false);
 
+  const lastPinchRef = useRef<number | null>(null);
+  const dragStartRef = useRef<{ cx: number; cy: number; ox: number; oy: number } | null>(null);
+
   const savedDocId = uid ? `${uid}_pyq_${pyq.id}` : null;
+
+  // Lock body scroll
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  // Escape key
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
 
   useEffect(() => {
     if (!savedDocId) return;
@@ -55,80 +88,217 @@ function PyqViewer({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?:
         setSaved(false);
       } else {
         await setDoc(doc(db, "saved_items", savedDocId), {
-          uid, itemType: "pyq", itemId: pyq.id,
-          savedAt: new Date().toISOString(),
+          uid, itemType: "pyq", itemId: pyq.id, savedAt: new Date().toISOString(),
         });
         setSaved(true);
       }
-    } catch (e) {
-      console.error("[PyqViewer save]", e);
-    } finally {
-      setSavingToggle(false);
+    } catch (e) { console.error("[PyqGallery save]", e); }
+    finally { setSavingToggle(false); }
+  };
+
+  const clampScale = (s: number) => Math.min(6, Math.max(1, s));
+
+  const zoomIn  = () => setScale(s => clampScale(s * 1.35));
+  const zoomOut = () => setScale(s => {
+    const next = clampScale(s / 1.35);
+    if (next <= 1) setOffset({ x: 0, y: 0 });
+    return next;
+  });
+  const resetZoom = () => { setScale(1); setOffset({ x: 0, y: 0 }); };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.12 : 0.89;
+    setScale(s => {
+      const next = clampScale(s * factor);
+      if (next <= 1) setOffset({ x: 0, y: 0 });
+      return next;
+    });
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      lastPinchRef.current = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY,
+      );
+    } else if (e.touches.length === 1 && scale > 1) {
+      dragStartRef.current = {
+        cx: e.touches[0].clientX, cy: e.touches[0].clientY,
+        ox: offset.x, oy: offset.y,
+      };
     }
   };
 
+  const handleTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault();
+    if (e.touches.length === 2 && lastPinchRef.current !== null) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY,
+      );
+      const ratio = dist / lastPinchRef.current;
+      setScale(s => clampScale(s * ratio));
+      lastPinchRef.current = dist;
+    } else if (e.touches.length === 1 && dragStartRef.current && scale > 1) {
+      const dx = (e.touches[0].clientX - dragStartRef.current.cx) / scale;
+      const dy = (e.touches[0].clientY - dragStartRef.current.cy) / scale;
+      setOffset({ x: dragStartRef.current.ox + dx, y: dragStartRef.current.oy + dy });
+    }
+  };
+
+  const handleTouchEnd = () => {
+    lastPinchRef.current = null;
+    dragStartRef.current = null;
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (scale <= 1) return;
+    e.preventDefault();
+    setIsDragging(true);
+    dragStartRef.current = { cx: e.clientX, cy: e.clientY, ox: offset.x, oy: offset.y };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!dragStartRef.current || !isDragging) return;
+    const dx = (e.clientX - dragStartRef.current.cx) / scale;
+    const dy = (e.clientY - dragStartRef.current.cy) / scale;
+    setOffset({ x: dragStartRef.current.ox + dx, y: dragStartRef.current.oy + dy });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    dragStartRef.current = null;
+  };
+
+  const handleImgClick = () => {
+    if (scale === 1) setScale(2.5);
+    else resetZoom();
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
-        <div className="flex items-start justify-between p-4 sm:p-6 border-b border-gray-100 flex-shrink-0">
-          <div className="flex-1 min-w-0 mr-4">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${isImage ? "bg-purple-50 text-purple-600" : "bg-orange-50 text-orange-600"}`}>
-                {isImage ? <Image className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
-                {isImage ? "Image" : "PDF"}
-              </span>
-              <span className="text-xs text-gray-400">{pyq.subject} · {pyq.year}</span>
-            </div>
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900">{pyq.title}</h2>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {uid && (
-              <button
-                onClick={toggleSave}
-                disabled={savingToggle}
-                title={saved ? "Remove from saved" : "Save this paper"}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-xl transition-all disabled:opacity-50 ${saved ? "bg-blue-500 text-white hover:bg-blue-600" : "border border-gray-200 text-gray-600 hover:bg-gray-50"}`}
-              >
-                <Bookmark className={`w-3.5 h-3.5 ${saved ? "fill-white" : ""}`} />
-                <span className="hidden sm:inline">{saved ? "Saved" : "Save"}</span>
-              </button>
-            )}
-            <a href={pyq.pdfUrl} target="_blank" rel="noopener noreferrer"
-               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-all">
-              <ExternalLink className="w-3.5 h-3.5" /> Open
-            </a>
-            <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-all">
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
-          </div>
+    <div className="fixed inset-0 z-[100] bg-black flex flex-col select-none">
+      {/* Top bar */}
+      <div
+        className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-3 flex-shrink-0"
+        style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%)" }}
+      >
+        <div className="flex-1 min-w-0 mr-3">
+          <p className="text-white font-semibold text-sm truncate leading-tight">{pyq.title}</p>
+          <p className="text-white/60 text-xs mt-0.5">{pyq.subject} · {pyq.year}</p>
         </div>
-        <div className="flex-1 overflow-auto p-4 sm:p-6 min-h-0">
-          {isImage ? (
-            <div className="flex flex-col items-center gap-3 h-full">
-              <img src={pyq.pdfUrl} alt={pyq.title} onClick={() => setImgZoomed(true)}
-                   className="max-w-full rounded-2xl shadow-sm cursor-zoom-in hover:opacity-95"
-                   style={{ maxHeight: "65vh", objectFit: "contain" }} />
-              <p className="text-xs text-gray-400">Click to zoom</p>
-              {imgZoomed && (
-                <div className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center cursor-zoom-out" onClick={() => setImgZoomed(false)}>
-                  <img src={pyq.pdfUrl} alt={pyq.title} className="max-w-full max-h-full object-contain p-4" />
-                  <button className="absolute top-4 right-4 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30" onClick={() => setImgZoomed(false)}>
-                    <X className="w-4 h-4 text-white" />
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3 h-full min-h-[400px] sm:min-h-[520px]">
-              <iframe src={`https://docs.google.com/viewer?url=${encodeURIComponent(pyq.pdfUrl)}&embedded=true`}
-                      className="flex-1 w-full rounded-2xl border border-gray-100 min-h-[400px]" title={pyq.title} />
-              <p className="text-xs text-center text-gray-400">
-                If the PDF doesn't load, <a href={pyq.pdfUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">open it directly</a>
-              </p>
-            </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {uid && (
+            <button
+              onClick={toggleSave}
+              disabled={savingToggle}
+              className={`p-2 rounded-full transition-all ${saved ? "bg-blue-500 text-white" : "bg-white/15 text-white hover:bg-white/25"}`}
+            >
+              <Bookmark className={`w-4 h-4 ${saved ? "fill-white" : ""}`} />
+            </button>
           )}
+          <a
+            href={pyq.pdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-2 rounded-full bg-white/15 hover:bg-white/25 text-white transition-all"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full bg-white/15 hover:bg-white/25 text-white transition-all"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
       </div>
+
+      {/* Image / PDF viewer */}
+      {isImage ? (
+        <div
+          className="flex-1 flex items-center justify-center overflow-hidden"
+          onWheel={handleWheel}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          style={{
+            touchAction: "none",
+            cursor: scale > 1 ? (isDragging ? "grabbing" : "grab") : "zoom-in",
+          }}
+        >
+          <img
+            src={pyq.pdfUrl}
+            alt={pyq.title}
+            onClick={isDragging ? undefined : handleImgClick}
+            draggable={false}
+            style={{
+              transform: `scale(${scale}) translate(${offset.x}px, ${offset.y}px)`,
+              transformOrigin: "center center",
+              maxWidth: "100%",
+              maxHeight: "100%",
+              objectFit: "contain",
+              transition: isDragging ? "none" : "transform 0.18s cubic-bezier(0.22,1,0.36,1)",
+              userSelect: "none",
+              display: "block",
+            }}
+          />
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col pt-14 pb-2">
+          <iframe
+            src={`https://docs.google.com/viewer?url=${encodeURIComponent(pyq.pdfUrl)}&embedded=true`}
+            className="flex-1 w-full border-0"
+            title={pyq.title}
+          />
+          <p className="text-center text-xs text-white/40 py-2">
+            If PDF doesn't load,{" "}
+            <a href={pyq.pdfUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+              open directly
+            </a>
+          </p>
+        </div>
+      )}
+
+      {/* Bottom zoom bar — image only */}
+      {isImage && (
+        <div
+          className="absolute bottom-0 left-0 right-0 flex items-center justify-center pb-6 pt-8"
+          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 100%)" }}
+        >
+          <div className="flex items-center gap-3 bg-black/50 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/10">
+            <button
+              onClick={zoomOut}
+              disabled={scale <= 1}
+              className="p-1.5 rounded-full hover:bg-white/15 text-white disabled:opacity-30 transition-all"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <button
+              onClick={resetZoom}
+              className="text-white/70 text-xs font-mono min-w-[42px] text-center hover:text-white transition-colors tabular-nums"
+            >
+              {Math.round(scale * 100)}%
+            </button>
+            <button
+              onClick={zoomIn}
+              disabled={scale >= 6}
+              className="p-1.5 rounded-full hover:bg-white/15 text-white disabled:opacity-30 transition-all"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+          </div>
+          {scale === 1 && (
+            <p className="absolute bottom-1 text-white/35 text-[10px]">
+              Tap · pinch · scroll to zoom
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -176,12 +346,12 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
 
   return (
     <>
-      {viewer && <PyqViewer pyq={viewer} onClose={() => setViewer(null)} uid={user?.uid} />}
+      {viewer && <PyqGallery pyq={viewer} onClose={() => setViewer(null)} uid={user?.uid} />}
 
       <div className="p-4 sm:p-6 lg:p-8">
         <div className="mb-5 sm:mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Previous Year Questions</h1>
-          <p className="text-gray-500 text-sm">Past exam papers — click any card to view</p>
+          <p className="text-gray-500 text-sm">Past exam papers — tap any card to view</p>
         </div>
 
         {!isLoggedIn && (
@@ -198,25 +368,38 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
         )}
 
         <div className="flex flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-5">
-          <select data-testid="select-grade-pyq" value={grade}
+          <select
+            data-testid="select-grade-pyq"
+            value={grade}
             onChange={(e) => { setGrade(Number(e.target.value)); setSubject(""); setYearFilter(""); }}
-            className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
             {[9, 10, 11, 12].map((g) => <option key={g} value={g}>Grade {g}</option>)}
           </select>
 
-          <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <select
+            value={yearFilter}
+            onChange={(e) => setYearFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
             <option value="">All Years</option>
             {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
 
           <div className="relative flex-1 min-w-[180px] max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by title…"
-              className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
             {search && (
-              <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
@@ -224,13 +407,18 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
         </div>
 
         <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-4 sm:mb-5">
-          <button onClick={() => setSubject("")}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${!subject ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+          <button
+            onClick={() => setSubject("")}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${!subject ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+          >
             All Subjects
           </button>
           {subjects.map((s) => (
-            <button key={s} onClick={() => setSubject(s)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${subject === s ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+            <button
+              key={s}
+              onClick={() => setSubject(s)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${subject === s ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+            >
               {s}
             </button>
           ))}
@@ -257,16 +445,21 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
         ) : (
           <div className="grid gap-2 sm:gap-3">
             {filtered.map((pyq) => {
-              const isImage = pyq.fileType === "image";
+              const isImg = detectIsImage(pyq);
               return (
-                <div key={pyq.id} className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 hover:shadow-md hover:border-blue-100 transition-all group w-full">
+                <div
+                  key={pyq.id}
+                  className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 hover:shadow-md hover:border-blue-100 transition-all group w-full"
+                >
                   <button
                     data-testid={`pyq-item-${pyq.id}`}
                     onClick={() => setViewer(pyq)}
                     className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 text-left"
                   >
-                    <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${isImage ? "bg-purple-50" : "bg-orange-50"}`}>
-                      {isImage ? <Image className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" /> : <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />}
+                    <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${isImg ? "bg-purple-50" : "bg-orange-50"}`}>
+                      {isImg
+                        ? <Image className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
+                        : <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />}
                     </div>
                     <div className="min-w-0">
                       <p className="font-semibold text-gray-900 truncate text-sm sm:text-base">
@@ -276,13 +469,13 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
                     </div>
                   </button>
                   <div className="flex items-center gap-2 flex-shrink-0 ml-2 sm:ml-3">
-                    <span className={`hidden sm:inline text-xs px-2 py-0.5 rounded-full font-medium ${isImage ? "bg-purple-50 text-purple-600" : "bg-orange-50 text-orange-600"}`}>
-                      {isImage ? "Image" : "PDF"}
+                    <span className={`hidden sm:inline text-xs px-2 py-0.5 rounded-full font-medium ${isImg ? "bg-purple-50 text-purple-600" : "bg-orange-50 text-orange-600"}`}>
+                      {isImg ? "Image" : "PDF"}
                     </span>
                     <Link
                       href={`/pyq/${pyq.id}`}
                       onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                      title="Open page"
+                      title="Open full page"
                       className="p-1 text-gray-300 hover:text-blue-400 transition-colors"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />

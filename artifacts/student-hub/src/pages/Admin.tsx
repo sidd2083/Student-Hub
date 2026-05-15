@@ -499,13 +499,13 @@ function ManagePyqs() {
     if (sel) { sel.removeAllRanges(); sel.addRange(savedRangeRef.current); }
   };
 
-  // Compress any image to JPEG base64 — handles 3MB+ by resizing to max 1400px
+  // Compress any image to JPEG base64 — max 800px, quality 0.65 to stay well under Firestore's 1MB limit
   const compressImage = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
       const url = URL.createObjectURL(file);
       const img = new window.Image();
       img.onload = () => {
-        const MAX = 1400;
+        const MAX = 800;
         let { width, height } = img;
         const ratio = Math.min(1, MAX / Math.max(width, height));
         width  = Math.round(width  * ratio);
@@ -515,7 +515,18 @@ function ManagePyqs() {
         canvas.height = height;
         canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
         URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL("image/jpeg", 0.82));
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.65);
+        // Safety check: if still too large, compress further
+        if (dataUrl.length > 600_000) {
+          const canvas2 = document.createElement("canvas");
+          const scale2 = Math.sqrt(600_000 / dataUrl.length);
+          canvas2.width  = Math.round(width  * scale2);
+          canvas2.height = Math.round(height * scale2);
+          canvas2.getContext("2d")!.drawImage(canvas, 0, 0, canvas2.width, canvas2.height);
+          resolve(canvas2.toDataURL("image/jpeg", 0.60));
+        } else {
+          resolve(dataUrl);
+        }
       };
       img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image load failed")); };
       img.src = url;
@@ -554,6 +565,16 @@ function ManagePyqs() {
     const richContent = richEditorRef.current?.innerHTML ?? "";
     if (form.contentType === "rich" && (!richContent || richContent.replace(/<[^>]*>/g, "").trim() === "")) {
       setSaveStatus("error"); setSaveMsg("Please add some content in the editor."); return;
+    }
+
+    // Check rich content size before hitting Firestore's 1MB limit
+    if (form.contentType === "rich") {
+      const richCheck = richEditorRef.current?.innerHTML ?? "";
+      if (richCheck.length > 900_000) {
+        setSaveStatus("error");
+        setSaveMsg(`Content too large (${Math.round(richCheck.length / 1000)}KB). Reduce images or text — Firestore limit is 1MB.`);
+        return;
+      }
     }
 
     setSaving(true); setSaveStatus("idle");
