@@ -72,11 +72,7 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
   }, [location]);
 
   return (
-    <div
-      ref={ref}
-      className="page-enter"
-      style={{ minHeight: "100%", display: "flex", flexDirection: "column" }}
-    >
+    <div ref={ref} className="page-enter" style={{ minHeight: "100%" }}>
       {children}
     </div>
   );

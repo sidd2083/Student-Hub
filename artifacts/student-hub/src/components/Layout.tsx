@@ -85,10 +85,32 @@ export function Layout({ children }: LayoutProps) {
 
   useEffect(() => { setToolsOpen(false); }, [location]);
 
+  // iOS PWA critical fix: html/body must have height:100% + overflow:hidden
+  // so iOS recognises the inner flex container (not the document) as the scroll root.
+  // Without this, overflow-y:auto on <main> is silently ignored on iOS Safari/PWA.
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const root = document.getElementById("root");
+    const prev = {
+      htmlH: html.style.height,   htmlO: html.style.overflow,
+      bodyH: body.style.height,   bodyO: body.style.overflow,
+      rootH: root?.style.height ?? "", rootO: root?.style.overflow ?? "",
+    };
+    html.style.height = body.style.height = "100%";
+    html.style.overflow = body.style.overflow = "hidden";
+    if (root) { root.style.height = "100%"; root.style.overflow = "hidden"; }
+    return () => {
+      html.style.height = prev.htmlH; html.style.overflow = prev.htmlO;
+      body.style.height = prev.bodyH; body.style.overflow = prev.bodyO;
+      if (root) { root.style.height = prev.rootH; root.style.overflow = prev.rootO; }
+    };
+  }, []);
+
   return (
     <div
       className="flex bg-gray-50 dark:bg-gray-950"
-      style={{ position: "fixed", inset: 0, overflow: "hidden" }}
+      style={{ height: "100%", overflow: "hidden" }}
     >
       <FloatingTimerBar />
 
