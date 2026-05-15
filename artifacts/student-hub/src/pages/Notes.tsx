@@ -382,7 +382,7 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
 }
 
 export default function Notes() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   return (
     <>
@@ -393,7 +393,7 @@ export default function Notes() {
         <meta property="og:title" content="Study Notes — Student Hub" />
         <meta property="og:description" content="Free study notes for Grade 9–12 students in Nepal." />
       </Helmet>
-      <NotesContent isLoggedIn={!!user} />
+      <NotesContent isLoggedIn={!!(user || profile)} />
     </>
   );
 }

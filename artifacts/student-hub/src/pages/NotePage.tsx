@@ -194,7 +194,7 @@ export default function NotePage() {
   const params = useParams<{ id: string }>();
   const id = params.id ?? "";
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [note, setNote] = useState<NoteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isError, setIsError] = useState(false);
@@ -399,7 +399,7 @@ export default function NotePage() {
               </div>
             </div>
 
-            {!user && (
+            {!user && !profile && (
               <div className="mb-5 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <p className="font-semibold text-white text-sm">Get full access — it's free!</p>
@@ -479,7 +479,7 @@ export default function NotePage() {
               </button>
             </div>
 
-            {!user && (
+            {!user && !profile && (
               <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-center mb-6">
                 <h2 className="text-lg font-bold text-white mb-1">Want more? Get full access — free.</h2>
                 <p className="text-blue-100 text-sm mb-4">Nep AI tutor, progress tracking, Report Card, and thousands more notes.</p>

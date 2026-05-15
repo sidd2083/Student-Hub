@@ -203,7 +203,7 @@ export default function PyqPage() {
   const handleTouchEnd = () => { lastTouchDist.current = null; lastPanPos.current = null; };
   const [pyq, setPyq] = useState<FirePyq | null>(null);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   useEffect(() => {
     if (!id) return;
@@ -449,7 +449,7 @@ export default function PyqPage() {
             <SuggestedPyqs current={pyq} />
 
             {/* CTA for logged-out users */}
-            {!user && (
+            {!user && !profile && (
               <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-center mt-6">
                 <h2 className="text-lg font-bold text-white mb-1">Get full access — it's free</h2>
                 <p className="text-blue-100 text-sm mb-4">Access Nep AI, Pomodoro timer, progress tracking, and more.</p>

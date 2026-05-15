@@ -299,7 +299,7 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
 }
 
 export default function Pyqs() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   return (
     <>
@@ -310,7 +310,7 @@ export default function Pyqs() {
         <meta property="og:title" content="Previous Year Questions — Student Hub" />
         <meta property="og:description" content="Free PYQs for Grade 9–12 students in Nepal. Browse by grade, subject, and year." />
       </Helmet>
-      <PyqsContent isLoggedIn={!!user} />
+      <PyqsContent isLoggedIn={!!(user || profile)} />
     </>
   );
 }
