@@ -86,7 +86,10 @@ export function Layout({ children }: LayoutProps) {
   useEffect(() => { setToolsOpen(false); }, [location]);
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
+    <div
+      className="flex bg-gray-50 dark:bg-gray-950 overflow-x-hidden"
+      style={{ height: "100dvh" }}
+    >
       <FloatingTimerBar />
 
       {/* ── Sidebar (desktop) ── */}
@@ -170,9 +173,11 @@ export function Layout({ children }: LayoutProps) {
       </aside>
 
       {/* ── Main content ── */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Mobile top bar */}
-        <header className="md:hidden h-12 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between px-4 flex-shrink-0">
+        <header className="md:hidden bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between px-4 flex-shrink-0"
+          style={{ height: "48px" }}
+        >
           <div className="flex items-center gap-2">
             {showBack ? (
               <button
@@ -211,8 +216,15 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 min-h-0 overflow-y-auto pb-20 md:pb-0 flex flex-col main-scroll-area" style={{ WebkitOverflowScrolling: "touch" }}>
+        {/* Page content — this is the ONLY scroll container on mobile */}
+        <main
+          className="flex-1 min-h-0 overflow-y-auto flex flex-col main-scroll-area"
+          style={{
+            WebkitOverflowScrolling: "touch",
+            overscrollBehavior: "contain",
+            paddingBottom: "calc(4rem + env(safe-area-inset-bottom, 0px))",
+          }}
+        >
           {children}
         </main>
       </div>
@@ -224,7 +236,10 @@ export function Layout({ children }: LayoutProps) {
             className="md:hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-sm"
             onClick={() => setToolsOpen(false)}
           />
-          <div className="md:hidden fixed bottom-16 left-0 right-0 z-50 px-3 pb-2">
+          <div
+            className="md:hidden fixed left-0 right-0 z-50 px-3 pb-2"
+            style={{ bottom: "calc(4rem + env(safe-area-inset-bottom, 0px))" }}
+          >
             <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden"
               style={{ animation: "slideUp 0.25s cubic-bezier(0.34,1.56,0.64,1) both" }}>
               <style>{`@keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }`}</style>
@@ -257,7 +272,10 @@ export function Layout({ children }: LayoutProps) {
       )}
 
       {/* ── Mobile Bottom Navigation ── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 shadow-lg z-40">
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 shadow-lg z-40"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      >
         <div className="flex items-center justify-around h-16 px-2">
           {bottomNavItems.map(({ href, icon: Icon, label, isTools }) => {
             const active = isTools

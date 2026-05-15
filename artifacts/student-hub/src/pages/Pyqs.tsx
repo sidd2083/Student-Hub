@@ -20,11 +20,19 @@ type Pyq = {
 };
 
 function detectIsImage(pyq: Pyq): boolean {
+  // If explicitly marked as image, trust it
   if (pyq.fileType === "image") return true;
-  if (pyq.fileType === "pdf" || pyq.fileType === "rich") return false;
+  // Rich text is never a standalone image
+  if (pyq.fileType === "rich") return false;
+  // For "pdf" or missing fileType, check the actual URL
+  // Firebase Storage URLs encode the path: e.g. pyqs%2F1234.jpg
   if (pyq.pdfUrl) {
-    const clean = pyq.pdfUrl.split("?")[0].toLowerCase();
-    return /\.(jpg|jpeg|png|webp|gif|bmp|svg)$/.test(clean);
+    try {
+      const decoded = decodeURIComponent(pyq.pdfUrl.split("?")[0]).toLowerCase();
+      return /\.(jpg|jpeg|png|webp|gif|bmp|svg)$/.test(decoded);
+    } catch {
+      return false;
+    }
   }
   return false;
 }
@@ -58,11 +66,23 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
 
   const savedDocId = uid ? `${uid}_pyq_${pyq.id}` : null;
 
-  // Lock body scroll
+  // Lock ALL scroll — body, html, and the .main-scroll-area flex container
   useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    const prevBodyOverflow   = document.body.style.overflow;
+    const prevHtmlOverflow   = document.documentElement.style.overflow;
+    document.body.style.overflow           = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    // The authenticated layout scrolls on this element, not body
+    const scrollArea = document.querySelector(".main-scroll-area") as HTMLElement | null;
+    const prevScrollArea = scrollArea?.style.overflowY ?? "";
+    if (scrollArea) scrollArea.style.overflowY = "hidden";
+
+    return () => {
+      document.body.style.overflow            = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      if (scrollArea) scrollArea.style.overflowY = prevScrollArea;
+    };
   }, []);
 
   // Escape key
@@ -348,7 +368,7 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
     <>
       {viewer && <PyqGallery pyq={viewer} onClose={() => setViewer(null)} uid={user?.uid} />}
 
-      <div className="p-4 sm:p-6 lg:p-8">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-full overflow-x-hidden">
         <div className="mb-5 sm:mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Previous Year Questions</h1>
           <p className="text-gray-500 text-sm">Past exam papers — tap any card to view</p>
@@ -386,7 +406,7 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
             {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
 
-          <div className="relative flex-1 min-w-[180px] max-w-sm">
+          <div className="relative flex-1 min-w-0 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             <input
               type="text"
@@ -465,7 +485,7 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
                       <p className="font-semibold text-gray-900 truncate text-sm sm:text-base">
                         <HighlightedText text={pyq.title} query={search} />
                       </p>
-                      <p className="text-xs sm:text-sm text-gray-500 mt-0.5">{pyq.subject} · {pyq.year}</p>
+                      <p className="text-xs sm:text-sm text-gray-500 mt-0.5 truncate">{pyq.subject} · {pyq.year}</p>
                     </div>
                   </button>
                   <div className="flex items-center gap-2 flex-shrink-0 ml-2 sm:ml-3">

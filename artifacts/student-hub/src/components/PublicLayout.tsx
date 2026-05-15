@@ -33,7 +33,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
   useEffect(() => { setToolsOpen(false); setMenuOpen(false); }, [location]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       {/* ── Desktop + Mobile Header ── */}
       <header className="bg-white border-b border-gray-100 sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
@@ -261,7 +261,8 @@ export function PublicLayout({ children }: PublicLayoutProps) {
       )}
 
       {/* ── Mobile Bottom Navigation ── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-lg z-40">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-lg z-40"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         <div className="flex items-center justify-around h-16 px-2">
           {mobileBottomNavBase.map(({ href, icon: Icon, label, isTools }) => {
             const active = isTools
