@@ -12,6 +12,7 @@ import {
 import { AppShell } from "@/components/AppShell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { InstallBanner } from "@/components/InstallBanner";
+import { PwaSplash } from "@/components/PwaSplash";
 
 // ── All pages eagerly loaded — zero Suspense flash on navigation ─────────────
 import Home         from "@/pages/Home";
@@ -176,6 +177,7 @@ function App() {
           </WouterRouter>
           <Toaster />
           <InstallBanner />
+          <PwaSplash />
         </TooltipProvider>
       </QueryClientProvider>
     </ErrorBoundary>
