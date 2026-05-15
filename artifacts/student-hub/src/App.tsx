@@ -1,5 +1,6 @@
-import { Suspense, useEffect, useLayoutEffect, useRef } from "react";
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Suspense, useEffect } from "react";
+import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
+import { AnimatePresence, motion } from "framer-motion";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -48,40 +49,51 @@ const queryClient = new QueryClient({
   },
 });
 
-/**
- * PageWrapper — the div stays mounted forever.
- * On each navigation useLayoutEffect fires *before* the browser paints,
- * resets the CSS animation, and lets it replay from opacity:0 → opacity:1.
- * No key-based remount → zero white-flash gap between pages.
- */
+const pageTransition = {
+  initial: { opacity: 0, y: 18 },
+  animate: { opacity: 1, y: 0 },
+  exit:    { opacity: 0, y: -8 },
+  transition: {
+    type: "spring" as const,
+    stiffness: 400,
+    damping: 40,
+    mass: 0.75,
+  },
+};
+
 function PageWrapper({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const ref = useRef<HTMLDivElement>(null);
-
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.animation = "none";
-    void el.offsetHeight; // force reflow so the browser registers the reset
-    el.style.animation = "";
-  }, [location]);
-
   return (
-    <div
-      ref={ref}
-      className="page-enter"
-      style={{ minHeight: "100%", display: "flex", flexDirection: "column" }}
-    >
-      {children}
-    </div>
+    <AnimatePresence mode="popLayout" initial={false}>
+      <motion.div
+        key={location}
+        {...pageTransition}
+        style={{ minHeight: "100%", display: "flex", flexDirection: "column", willChange: "opacity, transform" }}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
   );
+}
+
+// ── PWA / returning-user flash fix ────────────────────────────────────────────
+// If auth hint says the user was logged in (set by Firebase on last session),
+// skip rendering the public Home page entirely and redirect straight to /dashboard.
+// Firebase will confirm auth in the background — if the session expired, AuthContext
+// will redirect back to /login. This removes the public-page flash on PWA cold start.
+const AUTH_HINT_ACTIVE =
+  typeof localStorage !== "undefined" && localStorage.getItem("sh_authed") === "1";
+
+function SmartHome() {
+  if (AUTH_HINT_ACTIVE) return <Redirect to="/dashboard" replace />;
+  return <Home />;
 }
 
 function AppRoutes() {
   return (
     <PageWrapper>
       <Switch>
-        <Route path="/" component={Home} />
+        <Route path="/" component={SmartHome} />
 
         <Route path="/notes/:id" component={NotePage} />
         <Route path="/pyq/:id"   component={PyqPage} />
