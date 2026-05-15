@@ -6,10 +6,7 @@ import {
   setDoc, getDoc, addDoc, deleteDoc, updateDoc,
 } from "firebase/firestore";
 import { signInWithPopup } from "firebase/auth";
-import {
-  ref, uploadBytesResumable, getDownloadURL,
-} from "firebase/storage";
-import { db, storage, auth, googleProvider } from "@/lib/firebase";
+import { db, auth, googleProvider } from "@/lib/firebase";
 import {
   LayoutDashboard, BookOpen, FileText, Users,
   Shield, Plus, Trash2, LogOut, Megaphone, Upload, X, Image,
@@ -89,28 +86,27 @@ function FileUpload({ accept, label, storagePath, onUploaded, disabled }: FileUp
     const isPdf   = file.type === "application/pdf";
     if (!isImage && !isPdf) { setError("Please upload a PDF or image file."); return; }
 
-    const ext = file.name.split(".").pop();
-    const path = `${storagePath}/${Date.now()}.${ext}`;
-    const storageRef = ref(storage, path);
-    const task = uploadBytesResumable(storageRef, file);
-    task.on(
-      "state_changed",
-      (snap) => setProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
-      (err) => {
-        const code = (err as { code?: string }).code ?? "";
-        if (code === "storage/unauthorized" || code === "storage/unknown") {
-          setError("Upload blocked by Firebase Storage rules. Run: firebase deploy --only storage");
-        } else {
-          setError(err.message);
-        }
+    setProgress(10);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("folder", storagePath);
+
+      const resp = await fetch("/api/upload", { method: "POST", body: form });
+      const data = await resp.json() as { url?: string; error?: string };
+
+      if (!resp.ok || !data.url) {
+        setError(data.error ?? "Upload failed. Please try again.");
         setProgress(null);
-      },
-      async () => {
-        const url = await getDownloadURL(task.snapshot.ref);
-        setProgress(null);
-        onUploaded(url, isPdf ? "pdf" : "image");
+        return;
       }
-    );
+
+      setProgress(null);
+      onUploaded(data.url, isPdf ? "pdf" : "image");
+    } catch {
+      setError("Upload failed. Check your internet connection and try again.");
+      setProgress(null);
+    }
   };
 
   return (

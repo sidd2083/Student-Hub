@@ -87,8 +87,8 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div
-      className="flex bg-gray-50 dark:bg-gray-950 overflow-x-hidden"
-      style={{ height: "100dvh" }}
+      className="flex bg-gray-50 dark:bg-gray-950"
+      style={{ position: "fixed", inset: 0, overflow: "hidden" }}
     >
       <FloatingTimerBar />
 
@@ -173,7 +173,7 @@ export function Layout({ children }: LayoutProps) {
       </aside>
 
       {/* ── Main content ── */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
         {/* Mobile top bar */}
         <header className="md:hidden bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between px-4 flex-shrink-0"
           style={{ height: "48px" }}
@@ -218,11 +218,11 @@ export function Layout({ children }: LayoutProps) {
 
         {/* Page content — this is the ONLY scroll container on mobile */}
         <main
-          className="flex-1 min-h-0 overflow-y-auto flex flex-col main-scroll-area"
+          className="flex-1 min-h-0 overflow-y-auto main-scroll-area"
           style={{
             WebkitOverflowScrolling: "touch",
             overscrollBehavior: "contain",
-            paddingBottom: "calc(4rem + env(safe-area-inset-bottom, 0px))",
+            paddingBottom: "calc(5rem + env(safe-area-inset-bottom, 0px))",
           }}
         >
           {children}

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
@@ -55,272 +56,253 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
 function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?: string }) {
   const isImage = detectIsImage(pyq);
 
-  const [scale, setScale] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [saved, setSaved] = useState(false);
+  // React state — used for rendering
+  const [scale, setScale]       = useState(1);
+  const [offset, setOffset]     = useState({ x: 0, y: 0 });
+  const [isDragging, setDragging] = useState(false);
+  const [saved, setSaved]         = useState(false);
   const [savingToggle, setSavingToggle] = useState(false);
 
-  const lastPinchRef = useRef<number | null>(null);
-  const dragStartRef = useRef<{ cx: number; cy: number; ox: number; oy: number } | null>(null);
+  // Refs — used inside non-passive DOM event listeners (React state is stale there)
+  const scaleRef   = useRef(1);
+  const offsetRef  = useRef({ x: 0, y: 0 });
+  const lastPinch  = useRef<number | null>(null);
+  const dragStart  = useRef<{ cx: number; cy: number; ox: number; oy: number } | null>(null);
+  const mouseStart = useRef<{ cx: number; cy: number; ox: number; oy: number } | null>(null);
+  const imgBox     = useRef<HTMLDivElement>(null);
 
   const savedDocId = uid ? `${uid}_pyq_${pyq.id}` : null;
 
-  // Lock ALL scroll — body, html, and the .main-scroll-area flex container
+  // Helper — keep ref and state in sync
+  const applyScale = (s: number) => {
+    const v = Math.min(6, Math.max(1, s));
+    scaleRef.current = v;
+    setScale(v);
+    if (v <= 1) { offsetRef.current = { x: 0, y: 0 }; setOffset({ x: 0, y: 0 }); }
+  };
+  const applyOffset = (o: { x: number; y: number }) => { offsetRef.current = o; setOffset(o); };
+
+  // Lock ALL scroll when gallery is open
   useEffect(() => {
-    const prevBodyOverflow   = document.body.style.overflow;
-    const prevHtmlOverflow   = document.documentElement.style.overflow;
-    document.body.style.overflow           = "hidden";
-    document.documentElement.style.overflow = "hidden";
-
-    // The authenticated layout scrolls on this element, not body
-    const scrollArea = document.querySelector(".main-scroll-area") as HTMLElement | null;
-    const prevScrollArea = scrollArea?.style.overflowY ?? "";
-    if (scrollArea) scrollArea.style.overflowY = "hidden";
-
+    const body = document.body;
+    const html = document.documentElement;
+    const area = document.querySelector(".main-scroll-area") as HTMLElement | null;
+    const b = body.style.overflow, h = html.style.overflow, a = area?.style.overflowY ?? "";
+    body.style.overflow = html.style.overflow = "hidden";
+    if (area) area.style.overflowY = "hidden";
     return () => {
-      document.body.style.overflow            = prevBodyOverflow;
-      document.documentElement.style.overflow = prevHtmlOverflow;
-      if (scrollArea) scrollArea.style.overflowY = prevScrollArea;
+      body.style.overflow = b; html.style.overflow = h;
+      if (area) area.style.overflowY = a;
     };
   }, []);
 
   // Escape key
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    const fn = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", fn);
+    return () => window.removeEventListener("keydown", fn);
   }, [onClose]);
 
+  // Load saved state
   useEffect(() => {
     if (!savedDocId) return;
-    getDoc(doc(db, "saved_items", savedDocId))
-      .then(snap => setSaved(snap.exists()))
-      .catch(() => {});
+    getDoc(doc(db, "saved_items", savedDocId)).then(s => setSaved(s.exists())).catch(() => {});
   }, [savedDocId]);
+
+  // Non-passive touch event listeners — the ONLY way to call e.preventDefault()
+  // in modern React (React 17+ makes synthetic onTouchMove passive by default)
+  useEffect(() => {
+    if (!isImage) return;
+    const el = imgBox.current;
+    if (!el) return;
+
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        lastPinch.current = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY,
+        );
+        dragStart.current = null;
+      } else if (e.touches.length === 1 && scaleRef.current > 1) {
+        dragStart.current = { cx: e.touches[0].clientX, cy: e.touches[0].clientY, ox: offsetRef.current.x, oy: offsetRef.current.y };
+      }
+    };
+
+    const onMove = (e: TouchEvent) => {
+      e.preventDefault(); // ← works because listener is { passive: false }
+      if (e.touches.length === 2 && lastPinch.current !== null) {
+        const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        const ns = Math.min(6, Math.max(1, scaleRef.current * (d / lastPinch.current)));
+        scaleRef.current = ns; setScale(ns); lastPinch.current = d;
+      } else if (e.touches.length === 1 && dragStart.current && scaleRef.current > 1) {
+        const no = {
+          x: dragStart.current.ox + (e.touches[0].clientX - dragStart.current.cx) / scaleRef.current,
+          y: dragStart.current.oy + (e.touches[0].clientY - dragStart.current.cy) / scaleRef.current,
+        };
+        applyOffset(no);
+      }
+    };
+
+    const onEnd = () => { lastPinch.current = dragStart.current = null; if (scaleRef.current <= 1) applyScale(1); };
+
+    el.addEventListener("touchstart", onStart, { passive: false });
+    el.addEventListener("touchmove",  onMove,  { passive: false });
+    el.addEventListener("touchend",   onEnd);
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove",  onMove);
+      el.removeEventListener("touchend",   onEnd);
+    };
+  }, [isImage]);
 
   const toggleSave = async () => {
     if (!uid || !savedDocId || savingToggle) return;
     setSavingToggle(true);
     try {
-      if (saved) {
-        await deleteDoc(doc(db, "saved_items", savedDocId));
-        setSaved(false);
-      } else {
-        await setDoc(doc(db, "saved_items", savedDocId), {
-          uid, itemType: "pyq", itemId: pyq.id, savedAt: new Date().toISOString(),
-        });
-        setSaved(true);
-      }
+      if (saved) { await deleteDoc(doc(db, "saved_items", savedDocId)); setSaved(false); }
+      else { await setDoc(doc(db, "saved_items", savedDocId), { uid, itemType: "pyq", itemId: pyq.id, savedAt: new Date().toISOString() }); setSaved(true); }
     } catch (e) { console.error("[PyqGallery save]", e); }
     finally { setSavingToggle(false); }
   };
 
-  const clampScale = (s: number) => Math.min(6, Math.max(1, s));
+  // Mouse wheel zoom (desktop)
+  const handleWheel = (e: React.WheelEvent) => { e.preventDefault(); applyScale(scaleRef.current * (e.deltaY < 0 ? 1.12 : 0.89)); };
 
-  const zoomIn  = () => setScale(s => clampScale(s * 1.35));
-  const zoomOut = () => setScale(s => {
-    const next = clampScale(s / 1.35);
-    if (next <= 1) setOffset({ x: 0, y: 0 });
-    return next;
-  });
-  const resetZoom = () => { setScale(1); setOffset({ x: 0, y: 0 }); };
-
-  const handleWheel = (e: React.WheelEvent) => {
+  // Mouse drag (desktop)
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (scaleRef.current <= 1) return;
     e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.12 : 0.89;
-    setScale(s => {
-      const next = clampScale(s * factor);
-      if (next <= 1) setOffset({ x: 0, y: 0 });
-      return next;
+    mouseStart.current = { cx: e.clientX, cy: e.clientY, ox: offsetRef.current.x, oy: offsetRef.current.y };
+    setDragging(true);
+  };
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!mouseStart.current) return;
+    applyOffset({
+      x: mouseStart.current.ox + (e.clientX - mouseStart.current.cx) / scaleRef.current,
+      y: mouseStart.current.oy + (e.clientY - mouseStart.current.cy) / scaleRef.current,
     });
   };
+  const handleMouseUp = () => { mouseStart.current = null; setDragging(false); };
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      lastPinchRef.current = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY,
-      );
-    } else if (e.touches.length === 1 && scale > 1) {
-      dragStartRef.current = {
-        cx: e.touches[0].clientX, cy: e.touches[0].clientY,
-        ox: offset.x, oy: offset.y,
-      };
-    }
-  };
+  // Tap to zoom (images)
+  const handleImgClick = () => { if (!isDragging) applyScale(scaleRef.current > 1 ? 1 : 2.5); };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    e.preventDefault();
-    if (e.touches.length === 2 && lastPinchRef.current !== null) {
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY,
-      );
-      const ratio = dist / lastPinchRef.current;
-      setScale(s => clampScale(s * ratio));
-      lastPinchRef.current = dist;
-    } else if (e.touches.length === 1 && dragStartRef.current && scale > 1) {
-      const dx = (e.touches[0].clientX - dragStartRef.current.cx) / scale;
-      const dy = (e.touches[0].clientY - dragStartRef.current.cy) / scale;
-      setOffset({ x: dragStartRef.current.ox + dx, y: dragStartRef.current.oy + dy });
-    }
-  };
-
-  const handleTouchEnd = () => {
-    lastPinchRef.current = null;
-    dragStartRef.current = null;
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (scale <= 1) return;
-    e.preventDefault();
-    setIsDragging(true);
-    dragStartRef.current = { cx: e.clientX, cy: e.clientY, ox: offset.x, oy: offset.y };
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!dragStartRef.current || !isDragging) return;
-    const dx = (e.clientX - dragStartRef.current.cx) / scale;
-    const dy = (e.clientY - dragStartRef.current.cy) / scale;
-    setOffset({ x: dragStartRef.current.ox + dx, y: dragStartRef.current.oy + dy });
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    dragStartRef.current = null;
-  };
-
-  const handleImgClick = () => {
-    if (scale === 1) setScale(2.5);
-    else resetZoom();
-  };
-
-  return (
-    <div className="fixed inset-0 z-[100] bg-black flex flex-col select-none">
-      {/* Top bar */}
+  // Render as a portal so it's always above every scroll container / z-index
+  const overlay = (
+    <div
+      className="fixed inset-0 bg-black flex flex-col select-none"
+      style={{ zIndex: 9999, touchAction: isImage ? "none" : "auto" }}
+    >
+      {/* ── Top bar ── */}
       <div
-        className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-3 flex-shrink-0"
-        style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%)" }}
+        className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 flex-shrink-0"
+        style={{
+          paddingTop: "calc(0.75rem + env(safe-area-inset-top, 0px))",
+          paddingBottom: "2.5rem",
+          background: "linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, transparent 100%)",
+        }}
       >
-        <div className="flex-1 min-w-0 mr-3">
-          <p className="text-white font-semibold text-sm truncate leading-tight">{pyq.title}</p>
+        <div className="flex-1 min-w-0 mr-2">
+          <p className="text-white font-semibold text-sm truncate">{pyq.title}</p>
           <p className="text-white/60 text-xs mt-0.5">{pyq.subject} · {pyq.year}</p>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {uid && (
-            <button
-              onClick={toggleSave}
-              disabled={savingToggle}
-              className={`p-2 rounded-full transition-all ${saved ? "bg-blue-500 text-white" : "bg-white/15 text-white hover:bg-white/25"}`}
-            >
+            <button onClick={toggleSave} disabled={savingToggle}
+              className={`p-2.5 rounded-full transition-all ${saved ? "bg-blue-500 text-white" : "bg-white/15 text-white hover:bg-white/25"}`}>
               <Bookmark className={`w-4 h-4 ${saved ? "fill-white" : ""}`} />
             </button>
           )}
-          <a
-            href={pyq.pdfUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-2 rounded-full bg-white/15 hover:bg-white/25 text-white transition-all"
-          >
+          <a href={pyq.pdfUrl} target="_blank" rel="noopener noreferrer"
+            className="p-2.5 rounded-full bg-white/15 hover:bg-white/25 text-white transition-all">
             <ExternalLink className="w-4 h-4" />
           </a>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full bg-white/15 hover:bg-white/25 text-white transition-all"
-          >
+          <button onClick={onClose}
+            className="p-2.5 rounded-full bg-white/15 hover:bg-white/25 text-white transition-all">
             <X className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* Image / PDF viewer */}
+      {/* ── Content ── */}
       {isImage ? (
         <div
+          ref={imgBox}
           className="flex-1 flex items-center justify-center overflow-hidden"
           onWheel={handleWheel}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          style={{
-            touchAction: "none",
-            cursor: scale > 1 ? (isDragging ? "grabbing" : "grab") : "zoom-in",
-          }}
+          style={{ cursor: scale > 1 ? (isDragging ? "grabbing" : "grab") : "zoom-in" }}
         >
           <img
             src={pyq.pdfUrl}
             alt={pyq.title}
-            onClick={isDragging ? undefined : handleImgClick}
+            onClick={handleImgClick}
             draggable={false}
             style={{
+              maxWidth: "100%", maxHeight: "100%", objectFit: "contain",
+              display: "block", userSelect: "none", pointerEvents: "none",
               transform: `scale(${scale}) translate(${offset.x}px, ${offset.y}px)`,
               transformOrigin: "center center",
-              maxWidth: "100%",
-              maxHeight: "100%",
-              objectFit: "contain",
-              transition: isDragging ? "none" : "transform 0.18s cubic-bezier(0.22,1,0.36,1)",
-              userSelect: "none",
-              display: "block",
+              transition: (isDragging || mouseStart.current) ? "none" : "transform 0.15s ease",
             }}
           />
         </div>
       ) : (
-        <div className="flex-1 flex flex-col pt-14 pb-2">
-          <iframe
-            src={`https://docs.google.com/viewer?url=${encodeURIComponent(pyq.pdfUrl)}&embedded=true`}
-            className="flex-1 w-full border-0"
-            title={pyq.title}
-          />
+        <div className="flex-1 flex flex-col pt-14">
+          {pyq.fileType === "rich" ? (
+            <div className="flex-1 overflow-y-auto bg-white p-4"
+              dangerouslySetInnerHTML={{ __html: (pyq as any).content ?? "" }} />
+          ) : (
+            <iframe
+              src={`https://docs.google.com/viewer?url=${encodeURIComponent(pyq.pdfUrl)}&embedded=true`}
+              className="flex-1 w-full border-0" title={pyq.title}
+            />
+          )}
           <p className="text-center text-xs text-white/40 py-2">
-            If PDF doesn't load,{" "}
+            PDF not loading?{" "}
             <a href={pyq.pdfUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
-              open directly
+              Open directly ↗
             </a>
           </p>
         </div>
       )}
 
-      {/* Bottom zoom bar — image only */}
+      {/* ── Bottom zoom controls (images only) ── */}
       {isImage && (
         <div
-          className="absolute bottom-0 left-0 right-0 flex items-center justify-center pb-6 pt-8"
-          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 100%)" }}
+          className="absolute bottom-0 left-0 right-0 flex flex-col items-center"
+          style={{
+            paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom, 0px))",
+            paddingTop: "3rem",
+            background: "linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%)",
+          }}
         >
+          {scale === 1 && (
+            <p className="text-white/40 text-[10px] mb-2">Tap image · pinch · scroll to zoom</p>
+          )}
           <div className="flex items-center gap-3 bg-black/50 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/10">
-            <button
-              onClick={zoomOut}
-              disabled={scale <= 1}
-              className="p-1.5 rounded-full hover:bg-white/15 text-white disabled:opacity-30 transition-all"
-            >
+            <button onClick={() => applyScale(scaleRef.current / 1.5)} disabled={scale <= 1}
+              className="p-1.5 rounded-full hover:bg-white/15 text-white disabled:opacity-30 transition-all">
               <ZoomOut className="w-4 h-4" />
             </button>
-            <button
-              onClick={resetZoom}
-              className="text-white/70 text-xs font-mono min-w-[42px] text-center hover:text-white transition-colors tabular-nums"
-            >
+            <button onClick={() => applyScale(1)}
+              className="text-white/70 text-xs font-mono min-w-[42px] text-center hover:text-white transition-colors">
               {Math.round(scale * 100)}%
             </button>
-            <button
-              onClick={zoomIn}
-              disabled={scale >= 6}
-              className="p-1.5 rounded-full hover:bg-white/15 text-white disabled:opacity-30 transition-all"
-            >
+            <button onClick={() => applyScale(scaleRef.current * 1.5)} disabled={scale >= 6}
+              className="p-1.5 rounded-full hover:bg-white/15 text-white disabled:opacity-30 transition-all">
               <ZoomIn className="w-4 h-4" />
             </button>
           </div>
-          {scale === 1 && (
-            <p className="absolute bottom-1 text-white/35 text-[10px]">
-              Tap · pinch · scroll to zoom
-            </p>
-          )}
         </div>
       )}
     </div>
   );
+
+  return createPortal(overlay, document.body);
 }
 
 function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
