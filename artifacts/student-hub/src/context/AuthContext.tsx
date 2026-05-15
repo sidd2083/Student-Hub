@@ -46,12 +46,22 @@ const AuthContext = createContext<AuthContextType | null>(null);
 // that tells AppShell "someone was logged in on this device" so it can show the
 // authenticated layout instantly — even before the profile cache is available.
 const PROFILE_CACHE_KEY = "studenthub_profile_v2";
-const AUTH_HINT_KEY = "sh_authed";
+const AUTH_HINT_KEY  = "sh_authed"; // "1" = was logged in on this device
+const GUEST_HINT_KEY = "sh_guest";  // "1" = explicitly logged out on this device
 
+// setAuthHint(true)  → marks device as authenticated (clears guest flag)
+// setAuthHint(false) → marks device as guest (clears auth flag)
+// AppShell reads both flags synchronously so the correct layout is shown
+// on the very first render, with zero flicker in either direction.
 function setAuthHint(authed: boolean) {
   try {
-    if (authed) localStorage.setItem(AUTH_HINT_KEY, "1");
-    else localStorage.removeItem(AUTH_HINT_KEY);
+    if (authed) {
+      localStorage.setItem(AUTH_HINT_KEY, "1");
+      localStorage.removeItem(GUEST_HINT_KEY);
+    } else {
+      localStorage.removeItem(AUTH_HINT_KEY);
+      localStorage.setItem(GUEST_HINT_KEY, "1");
+    }
   } catch {}
 }
 
