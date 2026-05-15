@@ -1,6 +1,5 @@
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useLayoutEffect, useRef } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
-import { AnimatePresence, motion } from "framer-motion";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -49,30 +48,36 @@ const queryClient = new QueryClient({
   },
 });
 
-const pageTransition = {
-  initial: { opacity: 0, y: 18 },
-  animate: { opacity: 1, y: 0 },
-  exit:    { opacity: 0, y: -8 },
-  transition: {
-    type: "spring" as const,
-    stiffness: 400,
-    damping: 40,
-    mass: 0.75,
-  },
-};
-
+/**
+ * PageWrapper — single persistent div, never remounted.
+ * On every navigation, useLayoutEffect fires before the browser paints,
+ * resets the CSS animation, and lets it replay cleanly.
+ * No key-based remount = no duplicate-render glitch = no vibration.
+ */
 function PageWrapper({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const ref = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // Reset CSS animation so it replays on every route change
+    el.style.animation = "none";
+    void el.offsetHeight;
+    el.style.animation = "";
+    // Scroll the page content back to the top on every navigation
+    const scrollArea = el.closest(".main-scroll-area") as HTMLElement | null;
+    if (scrollArea) scrollArea.scrollTop = 0;
+  }, [location]);
+
   return (
-    <AnimatePresence mode="popLayout" initial={false}>
-      <motion.div
-        key={location}
-        {...pageTransition}
-        style={{ minHeight: "100%", display: "flex", flexDirection: "column", willChange: "opacity, transform" }}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
+    <div
+      ref={ref}
+      className="page-enter"
+      style={{ minHeight: "100%", display: "flex", flexDirection: "column" }}
+    >
+      {children}
+    </div>
   );
 }
 

@@ -285,7 +285,24 @@ html.dark, body.dark, #root.dark {
   background-color: #030712;
 }
 
-/* Page transitions handled by Framer Motion in App.tsx */
+/* ── Page transition ─────────────────────────────────────────────────── */
+/* Single-element approach: the wrapper div is never remounted.           */
+/* useLayoutEffect resets this animation on every route change so it      */
+/* replays cleanly — zero double-render, zero vibration.                  */
+@keyframes pageIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.page-enter {
+  animation: pageIn 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: opacity, transform;
+}
 
 /* ── Card hover lift ─────────────────────────────────────────────────── */
 .card-hover {
