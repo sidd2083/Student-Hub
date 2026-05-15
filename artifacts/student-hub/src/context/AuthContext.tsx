@@ -46,22 +46,17 @@ const AuthContext = createContext<AuthContextType | null>(null);
 // that tells AppShell "someone was logged in on this device" so it can show the
 // authenticated layout instantly — even before the profile cache is available.
 const PROFILE_CACHE_KEY = "studenthub_profile_v2";
-const AUTH_HINT_KEY  = "sh_authed"; // "1" = was logged in on this device
-const GUEST_HINT_KEY = "sh_guest";  // "1" = explicitly logged out on this device
+// "sh_authed" = "1" means Firebase confirmed this user is logged in on this device.
+// It is set the moment Firebase Auth fires with a valid user (before any Firestore fetch),
+// and cleared ONLY on explicit logout or when Firebase itself says the user is signed out.
+// It is NEVER cleared due to a missing Firestore profile (transient errors, new users, etc.)
+// so it can't cause false "logged out" flashes.
+const AUTH_HINT_KEY = "sh_authed";
 
-// setAuthHint(true)  → marks device as authenticated (clears guest flag)
-// setAuthHint(false) → marks device as guest (clears auth flag)
-// AppShell reads both flags synchronously so the correct layout is shown
-// on the very first render, with zero flicker in either direction.
 function setAuthHint(authed: boolean) {
   try {
-    if (authed) {
-      localStorage.setItem(AUTH_HINT_KEY, "1");
-      localStorage.removeItem(GUEST_HINT_KEY);
-    } else {
-      localStorage.removeItem(AUTH_HINT_KEY);
-      localStorage.setItem(GUEST_HINT_KEY, "1");
-    }
+    if (authed) localStorage.setItem(AUTH_HINT_KEY, "1");
+    else localStorage.removeItem(AUTH_HINT_KEY);
   } catch {}
 }
 
@@ -174,12 +169,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const applyProfile = useCallback((p: UserProfile | null) => {
     profileRef.current = p;
     setProfileState(p);
-    if (p) {
-      setCachedProfile(p.uid, p);
-      setAuthHint(true);   // user is logged in — set hint for instant layout on next open
-    } else {
-      setAuthHint(false);  // user logged out — clear hint immediately
-    }
+    if (p) setCachedProfile(p.uid, p);
+    // Auth hint is managed separately in onAuthStateChanged / signOut —
+    // NOT here, so Firestore errors or missing profiles can't accidentally
+    // flip the hint and cause a "logged out" flash for a real user.
   }, []);
 
   useEffect(() => {
@@ -217,6 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // ── Not logged in ──────────────────────────────────────────────────────
       if (!firebaseUser) {
+        setAuthHint(false); // clear auth hint — Firebase confirmed signed out
         setUser(null);
         applyProfile(null);
         clearProfileCache();
@@ -228,6 +222,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // Set auth hint IMMEDIATELY — before any Firestore fetch.
+      // This is the earliest possible moment we know the user is authenticated.
+      // On the next session open, AppShell reads this flag synchronously and
+      // shows the authenticated layout with zero delay.
+      setAuthHint(true);
       setUser(firebaseUser);
 
       // ── Fast path: use localStorage cache for instant startup ──────────────
@@ -354,6 +353,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await firebaseSignOut(auth);
+    setAuthHint(false); // clear auth hint on explicit logout
     setUser(null);
     applyProfile(null);
     clearProfileCache();
