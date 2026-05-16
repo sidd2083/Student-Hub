@@ -93,10 +93,7 @@ function getGeminiBaseUrl(): string {
   return process.env.AI_INTEGRATIONS_GEMINI_BASE_URL ?? "https://generativelanguage.googleapis.com";
 }
 
-async function askGemini(systemContent: string, history: ChatMessage[], message: string): Promise<string> {
-  const key = getGeminiKey();
-  const baseUrl = getGeminiBaseUrl();
-
+function buildGeminiBody(systemContent: string, history: ChatMessage[], message: string, maxTokens: number) {
   const contents = [
     ...history
       .filter(h => h.role === "user" || h.role === "assistant")
@@ -106,28 +103,107 @@ async function askGemini(systemContent: string, history: ChatMessage[], message:
       })),
     { role: "user", parts: [{ text: message }] },
   ];
-
-  const body = {
+  return {
     system_instruction: { parts: [{ text: systemContent }] },
     contents,
     generationConfig: {
-      maxOutputTokens: 2500,
+      maxOutputTokens: maxTokens,
       temperature: 0.8,
     },
   };
+}
 
+// ── Streaming chat (SSE) ──────────────────────────────────────────────────────
+async function streamGemini(
+  systemContent: string,
+  history: ChatMessage[],
+  message: string,
+  res: Response,
+): Promise<void> {
+  const key = getGeminiKey();
+  const baseUrl = getGeminiBaseUrl();
+  const apiVersion = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL ? "" : "v1beta";
+  const url = apiVersion
+    ? `${baseUrl}/${apiVersion}/models/gemini-2.5-flash:streamGenerateContent?key=${key}&alt=sse`
+    : `${baseUrl}/models/gemini-2.5-flash:streamGenerateContent?key=${key}&alt=sse`;
+
+  const body = buildGeminiBody(systemContent, history, message, 8192);
+
+  const geminiRes = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(55000),
+  });
+
+  if (!geminiRes.ok || !geminiRes.body) {
+    const errBody = await geminiRes.json().catch(() => ({})) as { error?: { message?: string } };
+    const msg = errBody?.error?.message ?? `HTTP ${geminiRes.status}`;
+    throw new Error(`Gemini error: ${msg}`);
+  }
+
+  // Set up SSE headers
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  const reader = geminiRes.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const raw = line.slice(6).trim();
+      if (!raw || raw === "[DONE]") continue;
+      try {
+        const json = JSON.parse(raw) as {
+          candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
+        };
+        const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        if (text) {
+          res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`);
+        }
+        // Propagate finish reason so the client knows we're done
+        const finishReason = json.candidates?.[0]?.finishReason;
+        if (finishReason && finishReason !== "STOP" && finishReason !== "MAX_TOKENS") {
+          res.write(`data: ${JSON.stringify({ error: `Stopped: ${finishReason}` })}\n\n`);
+        }
+      } catch {
+        // Partial JSON chunk — ignore, will be in next buffer
+      }
+    }
+  }
+
+  res.write("data: [DONE]\n\n");
+  res.end();
+}
+
+// ── Non-streaming fallback ────────────────────────────────────────────────────
+async function askGemini(systemContent: string, history: ChatMessage[], message: string): Promise<string> {
+  const key = getGeminiKey();
+  const baseUrl = getGeminiBaseUrl();
   const apiVersion = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL ? "" : "v1beta";
   const url = apiVersion
     ? `${baseUrl}/${apiVersion}/models/gemini-2.5-flash:generateContent?key=${key}`
     : `${baseUrl}/models/gemini-2.5-flash:generateContent?key=${key}`;
 
+  const body = buildGeminiBody(systemContent, history, message, 4096);
+
   const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(25000),
-    }
-  );
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(25000),
+  });
 
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({})) as { error?: { message?: string; code?: number } };
@@ -152,10 +228,11 @@ router.get("/ai/status", (_req: Request, res: Response) => {
 
 router.post("/ai/chat", async (req: Request, res: Response) => {
   try {
-    const { message, history = [], context } = req.body as {
+    const { message, history = [], context, stream = false } = req.body as {
       message?: string;
       history?: ChatMessage[];
       context?: ChatContext;
+      stream?: boolean;
     };
 
     if (!message) return res.status(400).json({ error: "message is required" });
@@ -167,12 +244,37 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
     }
 
     const systemContent = buildSystemContent(context);
+
+    if (stream) {
+      // Streaming — response is SSE; errors thrown inside become a stream error event
+      try {
+        await streamGemini(systemContent, history, message, res);
+      } catch (err) {
+        const errStr = String(err);
+        logger.error({ err }, "[AI] Streaming error");
+        if (!res.headersSent) {
+          const isRate = errStr.includes("429") || errStr.toLowerCase().includes("quota");
+          return res.status(isRate ? 429 : 500).json({
+            error: isRate
+              ? "Nep AI is a bit busy right now. Please wait a moment and try again."
+              : "Nep AI ran into an issue. Please try again.",
+          });
+        }
+        // Headers already sent — send error as SSE event and close
+        res.write(`data: ${JSON.stringify({ error: "Connection lost. Please try again." })}\n\n`);
+        res.write("data: [DONE]\n\n");
+        res.end();
+      }
+      return;
+    }
+
+    // Non-streaming fallback
     const reply = await askGemini(systemContent, history, message);
     return res.json({ reply });
 
   } catch (err) {
     const errStr = String(err);
-    logger.error({ err }, "AI handler error");
+    logger.error({ err }, "[AI] Handler error");
     if (errStr.includes("429") || errStr.toLowerCase().includes("quota") || errStr.toLowerCase().includes("rate")) {
       return res.status(429).json({ error: "Nep AI is a bit busy right now. Please wait a moment and try again." });
     }

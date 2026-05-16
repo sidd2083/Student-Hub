@@ -143,22 +143,64 @@ function buildSystemContent(ctx: StudyContext | null): string {
   return SYSTEM_PROMPT + parts.join("\n");
 }
 
-async function callOpenAI(
+/**
+ * Stream the AI response via SSE.
+ * Calls onChunk for every text piece received so the UI updates in real time.
+ * Returns the full assembled text when the stream ends.
+ */
+async function streamAI(
   message: string,
   history: Message[],
   ctx: StudyContext | null,
+  onChunk: (text: string) => void,
 ): Promise<string> {
   const res = await fetch("/api/ai/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, history, context: ctx }),
+    body: JSON.stringify({ message, history, context: ctx, stream: true }),
   });
+
+  // Non-2xx before streaming started — parse as JSON error
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as { error?: string };
     throw new Error(err.error ?? `AI service ${res.status}`);
   }
-  const data = await res.json() as { reply?: string };
-  return data.reply ?? "I couldn't generate a response. Please try again.";
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("No response stream available.");
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let full = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const raw = line.slice(6).trim();
+      if (!raw || raw === "[DONE]") continue;
+      try {
+        const json = JSON.parse(raw) as { chunk?: string; error?: string };
+        if (json.error) throw new Error(json.error);
+        if (json.chunk) {
+          full += json.chunk;
+          onChunk(json.chunk);
+        }
+      } catch (parseErr) {
+        if (parseErr instanceof Error && parseErr.message !== "Unexpected end of JSON input") {
+          throw parseErr;
+        }
+      }
+    }
+  }
+
+  return full || "I couldn't generate a response. Please try again.";
 }
 
 const STUDY_FALLBACKS: [RegExp, string][] = [
@@ -257,7 +299,7 @@ function NepAiContent() {
     if (pending && pending.id !== lastCtxIdRef.current) {
       lastCtxIdRef.current = pending.id;
       const msg = pending.context;
-      setMessages([{ role: "user", content: msg }]);
+      setMessages([{ role: "user", content: msg }, { role: "assistant", content: "" }]);
       setLoading(true);
       setLoadingCtx(true);
       (async () => {
@@ -265,10 +307,20 @@ function NepAiContent() {
         try { ctx = await loadStudyContext(user.uid); setContext(ctx); } catch { }
         finally { setLoadingCtx(false); }
         try {
-          const reply = await callOpenAI(msg, [], ctx);
-          setMessages(prev => [...prev, { role: "assistant", content: reply }]);
+          await streamAI(msg, [], ctx, (chunk) => {
+            setMessages(prev => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last?.role === "assistant") updated[updated.length - 1] = { role: "assistant", content: last.content + chunk };
+              return updated;
+            });
+          });
         } catch {
-          setMessages(prev => [...prev, { role: "assistant", content: getLocalFallback(msg) }]);
+          setMessages(prev => {
+            const updated = [...prev];
+            if (updated[updated.length - 1]?.role === "assistant") updated[updated.length - 1] = { role: "assistant", content: getLocalFallback(msg) };
+            return updated;
+          });
         } finally { setLoading(false); }
       })();
       return;
@@ -280,16 +332,26 @@ function NepAiContent() {
     prevInitialQRef.current = urlQ;
     autoSentRef.current = true;
     const msg = urlQ;
-    setMessages([{ role: "user", content: msg }]);
+    setMessages([{ role: "user", content: msg }, { role: "assistant", content: "" }]);
     setLoading(true);
     (async () => {
       let ctx: StudyContext | null = null;
       try { ctx = await loadStudyContext(user.uid); setContext(ctx); } catch { }
       try {
-        const reply = await callOpenAI(msg, [], ctx);
-        setMessages(prev => [...prev, { role: "assistant", content: reply }]);
+        await streamAI(msg, [], ctx, (chunk) => {
+          setMessages(prev => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last?.role === "assistant") updated[updated.length - 1] = { role: "assistant", content: last.content + chunk };
+            return updated;
+          });
+        });
       } catch {
-        setMessages(prev => [...prev, { role: "assistant", content: getLocalFallback(msg) }]);
+        setMessages(prev => {
+          const updated = [...prev];
+          if (updated[updated.length - 1]?.role === "assistant") updated[updated.length - 1] = { role: "assistant", content: getLocalFallback(msg) };
+          return updated;
+        });
       } finally { setLoading(false); }
     })();
   }, [location, user]);
@@ -314,29 +376,46 @@ function NepAiContent() {
     if (!msg || loading) return;
     setInput("");
     setShowCtxBanner(false);
-    const newMessages: Message[] = [...messages, { role: "user" as const, content: msg }];
-    setMessages(newMessages);
+    // Optimistically add user message + empty assistant placeholder
+    const historySnapshot = messages;
+    setMessages(prev => [
+      ...prev,
+      { role: "user" as const, content: msg },
+      { role: "assistant" as const, content: "" },
+    ]);
     setLoading(true);
     try {
-      const reply = await callOpenAI(msg, messages, context);
-      setMessages(prev => [...prev, { role: "assistant", content: reply }]);
+      await streamAI(msg, historySnapshot, context, (chunk) => {
+        setMessages(prev => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last?.role === "assistant") {
+            updated[updated.length - 1] = { role: "assistant", content: last.content + chunk };
+          }
+          return updated;
+        });
+      });
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      console.warn("[NepAI] call failed:", errMsg);
+      console.warn("[NepAI] stream failed:", errMsg);
       const isRateLimit = errMsg.includes("busy") || errMsg.includes("too many") || errMsg.includes("rate") || errMsg.includes("429");
       const isConfig    = errMsg.includes("not configured") || errMsg.includes("GEMINI_API_KEY") || errMsg.includes("API key") || errMsg.includes("503");
       const isUserFriendly = errMsg.length >= 10 && errMsg.length <= 300 && !errMsg.match(/^(AI service|status |fetch)/i);
       if (isRateLimit) startCooldown(20);
-      setMessages(prev => [...prev, {
-        role: "assistant",
-        content: isRateLimit
-          ? "Nep AI is a little busy — please wait 20 seconds and try again!"
-          : isConfig
-          ? "⚠️ Nep AI isn't connected.\n\nTo fix this on Vercel:\n1. Go to your Vercel project → Settings → Environment Variables\n2. Add **GEMINI_API_KEY** with your Google AI key\n3. Make sure it's enabled for **Production** environment\n4. Click **Redeploy** (not just save — you must redeploy!)\n\nGet a free key at: https://aistudio.google.com/apikey"
-          : isUserFriendly
-          ? errMsg
-          : "Sorry, I ran into a temporary issue. Please try again in a moment!",
-      }]);
+      const errorContent = isRateLimit
+        ? "Nep AI is a little busy — please wait 20 seconds and try again!"
+        : isConfig
+        ? "⚠️ Nep AI isn't connected.\n\nTo fix this on Vercel:\n1. Go to your Vercel project → Settings → Environment Variables\n2. Add **GEMINI_API_KEY** with your Google AI key\n3. Make sure it's enabled for **Production** environment\n4. Click **Redeploy** (not just save — you must redeploy!)\n\nGet a free key at: https://aistudio.google.com/apikey"
+        : isUserFriendly
+        ? errMsg
+        : "Sorry, I ran into a temporary issue. Please try again in a moment!";
+      setMessages(prev => {
+        const updated = [...prev];
+        if (updated[updated.length - 1]?.role === "assistant") {
+          updated[updated.length - 1] = { role: "assistant", content: errorContent };
+        }
+        return updated;
+      });
     } finally {
       setLoading(false);
     }
@@ -452,31 +531,44 @@ function NepAiContent() {
           </div>
         )}
 
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            {msg.role === "assistant" && (
-              <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-              </div>
-            )}
-            {msg.role === "user" ? (
-              <div
-                data-testid={`msg-${msg.role}-${i}`}
-                className="max-w-[78%] px-4 py-3 rounded-2xl rounded-br-sm text-sm leading-relaxed bg-blue-500 text-white"
-              >
-                {msg.content}
-              </div>
-            ) : (
-              <div
-                data-testid={`msg-${msg.role}-${i}`}
-                className="max-w-[82%] px-4 py-3 rounded-2xl rounded-bl-sm text-sm text-gray-800 bg-white border border-gray-100 shadow-sm"
-                dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content) }}
-              />
-            )}
-          </div>
-        ))}
+        {messages.map((msg, i) => {
+          const isStreamingPlaceholder =
+            loading && msg.role === "assistant" && i === messages.length - 1 && msg.content === "";
+          return (
+            <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              {msg.role === "assistant" && (
+                <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                </div>
+              )}
+              {msg.role === "user" ? (
+                <div
+                  data-testid={`msg-${msg.role}-${i}`}
+                  className="max-w-[78%] px-4 py-3 rounded-2xl rounded-br-sm text-sm leading-relaxed bg-blue-500 text-white"
+                >
+                  {msg.content}
+                </div>
+              ) : isStreamingPlaceholder ? (
+                <div className="bg-white border border-gray-100 shadow-sm px-4 py-3 rounded-2xl rounded-bl-sm">
+                  <div className="flex gap-1 items-center h-4">
+                    {[0, 150, 300].map(delay => (
+                      <span key={delay} className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: `${delay}ms` }} />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div
+                  data-testid={`msg-${msg.role}-${i}`}
+                  className="max-w-[82%] px-4 py-3 rounded-2xl rounded-bl-sm text-sm text-gray-800 bg-white border border-gray-100 shadow-sm"
+                  dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content) }}
+                />
+              )}
+            </div>
+          );
+        })}
 
-        {loading && (
+        {/* Show separate loading indicator only when no streaming placeholder is present */}
+        {loading && (messages.length === 0 || messages[messages.length - 1]?.role !== "assistant") && (
           <div className="flex justify-start">
             <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center mr-2 flex-shrink-0">
               <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
