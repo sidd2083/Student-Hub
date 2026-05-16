@@ -307,13 +307,21 @@ function NepAiContent() {
         try { ctx = await loadStudyContext(user.uid); setContext(ctx); } catch { }
         finally { setLoadingCtx(false); }
         try {
-          await streamAI(msg, [], ctx, (chunk) => {
+          const finalText = await streamAI(msg, [], ctx, (chunk) => {
             setMessages(prev => {
               const updated = [...prev];
               const last = updated[updated.length - 1];
               if (last?.role === "assistant") updated[updated.length - 1] = { role: "assistant", content: last.content + chunk };
               return updated;
             });
+          });
+          setMessages(prev => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last?.role === "assistant" && !last.content && finalText) {
+              updated[updated.length - 1] = { role: "assistant", content: finalText };
+            }
+            return updated;
           });
         } catch {
           setMessages(prev => {
@@ -338,13 +346,21 @@ function NepAiContent() {
       let ctx: StudyContext | null = null;
       try { ctx = await loadStudyContext(user.uid); setContext(ctx); } catch { }
       try {
-        await streamAI(msg, [], ctx, (chunk) => {
+        const finalText = await streamAI(msg, [], ctx, (chunk) => {
           setMessages(prev => {
             const updated = [...prev];
             const last = updated[updated.length - 1];
             if (last?.role === "assistant") updated[updated.length - 1] = { role: "assistant", content: last.content + chunk };
             return updated;
           });
+        });
+        setMessages(prev => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last?.role === "assistant" && !last.content && finalText) {
+            updated[updated.length - 1] = { role: "assistant", content: finalText };
+          }
+          return updated;
         });
       } catch {
         setMessages(prev => {
@@ -385,7 +401,7 @@ function NepAiContent() {
     ]);
     setLoading(true);
     try {
-      await streamAI(msg, historySnapshot, context, (chunk) => {
+      const finalText = await streamAI(msg, historySnapshot, context, (chunk) => {
         setMessages(prev => {
           const updated = [...prev];
           const last = updated[updated.length - 1];
@@ -394,6 +410,15 @@ function NepAiContent() {
           }
           return updated;
         });
+      });
+      // If chunks never arrived via onChunk, use the return value directly
+      setMessages(prev => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last?.role === "assistant" && !last.content && finalText) {
+          updated[updated.length - 1] = { role: "assistant", content: finalText };
+        }
+        return updated;
       });
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -550,10 +575,11 @@ function NepAiContent() {
                 </div>
               ) : isStreamingPlaceholder ? (
                 <div className="bg-white border border-gray-100 shadow-sm px-4 py-3 rounded-2xl rounded-bl-sm">
-                  <div className="flex gap-1 items-center h-4">
+                  <div className="flex gap-1.5 items-center">
                     {[0, 150, 300].map(delay => (
-                      <span key={delay} className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: `${delay}ms` }} />
+                      <span key={delay} className="w-2 h-2 bg-indigo-300 rounded-full animate-bounce" style={{ animationDelay: `${delay}ms` }} />
                     ))}
+                    <span className="text-xs text-gray-400 ml-1">Thinking…</span>
                   </div>
                 </div>
               ) : (
