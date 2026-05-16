@@ -27,7 +27,34 @@ interface Announcement { id: string; title: string; body: string; createdAt: str
 interface CustomBadge { id: string; text: string; emoji: string; color: string; createdAt: string }
 interface AutoBadge { emoji: string; label: string; bg: string; shadow: string; type: "study" | "streak" }
 
-const DISMISSED_KEY = "studenthub_dismissed_announcements";
+const DISMISSED_KEY   = "studenthub_dismissed_announcements";
+const STATS_CACHE_KEY = "sh_dash_v1";
+
+interface StatsCache {
+  uid: string;
+  streak: number;
+  studyMins: number;
+  pendingTasks: number;
+  customBadges: CustomBadge[];
+  ts: number;
+}
+
+function readStatsCache(uid: string): StatsCache | null {
+  try {
+    const raw = localStorage.getItem(STATS_CACHE_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as StatsCache;
+    if (d.uid !== uid) return null;
+    if (Date.now() - d.ts > 10 * 60_000) return null; // 10-min TTL
+    return d;
+  } catch { return null; }
+}
+
+function writeStatsCache(uid: string, data: Omit<StatsCache, "uid" | "ts">) {
+  try {
+    localStorage.setItem(STATS_CACHE_KEY, JSON.stringify({ uid, ...data, ts: Date.now() }));
+  } catch {}
+}
 
 const STUDY_TIERS = [
   { mins: 24000, emoji: "🏆", label: "Champion",    bg: "linear-gradient(135deg,#94a3b8,#e2e8f0,#94a3b8)", shadow: "0 4px 20px rgba(148,163,184,0.5)" },
@@ -192,8 +219,13 @@ function AchievementsCard({
 
 export default function Dashboard() {
   const { profile, user } = useAuth();
-  const [streak, setStreak]             = useState(0);
-  const [studyMins, setStudyMins]       = useState(0);
+
+  // profile is seeded from localStorage by AuthContext on the very first render —
+  // so profile?.uid is available synchronously. We use it to read the stats cache
+  // before any Firestore request fires, giving instant display on repeat visits.
+  const uid = user?.uid ?? profile?.uid;
+  const [streak, setStreak]             = useState<number>(() => readStatsCache(uid ?? "")?.streak ?? 0);
+  const [studyMins, setStudyMins]       = useState<number>(() => readStatsCache(uid ?? "")?.studyMins ?? 0);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [dismissed, setDismissed]       = useState<Set<string>>(() => {
     try {
@@ -201,9 +233,10 @@ export default function Dashboard() {
       return stored ? new Set(JSON.parse(stored) as string[]) : new Set();
     } catch { return new Set(); }
   });
-  const [customBadges, setCustomBadges] = useState<CustomBadge[]>([]);
-  const [pendingTasks, setPendingTasks] = useState(0);
-  const [statsLoaded, setStatsLoaded]   = useState(false);
+  const [customBadges, setCustomBadges] = useState<CustomBadge[]>(() => readStatsCache(uid ?? "")?.customBadges ?? []);
+  const [pendingTasks, setPendingTasks] = useState<number>(() => readStatsCache(uid ?? "")?.pendingTasks ?? 0);
+  // Mark loaded immediately if we have a cache — no skeleton needed on repeat visits
+  const [statsLoaded, setStatsLoaded]   = useState<boolean>(() => !!readStatsCache(uid ?? ""));
 
   const dismissAnnouncement = useCallback((id: string) => {
     setDismissed(prev => {
@@ -214,7 +247,7 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    const uid = user?.uid;
+    let mounted = true;
     (async () => {
       try {
         const announcementsPromise = getDocs(query(collection(db, "announcements"), orderBy("createdAt", "desc")));
@@ -226,29 +259,43 @@ export default function Dashboard() {
             announcementsPromise,
           ]);
 
+          if (!mounted) return;
+
+          let newStreak = 0, newMins = 0, newBadges: CustomBadge[] = [];
           if (userSnap.exists()) {
             const d = userSnap.data();
-            setStudyMins(d.totalStudyTime ?? 0);
-            setStreak(d.streak ?? 0);
-            setCustomBadges(d.badges ?? []);
+            newMins   = d.totalStudyTime ?? 0;
+            newStreak = d.streak ?? 0;
+            newBadges = d.badges ?? [];
+            setStudyMins(newMins);
+            setStreak(newStreak);
+            setCustomBadges(newBadges);
           }
-          setPendingTasks(tasksSnap.size);
+          const newPending = tasksSnap.size;
+          setPendingTasks(newPending);
+          // Persist fresh stats so next visit is instant
+          writeStatsCache(uid, { streak: newStreak, studyMins: newMins, pendingTasks: newPending, customBadges: newBadges });
 
           const list: Announcement[] = announcementsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
           setAnnouncements(list.slice(0, 3));
         } else {
           const announcementsSnap = await announcementsPromise;
+          if (!mounted) return;
           const list: Announcement[] = announcementsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
           setAnnouncements(list.slice(0, 3));
         }
       } catch (e) {
         console.error("[Dashboard] Load failed:", e);
-        setAnnouncements([]);
+        if (mounted) setAnnouncements([]);
       } finally {
-        setStatsLoaded(true);
+        if (mounted) setStatsLoaded(true);
       }
     })();
-  }, [user]);
+    return () => { mounted = false; };
+  // uid is stable once auth resolves — using it instead of `user` prevents
+  // re-runs when the Firebase User object reference changes but uid hasn't
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid]);
 
   const greeting = () => {
     const h = new Date().getHours();
