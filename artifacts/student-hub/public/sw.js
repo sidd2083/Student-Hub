@@ -1,4 +1,4 @@
-const CACHE_NAME = "student-hub-v5";
+const CACHE_NAME = "student-hub-v6";
 const SHELL_ASSETS = [
   "/",
   "/manifest.json",
@@ -25,37 +25,36 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Only handle GET requests for same-origin assets
   if (request.method !== "GET") return;
-  if (url.origin !== self.location.origin) return; // skip Firebase, Google APIs, fonts
+  if (url.origin !== self.location.origin) return;
 
-  // Skip API calls and Vite dev internals
   if (url.pathname.startsWith("/api/")) return;
   if (url.pathname.startsWith("/@") || url.pathname.includes("__vite") || url.pathname.includes("hot-update")) return;
 
-  // Navigation requests (HTML) — serve cached shell instantly, refresh in background
+  // Navigation requests — network-first so fresh HTML always wins
   if (request.mode === "navigate") {
     event.respondWith(
-      caches.open(CACHE_NAME).then(async (cache) => {
-        const cached = await cache.match("/");
-        const networkFetch = fetch(request)
-          .then((res) => { if (res.ok) cache.put("/", res.clone()); return res; })
-          .catch(() => null);
-        // Return cached immediately if available; wait for network otherwise
-        return cached ?? await networkFetch ?? await caches.match("/");
-      })
+      fetch(request)
+        .then((res) => {
+          if (res.ok) {
+            caches.open(CACHE_NAME).then((c) => c.put("/", res.clone()));
+          }
+          return res;
+        })
+        .catch(() => caches.match("/"))
     );
     return;
   }
 
-  // All other same-origin assets (JS, CSS, images, fonts) — cache-first
+  // JS/CSS/images — network-first with cache fallback (ensures fresh bundles)
   event.respondWith(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      const cached = await cache.match(request);
-      if (cached) return cached;
-      const response = await fetch(request);
-      if (response.ok) cache.put(request, response.clone());
-      return response;
-    })
+    fetch(request)
+      .then((res) => {
+        if (res.ok) {
+          caches.open(CACHE_NAME).then((c) => c.put(request, res.clone()));
+        }
+        return res;
+      })
+      .catch(() => caches.match(request))
   );
 });
