@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
@@ -7,7 +7,7 @@ import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc } fro
 import { db } from "@/lib/firebase";
 import {
   FileText, Image, Search, X, ExternalLink, Filter, LogIn,
-  Bookmark, ZoomIn, ZoomOut,
+  Bookmark, ZoomIn, ZoomOut, Maximize, Minimize,
 } from "lucide-react";
 
 type Pyq = {
@@ -21,12 +21,8 @@ type Pyq = {
 };
 
 function detectIsImage(pyq: Pyq): boolean {
-  // If explicitly marked as image, trust it
   if (pyq.fileType === "image") return true;
-  // Rich text is never a standalone image
   if (pyq.fileType === "rich") return false;
-  // For "pdf" or missing fileType, check the actual URL
-  // Firebase Storage URLs encode the path: e.g. pyqs%2F1234.jpg
   if (pyq.pdfUrl) {
     try {
       const decoded = decodeURIComponent(pyq.pdfUrl.split("?")[0]).toLowerCase();
@@ -56,24 +52,23 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
 function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?: string }) {
   const isImage = detectIsImage(pyq);
 
-  // React state — used for rendering
-  const [scale, setScale]       = useState(1);
-  const [offset, setOffset]     = useState({ x: 0, y: 0 });
-  const [isDragging, setDragging] = useState(false);
-  const [saved, setSaved]         = useState(false);
+  const [scale, setScale]             = useState(1);
+  const [offset, setOffset]           = useState({ x: 0, y: 0 });
+  const [isDragging, setDragging]     = useState(false);
+  const [saved, setSaved]             = useState(false);
   const [savingToggle, setSavingToggle] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Refs — used inside non-passive DOM event listeners (React state is stale there)
   const scaleRef   = useRef(1);
   const offsetRef  = useRef({ x: 0, y: 0 });
   const lastPinch  = useRef<number | null>(null);
   const dragStart  = useRef<{ cx: number; cy: number; ox: number; oy: number } | null>(null);
   const mouseStart = useRef<{ cx: number; cy: number; ox: number; oy: number } | null>(null);
   const imgBox     = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   const savedDocId = uid ? `${uid}_pyq_${pyq.id}` : null;
 
-  // Helper — keep ref and state in sync
   const applyScale = (s: number) => {
     const v = Math.min(6, Math.max(1, s));
     scaleRef.current = v;
@@ -82,27 +77,47 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
   };
   const applyOffset = (o: { x: number; y: number }) => { offsetRef.current = o; setOffset(o); };
 
-  // Lock ALL scroll when gallery is open — also kills pointer events on the
-  // scroll container so iOS touch gestures can't bleed through the overlay.
+  // Lock ALL scroll and prevent viewport pinch-zoom when gallery is open
   useEffect(() => {
     const body = document.body;
     const html = document.documentElement;
     const area = document.querySelector(".main-scroll-area") as HTMLElement | null;
     const b = body.style.overflow, h = html.style.overflow;
     const aOvf = area?.style.overflowY ?? "", aPE = area?.style.pointerEvents ?? "";
-    body.style.overflow = html.style.overflow = "hidden";
+    const prevTouchAction = body.style.touchAction;
+    const prevUserSelect  = body.style.userSelect;
+
+    body.style.overflow      = html.style.overflow = "hidden";
+    body.style.touchAction   = "none";
+    body.style.userSelect    = "none";
     if (area) { area.style.overflowY = "hidden"; area.style.pointerEvents = "none"; }
+
+    // Prevent browser pinch-to-zoom on the whole document while gallery is open
+    const preventZoom = (e: TouchEvent) => {
+      if (e.touches.length > 1) e.preventDefault();
+    };
+    document.addEventListener("touchmove", preventZoom, { passive: false });
+
     return () => {
-      body.style.overflow = b; html.style.overflow = h;
+      body.style.overflow    = b;
+      html.style.overflow    = h;
+      body.style.touchAction = prevTouchAction;
+      body.style.userSelect  = prevUserSelect;
       if (area) { area.style.overflowY = aOvf; area.style.pointerEvents = aPE; }
+      document.removeEventListener("touchmove", preventZoom);
     };
   }, []);
 
-  // Escape key
+  // Escape key & fullscreen change listener
   useEffect(() => {
-    const fn = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", fn);
-    return () => window.removeEventListener("keydown", fn);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { if (document.fullscreenElement) document.exitFullscreen(); else onClose(); } };
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("fullscreenchange", onFsChange);
+    };
   }, [onClose]);
 
   // Load saved state
@@ -111,8 +126,7 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
     getDoc(doc(db, "saved_items", savedDocId)).then(s => setSaved(s.exists())).catch(() => {});
   }, [savedDocId]);
 
-  // Non-passive touch event listeners — the ONLY way to call e.preventDefault()
-  // in modern React (React 17+ makes synthetic onTouchMove passive by default)
+  // Non-passive touch handlers for image pan/pinch
   useEffect(() => {
     if (!isImage) return;
     const el = imgBox.current;
@@ -131,7 +145,7 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
     };
 
     const onMove = (e: TouchEvent) => {
-      e.preventDefault(); // ← works because listener is { passive: false }
+      e.preventDefault();
       if (e.touches.length === 2 && lastPinch.current !== null) {
         const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
         const ns = Math.min(6, Math.max(1, scaleRef.current * (d / lastPinch.current)));
@@ -167,8 +181,22 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
     finally { setSavingToggle(false); }
   };
 
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await overlayRef.current?.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch {}
+  };
+
   // Mouse wheel zoom (desktop)
-  const handleWheel = (e: React.WheelEvent) => { e.preventDefault(); applyScale(scaleRef.current * (e.deltaY < 0 ? 1.12 : 0.89)); };
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    applyScale(scaleRef.current * (e.deltaY < 0 ? 1.12 : 0.89));
+  };
 
   // Mouse drag (desktop)
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -189,13 +217,13 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
   // Tap to zoom (images)
   const handleImgClick = () => { if (!isDragging) applyScale(scaleRef.current > 1 ? 1 : 2.5); };
 
-  // Render as a portal so it's always above every scroll container / z-index
   const overlay = (
     <div
+      ref={overlayRef}
       className="fixed inset-0 bg-black flex flex-col select-none"
       style={{ zIndex: 9999, touchAction: isImage ? "none" : "auto" }}
     >
-      {/* ── Top bar ── */}
+      {/* Top bar */}
       <div
         className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 flex-shrink-0"
         style={{
@@ -215,6 +243,13 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
               <Bookmark className={`w-4 h-4 ${saved ? "fill-white" : ""}`} />
             </button>
           )}
+          <button
+            onClick={toggleFullscreen}
+            title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            className="p-2.5 rounded-full bg-white/15 hover:bg-white/25 text-white transition-all"
+          >
+            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+          </button>
           <a href={pyq.pdfUrl} target="_blank" rel="noopener noreferrer"
             className="p-2.5 rounded-full bg-white/15 hover:bg-white/25 text-white transition-all">
             <ExternalLink className="w-4 h-4" />
@@ -226,7 +261,7 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
         </div>
       </div>
 
-      {/* ── Content ── */}
+      {/* Content */}
       {isImage ? (
         <div
           ref={imgBox}
@@ -236,7 +271,7 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          style={{ cursor: scale > 1 ? (isDragging ? "grabbing" : "grab") : "zoom-in" }}
+          style={{ cursor: scale > 1 ? (isDragging ? "grabbing" : "grab") : "zoom-in", touchAction: "none" }}
         >
           <img
             src={pyq.pdfUrl}
@@ -273,7 +308,7 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
         </div>
       )}
 
-      {/* ── Bottom zoom controls (images only) ── */}
+      {/* Bottom zoom controls (images only) */}
       {isImage && (
         <div
           className="absolute bottom-0 left-0 right-0 flex flex-col items-center"
@@ -452,41 +487,27 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
             {filtered.map((pyq) => {
               const isImg = detectIsImage(pyq);
               return (
-                <div
+                <button
                   key={pyq.id}
-                  className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 hover:shadow-md hover:border-blue-100 transition-all group w-full min-w-0 overflow-hidden"
+                  data-testid={`pyq-item-${pyq.id}`}
+                  onClick={() => setViewer(pyq)}
+                  className="flex items-center gap-3 sm:gap-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 hover:shadow-md hover:border-blue-100 transition-all group w-full min-w-0 overflow-hidden text-left"
                 >
-                  <button
-                    data-testid={`pyq-item-${pyq.id}`}
-                    onClick={() => setViewer(pyq)}
-                    className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 text-left"
-                  >
-                    <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${isImg ? "bg-purple-50" : "bg-orange-50"}`}>
-                      {isImg
-                        ? <Image className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
-                        : <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-gray-900 truncate text-sm sm:text-base">
-                        <HighlightedText text={pyq.title} query={search} />
-                      </p>
-                      <p className="text-xs sm:text-sm text-gray-500 mt-0.5 truncate">{pyq.subject} · {pyq.year}</p>
-                    </div>
-                  </button>
-                  <div className="flex items-center gap-2 flex-shrink-0 ml-2 sm:ml-3">
-                    <span className={`hidden sm:inline text-xs px-2 py-0.5 rounded-full font-medium ${isImg ? "bg-purple-50 text-purple-600" : "bg-orange-50 text-orange-600"}`}>
-                      {isImg ? "Image" : "PDF"}
-                    </span>
-                    <Link
-                      href={`/pyq/${pyq.id}`}
-                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                      title="Open full page"
-                      className="p-1 text-gray-300 hover:text-blue-400 transition-colors"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </Link>
+                  <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${isImg ? "bg-purple-50" : "bg-orange-50"}`}>
+                    {isImg
+                      ? <Image className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
+                      : <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />}
                   </div>
-                </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-gray-900 truncate text-sm sm:text-base">
+                      <HighlightedText text={pyq.title} query={search} />
+                    </p>
+                    <p className="text-xs sm:text-sm text-gray-500 mt-0.5 truncate">{pyq.subject} · {pyq.year}</p>
+                  </div>
+                  <span className={`hidden sm:inline flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${isImg ? "bg-purple-50 text-purple-600" : "bg-orange-50 text-orange-600"}`}>
+                    {isImg ? "Image" : "PDF"}
+                  </span>
+                </button>
               );
             })}
           </div>
