@@ -2,9 +2,9 @@ import {
   createContext, useCallback, useContext, useEffect, useRef, useState,
 } from "react";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { useAuth } from "./AuthContext";
-import { getNepaliDate, getNepaliYesterday } from "@/lib/nepaliDate";
+import { getNepaliDate } from "@/lib/nepaliDate";
 
 export type Phase = "work" | "shortBreak" | "longBreak";
 
@@ -206,79 +206,72 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     savedMinutesRef.current += mins;
     setSavedMinutesToday(prev => prev + mins);
 
+    // Fetch the Firebase ID token to authenticate the backend call
+    let token: string | undefined;
     try {
-      const res = await fetch("/api/study/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid, minutes: mins }),
-      });
-
-      if (res.ok) {
-        const data = await res.json() as { todayMinutes?: number };
-        // Sync UI to the server's authoritative total if available
-        if (data.todayMinutes !== undefined) {
-          setSavedMinutesToday(data.todayMinutes);
-        }
-        console.log(`[Timer] Saved ${mins} min via backend.`);
-        return;
-      }
-
-      const errData = await res.json().catch(() => ({})) as { error?: string };
-      console.warn("[Timer] Backend save failed, falling back to direct Firestore:", errData.error);
-    } catch (networkErr) {
-      console.warn("[Timer] Backend unreachable, falling back to direct Firestore:", networkErr);
+      token = await auth.currentUser?.getIdToken();
+    } catch {
+      // Token fetch failed; fallback will handle it
     }
 
-    // Firestore direct fallback
+    if (token) {
+      try {
+        const res = await fetch("/api/study/save", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({ uid, minutes: mins }),
+        });
+
+        if (res.ok) {
+          const data = await res.json() as { todayMinutes?: number };
+          if (data.todayMinutes !== undefined) {
+            setSavedMinutesToday(data.todayMinutes);
+          }
+          console.log(`[Timer] Saved ${mins} min via backend.`);
+          return;
+        }
+
+        const errData = await res.json().catch(() => ({})) as { error?: string };
+        console.warn("[Timer] Backend save failed, falling back to direct Firestore:", errData.error);
+      } catch (networkErr) {
+        console.warn("[Timer] Backend unreachable, falling back to direct Firestore:", networkErr);
+      }
+    }
+
+    // ── Firestore direct fallback ─────────────────────────────────────────────
+    // NOTE: This fallback intentionally does NOT modify `streak`.
+    // Streak is authoritative on the server only; it will sync on the next
+    // successful backend call. This prevents client-side streak manipulation.
     try {
       const today = getNepaliDate();
-      const yesterday = getNepaliYesterday();
       const userDocRef = doc(db, "users", uid);
       const snap = await getDoc(userDocRef);
 
       const data = snap.exists() ? snap.data() : {};
       const lastActive: string = data.lastActiveDate ?? "";
-      const prevToday: number = data.todayStudyTime ?? 0;
+      const prevToday: number = lastActive === today ? (data.todayStudyTime ?? 0) : 0;
       const prevTotal: number = data.totalStudyTime ?? 0;
-      const prevStreak: number = data.streak ?? 0;
-
-      let newStreak = prevStreak;
-      let newToday = prevToday;
-
-      if (lastActive === today) {
-        newToday = prevToday + mins;
-        if (prevToday < 5 && newToday >= 5) {
-          newStreak = prevStreak + 1;
-        }
-      } else {
-        newToday = mins;
-        if (lastActive === yesterday) {
-          if (newToday >= 5) {
-            newStreak = prevStreak + 1;
-          }
-        } else {
-          newStreak = newToday >= 5 ? 1 : 0;
-        }
-      }
+      const newToday = prevToday + mins;
 
       await setDoc(userDocRef, {
         totalStudyTime: prevTotal + mins,
         todayStudyTime: newToday,
-        streak: newStreak,
         lastActiveDate: today,
       }, { merge: true });
 
-      if (newToday !== undefined) setSavedMinutesToday(newToday);
-      console.log(`[Timer] Saved ${mins} min to Firestore directly. Total today: ${newToday}`);
+      setSavedMinutesToday(newToday);
+      console.log(`[Timer] Saved ${mins} min to Firestore (fallback). Total today: ${newToday}`);
 
-      const todayLog = getNepaliDate();
-      const logId = `${uid}_${todayLog}`;
+      const logId = `${uid}_${today}`;
       const logRef = doc(db, "study_logs", logId);
       const logSnap = await getDoc(logRef);
       if (logSnap.exists()) {
         await updateDoc(logRef, { studyMinutes: (logSnap.data().studyMinutes ?? 0) + mins });
       } else {
-        await setDoc(logRef, { uid, date: todayLog, studyMinutes: mins, tasksCompleted: 0, notesViewed: 0 });
+        await setDoc(logRef, { uid, date: today, studyMinutes: mins, tasksCompleted: 0, notesViewed: 0 });
       }
     } catch (err) {
       console.error("[Timer] All save methods failed:", err);

@@ -1,0 +1,119 @@
+Act as a senior cybersecurity engineer + full-stack architect. Your task is to FULLY AUDIT and HARDEN my existing web app (frontend + backend + database + APIs) WITHOUT breaking any current features (notes, PYQ, AI tools, streak system, groups, leaderboard).
+
+The app is already in production-like state, so make MINIMAL but HIGH IMPACT security improvements.
+
+========================
+GOALS
+========================
+- Prevent unauthorized access to database and APIs
+- Prevent data tampering (streak, study time, group stats)
+- Prevent spam, bot attacks, and API abuse
+- Ensure authentication is enforced everywhere
+- Ensure server-side validation for all critical logic
+- Ensure no secret leakage (API keys, service accounts)
+- Keep performance fast (NO heavy real-time overload)
+
+========================
+CRITICAL SECURITY REQUIREMENTS
+========================
+
+1. AUTHENTICATION (MANDATORY)
+- All write operations MUST require authentication.
+- Verify user identity on server-side ONLY.
+- Never trust frontend user role or flags.
+- Use secure token verification for all API routes.
+
+2. FIREBASE / DATABASE SECURITY
+- Replace any open rules like "allow read, write: if true" immediately.
+- Enforce:
+  - Users can only modify their own data.
+  - Public data is read-only unless explicitly allowed.
+- Validate schema in rules:
+  - Reject unknown fields
+  - Reject invalid data types
+  - Reject unrealistic values (e.g. negative time, extreme numbers)
+
+3. STREAK + STUDY TIME INTEGRITY (VERY IMPORTANT)
+- Server time (Asia/Kathmandu) must be the ONLY source of truth.
+- DAILY RESET TIME = 00:00 AM (Nepal Time, Asia/Kathmandu)
+- Prevent client-side manipulation of:
+  - study time
+  - streak count
+
+Rules:
+- Study session must be started and ended via server-verified API
+- Clamp session duration (0 < time <= 4 hours max)
+- Streak increases ONLY once per day when study >= 5 minutes
+- Use hasEarnedStreakToday flag to prevent double increment
+
+DAILY RESET LOGIC (CRITICAL):
+At 00:00 AM Nepal Time (Asia/Kathmandu):
+- Finalize previous day:
+  - if todayStudyTime >= 5 minutes → streak continues
+  - else → streak = 0
+- Reset:
+  - todayStudyTime = 0
+  - hasEarnedStreakToday = false
+
+4. GROUP SYSTEM SECURITY
+- Group stats must be computed server-side only
+- Prevent users from injecting fake group study time
+- Group streak is based on ALL members meeting daily minimum (>=5 min)
+- Use batch/transaction updates to prevent inconsistencies
+- Do NOT recalculate on every request; use daily aggregation
+
+5. API SECURITY
+- Add rate limiting:
+  - 60 requests/min for reads
+  - 10 requests/min for writes per user
+- Add input validation and sanitization on ALL endpoints
+- Block repeated spam requests (temporary ban logic if needed)
+- Prevent duplicate submissions (idempotency keys)
+
+6. SECRET PROTECTION
+- Ensure NO API keys, Firebase service accounts, or private credentials are exposed in frontend code
+- Move all sensitive operations to backend/server functions only
+- Use environment variables for all secrets
+
+7. STORAGE SECURITY
+- File uploads must:
+  - require authentication
+  - restrict file size (max 5MB)
+  - allow only safe file types (images/pdf)
+  - store files in user-specific folders only
+
+8. ADMIN SECURITY
+- Admin access must be controlled via server-side roles (custom claims or DB roles)
+- Never allow client to assign or modify admin status
+- Protect admin routes strictly
+
+9. PERFORMANCE PROTECTION
+- Avoid real-time listeners for all data
+- Use caching for leaderboard and group rankings
+- Precompute daily and weekly aggregates instead of recalculating on every request
+- Paginate large data sets
+
+10. LOGGING & MONITORING
+- Log:
+  - failed auth attempts
+  - rate limit hits
+  - invalid requests
+- Do NOT log sensitive user data
+
+========================
+OUTPUT REQUIRED
+========================
+1. List all security vulnerabilities found in current project
+2. Fix them with minimal code changes
+3. Provide updated:
+   - database rules
+   - API security middleware
+   - streak logic (fixed version)
+   - group calculation logic
+4. Ensure final system is production-ready, secure, and fast
+
+IMPORTANT:
+- Do NOT break existing features
+- Do NOT redesign UI
+- Focus only on backend/security/logic hardening
+- Keep system lightweight and scalable

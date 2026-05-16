@@ -16,51 +16,108 @@ service cloud.firestore {
     }
 
     // ── Users ────────────────────────────────────────────────────────────────
+    // • Any signed-in user may read profiles (needed for leaderboard).
+    // • Owners may update their own doc BUT cannot change `role` or `uid`.
+    // • Numeric fields are bounded to prevent stat injection.
+    // • Only admins may elevate roles or delete accounts.
     match /users/{uid} {
       allow read: if isSignedIn();
-      allow create: if isOwner(uid);
-      allow update: if isOwner(uid) || isAdmin();
+
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.role == 'user'
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.grade is int
+        && request.resource.data.grade >= 9
+        && request.resource.data.grade <= 12;
+
+      allow update: if isAdmin()
+        || (isOwner(uid)
+          // Block self-role-escalation and uid tampering
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'uid'])
+          // Clamp totalStudyTime: must not decrease, max +240 min per write
+          && (!('totalStudyTime' in request.resource.data)
+              || (request.resource.data.totalStudyTime is int
+                  && request.resource.data.totalStudyTime >= resource.data.get('totalStudyTime', 0)
+                  && request.resource.data.totalStudyTime <= resource.data.get('totalStudyTime', 0) + 240))
+          // Streak: can only stay same, increase by 1, or reset to 0
+          && (!('streak' in request.resource.data)
+              || (request.resource.data.streak is int
+                  && request.resource.data.streak >= 0
+                  && request.resource.data.streak <= 3650
+                  && (request.resource.data.streak == resource.data.get('streak', 0)
+                      || request.resource.data.streak == resource.data.get('streak', 0) + 1
+                      || request.resource.data.streak == 0)))
+          // todayStudyTime: 0-1440 (one full day)
+          && (!('todayStudyTime' in request.resource.data)
+              || (request.resource.data.todayStudyTime is int
+                  && request.resource.data.todayStudyTime >= 0
+                  && request.resource.data.todayStudyTime <= 1440)));
+
       allow delete: if isAdmin();
     }
 
     // ── Tasks ────────────────────────────────────────────────────────────────
     match /tasks/{taskId} {
       allow read:   if isSignedIn() && resource.data.uid == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
-      allow update: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 500;
+      allow update: if isSignedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
     // ── Study Logs ───────────────────────────────────────────────────────────
+    // Users may only read/write their own daily log.
+    // studyMinutes is bounded to 1440 (24 h) and cannot be set by another user.
     match /study_logs/{logId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.studyMinutes is int
+        && request.resource.data.studyMinutes >= 0
+        && request.resource.data.studyMinutes <= 1440;
+
+      allow update: if isSignedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.studyMinutes is int
+        && request.resource.data.studyMinutes >= 0
+        && request.resource.data.studyMinutes <= 1440;
     }
 
-    // ── Notes — public read so guests can browse ──────────────────────────────
+    // ── Notes — public read, admin write ─────────────────────────────────────
     match /notes/{noteId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
     }
 
-    // ── PYQs — public read so guests can browse ───────────────────────────────
+    // ── PYQs — public read, admin write ──────────────────────────────────────
     match /pyqs/{pyqId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
     }
 
-    // ── MCQs — public read so guests can browse ───────────────────────────────
+    // ── MCQs — public read, admin write ──────────────────────────────────────
     match /mcqs/{mcqId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
     }
 
-    // ── Announcements — public read ───────────────────────────────────────────
+    // ── Announcements — public read, admin write ──────────────────────────────
     match /announcements/{announcementId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
     }
 
-    // ── SEO Meta — public read ────────────────────────────────────────────────
+    // ── SEO Meta — public read, admin write ───────────────────────────────────
     match /seo_meta/{docId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -69,7 +126,12 @@ service cloud.firestore {
     // ── Saved Items ──────────────────────────────────────────────────────────
     match /saved_items/{itemId} {
       allow read:   if isSignedIn() && resource.data.uid == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.itemType is string
+        && request.resource.data.itemType.size() <= 20
+        && request.resource.data.itemId is string
+        && request.resource.data.itemId.size() <= 100;
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
   }
