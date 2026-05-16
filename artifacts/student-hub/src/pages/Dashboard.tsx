@@ -214,49 +214,41 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    const uid = user?.uid;
     (async () => {
       try {
-        const snap = await getDoc(doc(db, "users", user.uid));
-        if (snap.exists()) {
-          const d = snap.data();
-          setStudyMins(d.totalStudyTime ?? 0);
-          setStreak(d.streak ?? 0);
-          setCustomBadges(d.badges ?? []);
+        const announcementsPromise = getDocs(query(collection(db, "announcements"), orderBy("createdAt", "desc")));
+
+        if (uid) {
+          const [userSnap, tasksSnap, announcementsSnap] = await Promise.all([
+            getDoc(doc(db, "users", uid)),
+            getDocs(query(collection(db, "tasks"), where("uid", "==", uid), where("completed", "==", false))),
+            announcementsPromise,
+          ]);
+
+          if (userSnap.exists()) {
+            const d = userSnap.data();
+            setStudyMins(d.totalStudyTime ?? 0);
+            setStreak(d.streak ?? 0);
+            setCustomBadges(d.badges ?? []);
+          }
+          setPendingTasks(tasksSnap.size);
+
+          const list: Announcement[] = announcementsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
+          setAnnouncements(list.slice(0, 3));
+        } else {
+          const announcementsSnap = await announcementsPromise;
+          const list: Announcement[] = announcementsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
+          setAnnouncements(list.slice(0, 3));
         }
       } catch (e) {
-        console.error("[Dashboard] Stats load failed:", e);
+        console.error("[Dashboard] Load failed:", e);
+        setAnnouncements([]);
       } finally {
         setStatsLoaded(true);
       }
     })();
   }, [user]);
-
-  useEffect(() => {
-    if (!user?.uid) return;
-    (async () => {
-      try {
-        const q = query(collection(db, "tasks"), where("uid", "==", user.uid), where("completed", "==", false));
-        const snap = await getDocs(q);
-        setPendingTasks(snap.size);
-      } catch (e) {
-        console.error("[Dashboard] Tasks load failed:", e);
-      }
-    })();
-  }, [user]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const snap = await getDocs(query(collection(db, "announcements"), orderBy("createdAt", "desc")));
-        const list: Announcement[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
-        setAnnouncements(list.slice(0, 3));
-      } catch (e) {
-        console.error("[Dashboard] Announcements load failed:", e);
-        setAnnouncements([]);
-      }
-    })();
-  }, []);
 
   const greeting = () => {
     const h = new Date().getHours();

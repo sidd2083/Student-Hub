@@ -86,7 +86,7 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
     body.style.overflow    = html.style.overflow = "hidden";
     body.style.touchAction = "none";
     body.style.userSelect  = "none";
-    if (area) { area.style.overflowY = "hidden"; area.style.pointerEvents = "none"; }
+    if (area) { area.style.overflowY = "hidden"; }
 
     const blockPinch = (e: TouchEvent) => { if (e.touches.length > 1) e.preventDefault(); };
     document.addEventListener("touchmove", blockPinch, { passive: false });
@@ -96,7 +96,7 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
       html.style.overflow    = prevHtmlOvf;
       body.style.touchAction = prevTA;
       body.style.userSelect  = prevUS;
-      if (area) { area.style.overflowY = aOvf; area.style.pointerEvents = aPE; }
+      if (area) { area.style.overflowY = aOvf; }
       document.removeEventListener("touchmove", blockPinch);
     };
   }, []);
