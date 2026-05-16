@@ -82,17 +82,19 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
   };
   const applyOffset = (o: { x: number; y: number }) => { offsetRef.current = o; setOffset(o); };
 
-  // Lock ALL scroll when gallery is open
+  // Lock ALL scroll when gallery is open — also kills pointer events on the
+  // scroll container so iOS touch gestures can't bleed through the overlay.
   useEffect(() => {
     const body = document.body;
     const html = document.documentElement;
     const area = document.querySelector(".main-scroll-area") as HTMLElement | null;
-    const b = body.style.overflow, h = html.style.overflow, a = area?.style.overflowY ?? "";
+    const b = body.style.overflow, h = html.style.overflow;
+    const aOvf = area?.style.overflowY ?? "", aPE = area?.style.pointerEvents ?? "";
     body.style.overflow = html.style.overflow = "hidden";
-    if (area) area.style.overflowY = "hidden";
+    if (area) { area.style.overflowY = "hidden"; area.style.pointerEvents = "none"; }
     return () => {
       body.style.overflow = b; html.style.overflow = h;
-      if (area) area.style.overflowY = a;
+      if (area) { area.style.overflowY = aOvf; area.style.pointerEvents = aPE; }
     };
   }, []);
 
@@ -252,8 +254,9 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
         </div>
       ) : (
         <div className="flex-1 flex flex-col pt-14">
-          {pyq.fileType === "rich" ? (
-            <div className="flex-1 overflow-y-auto bg-white p-4"
+          {pyq.fileType === "rich" || pyq.fileType === "text" ? (
+            <div className="flex-1 overflow-y-auto bg-white p-4 prose prose-sm max-w-none"
+              style={{ overscrollBehavior: "contain" }}
               dangerouslySetInnerHTML={{ __html: (pyq as any).content ?? "" }} />
           ) : (
             <iframe
@@ -451,7 +454,7 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
               return (
                 <div
                   key={pyq.id}
-                  className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 hover:shadow-md hover:border-blue-100 transition-all group w-full"
+                  className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 hover:shadow-md hover:border-blue-100 transition-all group w-full min-w-0 overflow-hidden"
                 >
                   <button
                     data-testid={`pyq-item-${pyq.id}`}

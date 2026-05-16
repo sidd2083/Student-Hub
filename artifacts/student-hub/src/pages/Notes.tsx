@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
@@ -43,6 +44,17 @@ function NoteViewer({ note, onClose, uid }: { note: NoteView; onClose: () => voi
   const containerRef = useRef<HTMLDivElement>(null);
 
   const savedDocId = uid ? `${uid}_note_${note.id}` : null;
+
+  // Lock background scroll when the viewer is open — prevents iOS touch-scroll bleed-through.
+  useEffect(() => {
+    const area = document.querySelector(".main-scroll-area") as HTMLElement | null;
+    const prevOvf = area?.style.overflowY ?? "";
+    const prevPE  = area?.style.pointerEvents ?? "";
+    if (area) { area.style.overflowY = "hidden"; area.style.pointerEvents = "none"; }
+    return () => {
+      if (area) { area.style.overflowY = prevOvf; area.style.pointerEvents = prevPE; }
+    };
+  }, []);
 
   useEffect(() => {
     if (!savedDocId) return;
@@ -121,8 +133,8 @@ function NoteViewer({ note, onClose, uid }: { note: NoteView; onClose: () => voi
     })();
   }, [uid, note.id]);
 
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2 sm:p-4">
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 z-[9000] flex items-center justify-center p-2 sm:p-4">
       <div ref={containerRef} className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
         <div className="h-1 bg-gray-100 flex-shrink-0 rounded-t-3xl overflow-hidden">
           <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${scrollPct}%` }} />
@@ -233,7 +245,8 @@ function NoteViewer({ note, onClose, uid }: { note: NoteView; onClose: () => voi
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -342,7 +355,7 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
         ) : (
           <div className="space-y-2">
             {filtered.map((note) => (
-              <div key={note.id} className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 hover:shadow-sm hover:border-blue-100 transition-all group">
+              <div key={note.id} className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 hover:shadow-sm hover:border-blue-100 transition-all group min-w-0 overflow-hidden">
                 <button
                   data-testid={`note-item-${note.id}`}
                   onClick={() => setSelectedNote(note)}
@@ -356,8 +369,8 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
                     {note.contentType === "text"  && <Type     className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500"   />}
                   </div>
                   <div className="min-w-0">
-                    <p className="font-medium text-gray-900 truncate text-sm sm:text-base">{note.title}</p>
-                    <p className="text-xs sm:text-sm text-gray-500 mt-0.5">{note.subject} · {note.chapter}</p>
+                    <p className="font-medium text-gray-900 text-sm sm:text-base line-clamp-2 leading-snug">{note.title}</p>
+                    <p className="text-xs sm:text-sm text-gray-500 mt-0.5 truncate">{note.subject} · {note.chapter}</p>
                   </div>
                 </button>
                 <div className="flex items-center gap-2 flex-shrink-0 ml-2 sm:ml-3">
