@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
@@ -345,6 +345,7 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
 
 function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   const { profile, user } = useAuth();
+  const [, setLocation] = useLocation();
   const [grade, setGrade] = useState<number>(profile?.grade || 10);
   const [subject, setSubject] = useState("");
   const [yearFilter, setYearFilter] = useState<string>("");
@@ -490,7 +491,13 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
                 <button
                   key={pyq.id}
                   data-testid={`pyq-item-${pyq.id}`}
-                  onClick={() => setViewer(pyq)}
+                  onClick={() => {
+                    if (isImg) {
+                      setViewer(pyq);
+                    } else {
+                      setLocation(`/pyq/${pyq.id}`);
+                    }
+                  }}
                   className="flex items-center gap-3 sm:gap-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 hover:shadow-md hover:border-blue-100 transition-all group w-full min-w-0 overflow-hidden text-left"
                 >
                   <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${isImg ? "bg-purple-50" : "bg-orange-50"}`}>
