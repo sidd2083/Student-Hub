@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
+import { GoogleGenAI } from "@google/genai";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -32,7 +33,6 @@ const SYSTEM_PROMPT = `You are Nep AI — a brilliant, warm, and deeply invested
 - Be warm, encouraging, and real — like a coach who truly believes in the student
 - Celebrate wins (streak, progress, completed tasks) with genuine enthusiasm
 - Be honest about weaknesses but always follow with a concrete plan to improve
-- Use motivational comparisons: "Students who study 2 hours/day consistently outperform those who cram"
 
 ## WHEN GIVEN STUDY DATA (stats, tasks, logs)
 
@@ -49,7 +49,7 @@ Do a FULL analysis — never skim:
 Do NOT just repeat what the note says. Instead:
 1. **Explain the core idea** in simple language with a real-world analogy
 2. **Break it into key concepts** — each with its own mini-explanation
-3. **Show worked examples** for anything with formulas or processes  
+3. **Show worked examples** for anything with formulas or processes
 4. **Give memory tricks** — mnemonics, analogies, visual descriptions
 5. **Write 3–5 practice questions** at the end so they can test themselves
 6. **Connect it to the bigger picture** — how does this topic link to other chapters or subjects?
@@ -81,20 +81,25 @@ function buildSystemContent(context?: ChatContext): string {
   return SYSTEM_PROMPT + parts.join("\n");
 }
 
-function getGeminiKey(): string {
-  const key =
-    process.env.AI_INTEGRATIONS_GEMINI_API_KEY ??
-    process.env.GEMINI_API_KEY;
-  if (!key) throw new Error("Gemini API key is not configured.");
-  return key;
+function getGenAI() {
+  const apiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("Gemini API key is not configured.");
+
+  const baseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+
+  return new GoogleGenAI({
+    apiKey,
+    ...(baseUrl ? {
+      httpOptions: {
+        apiVersion: "",
+        baseUrl,
+      },
+    } : {}),
+  });
 }
 
-function getGeminiBaseUrl(): string {
-  return process.env.AI_INTEGRATIONS_GEMINI_BASE_URL ?? "https://generativelanguage.googleapis.com";
-}
-
-function buildGeminiBody(systemContent: string, history: ChatMessage[], message: string, maxTokens: number) {
-  const contents = [
+function buildContents(history: ChatMessage[], message: string) {
+  return [
     ...history
       .filter(h => h.role === "user" || h.role === "assistant")
       .map(h => ({
@@ -103,14 +108,6 @@ function buildGeminiBody(systemContent: string, history: ChatMessage[], message:
       })),
     { role: "user", parts: [{ text: message }] },
   ];
-  return {
-    system_instruction: { parts: [{ text: systemContent }] },
-    contents,
-    generationConfig: {
-      maxOutputTokens: maxTokens,
-      temperature: 0.8,
-    },
-  };
 }
 
 // ── Streaming chat (SSE) ──────────────────────────────────────────────────────
@@ -120,66 +117,28 @@ async function streamGemini(
   message: string,
   res: Response,
 ): Promise<void> {
-  const key = getGeminiKey();
-  const baseUrl = getGeminiBaseUrl();
-  const apiVersion = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL ? "" : "v1beta";
-  const url = apiVersion
-    ? `${baseUrl}/${apiVersion}/models/gemini-2.5-flash:streamGenerateContent?key=${key}&alt=sse`
-    : `${baseUrl}/models/gemini-2.5-flash:streamGenerateContent?key=${key}&alt=sse`;
+  const ai = getGenAI();
+  const contents = buildContents(history, message);
 
-  const body = buildGeminiBody(systemContent, history, message, 8192);
-
-  const geminiRes = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(55000),
-  });
-
-  if (!geminiRes.ok || !geminiRes.body) {
-    const errBody = await geminiRes.json().catch(() => ({})) as { error?: { message?: string } };
-    const msg = errBody?.error?.message ?? `HTTP ${geminiRes.status}`;
-    throw new Error(`Gemini error: ${msg}`);
-  }
-
-  // Set up SSE headers
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
-  const reader = geminiRes.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
+  const stream = await ai.models.generateContentStream({
+    model: "gemini-2.5-flash",
+    contents,
+    config: {
+      systemInstruction: systemContent,
+      maxOutputTokens: 8192,
+      temperature: 0.8,
+    },
+  });
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      const raw = line.slice(6).trim();
-      if (!raw || raw === "[DONE]") continue;
-      try {
-        const json = JSON.parse(raw) as {
-          candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
-        };
-        const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-        if (text) {
-          res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`);
-        }
-        // Propagate finish reason so the client knows we're done
-        const finishReason = json.candidates?.[0]?.finishReason;
-        if (finishReason && finishReason !== "STOP" && finishReason !== "MAX_TOKENS") {
-          res.write(`data: ${JSON.stringify({ error: `Stopped: ${finishReason}` })}\n\n`);
-        }
-      } catch {
-        // Partial JSON chunk — ignore, will be in next buffer
-      }
+  for await (const chunk of stream) {
+    const text = chunk.text;
+    if (text) {
+      res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`);
     }
   }
 
@@ -189,33 +148,20 @@ async function streamGemini(
 
 // ── Non-streaming fallback ────────────────────────────────────────────────────
 async function askGemini(systemContent: string, history: ChatMessage[], message: string): Promise<string> {
-  const key = getGeminiKey();
-  const baseUrl = getGeminiBaseUrl();
-  const apiVersion = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL ? "" : "v1beta";
-  const url = apiVersion
-    ? `${baseUrl}/${apiVersion}/models/gemini-2.5-flash:generateContent?key=${key}`
-    : `${baseUrl}/models/gemini-2.5-flash:generateContent?key=${key}`;
+  const ai = getGenAI();
+  const contents = buildContents(history, message);
 
-  const body = buildGeminiBody(systemContent, history, message, 4096);
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(25000),
+  const result = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents,
+    config: {
+      systemInstruction: systemContent,
+      maxOutputTokens: 4096,
+      temperature: 0.8,
+    },
   });
 
-  if (!res.ok) {
-    const errBody = await res.json().catch(() => ({})) as { error?: { message?: string; code?: number } };
-    const msg = errBody?.error?.message ?? `HTTP ${res.status}`;
-    throw new Error(`Gemini error: ${msg}`);
-  }
-
-  const data = await res.json() as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
-  };
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  return text ?? "I couldn't generate a response. Please try again.";
+  return result.text ?? "I couldn't generate a response. Please try again.";
 }
 
 router.get("/ai/status", (_req: Request, res: Response) => {
@@ -246,7 +192,6 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
     const systemContent = buildSystemContent(context);
 
     if (stream) {
-      // Streaming — response is SSE; errors thrown inside become a stream error event
       try {
         await streamGemini(systemContent, history, message, res);
       } catch (err) {
@@ -260,7 +205,6 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
               : "Nep AI ran into an issue. Please try again.",
           });
         }
-        // Headers already sent — send error as SSE event and close
         res.write(`data: ${JSON.stringify({ error: "Connection lost. Please try again." })}\n\n`);
         res.write("data: [DONE]\n\n");
         res.end();
@@ -268,7 +212,6 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
       return;
     }
 
-    // Non-streaming fallback
     const reply = await askGemini(systemContent, history, message);
     return res.json({ reply });
 

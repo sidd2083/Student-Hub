@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const IS_PWA =
   typeof window !== "undefined" &&
@@ -14,18 +14,17 @@ const alreadyShown =
 export function PwaSplash() {
   const [gone, setGone] = useState(false);
 
+  useEffect(() => {
+    if (!IS_PWA || alreadyShown) return;
+    sessionStorage.setItem(SPLASH_KEY, "1");
+    const timer = setTimeout(() => setGone(true), 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
   if (!IS_PWA || alreadyShown || gone) return null;
 
-  function handleAnimationEnd() {
-    sessionStorage.setItem(SPLASH_KEY, "1");
-    setGone(true);
-  }
-
   return (
-    <div
-      className="pwa-splash"
-      onAnimationEnd={handleAnimationEnd}
-    >
+    <div className="pwa-splash">
       <div className="pwa-splash-logo">
         <div
           style={{

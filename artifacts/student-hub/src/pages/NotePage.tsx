@@ -205,8 +205,14 @@ export default function NotePage() {
   const mainRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const scrollArea = document.querySelector(".main-scroll-area") as HTMLElement | null;
+    if (scrollArea) scrollArea.scrollTop = 0;
+    else window.scrollTo({ top: 0 });
+
     if (!id) { setIsError(true); setLoading(false); return; }
     setLoading(true);
+    setIsError(false);
+    setNote(null);
     getDoc(doc(db, "notes", id))
       .then(snap => {
         if (!snap.exists()) { setIsError(true); return; }

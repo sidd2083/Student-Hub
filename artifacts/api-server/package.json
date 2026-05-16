@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@google/genai": "^2.3.0",
     "@google/generative-ai": "^0.24.1",
     "@types/multer": "^2.1.0",
     "@types/pino-http": "^6.1.0",

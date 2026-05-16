@@ -21,7 +21,6 @@ import Login    from "@/pages/Login";
 import NotFound from "@/pages/not-found";
 
 // ── Lazy — each page becomes its own chunk; loaded on demand ─────────────────
-// The transition animation covers the ~instant load on repeat visits.
 const Dashboard    = lazy(() => import("@/pages/Dashboard"));
 const Onboarding   = lazy(() => import("@/pages/Onboarding"));
 const Notes        = lazy(() => import("@/pages/Notes"));
@@ -53,46 +52,45 @@ const queryClient = new QueryClient({
   },
 });
 
+function scrollToTop() {
+  const scrollArea = document.querySelector(".main-scroll-area") as HTMLElement | null;
+  if (scrollArea) {
+    scrollArea.scrollTop = 0;
+  } else {
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  }
+}
+
 /**
- * PageWrapper — framer-motion AnimatePresence transitions.
+ * PageWrapper — page transitions with scroll restoration.
  *
- * Each navigation:
- *   1. Fades out the current page (0.1s ease-in)
- *   2. Fades + lifts the new page into view (0.22s cubic-bezier ease-out)
- *
- * mode="wait" ensures the exit fully completes before the enter begins,
- * producing a clean, zero-jitter cross-fade with no layout shift.
- * initial={false} suppresses the animation on the very first render.
+ * On navigation:
+ *   1. New page fades + lifts in (0.18s) — no exit animation to avoid white flash
+ *   2. Scroll is reset to top immediately on location change
  */
 function PageWrapper({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
 
   useEffect(() => {
-    const scrollArea = document.querySelector(".main-scroll-area") as HTMLElement | null;
-    if (scrollArea) {
-      scrollArea.scrollTop = 0;
-    } else {
-      window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
-    }
+    scrollToTop();
+    // Second attempt after micro-task (handles lazy-loaded pages)
+    const raf = requestAnimationFrame(scrollToTop);
+    return () => cancelAnimationFrame(raf);
   }, [location]);
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    <AnimatePresence mode="sync" initial={false}>
       <motion.div
         key={location}
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 6 }}
         animate={{
           opacity: 1,
           y: 0,
-          transition: { duration: 0.22, ease: [0.4, 0, 0.2, 1] },
+          transition: { duration: 0.18, ease: [0.4, 0, 0.2, 1] },
         }}
-        exit={{
-          opacity: 0,
-          transition: { duration: 0.1, ease: "easeIn" },
-        }}
-        style={{ minHeight: "100%" }}
+        style={{ minHeight: "100%", backgroundColor: "transparent" }}
       >
-        <Suspense fallback={null}>
+        <Suspense fallback={<div style={{ minHeight: "100%" }} />}>
           {children}
         </Suspense>
       </motion.div>
