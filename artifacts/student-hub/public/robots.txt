@@ -4,10 +4,14 @@ Allow: /notes
 Allow: /notes/
 Allow: /pyqs
 Allow: /pyqs/
+Allow: /pyq/
 Allow: /about
 Allow: /contact
+Allow: /privacy
+Allow: /terms
 
 Disallow: /dashboard
+Disallow: /dashboard/
 Disallow: /mcq
 Disallow: /todo
 Disallow: /pomodoro
@@ -15,5 +19,12 @@ Disallow: /ai
 Disallow: /leaderboard
 Disallow: /settings
 Disallow: /admin
+Disallow: /admin/
+Disallow: /saved
+Disallow: /report
+Disallow: /login
+Disallow: /setup-profile
+Disallow: /onboarding
+Disallow: /api/
 
 Sitemap: https://studenthub.np/sitemap.xml

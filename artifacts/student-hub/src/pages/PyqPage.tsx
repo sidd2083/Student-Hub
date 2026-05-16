@@ -340,8 +340,19 @@ export default function PyqPage() {
     return () => el.removeEventListener("scroll", handler);
   }, [pyq]);
 
-  const isRich  = pyq?.contentType === "rich" || pyq?.fileType === "rich";
-  const isImage = !isRich && pyq?.fileType === "image";
+  const ft      = (pyq?.fileType ?? "").toLowerCase();
+  const isRich  = ft === "rich" || ft === "text" || pyq?.contentType === "rich" || pyq?.contentType === "text";
+  const isImage = !isRich && (() => {
+    if (ft === "image" || ft.startsWith("image/")) return true;
+    if (ft === "pdf" || ft.startsWith("application/pdf")) return false;
+    if (!pyq?.pdfUrl) return false;
+    try {
+      const raw  = pyq.pdfUrl.split("?")[0].toLowerCase();
+      const path = decodeURIComponent(raw);
+      return /\.(jpg|jpeg|png|webp|gif|bmp|svg|tiff|avif)(\s|$)/.test(path) ||
+             /\.(jpg|jpeg|png|webp|gif|bmp|svg|tiff|avif)(\s|$)/.test(raw);
+    } catch { return false; }
+  })();
   const fileUrl = isRich ? undefined : pyq?.pdfUrl;
   const richContent = isRich ? (pyq?.content ?? "") : "";
 

@@ -21,17 +21,18 @@ type Pyq = {
 };
 
 function detectIsImage(pyq: Pyq): boolean {
-  if (pyq.fileType === "image") return true;
-  if (pyq.fileType === "rich") return false;
-  if (pyq.pdfUrl) {
-    try {
-      const decoded = decodeURIComponent(pyq.pdfUrl.split("?")[0]).toLowerCase();
-      return /\.(jpg|jpeg|png|webp|gif|bmp|svg)$/.test(decoded);
-    } catch {
-      return false;
-    }
+  const ft = (pyq.fileType ?? "").toLowerCase();
+  if (ft === "image" || ft.startsWith("image/")) return true;
+  if (ft === "rich" || ft === "text" || ft === "pdf" || ft.startsWith("application/pdf")) return false;
+  if (!pyq.pdfUrl) return false;
+  try {
+    const raw  = pyq.pdfUrl.split("?")[0].toLowerCase();
+    const path = decodeURIComponent(raw);
+    return /\.(jpg|jpeg|png|webp|gif|bmp|svg|tiff|avif)(\s|$)/.test(path) ||
+           /\.(jpg|jpeg|png|webp|gif|bmp|svg|tiff|avif)(\s|$)/.test(raw);
+  } catch {
+    return false;
   }
-  return false;
 }
 
 function HighlightedText({ text, query }: { text: string; query: string }) {
@@ -533,8 +534,16 @@ export default function Pyqs() {
         <title>Previous Year Questions (PYQ) — Grade 9, 10, 11, 12 | Student Hub</title>
         <meta name="description" content="Free previous year exam papers for Nepal students in Grades 9–12. Browse by grade, subject, and year. PDF and image formats available." />
         <meta name="keywords" content="PYQ nepal, previous year questions, SEE question paper, NEB past paper, grade 10 exam paper" />
-        <meta property="og:title" content="Previous Year Questions — Student Hub" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://studenthub.np/pyqs" />
+        <meta property="og:title" content="Previous Year Questions — Grade 9–12 | Student Hub" />
         <meta property="og:description" content="Free PYQs for Grade 9–12 students in Nepal. Browse by grade, subject, and year." />
+        <meta property="og:image" content="https://studenthub.np/og-image.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="PYQ Papers — Student Hub Nepal" />
+        <meta name="twitter:description" content="Free previous year question papers for Grade 9–12 Nepal students." />
+        <meta name="twitter:image" content="https://studenthub.np/og-image.png" />
+        <link rel="canonical" href="https://studenthub.np/pyqs" />
       </Helmet>
       <PyqsContent isLoggedIn={!!(user || profile)} />
     </>

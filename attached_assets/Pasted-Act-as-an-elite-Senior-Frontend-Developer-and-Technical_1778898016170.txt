@@ -1,0 +1,31 @@
+Act as an elite Senior Frontend Developer and Technical SEO Expert. I need you to make my entire codebase 100% SEO-proof and optimized for Google's top-ranking algorithms (including Core Web Vitals, INP, and Mobile-First Indexing). 
+
+CRITICAL RULE: Do NOT change any major UI elements, design styles, branding, or core application features. Only enhance the underlying HTML tags, metadata, semantic structure, accessibility, and background performance for SEO.
+
+Please audit the repository and implement the following technical SEO architecture:
+
+1. GLOBAL META & HEAD STRUCTURE (Layout/Head Files):
+   - Ensure every page dynamically updates its `<title>` and `<meta name="description">`. 
+   - Clean up the main title formats to follow: "Page Topic/Keyword | BrandName".
+   - Inject Open Graph (og:title, og:description, og:image, og:type) and Twitter Card meta tags for professional social sharing.
+   - Verify that `<meta name="viewport" content="width=device-width, initial-scale=1.0">` is present globally.
+   - Strip out any accidental <meta name="robots" content="noindex"> tags unless they are intentionally on protected dashboard or authentication pages.
+
+2. SEMANTIC HTML & HEADING HIERARCHY:
+   - Audit the layout of all pages. Ensure there is strictly ONE <h1> tag per page (the main headline). If the logo or navigation is wrapped in an <h1>, refactor it to a standard div, span, or paragraph tag.
+   - Ensure structural headings follow a clean, cascading order (h1 -> h2 -> h3). Do not skip levels for visual styling; use CSS classes for sizing instead.
+   - Convert generic layout <div> blocks into semantic HTML5 landmark tags where appropriate: use <nav> for menus, <main> for core content wrappers, <article> for individual blog/notes/sets, <section> for logical groups, and <footer> for the bottom area.
+
+3. SITEMAP, ROBOTS.TXT, AND CRAWL ROUTING:
+   - Generate (or optimize existing) 'public/robots.txt' file. Explicitly allow all public content pathways, but use "Disallow" to block crawlers from scanning internal user dashboard, login, sign-up, or private configuration routes (e.g., Disallow: /dashboard/, Disallow: /api/auth/).
+   - Ensure a clean, dynamic 'sitemap.xml' setup is configured that lists only public static and dynamic pages.
+
+4. WEB SITE & ORGANIZATIONAL SCHEMA (Structured Data):
+   - Inject a JSON-LD Schema script into the `<head>` of the homepage to explicitly define our WebSite and organization branding to help Google automatically generate professional Sitelinks.
+
+5. PERFORMANCE, IMAGES, & ACCESSIBILITY:
+   - Add explicit 'alt' attributes to every single <img> tag across the site. For dynamic images (like past papers or project cards), use fallback text based on the item's title/context.
+   - Add explicit 'width' and 'height' properties (or modern CSS aspect-ratio properties) to images to eliminate layout shifts (CLS) and ace Core Web Vitals.
+   - For all anchor tags (<a>), ensure they contain clear descriptive text. If an icon or button link lacks text, add an 'aria-label' attribute so search bots can crawl the path accurately.
+
+Go through the files one by one, fix these underlying code details, and let me know a summary of the structural changes you made once you're finished!
