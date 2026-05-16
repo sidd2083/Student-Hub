@@ -250,6 +250,8 @@ function NoteViewer({ note, onClose, uid }: { note: NoteView; onClose: () => voi
   );
 }
 
+const notesCache = new Map<number, NoteView[]>();
+
 function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   const { user, profile } = useAuth();
   const [grade, setGrade] = useState<number>(profile?.grade || 10);
@@ -259,8 +261,14 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
     setSubject("");
+    const cached = notesCache.get(grade);
+    if (cached) {
+      setNotes(cached);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     const q = query(collection(db, "notes"), where("grade", "==", grade));
     getDocs(q).then(snap => {
       const list: NoteView[] = snap.docs
@@ -270,6 +278,7 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
           const bTime = (b as any).createdAt ?? "";
           return bTime.localeCompare(aTime);
         });
+      notesCache.set(grade, list);
       setNotes(list);
     }).catch(e => {
       console.error("[Notes] Load failed:", e);

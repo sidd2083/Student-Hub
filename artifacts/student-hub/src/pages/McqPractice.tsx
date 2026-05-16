@@ -33,6 +33,8 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
+const mcqCache = new Map<number, Mcq[]>();
+
 function McqContent() {
   const { profile, user } = useAuth();
   const [phase, setPhase] = useState<Phase>("setup");
@@ -50,10 +52,18 @@ function McqContent() {
   const grade = profile?.grade || 10;
 
   useEffect(() => {
+    const cached = mcqCache.get(grade);
+    if (cached) {
+      setAllMcqs(cached);
+      setLoadingMcqs(false);
+      return;
+    }
     setLoadingMcqs(true);
     const q = query(collection(db, "mcqs"), where("grade", "==", grade));
     getDocs(q).then(snap => {
-      setAllMcqs(snap.docs.map(d => ({ id: d.id, ...d.data() } as Mcq)));
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Mcq));
+      mcqCache.set(grade, list);
+      setAllMcqs(list);
     }).catch(e => {
       console.error("[MCQ] Load failed:", e);
       setAllMcqs([]);

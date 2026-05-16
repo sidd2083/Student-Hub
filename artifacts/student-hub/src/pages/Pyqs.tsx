@@ -292,6 +292,8 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
   );
 }
 
+const pyqsCache = new Map<number, Pyq[]>();
+
 function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   const { profile, user } = useAuth();
   const [, setLocation] = useLocation();
@@ -304,13 +306,20 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   const [loading, setLoading]     = useState(true);
 
   useEffect(() => {
-    setLoading(true);
     setSubject("");
     setYearFilter("");
+    const cached = pyqsCache.get(grade);
+    if (cached) {
+      setPyqs(cached);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     const q = query(collection(db, "pyqs"), where("grade", "==", grade));
     getDocs(q)
       .then(snap => {
         const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Pyq)).sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+        pyqsCache.set(grade, list);
         setPyqs(list);
       })
       .catch(e => { console.error("[Pyqs]", e); setPyqs([]); })

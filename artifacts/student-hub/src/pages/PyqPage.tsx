@@ -359,7 +359,7 @@ export default function PyqPage() {
   }, [pyq]);
 
   const ft      = (pyq?.fileType ?? "").toLowerCase();
-  const isRich  = ft === "rich" || ft === "text" || pyq?.contentType === "rich" || pyq?.contentType === "text";
+  const isRich  = ft === "rich" || ft === "text" || pyq?.contentType === "rich";
   const isImage = !isRich && (() => {
     if (ft === "image" || ft.startsWith("image/")) return true;
     if (ft === "pdf" || ft.startsWith("application/pdf")) return false;

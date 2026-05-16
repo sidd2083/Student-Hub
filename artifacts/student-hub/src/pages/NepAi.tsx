@@ -148,6 +148,23 @@ function buildSystemContent(ctx: StudyContext | null): string {
  * Calls onChunk for every text piece received so the UI updates in real time.
  * Returns the full assembled text when the stream ends.
  */
+function parseSseLines(text: string, onChunk: (t: string) => void): string {
+  let full = "";
+  for (const line of text.split("\n")) {
+    if (!line.startsWith("data: ")) continue;
+    const raw = line.slice(6).trim();
+    if (!raw || raw === "[DONE]") continue;
+    try {
+      const json = JSON.parse(raw) as { chunk?: string; error?: string };
+      if (json.error) throw new Error(json.error);
+      if (json.chunk) { full += json.chunk; onChunk(json.chunk); }
+    } catch (e) {
+      if (e instanceof Error && !e.message.includes("JSON")) throw e;
+    }
+  }
+  return full;
+}
+
 async function streamAI(
   message: string,
   history: Message[],
@@ -160,10 +177,20 @@ async function streamAI(
     body: JSON.stringify({ message, history, context: ctx, stream: true }),
   });
 
-  // Non-2xx before streaming started — parse as JSON error
+  // Non-2xx — parse as JSON error
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as { error?: string };
     throw new Error(err.error ?? `AI service ${res.status}`);
+  }
+
+  // If server returned plain JSON (fallback / proxy stripped SSE headers)
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    const data = await res.json() as { reply?: string; error?: string };
+    if (data.error) throw new Error(data.error);
+    const text = data.reply ?? "";
+    if (text) onChunk(text);
+    return text || "I couldn't generate a response. Please try again.";
   }
 
   const reader = res.body?.getReader();
@@ -180,25 +207,11 @@ async function streamAI(
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split("\n");
     buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      const raw = line.slice(6).trim();
-      if (!raw || raw === "[DONE]") continue;
-      try {
-        const json = JSON.parse(raw) as { chunk?: string; error?: string };
-        if (json.error) throw new Error(json.error);
-        if (json.chunk) {
-          full += json.chunk;
-          onChunk(json.chunk);
-        }
-      } catch (parseErr) {
-        if (parseErr instanceof Error && parseErr.message !== "Unexpected end of JSON input") {
-          throw parseErr;
-        }
-      }
-    }
+    full += parseSseLines(lines.join("\n"), onChunk);
   }
+
+  // Flush any leftover in buffer (incomplete last line)
+  if (buffer.trim()) full += parseSseLines(buffer, onChunk);
 
   return full || "I couldn't generate a response. Please try again.";
 }
