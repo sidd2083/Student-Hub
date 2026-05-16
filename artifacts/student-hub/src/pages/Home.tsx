@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { collection, query, where, getDocs } from "firebase/firestore";
@@ -65,7 +65,8 @@ interface PreviewNote { id: string; title: string; subject: string; grade: numbe
 interface PreviewPyq  { id: string; title: string; subject: string; grade: number; year: number }
 
 export default function Home() {
-  const { user, loading, signInWithGoogle } = useAuth();
+  const { user, loading } = useAuth();
+  const [, setLocation] = useLocation();
   const [notes, setNotes] = useState<PreviewNote[]>([]);
   const [pyqs, setPyqs] = useState<PreviewPyq[]>([]);
 
@@ -147,7 +148,7 @@ export default function Home() {
               <BookOpen className="w-5 h-5" aria-hidden="true" /> Browse Notes
             </Link>
             <button
-              onClick={signInWithGoogle}
+              onClick={() => setLocation("/login")}
               className="flex items-center justify-center gap-2 px-7 py-3.5 bg-white border border-gray-200 text-gray-700 rounded-2xl font-semibold text-base hover:bg-gray-50 transition-all shadow-sm"
               aria-label="Register for free with Google"
             >

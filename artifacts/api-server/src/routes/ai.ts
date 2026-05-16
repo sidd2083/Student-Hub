@@ -81,21 +81,16 @@ function buildSystemContent(context?: ChatContext): string {
   return SYSTEM_PROMPT + parts.join("\n");
 }
 
-function getGenAI() {
+function createGenAI() {
   const apiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("Gemini API key is not configured.");
+  if (!apiKey) throw new Error("No Gemini API key configured");
 
   const baseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
-
-  return new GoogleGenAI({
-    apiKey,
-    ...(baseUrl ? {
-      httpOptions: {
-        apiVersion: "",
-        baseUrl,
-      },
-    } : {}),
-  });
+  const opts: ConstructorParameters<typeof GoogleGenAI>[0] = { apiKey };
+  if (baseUrl) {
+    opts.httpOptions = { apiVersion: "", baseUrl };
+  }
+  return new GoogleGenAI(opts);
 }
 
 function buildContents(history: ChatMessage[], message: string) {
@@ -103,125 +98,105 @@ function buildContents(history: ChatMessage[], message: string) {
     ...history
       .filter(h => h.role === "user" || h.role === "assistant")
       .map(h => ({
-        role: h.role === "assistant" ? "model" : "user",
+        role: h.role === "assistant" ? "model" as const : "user" as const,
         parts: [{ text: h.content }],
       })),
-    { role: "user", parts: [{ text: message }] },
+    { role: "user" as const, parts: [{ text: message }] },
   ];
 }
 
-// ── Streaming chat (SSE) ──────────────────────────────────────────────────────
-async function streamGemini(
-  systemContent: string,
-  history: ChatMessage[],
-  message: string,
-  res: Response,
-): Promise<void> {
-  const ai = getGenAI();
-  const contents = buildContents(history, message);
-
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache, no-transform");
-  res.setHeader("X-Accel-Buffering", "no");
-  res.flushHeaders();
-
-  const stream = await ai.models.generateContentStream({
-    model: "gemini-2.5-flash",
-    contents,
-    config: {
-      systemInstruction: systemContent,
-      maxOutputTokens: 8192,
-      temperature: 0.8,
-    },
-  });
-
-  for await (const chunk of stream) {
-    const text = chunk.text;
-    if (text) {
-      res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`);
-    }
-  }
-
-  res.write("data: [DONE]\n\n");
-  res.end();
-}
-
-// ── Non-streaming fallback ────────────────────────────────────────────────────
-async function askGemini(systemContent: string, history: ChatMessage[], message: string): Promise<string> {
-  const ai = getGenAI();
-  const contents = buildContents(history, message);
-
-  const result = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents,
-    config: {
-      systemInstruction: systemContent,
-      maxOutputTokens: 4096,
-      temperature: 0.8,
-    },
-  });
-
-  return result.text ?? "I couldn't generate a response. Please try again.";
-}
-
 router.get("/ai/status", (_req: Request, res: Response) => {
-  const hasGemini = !!(
-    process.env.AI_INTEGRATIONS_GEMINI_API_KEY ??
-    process.env.GEMINI_API_KEY
-  );
-  res.json({ ok: hasGemini, gemini: hasGemini, backend: hasGemini ? "gemini" : "none" });
+  const hasKey = !!(process.env.AI_INTEGRATIONS_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY);
+  res.json({ ok: hasKey, gemini: hasKey, backend: hasKey ? "gemini" : "none" });
 });
 
 router.post("/ai/chat", async (req: Request, res: Response) => {
   try {
-    const { message, history = [], context, stream = false } = req.body as {
+    const { message, history = [], context, stream: wantStream = false } = req.body as {
       message?: string;
       history?: ChatMessage[];
       context?: ChatContext;
       stream?: boolean;
     };
 
-    if (!message) return res.status(400).json({ error: "message is required" });
+    if (!message?.trim()) {
+      return res.status(400).json({ error: "message is required" });
+    }
 
-    if (!process.env.AI_INTEGRATIONS_GEMINI_API_KEY && !process.env.GEMINI_API_KEY) {
+    const apiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
+    if (!apiKey) {
       return res.status(503).json({
-        error: "Nep AI is not configured. Please set GEMINI_API_KEY in your environment secrets.",
+        error: "Nep AI is not configured. Please set GEMINI_API_KEY in your environment.",
       });
     }
 
     const systemContent = buildSystemContent(context);
+    const contents = buildContents(history, message);
 
-    if (stream) {
-      try {
-        await streamGemini(systemContent, history, message, res);
-      } catch (err) {
-        const errStr = String(err);
-        logger.error({ err }, "[AI] Streaming error");
-        if (!res.headersSent) {
-          const isRate = errStr.includes("429") || errStr.toLowerCase().includes("quota");
-          return res.status(isRate ? 429 : 500).json({
-            error: isRate
-              ? "Nep AI is a bit busy right now. Please wait a moment and try again."
-              : "Nep AI ran into an issue. Please try again.",
-          });
+    // Always generate via non-streaming (most reliable with proxy),
+    // then emit the result as a single SSE chunk so the frontend works unchanged.
+    let replyText = "";
+    try {
+      const ai = createGenAI();
+      const result = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents,
+        config: {
+          systemInstruction: systemContent,
+          maxOutputTokens: 8192,
+          temperature: 0.8,
+        },
+      });
+      replyText = result.text ?? "";
+    } catch (genErr) {
+      const msg = String(genErr);
+      logger.error({ err: genErr }, "[AI] generateContent error");
+      if (msg.includes("429") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("rate")) {
+        const userMsg = "Nep AI is a bit busy right now — please try again in a moment.";
+        if (wantStream) {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.flushHeaders();
+          res.write(`data: ${JSON.stringify({ chunk: userMsg })}\n\n`);
+          res.write("data: [DONE]\n\n");
+          return res.end();
         }
-        res.write(`data: ${JSON.stringify({ error: "Connection lost. Please try again." })}\n\n`);
-        res.write("data: [DONE]\n\n");
-        res.end();
+        return res.status(429).json({ error: userMsg });
       }
-      return;
+      throw genErr;
     }
 
-    const reply = await askGemini(systemContent, history, message);
-    return res.json({ reply });
+    if (!replyText) {
+      replyText = "I wasn't able to generate a response. Please try again.";
+    }
 
+    // Return as SSE stream if requested, or plain JSON
+    if (wantStream) {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache, no-transform");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders();
+
+      // Emit in small chunks so the frontend renders progressively
+      const CHUNK_SIZE = 80;
+      for (let i = 0; i < replyText.length; i += CHUNK_SIZE) {
+        const piece = replyText.slice(i, i + CHUNK_SIZE);
+        res.write(`data: ${JSON.stringify({ chunk: piece })}\n\n`);
+      }
+      res.write("data: [DONE]\n\n");
+      return res.end();
+    }
+
+    return res.json({ reply: replyText });
   } catch (err) {
-    const errStr = String(err);
-    logger.error({ err }, "[AI] Handler error");
-    if (errStr.includes("429") || errStr.toLowerCase().includes("quota") || errStr.toLowerCase().includes("rate")) {
-      return res.status(429).json({ error: "Nep AI is a bit busy right now. Please wait a moment and try again." });
+    logger.error({ err }, "[AI] Unhandled error");
+    const msg = "Nep AI ran into an issue. Please try again.";
+    if (!res.headersSent) {
+      return res.status(500).json({ error: msg });
     }
-    return res.status(500).json({ error: "Nep AI ran into an issue. Please try again." });
+    res.write(`data: ${JSON.stringify({ chunk: msg })}\n\n`);
+    res.write("data: [DONE]\n\n");
+    return res.end();
   }
 });
 

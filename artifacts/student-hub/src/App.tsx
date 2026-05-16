@@ -13,7 +13,6 @@ import {
 import { AppShell } from "@/components/AppShell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { InstallBanner } from "@/components/InstallBanner";
-import { PwaSplash } from "@/components/PwaSplash";
 
 // ── Eager — shown immediately on first visit or common redirect ───────────────
 import Home     from "@/pages/Home";
@@ -189,7 +188,6 @@ function App() {
           </WouterRouter>
           <Toaster />
           <InstallBanner />
-          <PwaSplash />
         </TooltipProvider>
       </QueryClientProvider>
     </ErrorBoundary>
