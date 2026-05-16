@@ -1,20 +1,44 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-NP">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5, viewport-fit=cover" />
+
+    <!-- ── Primary SEO ───────────────────────────────────────────────────── -->
     <title>Student Hub — Free Study Platform for Nepal Grade 9–12</title>
-    <meta name="description" content="Free study platform for Grade 9–12 students in Nepal. Notes, PYQs, MCQ practice, AI tutor, Pomodoro timer, and progress tracking." />
-    <meta name="robots" content="index, follow" />
+    <meta name="description" content="Free study platform for Grade 9–12 students in Nepal. Notes, PYQs, MCQ practice, AI tutor, Pomodoro timer, and progress tracking for SEE and NEB exams." />
+    <meta name="keywords" content="student hub nepal, grade 10 notes, SEE preparation, NEB notes, PYQ nepal, free notes nepal, MCQ practice nepal, study tracker nepal, SEE 2081, NEB 2081" />
+    <meta name="author" content="Student Hub Nepal" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta name="language" content="English" />
+
+    <!-- ── Geo / Region ───────────────────────────────────────────────────── -->
+    <meta name="geo.region" content="NP" />
+    <meta name="geo.placename" content="Nepal" />
+
+    <!-- ── Open Graph (Facebook / WhatsApp / LinkedIn) ───────────────────── -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://studenthub.np/" />
     <meta property="og:site_name" content="Student Hub Nepal" />
-    <meta property="og:image" content="https://studenthub.np/og-image.png" />
+    <meta property="og:title" content="Student Hub — Free Study Platform for Nepal Grade 9–12" />
+    <meta property="og:description" content="Free notes, PYQs, MCQ practice, AI tutor and progress tracking for Grade 9–12 students in Nepal. Built for SEE and NEB exam preparation." />
+    <meta property="og:image" content="https://studenthub.np/opengraph.jpg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Student Hub Nepal — Free Study Platform" />
+    <meta property="og:locale" content="en_NP" />
+
+    <!-- ── Twitter / X Card ──────────────────────────────────────────────── -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="https://studenthub.np/og-image.png" />
+    <meta name="twitter:title" content="Student Hub — Free Study Platform for Nepal Grade 9–12" />
+    <meta name="twitter:description" content="Free notes, PYQs, MCQ practice, AI tutor and progress tracking for Grade 9–12 students in Nepal." />
+    <meta name="twitter:image" content="https://studenthub.np/opengraph.jpg" />
+    <meta name="twitter:image:alt" content="Student Hub Nepal" />
+
+    <!-- ── Canonical ─────────────────────────────────────────────────────── -->
     <link rel="canonical" href="https://studenthub.np/" />
+
+    <!-- ── PWA / Icons ───────────────────────────────────────────────────── -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" href="/icon-192.png" />
     <link rel="manifest" href="/manifest.json" />
@@ -25,15 +49,16 @@
     <meta name="apple-mobile-web-app-title" content="Student Hub" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
 
-    <!-- Preconnect to external origins ASAP -->
+    <!-- ── Performance: preconnect external origins ──────────────────────── -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
     <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com" />
     <link rel="dns-prefetch" href="https://securetoken.googleapis.com" />
     <link rel="dns-prefetch" href="https://generativelanguage.googleapis.com" />
+    <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com" />
 
-    <!-- Font: non-render-blocking with display=swap -->
+    <!-- ── Font: non-render-blocking, display=swap ───────────────────────── -->
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
@@ -43,29 +68,6 @@
     <noscript>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     </noscript>
-
-    <!-- Content protection: disable right-click and common inspect shortcuts -->
-    <script>
-      (function() {
-        document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
-        document.addEventListener('keydown', function(e) {
-          if (
-            e.key === 'F12' ||
-            (e.ctrlKey && e.shiftKey && ['I','J','C','K'].includes(e.key)) ||
-            (e.ctrlKey && e.key === 'U') ||
-            (e.metaKey && e.altKey && ['I','J','C'].includes(e.key))
-          ) {
-            e.preventDefault();
-            return false;
-          }
-        });
-        document.addEventListener('selectstart', function(e) {
-          if (e.target && (e.target.tagName === 'IMG' || e.target.tagName === 'A')) {
-            e.preventDefault();
-          }
-        });
-      })();
-    </script>
   </head>
   <body>
     <div id="root"></div>

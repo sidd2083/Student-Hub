@@ -1,18 +1,21 @@
 User-agent: *
-Allow: /
+
+# ── Public content — index everything ──────────────────────────────────────
+Allow: /$
 Allow: /notes
 Allow: /notes/
 Allow: /pyqs
 Allow: /pyqs/
 Allow: /pyq/
+Allow: /mcq
 Allow: /about
 Allow: /contact
 Allow: /privacy
 Allow: /terms
 
+# ── Private / authenticated routes — do not index ───────────────────────────
 Disallow: /dashboard
 Disallow: /dashboard/
-Disallow: /mcq
 Disallow: /todo
 Disallow: /pomodoro
 Disallow: /ai
@@ -27,4 +30,5 @@ Disallow: /setup-profile
 Disallow: /onboarding
 Disallow: /api/
 
+# ── Sitemap ──────────────────────────────────────────────────────────────────
 Sitemap: https://studenthub.np/sitemap.xml

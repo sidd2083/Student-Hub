@@ -286,16 +286,8 @@ html.dark, body.dark, #root.dark {
 }
 
 /* ── Page transition ─────────────────────────────────────────────────── */
-/* Pure opacity fade — no translateY so there is zero layout shift,       */
-/* zero jitter, and no vibration on navigation.                           */
-@keyframes pageIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-.page-enter {
-  animation: pageIn 200ms ease both;
-  will-change: opacity;
-}
+/* Handled by framer-motion AnimatePresence in App.tsx.                   */
+/* opacity + y fade managed there; no CSS animation needed here.          */
 
 /* ── PWA splash screen ───────────────────────────────────────────────── */
 @keyframes splashScreen {
