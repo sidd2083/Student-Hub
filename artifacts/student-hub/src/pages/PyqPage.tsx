@@ -312,10 +312,11 @@ export default function PyqPage() {
   const [pyq, setPyq]         = useState<FirePyq | null>(null);
   const [loading, setLoading] = useState(true);
   const [isError, setIsError] = useState(false);
-  const [scrollPct, setScrollPct]       = useState(0);
-  const [focusMode, setFocusMode]       = useState(false);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const mainRef = useRef<HTMLDivElement>(null);
+  const [scrollPct, setScrollPct] = useState(0);
+  const [focusMode, setFocusMode] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const mainRef   = useRef<HTMLDivElement>(null);
+  const richRef   = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!id) { setIsError(true); setLoading(false); return; }
@@ -338,6 +339,23 @@ export default function PyqPage() {
     };
     el.addEventListener("scroll", handler);
     return () => el.removeEventListener("scroll", handler);
+  }, [pyq]);
+
+  // Make every <img> inside rich-text content clickable → opens lightbox
+  useEffect(() => {
+    const el = richRef.current;
+    if (!el) return;
+    const imgs = Array.from(el.querySelectorAll<HTMLImageElement>("img"));
+    if (imgs.length === 0) return;
+    const handlers: Array<() => void> = [];
+    imgs.forEach(img => {
+      img.style.cursor = "zoom-in";
+      img.style.borderRadius = "12px";
+      const h = () => { if (img.src) setLightboxSrc(img.src); };
+      img.addEventListener("click", h);
+      handlers.push(() => img.removeEventListener("click", h));
+    });
+    return () => handlers.forEach(remove => remove());
   }, [pyq]);
 
   const ft      = (pyq?.fileType ?? "").toLowerCase();
@@ -367,7 +385,7 @@ export default function PyqPage() {
       )}
 
       {focusMode && pyq && <FocusReaderOverlay pyq={pyq} onClose={() => setFocusMode(false)} />}
-      {lightboxOpen && pyq && <ImageLightbox src={pyq.pdfUrl} alt={pyq.title} onClose={() => setLightboxOpen(false)} />}
+      {lightboxSrc && <ImageLightbox src={lightboxSrc} alt={pyq?.title ?? "Image"} onClose={() => setLightboxSrc(null)} />}
 
       <div ref={mainRef} className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 overflow-y-auto">
         {/* Progress bar */}
@@ -479,7 +497,7 @@ export default function PyqPage() {
               {/* Rich text */}
               {isRich && (
                 <div className="max-w-2xl mx-auto px-6 sm:px-10 py-10">
-                  <article className="prose prose-gray max-w-none text-gray-800 text-[16px] leading-[1.9]"
+                  <article ref={richRef} className="prose prose-gray max-w-none text-gray-800 text-[16px] leading-[1.9]"
                     dangerouslySetInnerHTML={{ __html: richContent }} />
                 </div>
               )}
@@ -487,7 +505,7 @@ export default function PyqPage() {
               {/* Image — thumbnail + click to open proper lightbox */}
               {isImage && pyq.pdfUrl && (
                 <div className="flex flex-col items-center gap-4 p-8">
-                  <div className="relative group cursor-zoom-in" onClick={() => setLightboxOpen(true)}>
+                  <div className="relative group cursor-zoom-in" onClick={() => setLightboxSrc(pyq.pdfUrl)}>
                     <img
                       src={pyq.pdfUrl}
                       alt={pyq.title}

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
-  FileText, Image, Search, X, ExternalLink, Filter, LogIn,
+  FileText, ImageIcon, Search, X, ExternalLink, Filter, LogIn,
   Bookmark, ZoomIn, ZoomOut, Maximize, Minimize,
 } from "lucide-react";
 
@@ -20,19 +20,9 @@ type Pyq = {
   fileType?: string | null;
 };
 
-function detectIsImage(pyq: Pyq): boolean {
+function isRichText(pyq: Pyq): boolean {
   const ft = (pyq.fileType ?? "").toLowerCase();
-  if (ft === "image" || ft.startsWith("image/")) return true;
-  if (ft === "rich" || ft === "text" || ft === "pdf" || ft.startsWith("application/pdf")) return false;
-  if (!pyq.pdfUrl) return false;
-  try {
-    const raw  = pyq.pdfUrl.split("?")[0].toLowerCase();
-    const path = decodeURIComponent(raw);
-    return /\.(jpg|jpeg|png|webp|gif|bmp|svg|tiff|avif)(\s|$)/.test(path) ||
-           /\.(jpg|jpeg|png|webp|gif|bmp|svg|tiff|avif)(\s|$)/.test(raw);
-  } catch {
-    return false;
-  }
+  return ft === "rich" || ft === "text" || ft.startsWith("text/html");
 }
 
 function HighlightedText({ text, query }: { text: string; query: string }) {
@@ -50,15 +40,18 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
   );
 }
 
+// ─── Full-screen image gallery ────────────────────────────────────────────────
+// Opens for ANY PYQ that isn't rich/text type.
+// Tries to load the URL as an image first; if it fails (onError) falls back to
+// a PDF iframe so it always shows something useful.
 function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?: string }) {
-  const isImage = detectIsImage(pyq);
-
-  const [scale, setScale]             = useState(1);
-  const [offset, setOffset]           = useState({ x: 0, y: 0 });
-  const [isDragging, setDragging]     = useState(false);
-  const [saved, setSaved]             = useState(false);
-  const [savingToggle, setSavingToggle] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [scale, setScale]         = useState(1);
+  const [offset, setOffset]       = useState({ x: 0, y: 0 });
+  const [isDragging, setDragging] = useState(false);
+  const [saved, setSaved]         = useState(false);
+  const [savingToggle, setSaving] = useState(false);
+  const [isFullscreen, setFullscreen] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
 
   const scaleRef   = useRef(1);
   const offsetRef  = useRef({ x: 0, y: 0 });
@@ -78,89 +71,81 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
   };
   const applyOffset = (o: { x: number; y: number }) => { offsetRef.current = o; setOffset(o); };
 
-  // Lock ALL scroll and prevent viewport pinch-zoom when gallery is open
+  // Lock scroll + block browser pinch-zoom
   useEffect(() => {
     const body = document.body;
     const html = document.documentElement;
     const area = document.querySelector(".main-scroll-area") as HTMLElement | null;
-    const b = body.style.overflow, h = html.style.overflow;
-    const aOvf = area?.style.overflowY ?? "", aPE = area?.style.pointerEvents ?? "";
-    const prevTouchAction = body.style.touchAction;
-    const prevUserSelect  = body.style.userSelect;
+    const prevBodyOvf = body.style.overflow;
+    const prevHtmlOvf = html.style.overflow;
+    const prevTA      = body.style.touchAction;
+    const prevUS      = body.style.userSelect;
+    const aOvf = area?.style.overflowY ?? "";
+    const aPE  = area?.style.pointerEvents ?? "";
 
-    body.style.overflow      = html.style.overflow = "hidden";
-    body.style.touchAction   = "none";
-    body.style.userSelect    = "none";
+    body.style.overflow    = html.style.overflow = "hidden";
+    body.style.touchAction = "none";
+    body.style.userSelect  = "none";
     if (area) { area.style.overflowY = "hidden"; area.style.pointerEvents = "none"; }
 
-    // Prevent browser pinch-to-zoom on the whole document while gallery is open
-    const preventZoom = (e: TouchEvent) => {
-      if (e.touches.length > 1) e.preventDefault();
-    };
-    document.addEventListener("touchmove", preventZoom, { passive: false });
+    const blockPinch = (e: TouchEvent) => { if (e.touches.length > 1) e.preventDefault(); };
+    document.addEventListener("touchmove", blockPinch, { passive: false });
 
     return () => {
-      body.style.overflow    = b;
-      html.style.overflow    = h;
-      body.style.touchAction = prevTouchAction;
-      body.style.userSelect  = prevUserSelect;
+      body.style.overflow    = prevBodyOvf;
+      html.style.overflow    = prevHtmlOvf;
+      body.style.touchAction = prevTA;
+      body.style.userSelect  = prevUS;
       if (area) { area.style.overflowY = aOvf; area.style.pointerEvents = aPE; }
-      document.removeEventListener("touchmove", preventZoom);
+      document.removeEventListener("touchmove", blockPinch);
     };
   }, []);
 
-  // Escape key & fullscreen change listener
+  // Escape + fullscreen listener
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { if (document.fullscreenElement) document.exitFullscreen(); else onClose(); } };
-    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
-    window.addEventListener("keydown", onKey);
-    document.addEventListener("fullscreenchange", onFsChange);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.removeEventListener("fullscreenchange", onFsChange);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { if (document.fullscreenElement) document.exitFullscreen(); else onClose(); }
     };
+    const onFs = () => setFullscreen(!!document.fullscreenElement);
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => { window.removeEventListener("keydown", onKey); document.removeEventListener("fullscreenchange", onFs); };
   }, [onClose]);
 
-  // Load saved state
+  // Check saved state
   useEffect(() => {
     if (!savedDocId) return;
     getDoc(doc(db, "saved_items", savedDocId)).then(s => setSaved(s.exists())).catch(() => {});
   }, [savedDocId]);
 
-  // Non-passive touch handlers for image pan/pinch
+  // Non-passive touch: pinch + pan for image
   useEffect(() => {
-    if (!isImage) return;
+    if (imgFailed) return;
     const el = imgBox.current;
     if (!el) return;
 
     const onStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
-        lastPinch.current = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY,
-        );
+        lastPinch.current = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
         dragStart.current = null;
       } else if (e.touches.length === 1 && scaleRef.current > 1) {
         dragStart.current = { cx: e.touches[0].clientX, cy: e.touches[0].clientY, ox: offsetRef.current.x, oy: offsetRef.current.y };
       }
     };
-
     const onMove = (e: TouchEvent) => {
       e.preventDefault();
       if (e.touches.length === 2 && lastPinch.current !== null) {
         const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-        const ns = Math.min(6, Math.max(1, scaleRef.current * (d / lastPinch.current)));
-        scaleRef.current = ns; setScale(ns); lastPinch.current = d;
+        applyScale(scaleRef.current * (d / lastPinch.current));
+        lastPinch.current = d;
       } else if (e.touches.length === 1 && dragStart.current && scaleRef.current > 1) {
-        const no = {
+        applyOffset({
           x: dragStart.current.ox + (e.touches[0].clientX - dragStart.current.cx) / scaleRef.current,
           y: dragStart.current.oy + (e.touches[0].clientY - dragStart.current.cy) / scaleRef.current,
-        };
-        applyOffset(no);
+        });
       }
     };
-
-    const onEnd = () => { lastPinch.current = dragStart.current = null; if (scaleRef.current <= 1) applyScale(1); };
+    const onEnd = () => { lastPinch.current = dragStart.current = null; };
 
     el.addEventListener("touchstart", onStart, { passive: false });
     el.addEventListener("touchmove",  onMove,  { passive: false });
@@ -170,36 +155,27 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
       el.removeEventListener("touchmove",  onMove);
       el.removeEventListener("touchend",   onEnd);
     };
-  }, [isImage]);
+  }, [imgFailed]);
 
   const toggleSave = async () => {
     if (!uid || !savedDocId || savingToggle) return;
-    setSavingToggle(true);
+    setSaving(true);
     try {
       if (saved) { await deleteDoc(doc(db, "saved_items", savedDocId)); setSaved(false); }
       else { await setDoc(doc(db, "saved_items", savedDocId), { uid, itemType: "pyq", itemId: pyq.id, savedAt: new Date().toISOString() }); setSaved(true); }
-    } catch (e) { console.error("[PyqGallery save]", e); }
-    finally { setSavingToggle(false); }
+    } catch (e) { console.error(e); }
+    finally { setSaving(false); }
   };
 
   const toggleFullscreen = async () => {
     try {
-      if (!document.fullscreenElement) {
-        await overlayRef.current?.requestFullscreen();
-      } else {
-        await document.exitFullscreen();
-      }
+      if (!document.fullscreenElement) await overlayRef.current?.requestFullscreen();
+      else await document.exitFullscreen();
     } catch {}
   };
 
-  // Mouse wheel zoom (desktop)
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    applyScale(scaleRef.current * (e.deltaY < 0 ? 1.12 : 0.89));
-  };
-
-  // Mouse drag (desktop)
+  // Mouse wheel zoom
+  const handleWheel = (e: React.WheelEvent) => { e.preventDefault(); applyScale(scaleRef.current * (e.deltaY < 0 ? 1.12 : 0.89)); };
   const handleMouseDown = (e: React.MouseEvent) => {
     if (scaleRef.current <= 1) return;
     e.preventDefault();
@@ -208,31 +184,19 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
   };
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!mouseStart.current) return;
-    applyOffset({
-      x: mouseStart.current.ox + (e.clientX - mouseStart.current.cx) / scaleRef.current,
-      y: mouseStart.current.oy + (e.clientY - mouseStart.current.cy) / scaleRef.current,
-    });
+    applyOffset({ x: mouseStart.current.ox + (e.clientX - mouseStart.current.cx) / scaleRef.current, y: mouseStart.current.oy + (e.clientY - mouseStart.current.cy) / scaleRef.current });
   };
   const handleMouseUp = () => { mouseStart.current = null; setDragging(false); };
 
-  // Tap to zoom (images)
-  const handleImgClick = () => { if (!isDragging) applyScale(scaleRef.current > 1 ? 1 : 2.5); };
-
-  const overlay = (
+  return createPortal(
     <div
       ref={overlayRef}
       className="fixed inset-0 bg-black flex flex-col select-none"
-      style={{ zIndex: 9999, touchAction: isImage ? "none" : "auto" }}
+      style={{ zIndex: 9999, touchAction: imgFailed ? "auto" : "none" }}
     >
       {/* Top bar */}
-      <div
-        className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 flex-shrink-0"
-        style={{
-          paddingTop: "calc(0.75rem + env(safe-area-inset-top, 0px))",
-          paddingBottom: "2.5rem",
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, transparent 100%)",
-        }}
-      >
+      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 flex-shrink-0"
+        style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top,0px))", paddingBottom: "2.5rem", background: "linear-gradient(to bottom,rgba(0,0,0,0.85) 0%,transparent 100%)" }}>
         <div className="flex-1 min-w-0 mr-2">
           <p className="text-white font-semibold text-sm truncate">{pyq.title}</p>
           <p className="text-white/60 text-xs mt-0.5">{pyq.subject} · {pyq.year}</p>
@@ -244,11 +208,8 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
               <Bookmark className={`w-4 h-4 ${saved ? "fill-white" : ""}`} />
             </button>
           )}
-          <button
-            onClick={toggleFullscreen}
-            title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-            className="p-2.5 rounded-full bg-white/15 hover:bg-white/25 text-white transition-all"
-          >
+          <button onClick={toggleFullscreen} title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            className="p-2.5 rounded-full bg-white/15 hover:bg-white/25 text-white transition-all">
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </button>
           <a href={pyq.pdfUrl} target="_blank" rel="noopener noreferrer"
@@ -262,8 +223,8 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
         </div>
       </div>
 
-      {/* Content */}
-      {isImage ? (
+      {/* Content: try image first, fallback to PDF iframe */}
+      {!imgFailed ? (
         <div
           ref={imgBox}
           className="flex-1 flex items-center justify-center overflow-hidden"
@@ -273,35 +234,31 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           style={{ cursor: scale > 1 ? (isDragging ? "grabbing" : "grab") : "zoom-in", touchAction: "none" }}
+          onClick={() => { if (!isDragging) applyScale(scaleRef.current > 1 ? 1 : 2.5); }}
         >
           <img
             src={pyq.pdfUrl}
             alt={pyq.title}
-            onClick={handleImgClick}
+            onError={() => setImgFailed(true)}
             draggable={false}
             style={{
               maxWidth: "100%", maxHeight: "100%", objectFit: "contain",
               display: "block", userSelect: "none", pointerEvents: "none",
               transform: `scale(${scale}) translate(${offset.x}px, ${offset.y}px)`,
               transformOrigin: "center center",
-              transition: (isDragging || mouseStart.current) ? "none" : "transform 0.15s ease",
+              transition: isDragging ? "none" : "transform 0.15s ease",
             }}
           />
         </div>
       ) : (
-        <div className="flex-1 flex flex-col pt-14">
-          {pyq.fileType === "rich" || pyq.fileType === "text" ? (
-            <div className="flex-1 overflow-y-auto bg-white p-4 prose prose-sm max-w-none"
-              style={{ overscrollBehavior: "contain" }}
-              dangerouslySetInnerHTML={{ __html: (pyq as any).content ?? "" }} />
-          ) : (
-            <iframe
-              src={`https://docs.google.com/viewer?url=${encodeURIComponent(pyq.pdfUrl)}&embedded=true`}
-              className="flex-1 w-full border-0" title={pyq.title}
-            />
-          )}
+        <div className="flex-1 flex flex-col" style={{ paddingTop: "56px" }}>
+          <iframe
+            src={`https://docs.google.com/viewer?url=${encodeURIComponent(pyq.pdfUrl)}&embedded=true`}
+            className="flex-1 w-full border-0"
+            title={pyq.title}
+          />
           <p className="text-center text-xs text-white/40 py-2">
-            PDF not loading?{" "}
+            Not loading?{" "}
             <a href={pyq.pdfUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
               Open directly ↗
             </a>
@@ -309,82 +266,65 @@ function PyqGallery({ pyq, onClose, uid }: { pyq: Pyq; onClose: () => void; uid?
         </div>
       )}
 
-      {/* Bottom zoom controls (images only) */}
-      {isImage && (
-        <div
-          className="absolute bottom-0 left-0 right-0 flex flex-col items-center"
-          style={{
-            paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom, 0px))",
-            paddingTop: "3rem",
-            background: "linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%)",
-          }}
-        >
-          {scale === 1 && (
-            <p className="text-white/40 text-[10px] mb-2">Tap image · pinch · scroll to zoom</p>
-          )}
+      {/* Zoom bar (only when showing image successfully) */}
+      {!imgFailed && (
+        <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center"
+          style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom,0px))", paddingTop: "3rem", background: "linear-gradient(to top,rgba(0,0,0,0.65) 0%,transparent 100%)" }}>
+          {scale === 1 && <p className="text-white/40 text-[10px] mb-2">Tap · pinch · scroll to zoom</p>}
           <div className="flex items-center gap-3 bg-black/50 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/10">
-            <button onClick={() => applyScale(scaleRef.current / 1.5)} disabled={scale <= 1}
+            <button onClick={(e) => { e.stopPropagation(); applyScale(scaleRef.current / 1.5); }} disabled={scale <= 1}
               className="p-1.5 rounded-full hover:bg-white/15 text-white disabled:opacity-30 transition-all">
               <ZoomOut className="w-4 h-4" />
             </button>
-            <button onClick={() => applyScale(1)}
+            <button onClick={(e) => { e.stopPropagation(); applyScale(1); }}
               className="text-white/70 text-xs font-mono min-w-[42px] text-center hover:text-white transition-colors">
               {Math.round(scale * 100)}%
             </button>
-            <button onClick={() => applyScale(scaleRef.current * 1.5)} disabled={scale >= 6}
+            <button onClick={(e) => { e.stopPropagation(); applyScale(scaleRef.current * 1.5); }} disabled={scale >= 6}
               className="p-1.5 rounded-full hover:bg-white/15 text-white disabled:opacity-30 transition-all">
               <ZoomIn className="w-4 h-4" />
             </button>
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
-
-  return createPortal(overlay, document.body);
 }
 
 function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   const { profile, user } = useAuth();
   const [, setLocation] = useLocation();
-  const [grade, setGrade] = useState<number>(profile?.grade || 10);
-  const [subject, setSubject] = useState("");
+  const [grade, setGrade]         = useState<number>(profile?.grade || 10);
+  const [subject, setSubject]     = useState("");
   const [yearFilter, setYearFilter] = useState<string>("");
-  const [search, setSearch] = useState("");
-  const [viewer, setViewer] = useState<Pyq | null>(null);
-  const [pyqs, setPyqs] = useState<Pyq[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [search, setSearch]       = useState("");
+  const [viewer, setViewer]       = useState<Pyq | null>(null);
+  const [pyqs, setPyqs]           = useState<Pyq[]>([]);
+  const [loading, setLoading]     = useState(true);
 
   useEffect(() => {
     setLoading(true);
     setSubject("");
     setYearFilter("");
     const q = query(collection(db, "pyqs"), where("grade", "==", grade));
-    getDocs(q).then(snap => {
-      const list: Pyq[] = snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as Pyq))
-        .sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
-      setPyqs(list);
-    }).catch(e => {
-      console.error("[Pyqs] Load failed:", e);
-      setPyqs([]);
-    }).finally(() => setLoading(false));
+    getDocs(q)
+      .then(snap => {
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Pyq)).sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+        setPyqs(list);
+      })
+      .catch(e => { console.error("[Pyqs]", e); setPyqs([]); })
+      .finally(() => setLoading(false));
   }, [grade]);
 
   const subjects = useMemo(() => [...new Set(pyqs.map(p => p.subject))].sort(), [pyqs]);
-  const years = useMemo(
-    () => [...new Set(pyqs.map(p => String(p.year)))].sort((a, b) => Number(b) - Number(a)),
-    [pyqs]
-  );
-
-  const filtered = useMemo(() => {
-    return pyqs.filter(p => {
-      if (subject && p.subject !== subject) return false;
-      if (yearFilter && String(p.year) !== yearFilter) return false;
-      if (search && !p.title.toLowerCase().includes(search.toLowerCase())) return false;
-      return true;
-    });
-  }, [pyqs, subject, yearFilter, search]);
+  const years    = useMemo(() => [...new Set(pyqs.map(p => String(p.year)))].sort((a, b) => Number(b) - Number(a)), [pyqs]);
+  const filtered = useMemo(() => pyqs.filter(p => {
+    if (subject && p.subject !== subject) return false;
+    if (yearFilter && String(p.year) !== yearFilter) return false;
+    if (search && !p.title.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  }), [pyqs, subject, yearFilter, search]);
 
   return (
     <>
@@ -410,38 +350,26 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
         )}
 
         <div className="flex flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-5">
-          <select
-            data-testid="select-grade-pyq"
-            value={grade}
-            onChange={(e) => { setGrade(Number(e.target.value)); setSubject(""); setYearFilter(""); }}
-            className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {[9, 10, 11, 12].map((g) => <option key={g} value={g}>Grade {g}</option>)}
+          <select value={grade}
+            onChange={e => { setGrade(Number(e.target.value)); setSubject(""); setYearFilter(""); }}
+            className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            {[9, 10, 11, 12].map(g => <option key={g} value={g}>Grade {g}</option>)}
           </select>
 
-          <select
-            value={yearFilter}
-            onChange={(e) => setYearFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
+          <select value={yearFilter} onChange={e => setYearFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
             <option value="">All Years</option>
             {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
 
           <div className="relative flex-1 min-w-0 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search by title…"
-              className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
             {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
+              <button onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
@@ -449,18 +377,13 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
         </div>
 
         <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-4 sm:mb-5">
-          <button
-            onClick={() => setSubject("")}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${!subject ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-          >
+          <button onClick={() => setSubject("")}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${!subject ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
             All Subjects
           </button>
-          {subjects.map((s) => (
-            <button
-              key={s}
-              onClick={() => setSubject(s)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${subject === s ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-            >
+          {subjects.map(s => (
+            <button key={s} onClick={() => setSubject(s)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${subject === s ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
               {s}
             </button>
           ))}
@@ -486,25 +409,24 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
           </div>
         ) : (
           <div className="grid gap-2 sm:gap-3">
-            {filtered.map((pyq) => {
-              const isImg = detectIsImage(pyq);
+            {filtered.map(pyq => {
+              const rich = isRichText(pyq);
               return (
                 <button
                   key={pyq.id}
-                  data-testid={`pyq-item-${pyq.id}`}
                   onClick={() => {
-                    if (isImg) {
-                      setViewer(pyq);
-                    } else {
+                    if (rich) {
                       setLocation(`/pyq/${pyq.id}`);
+                    } else {
+                      setViewer(pyq);
                     }
                   }}
-                  className="flex items-center gap-3 sm:gap-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 hover:shadow-md hover:border-blue-100 transition-all group w-full min-w-0 overflow-hidden text-left"
+                  className="flex items-center gap-3 sm:gap-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 hover:shadow-md hover:border-blue-100 transition-all w-full min-w-0 overflow-hidden text-left"
                 >
-                  <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${isImg ? "bg-purple-50" : "bg-orange-50"}`}>
-                    {isImg
-                      ? <Image className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
-                      : <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />}
+                  <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${rich ? "bg-indigo-50" : "bg-purple-50"}`}>
+                    {rich
+                      ? <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500" />
+                      : <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-gray-900 truncate text-sm sm:text-base">
@@ -512,8 +434,8 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
                     </p>
                     <p className="text-xs sm:text-sm text-gray-500 mt-0.5 truncate">{pyq.subject} · {pyq.year}</p>
                   </div>
-                  <span className={`hidden sm:inline flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${isImg ? "bg-purple-50 text-purple-600" : "bg-orange-50 text-orange-600"}`}>
-                    {isImg ? "Image" : "PDF"}
+                  <span className={`hidden sm:inline flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${rich ? "bg-indigo-50 text-indigo-600" : "bg-purple-50 text-purple-600"}`}>
+                    {rich ? "Article" : "View"}
                   </span>
                 </button>
               );
