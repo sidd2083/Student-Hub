@@ -81,9 +81,21 @@ function buildSystemContent(context?: ChatContext): string {
   return SYSTEM_PROMPT + parts.join("\n");
 }
 
+function getGeminiKey(): string {
+  const key =
+    process.env.AI_INTEGRATIONS_GEMINI_API_KEY ??
+    process.env.GEMINI_API_KEY;
+  if (!key) throw new Error("Gemini API key is not configured.");
+  return key;
+}
+
+function getGeminiBaseUrl(): string {
+  return process.env.AI_INTEGRATIONS_GEMINI_BASE_URL ?? "https://generativelanguage.googleapis.com";
+}
+
 async function askGemini(systemContent: string, history: ChatMessage[], message: string): Promise<string> {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new Error("GEMINI_API_KEY is not set. Please add it in your environment variables.");
+  const key = getGeminiKey();
+  const baseUrl = getGeminiBaseUrl();
 
   const contents = [
     ...history
@@ -104,9 +116,12 @@ async function askGemini(systemContent: string, history: ChatMessage[], message:
     },
   };
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
-    {
+  const apiVersion = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL ? "" : "v1beta";
+  const url = apiVersion
+    ? `${baseUrl}/${apiVersion}/models/gemini-2.5-flash:generateContent?key=${key}`
+    : `${baseUrl}/models/gemini-2.5-flash:generateContent?key=${key}`;
+
+  const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -128,7 +143,10 @@ async function askGemini(systemContent: string, history: ChatMessage[], message:
 }
 
 router.get("/ai/status", (_req: Request, res: Response) => {
-  const hasGemini = !!process.env.GEMINI_API_KEY;
+  const hasGemini = !!(
+    process.env.AI_INTEGRATIONS_GEMINI_API_KEY ??
+    process.env.GEMINI_API_KEY
+  );
   res.json({ ok: hasGemini, gemini: hasGemini, backend: hasGemini ? "gemini" : "none" });
 });
 
@@ -142,9 +160,9 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
 
     if (!message) return res.status(400).json({ error: "message is required" });
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.AI_INTEGRATIONS_GEMINI_API_KEY && !process.env.GEMINI_API_KEY) {
       return res.status(503).json({
-        error: "Nep AI is not configured. Please set GEMINI_API_KEY in your Vercel environment variables and redeploy.",
+        error: "Nep AI is not configured. Please set GEMINI_API_KEY in your environment secrets.",
       });
     }
 
