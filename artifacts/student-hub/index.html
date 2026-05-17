@@ -107,5 +107,87 @@
     -->
     <div id="root"><div id="boot-splash" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#ffffff;z-index:9999;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"><div style="width:72px;height:72px;background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);border-radius:20px;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 40px rgba(59,130,246,.4);margin-bottom:16px"><svg width="42" height="42" viewBox="0 0 180 180" fill="none"><path d="M90 44 C90 44 56 39 36 48 L36 136 C56 127 90 132 90 132 L90 44Z" fill="white" fill-opacity=".95"/><path d="M90 44 C90 44 124 39 144 48 L144 136 C124 127 90 132 90 132 L90 44Z" fill="white" fill-opacity=".7"/><line x1="90" y1="44" x2="90" y2="132" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/></svg></div><p style="font-size:17px;font-weight:600;color:#111827;margin:0 0 4px;letter-spacing:-.01em">Student Hub</p><p style="font-size:13px;color:#6b7280;margin:0">Study smarter. Rank higher.</p></div></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- ── Anti-Inspection Protection ───────────────────────────────────── -->
+    <script>
+    (function(){
+      'use strict';
+
+      /* ── 1. Disable right-click ───────────────────────────────────────── */
+      document.addEventListener('contextmenu', function(e){ e.preventDefault(); return false; });
+
+      /* ── 2. Block DevTools keyboard shortcuts ─────────────────────────── */
+      document.addEventListener('keydown', function(e){
+        var k = e.key, ctrl = e.ctrlKey || e.metaKey, shift = e.shiftKey;
+        // F12
+        if (k === 'F12'){ e.preventDefault(); e.stopPropagation(); return false; }
+        // Ctrl+Shift+I/J/C  (Inspector / Console / Element picker)
+        if (ctrl && shift && 'IJCijc'.indexOf(k) !== -1){ e.preventDefault(); e.stopPropagation(); return false; }
+        // Ctrl+U  (View Source)
+        if (ctrl && (k === 'u' || k === 'U') && !shift){ e.preventDefault(); e.stopPropagation(); return false; }
+        // Ctrl+S  (Save page HTML)
+        if (ctrl && (k === 's' || k === 'S') && !shift){ e.preventDefault(); e.stopPropagation(); return false; }
+      }, true);
+
+      /* ── 3. DevTools open-detection via debugger timing ──────────────── */
+      /* Only active on the real domain — skipped on localhost / Replit dev */
+      var h = location.hostname;
+      var isProd = h !== 'localhost' && h !== '127.0.0.1' && h.indexOf('.replit.dev') === -1 && h.indexOf('.repl.co') === -1;
+
+      if (isProd) {
+        var _dt = { open: false };
+
+        function _showBlock(){
+          if (document.getElementById('__sh_block')) return;
+          var d = document.createElement('div');
+          d.id = '__sh_block';
+          d.style.cssText = [
+            'position:fixed','top:0','left:0','width:100%','height:100%',
+            'background:rgba(15,23,42,0.97)','z-index:2147483647',
+            'display:flex','align-items:center','justify-content:center',
+            'flex-direction:column','font-family:system-ui,sans-serif'
+          ].join(';');
+          d.innerHTML = [
+            '<div style="background:#fff;border-radius:20px;padding:36px 44px;text-align:center;max-width:380px;box-shadow:0 24px 80px rgba(0,0,0,.4)">',
+              '<div style="width:56px;height:56px;background:#fee2e2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">',
+                '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+              '</div>',
+              '<h2 style="font-size:19px;font-weight:700;color:#0f172a;margin:0 0 8px">Access Restricted</h2>',
+              '<p style="color:#64748b;font-size:13.5px;line-height:1.65;margin:0 0 22px">',
+                'Developer tools are not permitted on Student Hub.',
+                '<br>Please close DevTools to continue studying.',
+              '</p>',
+              '<button onclick="location.reload()" ',
+                'style="background:#3b82f6;color:#fff;border:none;border-radius:10px;',
+                'padding:11px 28px;font-size:14px;font-weight:600;cursor:pointer;',
+                'box-shadow:0 4px 14px rgba(59,130,246,.4);transition:opacity .15s">',
+                'Close &amp; Continue',
+              '</button>',
+            '</div>'
+          ].join('');
+          document.body.appendChild(d);
+        }
+
+        function _hideBlock(){
+          var d = document.getElementById('__sh_block');
+          if (d) d.parentNode.removeChild(d);
+        }
+
+        function _check(){
+          var t = performance.now();
+          /* jshint ignore:start */
+          debugger; // paused here means DevTools is open
+          /* jshint ignore:end */
+          if (performance.now() - t > 150){
+            if (!_dt.open){ _dt.open = true; _showBlock(); }
+          } else {
+            if (_dt.open){ _dt.open = false; _hideBlock(); }
+          }
+        }
+
+        setInterval(_check, 1200);
+      }
+    })();
+    </script>
   </body>
 </html>
