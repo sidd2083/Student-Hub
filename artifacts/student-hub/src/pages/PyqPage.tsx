@@ -39,6 +39,10 @@ interface SeoMeta {
   structuredData: string;
 }
 
+// Module-level caches — persist across navigation within the same session.
+const pyqCache    = new Map<string, FirePyq>();
+const pyqSeoCache = new Map<string, SeoMeta | null>();
+
 // ── Full-screen image lightbox ────────────────────────────────────────────────
 function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
   const [scale, setScale]         = useState(1);
@@ -333,19 +337,32 @@ export default function PyqPage() {
   const richRef   = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!id) return;
-    getDoc(doc(db, "seo_meta", `pyq_${id}`))
-      .then(snap => { if (snap.exists()) setSeoMeta(snap.data() as SeoMeta); })
-      .catch(() => {});
-  }, [id]);
-
-  useEffect(() => {
     if (!id) { setIsError(true); setLoading(false); return; }
+
+    // Serve from in-memory cache instantly if already loaded this session
+    if (pyqCache.has(id)) {
+      setPyq(pyqCache.get(id)!);
+      setSeoMeta(pyqSeoCache.has(id) ? pyqSeoCache.get(id)! : null);
+      setLoading(false);
+      setIsError(false);
+      return;
+    }
+
     setLoading(true);
-    getDoc(doc(db, "pyqs", id))
-      .then(snap => {
-        if (!snap.exists()) { setIsError(true); return; }
-        setPyq({ id: snap.id, ...snap.data() } as FirePyq);
+
+    // Fetch PYQ + SEO meta in parallel — one round-trip instead of two sequential
+    Promise.all([
+      getDoc(doc(db, "pyqs", id)),
+      getDoc(doc(db, "seo_meta", `pyq_${id}`)),
+    ])
+      .then(([pyqSnap, seoSnap]) => {
+        if (!pyqSnap.exists()) { setIsError(true); return; }
+        const pyqData = { id: pyqSnap.id, ...pyqSnap.data() } as FirePyq;
+        pyqCache.set(id, pyqData);
+        setPyq(pyqData);
+        const seo = seoSnap.exists() ? (seoSnap.data() as SeoMeta) : null;
+        pyqSeoCache.set(id, seo);
+        setSeoMeta(seo);
       })
       .catch(() => setIsError(true))
       .finally(() => setLoading(false));

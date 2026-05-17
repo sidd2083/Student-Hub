@@ -14,6 +14,11 @@ import { getNepaliDate } from "@/lib/nepaliDate";
 
 const NOTE_VIEWED_KEY = "studenthub_viewed_notes_session";
 
+// Module-level caches — persist across navigation within the same session.
+// Opening a note you already visited is instant (no network round-trip).
+const noteCache = new Map<string, NoteData>();
+const seoCache  = new Map<string, SeoMeta | null>();
+
 interface NoteData {
   id: string;
   title: string;
@@ -216,23 +221,36 @@ export default function NotePage() {
     else window.scrollTo({ top: 0 });
 
     if (!id) { setIsError(true); setLoading(false); return; }
+
+    // Serve from in-memory cache instantly if already loaded this session
+    if (noteCache.has(id)) {
+      setNote(noteCache.get(id)!);
+      setSeoMeta(seoCache.has(id) ? seoCache.get(id)! : null);
+      setLoading(false);
+      setIsError(false);
+      return;
+    }
+
     setLoading(true);
     setIsError(false);
     setNote(null);
-    getDoc(doc(db, "notes", id))
-      .then(snap => {
-        if (!snap.exists()) { setIsError(true); return; }
-        setNote({ id: snap.id, ...snap.data() } as NoteData);
+
+    // Fetch note + SEO meta in parallel — one round-trip instead of two sequential
+    Promise.all([
+      getDoc(doc(db, "notes", id)),
+      getDoc(doc(db, "seo_meta", `note_${id}`)),
+    ])
+      .then(([noteSnap, seoSnap]) => {
+        if (!noteSnap.exists()) { setIsError(true); return; }
+        const noteData = { id: noteSnap.id, ...noteSnap.data() } as NoteData;
+        noteCache.set(id, noteData);
+        setNote(noteData);
+        const seo = seoSnap.exists() ? (seoSnap.data() as SeoMeta) : null;
+        seoCache.set(id, seo);
+        setSeoMeta(seo);
       })
       .catch(() => setIsError(true))
       .finally(() => setLoading(false));
-  }, [id]);
-
-  useEffect(() => {
-    if (!id) return;
-    getDoc(doc(db, "seo_meta", `note_${id}`))
-      .then(snap => { if (snap.exists()) setSeoMeta(snap.data() as SeoMeta); })
-      .catch(() => {});
   }, [id]);
 
   // Once-per-session note view logging

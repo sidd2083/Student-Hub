@@ -30,6 +30,12 @@ interface AutoBadge { emoji: string; label: string; bg: string; shadow: string; 
 const DISMISSED_KEY   = "studenthub_dismissed_announcements";
 const STATS_CACHE_KEY = "sh_dash_v1";
 
+// Module-level announcements cache — announcements rarely change, so we
+// keep them in memory for the session and skip the network on repeat visits.
+interface AnnCache { data: Announcement[]; ts: number }
+let announcementsCache: AnnCache | null = null;
+const ANN_CACHE_TTL = 5 * 60_000; // 5 minutes
+
 interface StatsCache {
   uid: string;
   streak: number;
@@ -250,13 +256,22 @@ export default function Dashboard() {
     let mounted = true;
     (async () => {
       try {
-        const announcementsPromise = getDocs(query(collection(db, "announcements"), orderBy("createdAt", "desc")));
+        // Use in-memory announcements cache to avoid hitting Firestore every visit
+        const fetchAnnouncements = async (): Promise<Announcement[]> => {
+          if (announcementsCache && Date.now() - announcementsCache.ts < ANN_CACHE_TTL) {
+            return announcementsCache.data;
+          }
+          const snap = await getDocs(query(collection(db, "announcements"), orderBy("createdAt", "desc")));
+          const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement)).slice(0, 3);
+          announcementsCache = { data: list, ts: Date.now() };
+          return list;
+        };
 
         if (uid) {
-          const [userSnap, tasksSnap, announcementsSnap] = await Promise.all([
+          const [userSnap, tasksSnap, annList] = await Promise.all([
             getDoc(doc(db, "users", uid)),
             getDocs(query(collection(db, "tasks"), where("uid", "==", uid), where("completed", "==", false))),
-            announcementsPromise,
+            fetchAnnouncements(),
           ]);
 
           if (!mounted) return;
@@ -275,14 +290,11 @@ export default function Dashboard() {
           setPendingTasks(newPending);
           // Persist fresh stats so next visit is instant
           writeStatsCache(uid, { streak: newStreak, studyMins: newMins, pendingTasks: newPending, customBadges: newBadges });
-
-          const list: Announcement[] = announcementsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
-          setAnnouncements(list.slice(0, 3));
+          setAnnouncements(annList);
         } else {
-          const announcementsSnap = await announcementsPromise;
+          const annList = await fetchAnnouncements();
           if (!mounted) return;
-          const list: Announcement[] = announcementsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
-          setAnnouncements(list.slice(0, 3));
+          setAnnouncements(annList);
         }
       } catch (e) {
         console.error("[Dashboard] Load failed:", e);

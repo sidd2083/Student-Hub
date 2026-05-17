@@ -48,8 +48,20 @@ export default defineConfig({
           if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/")) {
             return "vendor-react";
           }
-          if (id.includes("node_modules/firebase/")) {
-            return "vendor-firebase";
+          // Split Firebase into sub-chunks so the browser can download and
+          // cache each piece independently — auth/app loads fast on first visit,
+          // firestore (biggest) loads in parallel while auth resolves.
+          if (id.includes("node_modules/@firebase/firestore") || id.includes("node_modules/firebase/firestore")) {
+            return "vendor-firebase-firestore";
+          }
+          if (id.includes("node_modules/@firebase/auth") || id.includes("node_modules/firebase/auth")) {
+            return "vendor-firebase-auth";
+          }
+          if (id.includes("node_modules/@firebase/storage") || id.includes("node_modules/firebase/storage")) {
+            return "vendor-firebase-storage";
+          }
+          if (id.includes("node_modules/@firebase/") || id.includes("node_modules/firebase/")) {
+            return "vendor-firebase-core";
           }
           if (id.includes("node_modules/lucide-react/")) {
             return "vendor-icons";

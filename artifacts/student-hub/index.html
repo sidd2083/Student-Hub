@@ -50,13 +50,18 @@
     <link rel="apple-touch-icon" href="/icon-192.png" />
 
     <!-- ── Performance: preconnect external origins ──────────────────────── -->
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
-    <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com" />
-    <link rel="dns-prefetch" href="https://securetoken.googleapis.com" />
+    <!-- Firebase — full preconnect (not just dns-prefetch) for the hot paths -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://firebase.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin />
+    <!-- Secondary Google APIs — dns-prefetch is sufficient -->
     <link rel="dns-prefetch" href="https://generativelanguage.googleapis.com" />
     <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com" />
+    <link rel="dns-prefetch" href="https://www.googleapis.com" />
 
     <!-- ── JSON-LD Structured Data ────────────────────────────────────────── -->
     <script type="application/ld+json">

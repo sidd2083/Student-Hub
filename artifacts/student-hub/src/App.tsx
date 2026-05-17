@@ -70,6 +70,28 @@ function scrollToTop() {
  * GPU-composited opacity + translate, instant on fast devices.
  * Scroll resets to top on every navigation.
  */
+// Minimal inline skeleton shown while a lazy chunk is downloading.
+// Renders as a subtle pulsing bar at the top — visually communicates
+// "loading" without layout shift, matches the app's white background.
+function PageLoadingFallback() {
+  return (
+    <div style={{ minHeight: "100%" }}>
+      <div style={{
+        position: "fixed", top: 0, left: 0, right: 0,
+        height: "3px", background: "#e5e7eb", zIndex: 9998,
+      }}>
+        <div style={{
+          height: "100%", width: "40%",
+          background: "linear-gradient(90deg,#3b82f6,#60a5fa,#3b82f6)",
+          backgroundSize: "200% 100%",
+          animation: "shimmer 1.2s infinite linear",
+          borderRadius: "0 2px 2px 0",
+        }} />
+      </div>
+    </div>
+  );
+}
+
 function PageWrapper({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
 
@@ -81,7 +103,7 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
 
   return (
     <div key={location} className="page-fade" style={{ minHeight: "100%" }}>
-      <Suspense fallback={<div style={{ minHeight: "100%" }} />}>
+      <Suspense fallback={<PageLoadingFallback />}>
         {children}
       </Suspense>
     </div>
