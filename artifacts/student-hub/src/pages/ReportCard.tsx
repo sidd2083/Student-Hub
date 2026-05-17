@@ -107,19 +107,25 @@ function StudyBar({ logs, period }: { logs: DailyLog[]; period: ViewPeriod }) {
   const max = Math.max(...days.map(d => d.minutes), 1);
 
   return (
-    <div className="flex items-end gap-1 h-28">
-      {days.map(({ label, minutes, isToday }, idx) => (
-        <div key={idx} className="flex-1 flex flex-col items-center gap-0.5">
-          <div className="w-full flex flex-col justify-end" style={{ height: "80px" }}>
-            <div
-              className={`w-full rounded-t-sm transition-all ${isToday ? "bg-blue-500" : minutes > 0 ? "bg-blue-300" : "bg-gray-100"}`}
-              style={{ height: `${Math.max((minutes / max) * 80, minutes > 0 ? 3 : 1)}px` }}
-              title={`${minutes} min`}
-            />
+    <div className="flex items-end gap-0.5 h-28">
+      {days.map(({ label, minutes, isToday }, idx) => {
+        const numLabel = Number(label);
+        const showLabel = period !== "month" || isToday || numLabel === 1 || numLabel % 5 === 0;
+        return (
+          <div key={idx} className="flex-1 flex flex-col items-center gap-0.5 min-w-0">
+            <div className="w-full flex flex-col justify-end" style={{ height: "80px" }}>
+              <div
+                className={`w-full rounded-t-sm transition-all ${isToday ? "bg-blue-500" : minutes > 0 ? "bg-blue-300" : "bg-gray-100"}`}
+                style={{ height: `${Math.max((minutes / max) * 80, minutes > 0 ? 3 : 1)}px` }}
+                title={`${label}: ${minutes} min`}
+              />
+            </div>
+            <span className={`text-[8px] font-medium truncate w-full text-center leading-none ${isToday ? "text-blue-600" : "text-gray-400"}`}>
+              {showLabel ? label : ""}
+            </span>
           </div>
-          <span className={`text-[9px] font-medium ${isToday ? "text-blue-600" : "text-gray-400"}`}>{label}</span>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

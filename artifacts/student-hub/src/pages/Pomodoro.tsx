@@ -7,7 +7,7 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   Play, Pause, RotateCcw, Timer, CheckSquare,
-  SkipForward, Settings, X,
+  SkipForward, Settings, X, Eye, EyeOff,
 } from "lucide-react";
 import type { Phase } from "@/context/TimerContext";
 
@@ -27,29 +27,63 @@ function phaseColor(p: Phase) {
   return { ring: "#a855f7", text: "text-purple-500", bg: "bg-purple-500" };
 }
 
-function SettingsPanel({ onClose }: { onClose: () => void }) {
-  const { settings, updateSettings, running } = useTimer();
+function NumInput({
+  label, value, min, max, unit, disabled,
+  onChange,
+}: {
+  label: string; value: number; min: number; max: number; unit: string;
+  disabled: boolean; onChange: (v: number) => void;
+}) {
+  const [raw, setRaw] = useState(String(value));
 
-  const row = (label: string, key: keyof typeof settings, min: number, max: number, unit: string) => (
+  useEffect(() => { setRaw(String(value)); }, [value]);
+
+  const commit = (s: string) => {
+    const n = parseInt(s, 10);
+    if (!isNaN(n)) onChange(Math.min(max, Math.max(min, n)));
+    setRaw(String(value));
+  };
+
+  const displayVal = value >= 60
+    ? `${Math.floor(value / 60)}h ${value % 60}m`
+    : `${value}${unit}`;
+
+  return (
     <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-      <span className="text-sm text-gray-700">{label}</span>
+      <div>
+        <span className="text-sm text-gray-700">{label}</span>
+        {value >= 60 && <span className="text-xs text-gray-400 ml-1">({displayVal})</span>}
+      </div>
       <div className="flex items-center gap-2">
         <button
-          disabled={running || settings[key] <= min}
-          onClick={() => updateSettings({ [key]: Math.max(min, (settings[key] as number) - 1) })}
+          disabled={disabled || value <= min}
+          onClick={() => onChange(Math.max(min, value - (value > 60 ? 5 : 1)))}
           className="w-7 h-7 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 font-bold text-sm flex items-center justify-center"
         >−</button>
-        <span className="w-12 text-center text-sm font-semibold text-gray-900">
-          {settings[key]} {unit}
-        </span>
+        <input
+          type="number"
+          disabled={disabled}
+          value={raw}
+          min={min}
+          max={max}
+          onChange={e => setRaw(e.target.value)}
+          onBlur={e => commit(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") commit(raw); }}
+          className="w-16 text-center text-sm font-semibold text-gray-900 border border-gray-200 rounded-lg py-1 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-40 bg-white"
+        />
+        <span className="text-xs text-gray-400 w-6">{unit}</span>
         <button
-          disabled={running || settings[key] >= max}
-          onClick={() => updateSettings({ [key]: Math.min(max, (settings[key] as number) + 1) })}
+          disabled={disabled || value >= max}
+          onClick={() => onChange(Math.min(max, value + (value >= 60 ? 5 : 1)))}
           className="w-7 h-7 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 font-bold text-sm flex items-center justify-center"
         >+</button>
       </div>
     </div>
   );
+}
+
+function SettingsPanel({ onClose }: { onClose: () => void }) {
+  const { settings, updateSettings, running } = useTimer();
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-5 mb-5">
@@ -59,11 +93,60 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
           <X className="w-4 h-4" />
         </button>
       </div>
-      {running && <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mb-3">Pause the timer to change settings.</p>}
-      {row("Focus duration", "workMins", 5, 90, "min")}
-      {row("Short break", "shortBreakMins", 1, 30, "min")}
-      {row("Long break", "longBreakMins", 5, 60, "min")}
-      {row("Sessions before long break", "sessionsBeforeLongBreak", 2, 8, "")}
+      {running && (
+        <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mb-3">
+          Pause the timer to change settings.
+        </p>
+      )}
+
+      <NumInput
+        label="Focus duration"
+        value={settings.workMins}
+        min={1} max={1440} unit="min"
+        disabled={running}
+        onChange={v => updateSettings({ workMins: v })}
+      />
+      <NumInput
+        label="Short break"
+        value={settings.shortBreakMins}
+        min={1} max={120} unit="min"
+        disabled={running}
+        onChange={v => updateSettings({ shortBreakMins: v })}
+      />
+      <NumInput
+        label="Long break"
+        value={settings.longBreakMins}
+        min={1} max={480} unit="min"
+        disabled={running}
+        onChange={v => updateSettings({ longBreakMins: v })}
+      />
+      <NumInput
+        label="Sessions before long break"
+        value={settings.sessionsBeforeLongBreak}
+        min={2} max={10} unit=""
+        disabled={running}
+        onChange={v => updateSettings({ sessionsBeforeLongBreak: v })}
+      />
+
+      <div className="flex items-center justify-between py-3">
+        <div>
+          <span className="text-sm text-gray-700">Auto-switch phases</span>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {settings.autoSwitch ? "Breaks start automatically" : "Manual start after each phase"}
+          </p>
+        </div>
+        <button
+          disabled={running}
+          onClick={() => updateSettings({ autoSwitch: !settings.autoSwitch })}
+          className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-40 ${
+            settings.autoSwitch ? "bg-blue-500" : "bg-gray-300"
+          }`}
+        >
+          <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+            settings.autoSwitch ? "translate-x-5" : "translate-x-0"
+          }`} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -78,6 +161,7 @@ function PomodoroContent() {
   const [activeTask, setActiveTask] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [pendingTasks, setPendingTasks] = useState<Array<{ id: string; text: string }>>([]);
+  const [tabPaused, setTabPaused] = useState(false);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -92,10 +176,23 @@ function PomodoroContent() {
     if (!running) return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
-      e.returnValue = "Your Pomodoro timer is still running. If you leave, your current session progress may not be saved.";
+      e.returnValue = "Your Pomodoro timer is still running.";
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
+  }, [running]);
+
+  // Detect when user returns from another tab and timer was auto-paused
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        setTabPaused(false);
+      } else {
+        if (running) setTabPaused(true);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [running]);
 
   const totalSecs = (() => {
@@ -105,8 +202,10 @@ function PomodoroContent() {
   })();
 
   const progress = totalSecs > 0 ? ((totalSecs - seconds) / totalSecs) * 100 : 0;
-  const mins = Math.floor(seconds / 60).toString().padStart(2, "0");
+  const hrs  = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60).toString().padStart(2, "0");
   const secs = (seconds % 60).toString().padStart(2, "0");
+  const displayTime = hrs > 0 ? `${hrs}:${mins}:${secs}` : `${mins}:${secs}`;
   const circumference = 2 * Math.PI * 44;
   const colors = phaseColor(phase);
 
@@ -129,9 +228,27 @@ function PomodoroContent() {
 
       {savedMinutesToday > 0 && (
         <div className="flex gap-3 mb-4 px-4 py-2.5 bg-blue-50 border border-blue-100 rounded-2xl">
-          <span className="text-sm text-blue-700 font-medium">Today: <span className="font-bold">{fmtTime(savedMinutesToday)}</span> saved to leaderboard</span>
+          <span className="text-sm text-blue-700 font-medium">
+            Today: <span className="font-bold">{fmtTime(savedMinutesToday)}</span> saved to leaderboard
+          </span>
         </div>
       )}
+
+      {tabPaused && !running && (
+        <div className="flex items-center gap-2 mb-4 px-4 py-2.5 bg-amber-50 border border-amber-100 rounded-2xl">
+          <EyeOff className="w-4 h-4 text-amber-600 flex-shrink-0" />
+          <p className="text-sm text-amber-700">
+            Timer paused — you left this tab. Press <strong>Start</strong> when you're ready to study again.
+          </p>
+        </div>
+      )}
+
+      <div className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-2.5 mb-4 flex items-center gap-2">
+        <Eye className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        <p className="text-xs text-gray-500">
+          Timer pauses automatically if you switch tabs or scroll away — only active study time is counted.
+        </p>
+      </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center mb-5">
         <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-6 ${
@@ -141,6 +258,7 @@ function PomodoroContent() {
         }`}>
           <span className={`w-1.5 h-1.5 rounded-full ${colors.bg} ${running ? "animate-pulse" : ""}`} />
           {phaseLabel(phase)}
+          {settings.autoSwitch && <span className="ml-1 opacity-60">· Auto</span>}
         </div>
 
         <div className="flex gap-1.5 justify-center mb-6">
@@ -163,11 +281,11 @@ function PomodoroContent() {
               strokeDasharray={circumference}
               strokeDashoffset={circumference * (1 - progress / 100)}
               strokeLinecap="round"
-              className="transition-all duration-1000"
+              className="transition-all duration-500"
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-4xl font-bold text-gray-900 tabular-nums">{mins}:{secs}</span>
+            <span className="text-4xl font-bold text-gray-900 tabular-nums">{displayTime}</span>
             <span className="text-xs text-gray-400 mt-1">{phaseLabel(phase)}</span>
           </div>
         </div>
@@ -190,7 +308,8 @@ function PomodoroContent() {
         </div>
 
         <p className="mt-4 text-xs text-gray-400">
-          Sessions completed: {sessionsCompleted} · Long break every {settings.sessionsBeforeLongBreak}
+          Sessions: {sessionsCompleted} · Long break every {settings.sessionsBeforeLongBreak}
+          {settings.autoSwitch ? " · Auto-switch ON" : " · Manual switch"}
         </p>
       </div>
 

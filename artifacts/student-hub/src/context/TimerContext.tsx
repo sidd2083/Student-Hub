@@ -14,6 +14,7 @@ export interface TimerSettings {
   longBreakMins: number;
   sessionsBeforeLongBreak: number;
   sessionsBeforeShortBreak: number;
+  autoSwitch: boolean;
 }
 
 const DEFAULT_SETTINGS: TimerSettings = {
@@ -22,6 +23,7 @@ const DEFAULT_SETTINGS: TimerSettings = {
   longBreakMins: 15,
   sessionsBeforeLongBreak: 4,
   sessionsBeforeShortBreak: 2,
+  autoSwitch: false,
 };
 
 interface TimerContextType {
@@ -362,8 +364,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         // Phase just completed
         secondsRef.current = 0;
         setSeconds(0);
-        runningRef.current = false;
-        setRunning(false);
 
         // Save any remaining fractional work time
         if (phaseRef.current === "work") {
@@ -372,7 +372,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           if (remaining >= 1) {
             saveMinutes(remaining);
           } else {
-            // Save a partial final minute if >= 30 seconds remain uncounted
             const fractional = totalWorkSecondsRef.current - savedMinutesRef.current * 60;
             if (fractional >= 30) {
               saveMinutes(1);
@@ -381,6 +380,26 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         }
 
         nextPhase(phaseRef.current, sessionsRef.current, settingsRef.current);
+
+        // Auto-switch: immediately start the new phase without user action
+        if (settingsRef.current.autoSwitch) {
+          const nowMs = Date.now();
+          runningRef.current = true;
+          setRunning(true);
+          displayWallStartRef.current = nowMs;
+          displayBaseSecsRef.current = secondsRef.current;
+          if (phaseRef.current === "work") {
+            workWallStartRef.current = nowMs;
+            workBaseSecsRef.current = 0;
+            totalWorkSecondsRef.current = 0;
+            savedMinutesRef.current = 0;
+          } else {
+            workWallStartRef.current = null;
+          }
+        } else {
+          runningRef.current = false;
+          setRunning(false);
+        }
       } else if (newDisplaySecs !== secondsRef.current) {
         secondsRef.current = newDisplaySecs;
         setSeconds(newDisplaySecs);
@@ -389,6 +408,32 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
     return () => clearInterval(interval);
   }, [running, saveMinutes, nextPhase]);
+
+  // Pause timer automatically when user switches away from the tab
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden && runningRef.current) {
+        // Snapshot wall-clock time before pausing
+        if (phaseRef.current === "work" && workWallStartRef.current !== null) {
+          const elapsed = (Date.now() - workWallStartRef.current) / 1000;
+          totalWorkSecondsRef.current = workBaseSecsRef.current + elapsed;
+        }
+        if (displayWallStartRef.current !== null) {
+          const elapsed = Math.floor((Date.now() - displayWallStartRef.current) / 1000);
+          const newSecs = Math.max(0, displayBaseSecsRef.current - elapsed);
+          secondsRef.current = newSecs;
+          setSeconds(newSecs);
+        }
+        workWallStartRef.current    = null;
+        displayWallStartRef.current = null;
+        runningRef.current = false;
+        setRunning(false);
+        persistState();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [persistState]);
 
   const start = useCallback(() => {
     if (running) return;

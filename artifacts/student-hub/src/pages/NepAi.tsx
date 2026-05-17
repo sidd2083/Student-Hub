@@ -305,20 +305,21 @@ function NepAiContent() {
   }, [messages, loading]);
 
   useEffect(() => {
-    if (!user) return;
-
     // 1. Check sessionStorage for context set by Notes / ReportCard
+    // Do this BEFORE the user check so context is never lost due to auth timing
     const pending = consumeAiContext();
     if (pending && pending.id !== lastCtxIdRef.current) {
       lastCtxIdRef.current = pending.id;
       const msg = pending.context;
       setMessages([{ role: "user", content: msg }, { role: "assistant", content: "" }]);
       setLoading(true);
-      setLoadingCtx(true);
       (async () => {
         let ctx: StudyContext | null = null;
-        try { ctx = await loadStudyContext(user.uid); setContext(ctx); } catch { }
-        finally { setLoadingCtx(false); }
+        if (user?.uid) {
+          setLoadingCtx(true);
+          try { ctx = await loadStudyContext(user.uid); setContext(ctx); } catch { }
+          finally { setLoadingCtx(false); }
+        }
         try {
           const finalText = await streamAI(msg, [], ctx, (chunk) => {
             setMessages(prev => {
@@ -348,6 +349,7 @@ function NepAiContent() {
     }
 
     // 2. Fall back to URL query string (direct links / bookmarks)
+    if (!user) return;
     const urlQ = new URLSearchParams(search).get("q") || "";
     if (!urlQ || urlQ === prevInitialQRef.current) return;
     prevInitialQRef.current = urlQ;
@@ -443,7 +445,7 @@ function NepAiContent() {
       const errorContent = isRateLimit
         ? "Nep AI is a little busy — please wait 20 seconds and try again!"
         : isConfig
-        ? "⚠️ Nep AI isn't connected.\n\nTo fix this on Vercel:\n1. Go to your Vercel project → Settings → Environment Variables\n2. Add **GEMINI_API_KEY** with your Google AI key\n3. Make sure it's enabled for **Production** environment\n4. Click **Redeploy** (not just save — you must redeploy!)\n\nGet a free key at: https://aistudio.google.com/apikey"
+        ? "Nep AI isn't connected yet. Please contact the site admin to configure the AI service."
         : isUserFriendly
         ? errMsg
         : "Sorry, I ran into a temporary issue. Please try again in a moment!";
