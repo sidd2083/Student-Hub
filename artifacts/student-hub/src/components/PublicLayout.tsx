@@ -60,6 +60,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
             <Link href="/"        className="hover:text-blue-600 transition-colors">Home</Link>
             <Link href="/notes"   className="hover:text-blue-600 transition-colors">Notes</Link>
             <Link href="/pyqs"    className="hover:text-blue-600 transition-colors">PYQ</Link>
+            <Link href="/tools"   className={`hover:text-blue-600 transition-colors ${location.startsWith("/tools") ? "text-blue-600 font-semibold" : ""}`}>Tools</Link>
             <Link href="/about"   className="hover:text-blue-600 transition-colors">About</Link>
             <Link href="/contact" className="hover:text-blue-600 transition-colors">Contact</Link>
           </nav>
@@ -88,6 +89,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
               { href: "/",        label: "Home"    },
               { href: "/notes",   label: "Notes"   },
               { href: "/pyqs",    label: "PYQ"     },
+              { href: "/tools",   label: "Tools"   },
               { href: "/about",   label: "About"   },
               { href: "/contact", label: "Contact" },
             ].map(({ href, label }) => (
@@ -170,6 +172,8 @@ export function PublicLayout({ children }: PublicLayoutProps) {
               <h4 className="text-white text-xs font-semibold uppercase tracking-wider mb-3">Tools</h4>
               <ul className="space-y-2">
                 {[
+                  { href: "/tools/gpa-calculator",        label: "NEB GPA Calculator"  },
+                  { href: "/tools/attendance-calculator",  label: "Attendance Calculator"},
                   { href: "/pomodoro", label: "Pomodoro Timer" },
                   { href: "/todo",     label: "To-Do List"     },
                   { href: "/report",   label: "Report Card"    },

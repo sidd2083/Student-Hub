@@ -40,6 +40,9 @@ const AdminLogin   = lazy(() => import("@/pages/AdminLogin"));
 const Admin        = lazy(() => import("@/pages/Admin"));
 const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
 const Terms        = lazy(() => import("@/pages/Terms"));
+const Tools               = lazy(() => import("@/pages/Tools"));
+const GpaCalculator       = lazy(() => import("@/pages/GpaCalculator"));
+const AttendanceCalculator = lazy(() => import("@/pages/AttendanceCalculator"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -116,6 +119,9 @@ function AppRoutes() {
         <Route path="/pyq/:id"   component={PyqPage} />
         <Route path="/notes"     component={Notes} />
         <Route path="/pyqs"      component={Pyqs} />
+        <Route path="/tools/gpa-calculator"        component={GpaCalculator} />
+        <Route path="/tools/attendance-calculator" component={AttendanceCalculator} />
+        <Route path="/tools"     component={Tools} />
         <Route path="/about"     component={About} />
         <Route path="/contact"   component={Contact} />
         <Route path="/privacy"   component={PrivacyPolicy} />
