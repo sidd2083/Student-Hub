@@ -394,25 +394,57 @@ const FAQ_SCHEMA = {
   "@context": "https://schema.org",
   "@type": "FAQPage",
   mainEntity: [
-    { "@type": "Question", name: "How is NEB Class 12 GPA calculated?", acceptedAnswer: { "@type": "Answer", text: "NEB Class 12 GPA is calculated by averaging the grade points of all subjects. Each subject has two components: Theory (75 marks) and Practical/Internal (25 marks). The subject GPA = (Theory GPA × 75 + Practical GPA × 25) ÷ 100. Your final GPA = average of all subject GPAs." } },
-    { "@type": "Question", name: "What subjects does NEB Science stream have?", acceptedAnswer: { "@type": "Answer", text: "NEB Class 12 Science compulsory subjects are: English, Nepali, Physics, Chemistry, and Mathematics. Students must choose one optional subject: Biology or Computer Science. All subjects carry 100 marks — 75 for Theory and 25 for Practical." } },
-    { "@type": "Question", name: "What subjects does NEB Management stream have?", acceptedAnswer: { "@type": "Answer", text: "NEB Class 12 Management compulsory subjects are: English, Nepali, and either Mathematics or Social Studies & Life Skills (student's choice). Students then choose 3 optional subjects from: Accountancy, Economics, Business Studies, Computer Science, Tourism & Mountaineering, Business Mathematics, or Hotel Management." } },
-    { "@type": "Question", name: "What is the NEB grading system 2082?", acceptedAnswer: { "@type": "Answer", text: "The NEB grading system uses letter grades: A+ (4.0 GPA, 90–100%), A (3.6, 80–89%), B+ (3.2, 70–79%), B (2.8, 60–69%), C+ (2.4, 50–59%), C (2.0, 40–49%), D (1.6, 35–39%), NG (0, below 35%). The minimum pass grade is D in all subjects." } },
-    { "@type": "Question", name: "What GPA is needed for MBBS in Nepal?", acceptedAnswer: { "@type": "Answer", text: "For MBBS in Nepal, you typically need a minimum GPA of 3.2 (B+) in NEB Class 12 Science, with strong grades in Physics, Chemistry, and Biology. Top government medical colleges and scholarships require 3.6 (A) or above." } },
-    { "@type": "Question", name: "Is the practical/internal grade important for NEB GPA?", acceptedAnswer: { "@type": "Answer", text: "Yes. Practical/Internal marks contribute 25% of the total subject marks (25 out of 100). Scoring high in practicals can meaningfully improve your subject GPA. For example, a student with theory grade B+ (3.2) and practical grade A+ (4.0) gets a subject GPA of (3.2×75 + 4.0×25)/100 = 3.4 — between B+ and A." } },
+    { "@type": "Question", name: "How is NEB Class 12 GPA calculated in Nepal?", acceptedAnswer: { "@type": "Answer", text: "NEB Class 12 GPA is calculated by averaging the grade points of all subjects. Each subject has two components: Theory (75 marks) and Practical/Internal (25 marks). Subject GPA = (Theory GPA × 75 + Practical GPA × 25) ÷ 100. Final GPA = sum of all subject GPAs ÷ number of subjects (6). This NEB GPA calculator applies the official formula automatically." } },
+    { "@type": "Question", name: "What subjects does NEB Science stream have in 2082/2083?", acceptedAnswer: { "@type": "Answer", text: "NEB Class 12 Science compulsory subjects are: English, Nepali, Physics, Chemistry, and Mathematics. Students must choose one optional subject: Biology or Computer Science. All subjects carry 100 marks — 75 for Theory and 25 for Practical. This structure applies for NEB exams 2082 and 2083 BS." } },
+    { "@type": "Question", name: "What subjects does NEB Management stream have in 2082/2083?", acceptedAnswer: { "@type": "Answer", text: "NEB Class 12 Management compulsory subjects are: English, Nepali, and either Mathematics or Social Studies & Life Skills. Students then choose 3 optional subjects from: Accountancy, Economics, Business Studies, Computer Science, Tourism & Mountaineering, Business Mathematics, or Hotel Management." } },
+    { "@type": "Question", name: "What is the NEB grading system 2082 2083?", acceptedAnswer: { "@type": "Answer", text: "The NEB grading system: A+ (4.0, 90–100%), A (3.6, 80–89%), B+ (3.2, 70–79%), B (2.8, 60–69%), C+ (2.4, 50–59%), C (2.0, 40–49%), D (1.6, 35–39%), NG (0, below 35%). Minimum pass is grade D. This grading scale is unchanged for NEB 2082 and 2083." } },
+    { "@type": "Question", name: "What GPA is needed for MBBS in Nepal 2082?", acceptedAnswer: { "@type": "Answer", text: "For MBBS in Nepal (government colleges), you typically need a minimum GPA of 3.2 (B+) in NEB Class 12 Science with Biology. Government scholarships and top private medical colleges usually require 3.6 (A) or above in Biology, Chemistry, and Physics. CEE (Common Entrance Examination) scores also matter alongside GPA." } },
+    { "@type": "Question", name: "What GPA is needed for IOE (Engineering) entrance in Nepal?", acceptedAnswer: { "@type": "Answer", text: "For IOE entrance examination (Tribhuvan University Engineering), the minimum eligibility is usually a GPA of 2.4 (B) or above in NEB Class 12 Science with Physics and Mathematics. However, to be competitive for popular programs like Computer Engineering or Civil Engineering, students typically need a GPA of 3.2 (A) or higher along with a strong IOE entrance score." } },
+    { "@type": "Question", name: "What GPA is required for government scholarship in Nepal 2082?", acceptedAnswer: { "@type": "Answer", text: "For Nepal government scholarships (Prime Minister Scholarship, NEB Merit Scholarship), a GPA of 3.6 (A) or above is typically required. The Gandaki Province and Bagmati Province scholarship programs have similar cutoffs. Merit-based scholarships at top colleges like St. Xavier's, Budhanilkantha, or KMC require 3.6–4.0 GPA." } },
+    { "@type": "Question", name: "Is the practical/internal grade important for NEB GPA?", acceptedAnswer: { "@type": "Answer", text: "Yes, critically. Practical/Internal marks are 25% of total (25 out of 100 marks). A student with theory B+ (3.2) and practical A+ (4.0) gets subject GPA = (3.2×75 + 4.0×25)/100 = 3.4. Scoring well in practicals is often easier and can lift your overall GPA significantly. Never neglect practicals and internals." } },
+    { "@type": "Question", name: "What is the NEB Grade Improvement Exam?", acceptedAnswer: { "@type": "Answer", text: "NEB offers a Grade Improvement Exam for Class 12 students who want to improve their grades in specific subjects. Students can appear in up to all subjects to improve their GPA. The improved grades replace the previous ones on the marksheet. It is available within a year of the original result. This is useful for students who missed MBBS, Engineering, or scholarship cutoffs by a small margin." } },
+    { "@type": "Question", name: "How do I convert NEB percentage to GPA?", acceptedAnswer: { "@type": "Answer", text: "NEB uses a direct grade-band system, not a percentage-to-GPA conversion. Your percentage in each subject determines the grade band: 90%+ → A+ (4.0), 80–89% → A (3.6), 70–79% → B+ (3.2), 60–69% → B (2.8), 50–59% → C+ (2.4), 40–49% → C (2.0), 35–39% → D (1.6), below 35% → NG (0). Final GPA = average of all subject GPAs." } },
   ],
 };
 
 const HOWTO_SCHEMA = {
   "@context": "https://schema.org",
   "@type": "HowTo",
-  name: "How to Calculate NEB Class 12 GPA",
-  description: "Step-by-step guide to calculate your NEB Grade 12 GPA using the official grading system.",
+  name: "How to Calculate NEB Class 12 GPA Nepal 2082",
+  description: "Free step-by-step guide to calculate your NEB Grade 12 GPA using the official NEB grading formula for Science and Management streams.",
   step: [
-    { "@type": "HowToStep", name: "Select Your Stream", text: "Choose Science or Management faculty based on your NEB enrollment." },
-    { "@type": "HowToStep", name: "Enter Theory Grades", text: "Select the letter grade you received in the Theory paper (75 marks) for each subject." },
+    { "@type": "HowToStep", name: "Select Your Stream", text: "Choose Science or Management faculty based on your NEB Class 12 enrollment." },
+    { "@type": "HowToStep", name: "Enter Theory Grades", text: "For each subject, select the letter grade you received in the Theory paper (75 marks) — A+, A, B+, B, C+, C, D, or NG." },
     { "@type": "HowToStep", name: "Enter Practical/Internal Grades", text: "Select the grade from your Practical exam or Internal assessment (25 marks) for each subject." },
-    { "@type": "HowToStep", name: "Read Your GPA", text: "Your GPA appears instantly along with a subject-wise breakdown. No button to press." },
+    { "@type": "HowToStep", name: "Read Your Instant GPA", text: "Your NEB GPA appears instantly with subject-wise breakdown and performance label. No button needed." },
+  ],
+};
+
+const WEBAPP_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "NEB GPA Calculator Nepal 2082 2083 — Class 12 Science & Management",
+  applicationCategory: "EducationApplication",
+  operatingSystem: "Web Browser",
+  url: "https://studenthubnp.com/tools/gpa-calculator",
+  description: "Free NEB GPA Calculator for Class 12 Nepal 2082 and 2083. Calculate your GPA using the official NEB grading formula — weighted 75% Theory + 25% Practical — for Science and Management streams instantly.",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  featureList: [
+    "NEB Class 12 Science GPA calculator (Physics, Chemistry, Maths, Biology/Computer)",
+    "NEB Class 12 Management GPA calculator (Accountancy, Economics, Business Studies)",
+    "Official NEB formula: 75% Theory + 25% Practical per subject",
+    "Subject-wise GPA breakdown with grade labels",
+    "Free, instant, no sign-up required",
+  ],
+};
+
+const BREADCRUMB_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://studenthubnp.com" },
+    { "@type": "ListItem", position: 2, name: "Tools", item: "https://studenthubnp.com/tools" },
+    { "@type": "ListItem", position: 3, name: "NEB GPA Calculator", item: "https://studenthubnp.com/tools/gpa-calculator" },
   ],
 };
 
@@ -423,18 +455,33 @@ export default function GpaCalculator() {
   return (
     <>
       <Helmet>
-        <title>NEB GPA Calculator Nepal 2082 — Class 12 Science &amp; Management | Student Hub</title>
-        <meta name="description" content="Free NEB GPA Calculator for Class 12 Nepal 2082. Accurate theory + practical grade calculation for Science (Physics, Chemistry, Biology, Computer) and Management (Accountancy, Economics, Business Studies) streams." />
-        <meta name="keywords" content="NEB GPA calculator, Class 12 GPA calculator Nepal, NEB grading system 2082, NEB GPA calculator science management, SEE GPA Nepal" />
-        <meta property="og:title" content="NEB GPA Calculator Nepal 2082 — Class 12 | Student Hub" />
-        <meta property="og:description" content="Accurate NEB Class 12 GPA calculator with theory + practical split. Science and Management streams. Official NEB grading system 2082." />
+        <title>NEB GPA Calculator Nepal 2082/2083 — Class 12 Science &amp; Management (Official Formula) | Student Hub</title>
+        <meta name="description" content="Free NEB GPA Calculator for Class 12 Nepal 2082 and 2083. Accurate theory + practical grade calculation using official NEB formula for Science (Physics, Chemistry, Biology/Computer) and Management (Accountancy, Economics, Business Studies) streams. Instant results — no sign-up." />
+        <meta name="keywords" content="NEB GPA calculator, NEB GPA calculator Nepal, class 12 GPA calculator Nepal, NEB grading system 2082, NEB GPA calculator 2082, NEB GPA 2083, NEB class 12 result calculator, NEB grading system Nepal, grade 12 nepal GPA, NEB GPA calculation formula, NEB science GPA calculator, NEB management GPA calculator, कक्षा १२ GPA calculator, NEB result calculator 2082, NEB grade point scale, NEB class 12 grading 2082, NEB GPA calculator online free Nepal, class 12 result GPA nepal, NEB 2082 result calculator, NEB grade calculator Nepal 2082 2083" />
+        <meta name="author" content="Student Hub Nepal" />
+        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+        <meta name="geo.region" content="NP" />
+        <meta name="geo.placename" content="Nepal" />
+
+        <meta property="og:title" content="NEB GPA Calculator Nepal 2082/2083 — Class 12 Science &amp; Management | Student Hub" />
+        <meta property="og:description" content="Free NEB GPA Calculator for Class 12 Nepal. Official formula: 75% Theory + 25% Practical. Science and Management streams. Instant subject-wise breakdown. Works for 2082 and 2083 exams." />
         <meta property="og:type" content="website" />
-        <meta name="twitter:card" content="summary" />
-        <meta name="twitter:title" content="NEB GPA Calculator Nepal 2082 | Student Hub" />
-        <meta name="twitter:description" content="Calculate your NEB Class 12 GPA instantly — Science and Management streams with theory + practical breakdown." />
+        <meta property="og:url" content="https://studenthubnp.com/tools/gpa-calculator" />
+        <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta property="og:image:alt" content="NEB GPA Calculator Nepal 2082 — Class 12 Science and Management" />
+        <meta property="og:site_name" content="Student Hub Nepal" />
+        <meta property="og:locale" content="en_NP" />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="NEB GPA Calculator Nepal 2082/2083 — Class 12 | Student Hub" />
+        <meta name="twitter:description" content="Free NEB Class 12 GPA calculator. Official formula — 75% Theory + 25% Practical. Science and Management streams. Instant results." />
+        <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
+
         <link rel="canonical" href="https://studenthubnp.com/tools/gpa-calculator" />
         <script type="application/ld+json">{JSON.stringify(FAQ_SCHEMA)}</script>
         <script type="application/ld+json">{JSON.stringify(HOWTO_SCHEMA)}</script>
+        <script type="application/ld+json">{JSON.stringify(WEBAPP_SCHEMA)}</script>
+        <script type="application/ld+json">{JSON.stringify(BREADCRUMB_SCHEMA)}</script>
       </Helmet>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
@@ -525,65 +572,102 @@ export default function GpaCalculator() {
 
         {/* SEO content */}
         <article className="mt-8 space-y-5 text-gray-600 text-sm leading-relaxed">
-          <h2 className="text-xl font-bold text-gray-900">NEB GPA Calculator Nepal 2082 — Complete Guide</h2>
+          <h2 className="text-xl font-bold text-gray-900">NEB GPA Calculator Nepal 2082/2083 — Complete Guide</h2>
           <p>
-            This <strong>NEB GPA Calculator</strong> is built specifically for Class 12 students in Nepal following the <strong>National Examinations Board (NEB)</strong> curriculum. It accurately computes your GPA using the official weighted formula — 75% Theory + 25% Practical per subject — for both <strong>Science</strong> and <strong>Management</strong> streams.
+            This free <strong>NEB GPA Calculator</strong> is built specifically for <strong>Class 12 students in Nepal</strong> following the <strong>National Examinations Board (NEB)</strong> curriculum for 2082 and 2083 BS. It calculates your GPA using the <strong>official NEB weighted formula</strong> — 75% Theory + 25% Practical per subject — for both <strong>Science</strong> and <strong>Management</strong> streams. No manual calculation, no spreadsheet — just instant, accurate results.
           </p>
 
-          <h3 className="text-lg font-bold text-gray-900">NEB Science Stream — Subjects and GPA Calculation</h3>
+          <h3 className="text-lg font-bold text-gray-900">NEB Science Stream — Subjects and GPA Calculation (2082/2083)</h3>
           <p>
-            The NEB Class 12 Science stream has five compulsory subjects: <strong>English, Nepali, Physics, Chemistry,</strong> and <strong>Mathematics</strong>. Students must additionally choose one optional subject — <strong>Biology</strong> or <strong>Computer Science</strong>.
+            NEB Class 12 Science stream compulsory subjects: <strong>English, Nepali, Physics, Chemistry,</strong> and <strong>Mathematics</strong>. One optional subject: <strong>Biology</strong> or <strong>Computer Science</strong>.
           </p>
           <p>
-            Every subject carries a total of 100 marks: <strong>75 for Theory</strong> and <strong>25 for Practical</strong>. To calculate your GPA for any subject, the formula is:
+            Every subject carries 100 marks — <strong>75 Theory + 25 Practical</strong>. Subject GPA formula:
           </p>
           <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 font-mono text-xs text-gray-700">
             Subject GPA = (Theory Grade Points × 75 + Practical Grade Points × 25) ÷ 100
           </div>
           <p>
-            For example, a student scoring <strong>A (3.6)</strong> in Physics theory and <strong>A+ (4.0)</strong> in Physics practical gets: (3.6 × 75 + 4.0 × 25) ÷ 100 = <strong>3.7 GPA</strong> — which rounds to an A+ overall.
+            <strong>Example:</strong> A (3.6) in Physics Theory + A+ (4.0) in Physics Practical → (3.6 × 75 + 4.0 × 25) ÷ 100 = <strong>3.70 GPA</strong>.
           </p>
 
-          <h3 className="text-lg font-bold text-gray-900">NEB Management Stream — Subjects and Optional Selection</h3>
+          <h3 className="text-lg font-bold text-gray-900">NEB Management Stream — Subjects (2082/2083)</h3>
           <p>
-            The NEB Class 12 Management stream has three compulsory subjects: <strong>English, Nepali,</strong> and either <strong>Mathematics</strong> or <strong>Social Studies &amp; Life Skills</strong> (the student's choice based on their school's offering). Students then select <strong>3 optional subjects</strong> from: Accountancy, Economics, Business Studies, Computer Science, Tourism &amp; Mountaineering, Business Mathematics, or Hotel Management.
+            NEB Class 12 Management compulsory subjects: <strong>English, Nepali,</strong> and either <strong>Mathematics</strong> or <strong>Social Studies &amp; Life Skills</strong>. Students choose <strong>3 optional subjects</strong> from: Accountancy, Economics, Business Studies, Computer Science, Tourism &amp; Mountaineering, Business Mathematics, or Hotel Management.
           </p>
           <p>
-            Each subject still follows the 75 Theory + 25 Internal/Practical structure. This means a student who scores well in their Internal assessments can meaningfully boost their overall GPA even if their Theory performance was slightly lower.
+            All subjects follow 75 Theory + 25 Internal/Practical structure. Strong Internal scores can significantly boost your overall GPA.
           </p>
 
           <h3 className="text-lg font-bold text-gray-900">How is the Final NEB GPA Calculated?</h3>
-          <p>
-            Your final NEB GPA is the simple average of all six subject GPAs:
-          </p>
           <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 font-mono text-xs text-gray-700">
-            Final GPA = Sum of all subject GPAs ÷ Number of subjects (6)
+            Final GPA = Sum of all 6 Subject GPAs ÷ 6
           </div>
           <p>
-            <strong>Example (Science):</strong> English 3.7, Nepali 3.5, Physics 3.2, Chemistry 3.0, Mathematics 3.4, Biology 3.6 → Total = 20.4 → <strong>Final GPA = 3.40</strong> (Grade A, Excellent).
+            <strong>Example (Science):</strong> English 3.7, Nepali 3.5, Physics 3.2, Chemistry 3.0, Maths 3.4, Biology 3.6 → Total 20.4 → <strong>Final GPA = 3.40</strong> (Grade A, Excellent).
           </p>
+
+          <h3 className="text-lg font-bold text-gray-900">NEB GPA Requirements for Top Courses in Nepal 2082</h3>
+          <p>
+            Your NEB GPA directly determines which courses and scholarships you qualify for after Class 12:
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border border-gray-100 rounded-xl overflow-hidden">
+              <thead className="bg-gray-50">
+                <tr className="text-gray-500">
+                  <th className="text-left px-3 py-2 font-semibold">Course / Program</th>
+                  <th className="text-left px-3 py-2 font-semibold">Minimum GPA</th>
+                  <th className="text-left px-3 py-2 font-semibold">Notes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {[
+                  ["MBBS (Government colleges)", "3.2 (B+) in PCB", "CEE entrance score also required"],
+                  ["MBBS (Top private / scholarship)", "3.6 (A) or above", "KU, PAHS, BPKIHS scholarships"],
+                  ["IOE Engineering (TU)", "2.4 (B) eligibility", "IOE entrance score is key; 3.2+ competitive"],
+                  ["BIT / BCA / B.Sc. CSIT", "2.0 (C+) minimum", "Entrance exams may apply at some colleges"],
+                  ["BBS / BBA / BHM", "2.0 (C+) minimum", "Most management colleges"],
+                  ["Government Merit Scholarship", "3.6 (A+) preferred", "PM Scholarship, NEB Scholarship"],
+                  ["Foreign University (India, Australia)", "3.2 (A) or above", "Varies by institution and country"],
+                  ["Grade Improvement Exam eligibility", "All grades", "Can retake to improve any subject GPA"],
+                ].map(([course, gpa, notes]) => (
+                  <tr key={course} className="text-xs">
+                    <td className="px-3 py-2 text-gray-700 font-medium">{course}</td>
+                    <td className="px-3 py-2 font-bold text-blue-600">{gpa}</td>
+                    <td className="px-3 py-2 text-gray-500">{notes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           <h3 className="text-lg font-bold text-gray-900">What Does Your NEB GPA Mean?</h3>
           <ul className="list-disc list-inside space-y-1.5">
-            <li><strong>3.6–4.0 (A+, Outstanding):</strong> Eligible for top scholarships, MBBS, engineering — best colleges in Nepal and abroad.</li>
-            <li><strong>3.2–3.59 (A, Excellent):</strong> Eligible for most government scholarships and competitive courses.</li>
-            <li><strong>2.8–3.19 (B+, Very Good):</strong> Good for BBS, BBA, and most bachelor's programmes.</li>
+            <li><strong>3.6–4.0 (A+, Outstanding):</strong> Top scholarships, MBBS, Engineering — best colleges in Nepal and abroad.</li>
+            <li><strong>3.2–3.59 (A, Excellent):</strong> Government scholarships, medical and engineering colleges.</li>
+            <li><strong>2.8–3.19 (B+, Very Good):</strong> BBS, BBA, BCA, most bachelor's programs.</li>
             <li><strong>2.4–2.79 (B, Good):</strong> Qualifies for most colleges. Limited scholarship options.</li>
-            <li><strong>2.0–2.39 (C+, Satisfactory):</strong> Passes NEB. Most general bachelor's programmes still open.</li>
-            <li><strong>1.6–1.99 (C, Acceptable):</strong> Marginal pass. Important to retake weak subjects.</li>
-            <li><strong>Below 1.6 (D or NG):</strong> Failed or insufficient. NEB Grade Improvement Exam available.</li>
+            <li><strong>2.0–2.39 (C+, Satisfactory):</strong> Passes NEB. General bachelor's programs open.</li>
+            <li><strong>1.6–1.99 (C, Acceptable):</strong> Marginal pass. Retake weak subjects via Grade Improvement Exam.</li>
+            <li><strong>Below 1.6 (D or NG):</strong> Failed or insufficient. NEB Grade Improvement Exam available within 1 year.</li>
           </ul>
+
+          <h3 className="text-lg font-bold text-gray-900">NEB Grade Improvement Exam 2082/2083</h3>
+          <p>
+            NEB offers a <strong>Grade Improvement Examination</strong> for Class 12 students who want to improve their GPA in one or more subjects. The improved grade replaces the original on your marksheet. It is typically held within a year of the original result. This is especially useful for students who narrowly missed the MBBS, IOE entrance GPA cutoff, or a scholarship threshold. Use this calculator to estimate what grade you need in which subject to reach your target GPA.
+          </p>
 
           <h3 className="text-lg font-bold text-gray-900">Tips to Improve Your NEB GPA</h3>
           <ul className="list-disc list-inside space-y-1.5">
-            <li>Practicals count — getting an A+ in practical (easy to score) can lift a B+ theory to an A overall.</li>
-            <li>Practice from <Link href="/pyqs" className="text-blue-600 hover:underline">previous year NEB question papers (PYQs)</Link> — pattern familiarity directly improves theory marks.</li>
-            <li>Use <Link href="/notes" className="text-blue-600 hover:underline">subject-wise study notes</Link> for chapter-level revision instead of reading full textbooks repeatedly.</li>
-            <li>Ask <Link href="/ai" className="text-blue-600 hover:underline">Nep AI</Link> to explain NEB-syllabus concepts in simple Nepali or English.</li>
-            <li>Track your daily study sessions with the <Link href="/pomodoro" className="text-blue-600 hover:underline">Pomodoro Timer</Link> — 4 focused 25-minute sessions daily is more effective than marathon studying.</li>
+            <li><strong>Practicals are easy marks</strong> — getting A+ in Practical (22.5/25) when you scored B+ in Theory can push your subject GPA from 3.2 to 3.4.</li>
+            <li>Practise from <Link href="/pyqs" className="text-blue-600 hover:underline">previous year NEB question papers (PYQs)</Link> — understanding the exam pattern directly improves theory marks.</li>
+            <li>Use <Link href="/notes" className="text-blue-600 hover:underline">subject-wise chapter notes</Link> for targeted revision rather than reading full textbooks.</li>
+            <li>Ask <Link href="/ai" className="text-blue-600 hover:underline">Nep AI</Link> to explain NEB syllabus concepts in simple Nepali or English.</li>
+            <li>Track daily study with the <Link href="/pomodoro" className="text-blue-600 hover:underline">Pomodoro Timer</Link> — 4 focused 25-minute sessions beats marathon cramming.</li>
+            <li>Keep your attendance above 75% — use the <Link href="/tools/attendance-calculator" className="text-blue-600 hover:underline">Attendance Calculator</Link> to track how many classes you can safely miss.</li>
           </ul>
 
-          <h2 className="text-xl font-bold text-gray-900 pt-2">Frequently Asked Questions</h2>
+          <h2 className="text-xl font-bold text-gray-900 pt-2">Frequently Asked Questions — NEB GPA Calculator Nepal</h2>
           {FAQ_SCHEMA.mainEntity.map((faq, i) => (
             <details key={i} className="border border-gray-100 rounded-xl p-4 group">
               <summary className="font-semibold text-gray-900 cursor-pointer text-sm list-none flex items-center justify-between">

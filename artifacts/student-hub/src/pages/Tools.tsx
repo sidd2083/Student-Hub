@@ -2,6 +2,38 @@ import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { Calculator, CalendarCheck, ArrowRight } from "lucide-react";
 
+const TOOLS_ITEMLIST_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  name: "Free Student Tools — NEB GPA Calculator & Attendance Calculator",
+  description: "Free online calculators for students: NEB GPA Calculator for Nepal Class 12 (2082/2083) and Attendance Calculator for any college requirement worldwide.",
+  url: "https://studenthubnp.com/tools",
+  numberOfItems: 2,
+  itemListElement: [
+    {
+      "@type": "ListItem", position: 1,
+      name: "NEB GPA Calculator Nepal 2082 2083",
+      url: "https://studenthubnp.com/tools/gpa-calculator",
+      description: "Free NEB Class 12 GPA calculator using official formula — 75% Theory + 25% Practical. Science and Management streams.",
+    },
+    {
+      "@type": "ListItem", position: 2,
+      name: "Attendance Calculator — How Many Classes Can I Miss?",
+      url: "https://studenthubnp.com/tools/attendance-calculator",
+      description: "Free attendance percentage calculator. Find how many classes you can miss or bunk, or how many you need to reach 75%, 80%, or any required percentage.",
+    },
+  ],
+};
+
+const BREADCRUMB_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://studenthubnp.com" },
+    { "@type": "ListItem", position: 2, name: "Tools", item: "https://studenthubnp.com/tools" },
+  ],
+};
+
 const tools = [
   {
     href: "/tools/gpa-calculator",
@@ -29,10 +61,20 @@ export default function Tools() {
   return (
     <>
       <Helmet>
-        <title>Student Tools — GPA & Attendance Calculator | Student Hub</title>
-        <meta name="description" content="Free student tools: NEB GPA Calculator for Nepal Class 12, and a universal Attendance Calculator. Fast, accurate, and easy to use." />
-        <meta property="og:title" content="Student Tools — Student Hub" />
-        <meta property="og:description" content="Calculate your NEB GPA or check your attendance percentage instantly." />
+        <title>Free Student Tools — NEB GPA Calculator Nepal &amp; Attendance Calculator | Student Hub</title>
+        <meta name="description" content="Free student tools: NEB GPA Calculator for Nepal Class 12 (2082/2083) with official theory + practical formula, and a universal Attendance Calculator for 75%, 80%, or any required percentage. Instant, accurate, no sign-up." />
+        <meta name="keywords" content="NEB GPA calculator Nepal, attendance calculator, class 12 GPA calculator Nepal, how many classes can I miss, NEB grading 2082, student tools Nepal, free calculator for students" />
+        <meta property="og:title" content="Free Student Tools — NEB GPA Calculator &amp; Attendance Calculator | Student Hub" />
+        <meta property="og:description" content="Free NEB GPA Calculator for Nepal Class 12 (2082/2083) and Attendance Calculator. Instant results, no sign-up required." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://studenthubnp.com/tools" />
+        <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Free Student Tools — NEB GPA &amp; Attendance Calculator" />
+        <meta name="twitter:description" content="Free NEB GPA Calculator for Nepal Class 12 and Attendance Calculator. Instant, accurate, no sign-up." />
+        <link rel="canonical" href="https://studenthubnp.com/tools" />
+        <script type="application/ld+json">{JSON.stringify(TOOLS_ITEMLIST_SCHEMA)}</script>
+        <script type="application/ld+json">{JSON.stringify(BREADCRUMB_SCHEMA)}</script>
       </Helmet>
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
