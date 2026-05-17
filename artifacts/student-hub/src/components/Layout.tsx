@@ -15,7 +15,6 @@ const sidebarNav = [
   { href: "/notes",       icon: BookOpen,         label: "Notes"      },
   { href: "/pyqs",        icon: FileText,         label: "PYQ"        },
   { href: "/saved",       icon: Bookmark,         label: "Saved"      },
-  { href: "/tools",       icon: Calculator,       label: "Tools"      },
   { href: "/ai",          icon: MessageCircle,    label: "Nep AI"     },
   { href: "/pomodoro",    icon: Timer,            label: "Pomodoro"   },
   { href: "/todo",        icon: CheckSquare,      label: "To-do"      },
