@@ -7,7 +7,7 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   Play, Pause, RotateCcw, Timer, CheckSquare,
-  SkipForward, Settings, X, Eye, EyeOff,
+  SkipForward, Settings, X, Eye,
 } from "lucide-react";
 import type { Phase } from "@/context/TimerContext";
 
@@ -161,7 +161,6 @@ function PomodoroContent() {
   const [activeTask, setActiveTask] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [pendingTasks, setPendingTasks] = useState<Array<{ id: string; text: string }>>([]);
-  const [tabPaused, setTabPaused] = useState(false);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -182,18 +181,6 @@ function PomodoroContent() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [running]);
 
-  // Detect when user returns from another tab and timer was auto-paused
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (!document.hidden) {
-        setTabPaused(false);
-      } else {
-        if (running) setTabPaused(true);
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [running]);
 
   const totalSecs = (() => {
     if (phase === "work") return settings.workMins * 60;
@@ -234,19 +221,10 @@ function PomodoroContent() {
         </div>
       )}
 
-      {tabPaused && !running && (
-        <div className="flex items-center gap-2 mb-4 px-4 py-2.5 bg-amber-50 border border-amber-100 rounded-2xl">
-          <EyeOff className="w-4 h-4 text-amber-600 flex-shrink-0" />
-          <p className="text-sm text-amber-700">
-            Timer paused — you left this tab. Press <strong>Start</strong> when you're ready to study again.
-          </p>
-        </div>
-      )}
-
       <div className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-2.5 mb-4 flex items-center gap-2">
         <Eye className="w-4 h-4 text-gray-400 flex-shrink-0" />
         <p className="text-xs text-gray-500">
-          Timer pauses automatically if you switch tabs or scroll away — only active study time is counted.
+          Timer keeps running when you switch tabs. If you're away too long, we'll check in!
         </p>
       </div>
 

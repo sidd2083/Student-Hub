@@ -409,31 +409,11 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [running, saveMinutes, nextPhase]);
 
-  // Pause timer automatically when user switches away from the tab
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.hidden && runningRef.current) {
-        // Snapshot wall-clock time before pausing
-        if (phaseRef.current === "work" && workWallStartRef.current !== null) {
-          const elapsed = (Date.now() - workWallStartRef.current) / 1000;
-          totalWorkSecondsRef.current = workBaseSecsRef.current + elapsed;
-        }
-        if (displayWallStartRef.current !== null) {
-          const elapsed = Math.floor((Date.now() - displayWallStartRef.current) / 1000);
-          const newSecs = Math.max(0, displayBaseSecsRef.current - elapsed);
-          secondsRef.current = newSecs;
-          setSeconds(newSecs);
-        }
-        workWallStartRef.current    = null;
-        displayWallStartRef.current = null;
-        runningRef.current = false;
-        setRunning(false);
-        persistState();
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [persistState]);
+  // Timer keeps running when the user switches tabs.
+  // StudyGuardian (mounted in App.tsx) handles smart absence detection,
+  // popups, and auto-switch after 1 h away — no need to pause here.
+  // The wall-clock references (workWallStartRef / displayWallStartRef) ensure
+  // accurate time even when the browser throttles the setInterval in bg tabs.
 
   const start = useCallback(() => {
     if (running) return;
