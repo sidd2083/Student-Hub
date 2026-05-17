@@ -276,6 +276,16 @@ html {
   overscroll-behavior: contain;
 }
 
+/* ── Zoomable images inside rich prose content ───────────────────────────── */
+.prose-img-zoomable img {
+  cursor: zoom-in;
+  border-radius: 12px;
+  transition: opacity 0.15s ease;
+}
+.prose-img-zoomable img:hover {
+  opacity: 0.92;
+}
+
 /* ── Body background — match the page so no white ever shows through ─────── */
 html, body, #root {
   background-color: #f9fafb;

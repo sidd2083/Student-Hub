@@ -362,22 +362,9 @@ export default function PyqPage() {
     return () => el.removeEventListener("scroll", handler);
   }, [pyq]);
 
-  // Make every <img> inside rich-text content clickable → opens lightbox
-  useEffect(() => {
-    const el = richRef.current;
-    if (!el) return;
-    const imgs = Array.from(el.querySelectorAll<HTMLImageElement>("img"));
-    if (imgs.length === 0) return;
-    const handlers: Array<() => void> = [];
-    imgs.forEach(img => {
-      img.style.cursor = "zoom-in";
-      img.style.borderRadius = "12px";
-      const h = () => { if (img.src) setLightboxSrc(img.src); };
-      img.addEventListener("click", h);
-      handlers.push(() => img.removeEventListener("click", h));
-    });
-    return () => handlers.forEach(remove => remove());
-  }, [pyq]);
+  // Image clicks inside rich content are handled via React event delegation on the article element below.
+  // (Imperative addEventListener approach broke on re-render because dangerouslySetInnerHTML
+  //  replaces DOM nodes, discarding the old handlers; event delegation is immune to this.)
 
   const ft      = (pyq?.fileType ?? "").toLowerCase();
   const isRich  = ft === "rich" || ft === "text" || pyq?.contentType === "rich";
@@ -532,8 +519,18 @@ export default function PyqPage() {
               {/* Rich text */}
               {isRich && (
                 <div className="max-w-2xl mx-auto px-6 sm:px-10 py-10">
-                  <article ref={richRef} className="prose prose-gray max-w-none text-gray-800 text-[16px] leading-[1.9]"
-                    dangerouslySetInnerHTML={{ __html: richContent }} />
+                  <article
+                    ref={richRef}
+                    className="prose prose-gray max-w-none text-gray-800 text-[16px] leading-[1.9] prose-img-zoomable"
+                    dangerouslySetInnerHTML={{ __html: richContent }}
+                    onClick={(e) => {
+                      const t = e.target as HTMLElement;
+                      if (t.tagName === "IMG") {
+                        const src = (t as HTMLImageElement).src;
+                        if (src) setLightboxSrc(src);
+                      }
+                    }}
+                  />
                 </div>
               )}
 
