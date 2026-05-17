@@ -5,6 +5,7 @@ import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { collection, query, where, getDocs, getDoc, doc, updateDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { setAiContext } from "@/lib/aiContext";
 import { BookOpen, ChevronRight, FileText, Image, Type, X, ExternalLink, ZoomIn, LogIn, Sparkles, Maximize2, Minimize2, Bookmark } from "lucide-react";
 
 type NoteView = {
@@ -108,11 +109,12 @@ function NoteViewer({ note, onClose, uid }: { note: NoteView; onClose: () => voi
   }, []);
 
   const handleAskAi = () => {
-    onClose();
     const ctx = note.contentType === "text"
       ? `I am reading a note titled "${note.title}" (${note.subject}, Chapter: ${note.chapter}). Here is the content:\n\n${note.content.slice(0, 1500)}\n\nPlease explain this clearly and help me understand the key concepts.`
       : `I am reading a ${note.contentType} note titled "${note.title}" (${note.subject}, Chapter: ${note.chapter}). Please explain this topic to me and tell me the key things I should know.`;
-    setLocation(`/ai?q=${encodeURIComponent(ctx)}`);
+    setAiContext(ctx);
+    onClose();
+    setLocation("/ai");
   };
 
   // Log note view

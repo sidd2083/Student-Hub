@@ -1,0 +1,157 @@
+You are a senior full-stack developer + professional SEO specialist + performance engineer.
+
+Your task is to build a production-ready feature system for my website StudentHub with EXTREME focus on:
+1. SEO ranking
+2. Performance (fast loading)
+3. Clean UI/UX
+4. Zero bugs
+
+========================
+🔹 GLOBAL REQUIREMENTS
+========================
+
+- Framework: Next.js (App Router)
+- Hosting: Vercel optimized
+- Domain: studenthubnp.com (prepare for migration)
+- Use server-side rendering (SSR) or static generation (SSG) wherever needed
+- Ensure Core Web Vitals are excellent (LCP < 2.5s, CLS minimal)
+- Remove splash screen (logo loading screen) completely from website (keep only in PWA)
+- Optimize images, lazy load everything
+- Use lightweight UI (no heavy libraries)
+
+========================
+🔹 HEADER FEATURE
+========================
+
+- Add a new top header menu item: "Tools"
+- This page is ONLY accessible via header
+- Do NOT show tools anywhere else on site
+- Clean minimal UI (Apple-style, white UI, smooth)
+
+========================
+🔹 TOOLS PAGE STRUCTURE
+========================
+
+- Page title: "Student Tools"
+- Show 2 tools:
+   1. GPA Calculator (Nepal)
+   2. Attendance Calculator (Global)
+
+- Each tool has:
+   - card UI
+   - icon
+   - short description
+   - CTA button
+
+========================
+🔹 TOOL 1: GPA CALCULATOR (NEPAL SEO DOMINATION)
+========================
+
+Build a fully functional NEB Class 12 GPA Calculator.
+
+Features:
+- Faculty selection:
+   - Science
+   - Management (Commerce)
+- Subject-wise grade input (A+, A, B+, etc.)
+- Convert grades → GPA correctly (NEB system)
+- Show:
+   - GPA result
+   - Grade equivalent
+   - Performance message
+
+SEO REQUIREMENTS (VERY IMPORTANT):
+- Target Nepal ONLY
+- Use keywords:
+   - "NEB GPA calculator"
+   - "Class 12 GPA calculator Nepal"
+   - "SEE GPA calculator Nepal"
+   - "NEB grading system Nepal"
+- Add:
+   - H1, H2, H3 headings
+   - 800–1200 words SEO content below tool
+   - FAQ schema (JSON-LD)
+   - Meta title + meta description
+   - OpenGraph tags
+
+- URL:
+   /tools/gpa-calculator-nepal
+
+- Add internal linking to notes pages
+
+========================
+🔹 TOOL 2: ATTENDANCE CALCULATOR (GLOBAL SEO)
+========================
+
+Build a universal attendance calculator.
+
+Inputs:
+- Total classes
+- Attended classes
+- Required percentage (default 75%)
+
+Output:
+- Current attendance %
+- Classes you can miss
+- Classes required to reach target
+
+Advanced Logic:
+- Real-time calculation
+- Edge case handling
+
+SEO REQUIREMENTS (EXTREME PRIORITY):
+- Target GLOBAL (USA, India, etc.)
+- Keywords:
+   - "attendance calculator"
+   - "75% attendance calculator"
+   - "how many classes can I miss"
+   - "attendance percentage calculator"
+- Add:
+   - 1200–2000 words SEO content
+   - examples
+   - FAQs
+   - structured data (FAQ + HowTo schema)
+- URL:
+   /tools/attendance-calculator
+
+- Write content in simple global English
+
+========================
+🔹 PERFORMANCE OPTIMIZATION
+========================
+
+- Code split tools
+- Lazy load components
+- Use minimal JS
+- Avoid re-renders
+- Use caching (ISR if possible)
+
+========================
+🔹 ADSENSE OPTIMIZATION
+========================
+
+- Add ad slots:
+   - top banner
+   - mid content
+   - bottom
+- Ensure layout is clean (no spammy ads)
+- CLS safe (no layout shift)
+
+========================
+🔹 FINAL OUTPUT
+========================
+
+- Fully working pages
+- SEO optimized structure
+- Fast performance
+- Clean UI
+- No placeholder logic
+- No fake data
+- Production-ready code
+
+IMPORTANT:
+This system must be built in a way that maximizes ranking potential in:
+- Nepal (GPA calculator)
+- Global search (attendance calculator)
+
+Focus on real SEO structure, not just keywords.

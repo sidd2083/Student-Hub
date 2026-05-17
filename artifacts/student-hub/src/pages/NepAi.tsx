@@ -383,7 +383,7 @@ function NepAiContent() {
         });
       } finally { setLoading(false); }
     })();
-  }, [location, user]);
+  }, [location, search, user]);
 
   const loadContextManual = useCallback(async () => {
     if (!user?.uid) return;
