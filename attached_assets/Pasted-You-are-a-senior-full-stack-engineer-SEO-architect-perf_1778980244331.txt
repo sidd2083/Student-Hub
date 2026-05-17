@@ -1,0 +1,208 @@
+You are a senior full-stack engineer + SEO architect + performance optimization expert.
+
+Build TWO HIGHLY OPTIMIZED TOOL PAGES for my website StudentHub with extreme focus on:
+
+- SEO (Google ranking)
+- Accuracy of calculation logic
+- Speed (Core Web Vitals)
+- Clean UI
+- Structured data (schema)
+- Real-world usability
+
+Domain: studenthubnp.com (future migration ready)
+
+========================
+🔴 GLOBAL REQUIREMENTS
+========================
+
+- Use Next.js App Router
+- Use SSR/SSG for SEO pages
+- Ensure LCP < 2.5s, minimal JS
+- Lazy load all non-critical components
+- Remove all splash screen from website (ONLY keep PWA splash)
+- Use clean white UI (Apple style minimal)
+- No heavy animations
+- Mobile-first design
+
+========================
+🟡 HEADER NAVIGATION
+========================
+
+Add ONLY ONE menu item:
+
+👉 "Tools"
+
+Inside Tools page show ONLY:
+1. NEB GPA Calculator (Nepal SEO)
+2. Attendance Calculator (Global SEO)
+
+DO NOT expose tools anywhere else in site.
+
+========================
+🟢 TOOL 1: NEB GPA CALCULATOR (NEPAL FOCUSED - HIGH ACCURACY)
+
+URL:
+ /tools/neb-class-12-gpa-calculator
+
+------------------------
+🔹 REQUIREMENTS (VERY IMPORTANT)
+------------------------
+
+This must be EXACT NEB Class 12 Nepal grading system accurate.
+
+Two streams:
+
+========================
+SCIENCE STREAM:
+========================
+Subjects:
+- Physics
+- Chemistry
+- Mathematics
+- Nepali
+- English
+- Optional Subject 1 (Computer / Biology / others)
+- Optional Subject 2 (75 marks subject selection system)
+- Practical marks included where applicable
+
+User must be able to:
+- Enter grade (A+, A, B+, etc.)
+- Select subject type (theory + practical split where needed)
+- Choose optional subjects correctly
+- Handle 50-mark and 75-mark subject rules
+
+========================
+MANAGEMENT / COMMERCE STREAM:
+========================
+Subjects:
+- Nepali
+- English
+- Mathematics OR Social Studies (user choice rule)
+- Accountancy
+- Economics
+- Business Studies
+- Optional subjects (multiple selection system)
+
+Must include:
+- correct NEB subject rules
+- optional subject selection logic
+- grade conversion accuracy
+
+------------------------
+🔹 CALCULATION RULE
+------------------------
+
+- Convert grades → GPA using latest NEB grading system
+- Ensure precision (no rounding bugs)
+- Show:
+   - Total GPA
+   - Subject-wise breakdown
+   - Grade interpretation
+
+------------------------
+🔹 SEO REQUIREMENTS (NEPAL DOMINATION)
+------------------------
+
+Target ONLY Nepal search traffic:
+
+Primary keywords:
+- NEB GPA calculator
+- Class 12 GPA calculator Nepal
+- NEB grading system 2082
+- NEB GPA calculator science management
+
+Must include:
+- SEO optimized H1, H2, H3 structure
+- 1200+ words content below tool
+- FAQ section
+- HowTo schema (JSON-LD)
+- Meta title + description
+- OpenGraph + Twitter cards
+- Internal linking to notes and PYQ pages
+
+Important:
+Do NOT keyword stuff. Write natural educational content.
+
+========================
+🔵 TOOL 2: ATTENDANCE CALCULATOR (GLOBAL SEO TARGET)
+
+URL:
+ /tools/attendance-calculator
+
+------------------------
+🔹 REQUIREMENTS
+------------------------
+
+Inputs:
+- Total classes
+- Attended classes
+- Required percentage (default 75%)
+
+Outputs:
+- Attendance %
+- Classes you can miss
+- Classes needed to reach target
+
+Must be fast, real-time, no delay.
+
+------------------------
+🔹 GLOBAL SEO STRATEGY (VERY IMPORTANT)
+------------------------
+
+Target countries:
+- USA
+- UK
+- India
+- Canada
+- Australia
+
+Primary keywords:
+- attendance calculator
+- how many classes can I miss
+- 75% attendance calculator
+- attendance percentage calculator college
+
+Add:
+- 1500–2500 words SEO content
+- real examples (college, school, university use cases)
+- FAQ section
+- HowTo schema (JSON-LD)
+- structured headings (H1-H4 properly)
+- internal linking structure
+
+Make content simple English for global audience.
+
+========================
+🟣 PERFORMANCE ENGINEERING (CRITICAL)
+
+- Optimize images (WebP)
+- Use dynamic import for tools
+- Avoid unnecessary re-renders
+- Reduce JS bundle size
+- Enable caching / ISR where possible
+- Ensure mobile speed is excellent
+
+========================
+🟠 ADSENSE READY STRUCTURE
+
+Add ad slots safely:
+- top banner (below title)
+- middle content
+- bottom
+
+Ensure:
+- no layout shift
+- no intrusive ads
+- clean UX
+
+========================
+🔵 FINAL OUTPUT REQUIREMENTS
+
+- Production-ready code
+- Fully working calculators
+- SEO structured pages
+- Fast loading
+- No placeholder logic
+- No bugs
+- Clean UI
+- Scalable architecture
