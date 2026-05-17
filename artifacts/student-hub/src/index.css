@@ -227,13 +227,14 @@
 .dark .prose h4 { color: hsl(210 40% 96%); }
 .dark .prose strong { color: hsl(210 40% 96%); }
 
-/* ── Page transition ───────────────────────────────────────────────────── */
+/* ── Page transition (CSS-only, GPU-composited, zero JS overhead) ───────── */
 @keyframes pageFadeIn {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(3px); }
   to   { opacity: 1; transform: translateY(0);   }
 }
 .page-fade {
-  animation: pageFadeIn 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  animation: pageFadeIn 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  will-change: opacity, transform;
 }
 
 /* ── Skeleton shimmer for loading states ──────────────────────────────── */
@@ -286,8 +287,7 @@ html.dark, body.dark, #root.dark {
 }
 
 /* ── Page transition ─────────────────────────────────────────────────── */
-/* Handled by framer-motion AnimatePresence in App.tsx.                   */
-/* opacity + y fade managed there; no CSS animation needed here.          */
+/* Handled by .page-fade CSS class — see @keyframes pageFadeIn above.    */
 
 /* ── PWA splash screen ───────────────────────────────────────────────── */
 @keyframes splashScreen {

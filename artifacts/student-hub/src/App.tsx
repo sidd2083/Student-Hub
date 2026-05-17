@@ -1,6 +1,5 @@
 import { Suspense, lazy, useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
-import { AnimatePresence, motion } from "framer-motion";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -66,9 +65,9 @@ function scrollToTop() {
 /**
  * PageWrapper — page transitions with scroll restoration.
  *
- * On navigation:
- *   1. New page fades + lifts in (0.18s) — no exit animation to avoid white flash
- *   2. Scroll is reset to top immediately on location change
+ * Uses CSS `page-fade` keyframe (index.css) — zero JS overhead,
+ * GPU-composited opacity + translate, instant on fast devices.
+ * Scroll resets to top on every navigation.
  */
 function PageWrapper({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -80,18 +79,11 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
   }, [location]);
 
   return (
-    <AnimatePresence mode="sync" initial={false}>
-      <motion.div
-        key={location}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1, transition: { duration: 0.08, ease: "linear" } }}
-        style={{ minHeight: "100%", backgroundColor: "transparent" }}
-      >
-        <Suspense fallback={<div style={{ minHeight: "100%" }} />}>
-          {children}
-        </Suspense>
-      </motion.div>
-    </AnimatePresence>
+    <div key={location} className="page-fade" style={{ minHeight: "100%" }}>
+      <Suspense fallback={<div style={{ minHeight: "100%" }} />}>
+        {children}
+      </Suspense>
+    </div>
   );
 }
 

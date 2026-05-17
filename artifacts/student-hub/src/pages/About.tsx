@@ -8,13 +8,13 @@ export default function About() {
         <title>About — Student Hub</title>
         <meta name="description" content="Student Hub is a free study platform for Grade 9–12 students in Nepal. Access notes, past papers, Nep AI, and progress tracking." />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://studenthub.np/about" />
+        <meta property="og:url" content="https://studenthubnp.com/about" />
         <meta property="og:title" content="About — Student Hub Nepal" />
         <meta property="og:description" content="Free study platform for Nepali students. Notes, PYQs, Nep AI, and progress tracking — all in one place." />
-        <meta property="og:image" content="https://studenthub.np/og-image.png" />
+        <meta property="og:image" content="https://studenthubnp.com/og-image.png" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:image" content="https://studenthub.np/og-image.png" />
-        <link rel="canonical" href="https://studenthub.np/about" />
+        <meta name="twitter:image" content="https://studenthubnp.com/og-image.png" />
+        <link rel="canonical" href="https://studenthubnp.com/about" />
       </Helmet>
 
       <div className="min-h-screen bg-gray-50">

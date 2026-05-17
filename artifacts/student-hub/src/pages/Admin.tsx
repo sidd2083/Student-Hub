@@ -1248,7 +1248,7 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
     setForm(p => ({ ...p, [k]: e.target.value }));
 
   const autoJsonLd = () => {
-    const baseUrl = "https://studenthub.np";
+    const baseUrl = "https://studenthubnp.com";
     const ld = {
       "@context": "https://schema.org",
       "@type": target.kind === "note" ? "Article" : "Course",
@@ -1318,7 +1318,7 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Canonical URL</label>
-                <input value={form.canonicalUrl} onChange={f("canonicalUrl")} placeholder="https://studenthub.np/notes/grade-10-science"
+                <input value={form.canonicalUrl} onChange={f("canonicalUrl")} placeholder="https://studenthubnp.com/notes/grade-10-science"
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
                 <p className="text-xs text-gray-400 mt-1">Prevents duplicate content issues</p>
               </div>
@@ -1348,7 +1348,7 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">OG Image URL</label>
-                <input value={form.ogImage} onChange={f("ogImage")} placeholder="https://studenthub.np/og-images/grade10-science.jpg"
+                <input value={form.ogImage} onChange={f("ogImage")} placeholder="https://studenthubnp.com/og-images/grade10-science.jpg"
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
                 <p className="text-xs text-gray-400 mt-1">Recommended: 1200×630px image (upload to Firebase Storage first)</p>
               </div>
@@ -1374,7 +1374,7 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
                   </div>
                   <div>
                     <label className="block text-xs text-gray-500 mb-1.5">Twitter Image URL <span className="text-gray-400">(leave blank to use OG image)</span></label>
-                    <input value={form.twitterImage} onChange={f("twitterImage")} placeholder="https://studenthub.np/twitter-card.jpg"
+                    <input value={form.twitterImage} onChange={f("twitterImage")} placeholder="https://studenthubnp.com/twitter-card.jpg"
                       className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
                   </div>
                 </div>
@@ -1457,7 +1457,7 @@ function SeoPanel() {
   const [loadingItems, setLoadingItems] = useState(true);
   const [filterKind, setFilterKind] = useState<"all" | "note" | "pyq">("all");
   const [filterGrade, setFilterGrade] = useState<"all" | number>("all");
-  const baseUrl = "https://studenthub.np";
+  const baseUrl = "https://studenthubnp.com";
 
   useEffect(() => {
     setLoadingItems(true);
@@ -1573,7 +1573,7 @@ function SeoPanel() {
         <div className="space-y-2 text-xs text-gray-600">
           <div className="flex items-start gap-2">
             <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 font-bold text-[10px] flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-            <p>Go to <strong>search.google.com/search-console</strong> and add your property (e.g. <code className="bg-gray-100 px-1 rounded">studenthub.np</code>)</p>
+            <p>Go to <strong>search.google.com/search-console</strong> and add your property (e.g. <code className="bg-gray-100 px-1 rounded">studenthubnp.com</code>)</p>
           </div>
           <div className="flex items-start gap-2">
             <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 font-bold text-[10px] flex items-center justify-center flex-shrink-0 mt-0.5">2</span>

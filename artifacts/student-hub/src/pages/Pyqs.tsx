@@ -466,15 +466,15 @@ export default function Pyqs() {
         <meta name="description" content="Free previous year exam papers for Nepal students in Grades 9–12. Browse by grade, subject, and year. PDF and image formats available." />
         <meta name="keywords" content="PYQ nepal, previous year questions, SEE question paper, NEB past paper, grade 10 exam paper" />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://studenthub.np/pyqs" />
+        <meta property="og:url" content="https://studenthubnp.com/pyqs" />
         <meta property="og:title" content="Previous Year Questions — Grade 9–12 | Student Hub" />
         <meta property="og:description" content="Free PYQs for Grade 9–12 students in Nepal. Browse by grade, subject, and year." />
-        <meta property="og:image" content="https://studenthub.np/og-image.png" />
+        <meta property="og:image" content="https://studenthubnp.com/og-image.png" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="PYQ Papers — Student Hub Nepal" />
         <meta name="twitter:description" content="Free previous year question papers for Grade 9–12 Nepal students." />
-        <meta name="twitter:image" content="https://studenthub.np/og-image.png" />
-        <link rel="canonical" href="https://studenthub.np/pyqs" />
+        <meta name="twitter:image" content="https://studenthubnp.com/og-image.png" />
+        <link rel="canonical" href="https://studenthubnp.com/pyqs" />
       </Helmet>
       <PyqsContent isLoggedIn={!!(user || profile)} />
     </>

@@ -30,6 +30,12 @@ interface SeoMeta {
   description: string;
   keywords: string;
   noIndex: boolean;
+  canonicalUrl: string;
+  ogImage: string;
+  ogType: string;
+  twitterCard: string;
+  twitterImage: string;
+  structuredData: string;
 }
 
 function ZoomLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
@@ -298,10 +304,20 @@ export default function NotePage() {
         <title>{metaTitle}</title>
         {metaDesc && <meta name="description" content={metaDesc} />}
         {metaKeywords && <meta name="keywords" content={metaKeywords} />}
-        {seoMeta?.noIndex && <meta name="robots" content="noindex,nofollow" />}
+        {seoMeta?.noIndex ? <meta name="robots" content="noindex,nofollow" /> : <meta name="robots" content="index,follow" />}
         {note && <meta property="og:title" content={seoMeta?.seoTitle || `${note.title} — Student Hub`} />}
         {metaDesc && <meta property="og:description" content={metaDesc} />}
-        {note && <link rel="canonical" href={`https://studenthub.np/notes/${id}-${canonicalSlug}`} />}
+        <meta property="og:type" content={seoMeta?.ogType || "article"} />
+        {seoMeta?.ogImage && <meta property="og:image" content={seoMeta.ogImage} />}
+        <meta name="twitter:card" content={seoMeta?.twitterCard || "summary_large_image"} />
+        {(seoMeta?.twitterImage || seoMeta?.ogImage) && (
+          <meta name="twitter:image" content={seoMeta.twitterImage || seoMeta.ogImage} />
+        )}
+        <link rel="canonical" href={seoMeta?.canonicalUrl || `https://studenthubnp.com/notes/${id}-${canonicalSlug}`} />
+        {seoMeta?.structuredData && (() => {
+          try { JSON.parse(seoMeta.structuredData); return <script type="application/ld+json">{seoMeta.structuredData}</script>; }
+          catch { return null; }
+        })()}
       </Helmet>
 
       {focusMode && note && (

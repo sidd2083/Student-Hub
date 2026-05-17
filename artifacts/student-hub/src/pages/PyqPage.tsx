@@ -26,6 +26,19 @@ interface FirePyq {
   createdAt?: string;
 }
 
+interface SeoMeta {
+  seoTitle: string;
+  description: string;
+  keywords: string;
+  noIndex: boolean;
+  canonicalUrl: string;
+  ogImage: string;
+  ogType: string;
+  twitterCard: string;
+  twitterImage: string;
+  structuredData: string;
+}
+
 // ── Full-screen image lightbox ────────────────────────────────────────────────
 function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
   const [scale, setScale]         = useState(1);
@@ -315,8 +328,16 @@ export default function PyqPage() {
   const [scrollPct, setScrollPct] = useState(0);
   const [focusMode, setFocusMode] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [seoMeta, setSeoMeta] = useState<SeoMeta | null>(null);
   const mainRef   = useRef<HTMLDivElement>(null);
   const richRef   = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    getDoc(doc(db, "seo_meta", `pyq_${id}`))
+      .then(snap => { if (snap.exists()) setSeoMeta(snap.data() as SeoMeta); })
+      .catch(() => {});
+  }, [id]);
 
   useEffect(() => {
     if (!id) { setIsError(true); setLoading(false); return; }
@@ -378,9 +399,23 @@ export default function PyqPage() {
     <>
       {pyq && (
         <Helmet>
-          <title>{`${pyq.title} — Grade ${pyq.grade} ${pyq.subject} PYQ ${pyq.year} | Student Hub`}</title>
-          <meta name="description" content={`Previous year question paper: ${pyq.subject}, Grade ${pyq.grade}, ${pyq.year}. Free to view and download.`} />
-          <link rel="canonical" href={`https://studenthub.np/pyq/${id}`} />
+          <title>{seoMeta?.seoTitle || `${pyq.title} — Grade ${pyq.grade} ${pyq.subject} PYQ ${pyq.year} | Student Hub`}</title>
+          <meta name="description" content={seoMeta?.description || `Previous year question paper: ${pyq.subject}, Grade ${pyq.grade}, ${pyq.year}. Free to view and download.`} />
+          {seoMeta?.keywords && <meta name="keywords" content={seoMeta.keywords} />}
+          {seoMeta?.noIndex ? <meta name="robots" content="noindex,nofollow" /> : <meta name="robots" content="index,follow" />}
+          <meta property="og:title" content={seoMeta?.seoTitle || `${pyq.title} — Student Hub`} />
+          <meta property="og:description" content={seoMeta?.description || `Grade ${pyq.grade} ${pyq.subject} PYQ ${pyq.year}`} />
+          <meta property="og:type" content={seoMeta?.ogType || "article"} />
+          {seoMeta?.ogImage && <meta property="og:image" content={seoMeta.ogImage} />}
+          <meta name="twitter:card" content={seoMeta?.twitterCard || "summary_large_image"} />
+          {(seoMeta?.twitterImage || seoMeta?.ogImage) && (
+            <meta name="twitter:image" content={seoMeta!.twitterImage || seoMeta!.ogImage} />
+          )}
+          <link rel="canonical" href={seoMeta?.canonicalUrl || `https://studenthubnp.com/pyq/${id}`} />
+          {seoMeta?.structuredData && (() => {
+            try { JSON.parse(seoMeta.structuredData); return <script type="application/ld+json">{seoMeta.structuredData}</script>; }
+            catch { return null; }
+          })()}
         </Helmet>
       )}
 

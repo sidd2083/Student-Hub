@@ -415,15 +415,15 @@ export default function Notes() {
         <meta name="description" content="Free study notes for Nepal students in Grades 9–12. Browse by subject and chapter. PDF, image, and text notes available." />
         <meta name="keywords" content="grade 10 notes nepal, SEE notes, NEB notes, science notes, maths notes, class 10 notes" />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://studenthub.np/notes" />
+        <meta property="og:url" content="https://studenthubnp.com/notes" />
         <meta property="og:title" content="Study Notes — Grade 9–12 | Student Hub" />
         <meta property="og:description" content="Free study notes for Grade 9–12 students in Nepal. Browse by subject and chapter." />
-        <meta property="og:image" content="https://studenthub.np/og-image.png" />
+        <meta property="og:image" content="https://studenthubnp.com/og-image.png" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Study Notes — Student Hub Nepal" />
         <meta name="twitter:description" content="Free notes for Grade 9–12 Nepal students." />
-        <meta name="twitter:image" content="https://studenthub.np/og-image.png" />
-        <link rel="canonical" href="https://studenthub.np/notes" />
+        <meta name="twitter:image" content="https://studenthubnp.com/og-image.png" />
+        <link rel="canonical" href="https://studenthubnp.com/notes" />
       </Helmet>
       <NotesContent isLoggedIn={!!(user || profile)} />
     </>

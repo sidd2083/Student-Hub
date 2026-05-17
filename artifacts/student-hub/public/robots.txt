@@ -31,4 +31,4 @@ Disallow: /onboarding
 Disallow: /api/
 
 # ── Sitemap ──────────────────────────────────────────────────────────────────
-Sitemap: https://studenthub.np/sitemap.xml
+Sitemap: https://studenthubnp.com/sitemap.xml
