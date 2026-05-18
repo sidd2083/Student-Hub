@@ -12,6 +12,8 @@ Allow: /about
 Allow: /contact
 Allow: /privacy
 Allow: /terms
+Allow: /tools
+Allow: /tools/
 
 # ── Private / authenticated routes — do not index ───────────────────────────
 Disallow: /dashboard

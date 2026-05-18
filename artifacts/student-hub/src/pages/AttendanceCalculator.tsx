@@ -7,29 +7,29 @@ const FAQ_SCHEMA = {
   "@context": "https://schema.org",
   "@type": "FAQPage",
   mainEntity: [
-    { "@type": "Question", name: "What is the 75% attendance rule?", acceptedAnswer: { "@type": "Answer", text: "The 75% attendance rule requires students to attend at least 75 out of every 100 classes. Students who fall below this threshold may be barred from sitting for exams or face grade deductions. This rule is mandatory in most UGC-affiliated colleges in India, Tribhuvan University (TU) colleges in Nepal, National University in Bangladesh, and many other institutions worldwide." } },
-    { "@type": "Question", name: "How do I calculate my attendance percentage?", acceptedAnswer: { "@type": "Answer", text: "Attendance percentage = (Classes attended ÷ Total classes held) × 100. For example, if 80 classes were held and you attended 65, your attendance is (65 ÷ 80) × 100 = 81.25%. Our free online attendance calculator does this instantly — just enter your numbers above." } },
-    { "@type": "Question", name: "How many classes can I miss (bunk) with 75% attendance requirement?", acceptedAnswer: { "@type": "Answer", text: "Maximum classes you can bunk = Total classes × (1 − required % / 100) − classes already missed. Example: 100 total classes, 75% rule → you can bunk at most 25 classes total. If you've already missed 10, you can bunk 15 more. Use our attendance calculator above for your exact number instantly." } },
-    { "@type": "Question", name: "How many classes do I need to attend to reach 75%?", acceptedAnswer: { "@type": "Answer", text: "If your current attendance is below the required percentage, use this formula: Classes needed = (Required % × Total classes − 100 × Classes attended) ÷ (100 − Required %). Example: 60 total classes, 40 attended (66.7%), 75% required → (75×60 − 100×40) ÷ 25 = 20 consecutive classes. Our calculator shows this result instantly." } },
-    { "@type": "Question", name: "Can I calculate attendance for 80%, 85%, or 90% requirement?", acceptedAnswer: { "@type": "Answer", text: "Yes. This attendance percentage calculator works for any required percentage — 75%, 80%, 85%, 90%, or any custom value. Simply enter your institution's minimum attendance requirement in the 'Required %' field and the calculator adjusts all results automatically. Medical colleges in India often require 80%, while UK universities require 85–90% for international students." } },
-    { "@type": "Question", name: "What happens if my attendance drops below the minimum?", acceptedAnswer: { "@type": "Answer", text: "Consequences vary by institution. Common penalties include: being barred from semester/board exams (most common in India and Nepal), grade deductions (10–20% of marks), detention to the same academic year, or requirement to repeat the course. International students on F-1 (USA) or Student Visa (UK) may also face visa consequences. Always check your college's specific attendance policy." } },
-    { "@type": "Question", name: "Is there a bunk calculator for college students in India?", acceptedAnswer: { "@type": "Answer", text: "Yes — this is a bunk calculator for college. Enter your total classes, classes attended, and required percentage (75% for most Indian colleges). The calculator instantly tells you how many more classes you can bunk while staying safe, or how many you must attend to recover your attendance. It works for DU, Mumbai University, Anna University, VTU, and all UGC colleges." } },
-    { "@type": "Question", name: "How do I write an attendance shortage application/letter?", acceptedAnswer: { "@type": "Answer", text: "If your attendance is below the required percentage, you can write an application to your principal or HOD requesting attendance condonation. Format: Address the principal, state your enrollment number and current attendance percentage, explain the genuine reason (illness, family emergency, etc.), attach supporting documents (medical certificate, etc.), and request relaxation as per college rules. Many colleges allow condonation of up to 5–10% shortage on medical or genuine grounds." } },
-    { "@type": "Question", name: "What is the attendance rule for TU (Tribhuvan University) Nepal?", acceptedAnswer: { "@type": "Answer", text: "Tribhuvan University (TU) and most affiliated colleges in Nepal require a minimum of 75% attendance in each subject. Students with attendance below 75% are typically not allowed to appear in the semester or annual examination. Some colleges have stricter rules of 80%. NEB (National Examinations Board) Class 11 and 12 also have attendance requirements set by individual schools." } },
-    { "@type": "Question", name: "How many classes can I miss per week and stay above 75%?", acceptedAnswer: { "@type": "Answer", text: "It depends on your total classes. If you have 6 classes per day and 5 days a week (30 per week), attending 22–23 per week (75%) is the minimum. However, it's safer to track cumulative attendance rather than weekly, because missed days compound. Use our attendance calculator to track your exact running total." } },
+    { "@type": "Question", name: "What is the 75% attendance rule in college?", acceptedAnswer: { "@type": "Answer", text: "The 75% attendance rule requires students to attend at least 75 out of every 100 classes. In India, UGC mandates 75% attendance for all affiliated colleges. In the UK, Student Visa holders must maintain 85–90%. In Australia, Student Visa (Subclass 500) holders must maintain 80% under the ESOS Act. In the USA there is no federal mandate, but most universities require 75–85% especially for international students." } },
+    { "@type": "Question", name: "How do I calculate my attendance percentage?", acceptedAnswer: { "@type": "Answer", text: "Attendance % = (Classes Attended ÷ Total Classes Held) × 100. Example: 65 attended out of 80 total = (65 ÷ 80) × 100 = 81.25%. Our free online attendance calculator does this instantly — just type your numbers above." } },
+    { "@type": "Question", name: "How many classes can I miss or bunk?", acceptedAnswer: { "@type": "Answer", text: "Classes you can bunk = Total Classes × (1 − Required% ÷ 100) − Classes already missed. Example: 100 total classes, 75% rule: you can miss at most 25 classes total. If you've already missed 10, you can only miss 15 more. Enter your numbers above and the bunk calculator shows this instantly." } },
+    { "@type": "Question", name: "How many classes do I need to attend to reach 75%?", acceptedAnswer: { "@type": "Answer", text: "Classes needed = (Required% × Total − 100 × Attended) ÷ (100 − Required%). Example: 60 total, 40 attended (66.7%), 75% required → (75×60 − 100×40) ÷ 25 = 20 consecutive classes. The calculator shows this recovery number instantly." } },
+    { "@type": "Question", name: "Can I use this for 80%, 85%, or 90% attendance requirement?", acceptedAnswer: { "@type": "Answer", text: "Yes — this attendance calculator works for any percentage. Change the 'Required %' field to 80% (medical colleges India), 85% (many Canadian and UK universities), 90% (some professional programs), or any value and it recalculates instantly." } },
+    { "@type": "Question", name: "What is the attendance rule in Indian colleges?", acceptedAnswer: { "@type": "Answer", text: "UGC (University Grants Commission) mandates a minimum 75% attendance for all affiliated colleges in India, including DU, Mumbai University, Anna University, VTU, Osmania, and Pune University. Medical colleges under MCI/NMC require 75–80%. IITs and NITs enforce 75% strictly with grade penalties." } },
+    { "@type": "Question", name: "What is the attendance requirement for Australian student visa?", acceptedAnswer: { "@type": "Answer", text: "International students on an Australian Student Visa (Subclass 500) must maintain at least 80% attendance under the ESOS Act. Universities like Melbourne, Sydney, Monash, and RMIT all enforce this. Falling below 80% can trigger a visa compliance report which risks visa cancellation." } },
+    { "@type": "Question", name: "What is the attendance rule in USA universities?", acceptedAnswer: { "@type": "Answer", text: "US universities do not have a federal attendance mandate, but most set their own policies ranging from 75% to 85%. International students on F-1 visas must maintain 'full-time status' which typically requires attending required classes. Missing too many classes can trigger a SEVIS termination report affecting F-1 status." } },
+    { "@type": "Question", name: "How do I write an attendance shortage application?", acceptedAnswer: { "@type": "Answer", text: "Address the letter to your Principal/Dean/HoD. Include: student name, enrollment ID, current attendance percentage, subject(s) affected, genuine reason (medical, emergency, official event), and supporting documents (medical certificate, hospital records, etc.). Request condonation under the college's policy. Most institutions allow 5–10% condonation on valid grounds." } },
+    { "@type": "Question", name: "How many classes can I miss per week and stay above 75%?", acceptedAnswer: { "@type": "Answer", text: "Track cumulative, not weekly — missed classes compound quickly. As a rough guide: with 30 classes/week, attending at least 23 per week keeps you at 75%+. But the safest approach is to check your running total using this calculator at the start of each week." } },
   ],
 };
 
 const HOWTO_SCHEMA = {
   "@context": "https://schema.org",
   "@type": "HowTo",
-  name: "How to Calculate Attendance Percentage Online",
-  description: "Free step-by-step guide to calculate your attendance percentage and find out exactly how many classes you can miss or need to attend.",
+  name: "How to Use the Attendance Calculator",
+  description: "Free step-by-step guide to find your attendance percentage and see exactly how many classes you can miss.",
   step: [
-    { "@type": "HowToStep", name: "Enter Total Classes Held", text: "Enter the total number of classes your college has conducted so far in the semester or year." },
-    { "@type": "HowToStep", name: "Enter Classes Attended", text: "Enter the number of classes you have actually attended out of the total classes held." },
-    { "@type": "HowToStep", name: "Set Your Required Percentage", text: "Enter your institution's minimum attendance requirement. Default is 75% — change to 80%, 85%, 90% or any value as needed." },
-    { "@type": "HowToStep", name: "Instant Results", text: "The calculator instantly shows: your current attendance percentage, how many more classes you can bunk (miss), or how many consecutive classes you need to attend to recover your attendance. No button to press." },
+    { "@type": "HowToStep", name: "Enter Total Classes Held", text: "Enter the total number of classes your college has conducted so far this semester." },
+    { "@type": "HowToStep", name: "Enter Classes Attended", text: "Enter the number of classes you have actually attended." },
+    { "@type": "HowToStep", name: "Set Your Required Percentage", text: "Enter your college's minimum. Default is 75% — change it to 80%, 85%, 90%, or any value." },
+    { "@type": "HowToStep", name: "Read Instant Results", text: "See your current percentage, exactly how many more classes you can miss (bunk), or how many consecutive classes you need to attend to recover. No button needed." },
   ],
 };
 
@@ -40,14 +40,14 @@ const WEBAPP_SCHEMA = {
   applicationCategory: "EducationApplication",
   operatingSystem: "Web Browser",
   url: "https://studenthubnp.com/tools/attendance-calculator",
-  description: "Free online attendance calculator. Find your attendance percentage, how many classes you can miss or bunk, and how many you need to reach 75%, 80%, or any required percentage. Works for India, Nepal, Bangladesh, UK, and worldwide.",
+  description: "Free online attendance calculator. Instantly find your attendance percentage, how many classes you can miss or bunk, and how many you need to reach 75%, 80%, or any required percentage. Used by college students in India, USA, Australia, Canada, and UK.",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
   featureList: [
-    "Calculate attendance percentage instantly",
-    "Find how many classes you can bunk or miss",
-    "Find how many classes you need to attend to reach 75%",
-    "Works for any required percentage (75%, 80%, 85%, 90%)",
-    "Free, no sign-up required",
+    "Instant attendance percentage calculation",
+    "Bunk calculator — how many classes you can miss",
+    "Recovery calculator — how many classes to attend to reach 75%",
+    "Works for 75%, 80%, 85%, 90% or any custom requirement",
+    "Free, no login, no sign-up",
   ],
 };
 
@@ -93,19 +93,19 @@ export default function AttendanceCalculator() {
   return (
     <>
       <Helmet>
-        <title>Attendance Calculator — How Many Classes Can I Miss or Bunk? (75% Rule) | Student Hub</title>
-        <meta name="description" content="Free online attendance calculator: instantly find your attendance percentage, exactly how many classes you can miss or bunk, and how many you need to reach 75%, 80%, or any required %. Works for India, Nepal, Bangladesh, UK — no sign-up." />
-        <meta name="keywords" content="attendance calculator, 75 attendance calculator, how many classes can i miss, how many classes can i bunk, bunk calculator, attendance percentage calculator, class attendance calculator, college attendance calculator, attendance calculator india, attendance calculator nepal, attendance shortage calculator, 75 percent attendance rule, how many classes can i skip, minimum attendance calculator, attendance calculator online free, lecture attendance calculator, bunking calculator college, how many lectures can i miss, attendance calculator for 75 percent" />
-        <meta name="author" content="Student Hub Nepal" />
+        <title>Attendance Calculator — How Many Classes Can I Miss or Bunk? | Free Online Tool</title>
+        <meta name="description" content="Free online attendance calculator: instantly find your attendance percentage, exactly how many classes you can miss or bunk, and how many you need to reach 75%, 80%, or any required %. Works for college students in India, USA, Australia, Canada, UK — no sign-up." />
+        <meta name="keywords" content="attendance calculator, how many classes can i miss, how many classes can i bunk, bunk calculator, 75 attendance calculator, attendance percentage calculator, class attendance calculator, college attendance calculator, attendance calculator india, attendance calculator australia, attendance calculator usa, attendance calculator canada, attendance calculator uk, attendance shortage calculator, 75 percent attendance rule, how many classes can i skip, minimum attendance calculator, attendance calculator online free, lecture attendance calculator, bunking calculator college, how many lectures can i miss, attendance calculator for 75 percent, college bunk calculator, student attendance tracker" />
+        <meta name="author" content="Student Hub" />
         <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
 
-        <meta property="og:title" content="Attendance Calculator — How Many Classes Can I Miss or Bunk? | Student Hub" />
-        <meta property="og:description" content="Free attendance calculator: find your attendance %, how many classes you can bunk/miss, or how many you need to reach 75%, 80%, or any required percentage. Instant results for India, Nepal, Bangladesh, UK." />
+        <meta property="og:title" content="Attendance Calculator — How Many Classes Can I Miss or Bunk? | Free Online Tool" />
+        <meta property="og:description" content="Free attendance calculator: find your attendance %, how many classes you can bunk/miss, or how many you need to reach 75%, 80%, or any required percentage. India, USA, Australia, UK, Canada." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://studenthubnp.com/tools/attendance-calculator" />
         <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
         <meta property="og:image:alt" content="Free Attendance Calculator — How Many Classes Can I Miss?" />
-        <meta property="og:site_name" content="Student Hub Nepal" />
+        <meta property="og:site_name" content="Student Hub" />
 
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Attendance Calculator — How Many Classes Can I Miss or Bunk?" />
@@ -302,7 +302,7 @@ export default function AttendanceCalculator() {
         <article className="prose prose-sm max-w-none text-gray-600 space-y-6">
           <h2 className="text-xl font-bold text-gray-900">Attendance Calculator — Complete Guide (75% Rule, Bunk Calculator & More)</h2>
           <p>
-            Whether you are a college student worried about the <strong>75% attendance rule</strong>, looking for a <strong>bunk calculator</strong> to plan ahead, or need to know how many classes you must attend to recover — this free <strong>attendance percentage calculator</strong> gives you instant, accurate answers. No formula to memorise. Works for India, Nepal, Bangladesh, the UK, and every institution worldwide.
+            Whether you are a college student worried about the <strong>75% attendance rule</strong>, looking for a <strong>bunk calculator</strong> to plan ahead, or need to know how many classes you must attend to recover — this free <strong>attendance percentage calculator</strong> gives you instant, accurate answers. No formula to memorise. Works for students in India, USA, Australia, Canada, the UK, and every institution worldwide.
           </p>
 
           <h3 className="text-lg font-bold text-gray-900">What Is the 75% Attendance Rule?</h3>
@@ -384,13 +384,12 @@ export default function AttendanceCalculator() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {[
-                  ["🇮🇳 India", "75%", "UGC mandate for all colleges. Medical: 80%."],
-                  ["🇳🇵 Nepal", "75–80%", "Tribhuvan University (TU) and most colleges. NEB schools vary."],
-                  ["🇧🇩 Bangladesh", "75%", "National University (NU) and Dhaka University standard."],
-                  ["🇬🇧 UK", "85–90%", "Required for Tier 4 / Student Visa compliance."],
-                  ["🇦🇺 Australia", "80%", "Student visa (Subclass 500) ESOS Act requirement."],
-                  ["🇺🇸 USA", "80–85%", "F-1 visa students — institution-set, no federal mandate."],
-                  ["🇵🇰 Pakistan", "75%", "HEC requirement for affiliated colleges and universities."],
+                  ["🇮🇳 India", "75%", "UGC mandate for all colleges. Medical / IITs / NITs: 75–80%."],
+                  ["🇦🇺 Australia", "80%", "Student Visa (Subclass 500) ESOS Act — monitored by PRISMS."],
+                  ["🇬🇧 UK", "85–90%", "Student Visa compliance — UKVI reports if breached."],
+                  ["🇺🇸 USA", "75–85%", "Institution-set; F-1 students risk SEVIS status if missing classes."],
+                  ["🇨🇦 Canada", "80%", "Most universities; required for study permit compliance."],
+                  ["🇵🇰 Pakistan", "75%", "HEC requirement for all affiliated colleges and universities."],
                 ].map(([country, req, notes]) => (
                   <tr key={country} className="text-xs">
                     <td className="px-3 py-2 font-medium text-gray-800">{country}</td>

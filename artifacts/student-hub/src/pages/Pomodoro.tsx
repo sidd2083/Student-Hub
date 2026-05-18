@@ -7,7 +7,7 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   Play, Pause, RotateCcw, Timer, CheckSquare,
-  SkipForward, Settings, X, Eye,
+  SkipForward, Settings, X, Eye, Maximize2, Minimize2,
 } from "lucide-react";
 import type { Phase } from "@/context/TimerContext";
 
@@ -161,6 +161,7 @@ function PomodoroContent() {
   const [activeTask, setActiveTask] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [pendingTasks, setPendingTasks] = useState<Array<{ id: string; text: string }>>([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -181,6 +182,13 @@ function PomodoroContent() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [running]);
 
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setIsFullscreen(false); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isFullscreen]);
+
 
   const totalSecs = (() => {
     if (phase === "work") return settings.workMins * 60;
@@ -195,6 +203,82 @@ function PomodoroContent() {
   const displayTime = hrs > 0 ? `${hrs}:${mins}:${secs}` : `${mins}:${secs}`;
   const circumference = 2 * Math.PI * 44;
   const colors = phaseColor(phase);
+  const fsCircumference = 2 * Math.PI * 58;
+
+  // ── Fullscreen overlay ────────────────────────────────────────────────────
+  if (isFullscreen) {
+    return (
+      <div className="fixed inset-0 z-[9000] bg-slate-950 flex flex-col items-center justify-center select-none">
+        <button
+          onClick={() => setIsFullscreen(false)}
+          title="Exit fullscreen (Esc)"
+          className="absolute top-5 right-5 p-2.5 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-all"
+        >
+          <Minimize2 className="w-5 h-5" />
+        </button>
+
+        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-6 ${
+          phase === "work" ? "bg-blue-900/60 text-blue-300" :
+          phase === "shortBreak" ? "bg-green-900/60 text-green-300" :
+          "bg-purple-900/60 text-purple-300"
+        }`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${colors.bg} ${running ? "animate-pulse" : ""}`} />
+          {phaseLabel(phase)}
+        </div>
+
+        <div className="flex gap-2 justify-center mb-8">
+          {Array.from({ length: settings.sessionsBeforeLongBreak }, (_, i) => {
+            const completed = sessionsCompleted % settings.sessionsBeforeLongBreak;
+            const isFull = sessionsCompleted > 0 && sessionsCompleted % settings.sessionsBeforeLongBreak === 0;
+            return (
+              <div key={i} className={`w-2.5 h-2.5 rounded-full transition-all ${
+                (isFull ? true : i < completed) ? "bg-blue-400 scale-110" : "bg-slate-700"
+              }`} />
+            );
+          })}
+        </div>
+
+        <div className="relative w-80 h-80 mb-10">
+          <svg className="w-full h-full -rotate-90" viewBox="0 0 130 130">
+            <circle cx="65" cy="65" r="58" fill="none" stroke="#1e293b" strokeWidth="8" />
+            <circle
+              cx="65" cy="65" r="58" fill="none"
+              stroke={colors.ring} strokeWidth="8"
+              strokeDasharray={fsCircumference}
+              strokeDashoffset={fsCircumference * (1 - progress / 100)}
+              strokeLinecap="round"
+              className="transition-all duration-500"
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-6xl font-black text-white tabular-nums tracking-tight">{displayTime}</span>
+            <span className="text-sm text-slate-400 mt-2">{phaseLabel(phase)}</span>
+          </div>
+        </div>
+
+        <div className="flex gap-4 justify-center">
+          <button onClick={reset} className="p-4 rounded-2xl bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all" title="Reset">
+            <RotateCcw className="w-6 h-6" />
+          </button>
+          <button
+            onClick={running ? pause : start}
+            className={`px-12 py-4 rounded-2xl font-bold text-lg transition-all flex items-center gap-3 ${
+              running ? "bg-slate-700 text-white hover:bg-slate-600" : `${colors.bg} text-white hover:opacity-90`
+            }`}
+          >
+            {running ? <><Pause className="w-6 h-6" /> Pause</> : <><Play className="w-6 h-6" /> Start</>}
+          </button>
+          <button onClick={skipPhase} className="p-4 rounded-2xl bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all" title="Skip">
+            <SkipForward className="w-6 h-6" />
+          </button>
+        </div>
+
+        <p className="mt-6 text-xs text-slate-600">
+          Sessions: {sessionsCompleted} · Press Esc to exit
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-8 max-w-lg mx-auto">
@@ -203,12 +287,21 @@ function PomodoroContent() {
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Pomodoro Timer</h1>
           <p className="text-gray-500 text-sm">Stay focused — time saves live as you study</p>
         </div>
-        <button
-          onClick={() => setShowSettings(s => !s)}
-          className={`p-2 rounded-xl transition-colors ${showSettings ? "bg-blue-50 text-blue-500" : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"}`}
-        >
-          <Settings className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setIsFullscreen(true)}
+            title="Fullscreen mode"
+            className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+          >
+            <Maximize2 className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => setShowSettings(s => !s)}
+            className={`p-2 rounded-xl transition-colors ${showSettings ? "bg-blue-50 text-blue-500" : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"}`}
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}

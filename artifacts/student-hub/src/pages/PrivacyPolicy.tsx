@@ -44,7 +44,7 @@ export default function PrivacyPolicy() {
 
             <section>
               <h2 className="text-lg font-bold text-gray-800 mb-2">3. Data Storage and Security</h2>
-              <p className="text-gray-600">Your data is stored securely in a PostgreSQL database. Authentication is handled by Google Firebase with industry-standard encryption. We do not sell your personal information to third parties.</p>
+              <p className="text-gray-600">Your data is stored securely in <strong>Firebase Firestore</strong> (Google Cloud), a globally distributed, encrypted cloud database. Authentication is handled by Google Firebase with industry-standard TLS encryption in transit and AES-256 encryption at rest. We do not sell your personal information to third parties.</p>
             </section>
 
             <section>
@@ -59,8 +59,19 @@ export default function PrivacyPolicy() {
             </section>
 
             <section>
-              <h2 className="text-lg font-bold text-gray-800 mb-2">5. Cookies</h2>
-              <p className="text-gray-600">We use browser localStorage and sessionStorage for functionality (e.g., timer state, dismissed notifications). Google AdSense may use cookies for advertising. You can disable cookies in your browser settings, but this may affect functionality.</p>
+              <h2 className="text-lg font-bold text-gray-800 mb-2">5. Cookies and Advertising</h2>
+              <p className="text-gray-600">Student Hub uses:</p>
+              <ul className="list-disc pl-5 text-gray-600 space-y-1 mt-2">
+                <li><strong>localStorage / sessionStorage</strong> — for functionality such as timer state and dismissed notifications. These are not tracking cookies.</li>
+                <li><strong>Google AdSense cookies</strong> — Google may use cookies (including the DoubleClick cookie) to serve interest-based advertisements on our site. These cookies allow Google and its partners to serve ads based on prior visits to our website or other websites. You may opt out of personalised advertising by visiting <a href="https://www.google.com/settings/ads" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Google Ads Settings</a>.</li>
+                <li><strong>Firebase authentication cookies</strong> — used to maintain your logged-in session securely.</li>
+              </ul>
+              <p className="text-gray-600 mt-2">You can disable cookies in your browser settings. Disabling advertising cookies will not affect site functionality, but may result in less relevant ads.</p>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-bold text-gray-800 mb-2">5a. Google AdSense Disclosure</h2>
+              <p className="text-gray-600">We use Google AdSense to display advertisements. Google AdSense uses cookies to personalise ads. Google, as a third-party vendor, uses cookies to serve ads based on a user's prior visits to our website or other websites. Third-party vendors, including Google, use cookies to serve ads based on users' prior visits. Users may opt out of personalised advertising by visiting <a href="https://www.aboutads.info" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">About Ads</a> or <a href="https://www.networkadvertising.org/choices/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">NAI Opt-Out</a>.</p>
             </section>
 
             <section>

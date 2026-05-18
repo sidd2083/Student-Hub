@@ -2,28 +2,65 @@ import { useEffect, useRef, useState } from "react";
 import { useTimer } from "@/context/TimerContext";
 import type { Phase } from "@/context/TimerContext";
 
-// ── Alert beep (3 escalating tones) ─────────────────────────────────────────
+type AudioCtxCtor = typeof AudioContext;
+function getAudioCtx() {
+  return new ((window as unknown as { webkitAudioContext?: AudioCtxCtor }).webkitAudioContext || AudioContext)();
+}
+
+// ── Alert beep — loud 3 escalating tones ─────────────────────────────────────
 function playAlertBeep() {
   try {
-    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-    const beeps = [
-      { freq: 660, t: 0.0 },
-      { freq: 880, t: 0.28 },
-      { freq: 1100, t: 0.56 },
-    ];
-    beeps.forEach(({ freq, t }) => {
-      const osc = ctx.createOscillator();
-      const g   = ctx.createGain();
-      osc.connect(g);
-      g.connect(ctx.destination);
-      osc.type = "square";
-      osc.frequency.value = freq;
-      g.gain.setValueAtTime(0.25, ctx.currentTime + t);
-      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.22);
-      osc.start(ctx.currentTime + t);
-      osc.stop(ctx.currentTime + t + 0.25);
+    const ctx = getAudioCtx();
+    ctx.resume().then(() => {
+      [{ freq: 660, t: 0.0 }, { freq: 880, t: 0.28 }, { freq: 1100, t: 0.56 }]
+        .forEach(({ freq, t }) => {
+          const osc = ctx.createOscillator();
+          const g   = ctx.createGain();
+          osc.connect(g); g.connect(ctx.destination);
+          osc.type = "square";
+          osc.frequency.value = freq;
+          g.gain.setValueAtTime(0.4, ctx.currentTime + t);
+          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.22);
+          osc.start(ctx.currentTime + t);
+          osc.stop(ctx.currentTime + t + 0.25);
+        });
     });
   } catch {}
+}
+
+// ── Wellness chime — soft 2-tone sine ────────────────────────────────────────
+function playWellnessChime() {
+  try {
+    const ctx = getAudioCtx();
+    ctx.resume().then(() => {
+      [{ freq: 523, t: 0.0 }, { freq: 659, t: 0.22 }].forEach(({ freq, t }) => {
+        const osc = ctx.createOscillator();
+        const g   = ctx.createGain();
+        osc.connect(g); g.connect(ctx.destination);
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        g.gain.setValueAtTime(0.22, ctx.currentTime + t);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.55);
+        osc.start(ctx.currentTime + t);
+        osc.stop(ctx.currentTime + t + 0.6);
+      });
+    });
+  } catch {}
+}
+
+// ── Browser notification — fires even when user is on another tab ─────────────
+let _permAsked = false;
+function requestNotifPermission() {
+  if (_permAsked) return;
+  _permAsked = true;
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+}
+function sendStudyNotification(title: string, body: string) {
+  if ("Notification" in window && Notification.permission === "granted") {
+    try { new Notification(title, { body, icon: "/icon-192.png", tag: "study-guardian" }); } catch {}
+  }
 }
 
 // ── Wellness messages (rotate through them) ──────────────────────────────────
@@ -57,7 +94,7 @@ function AbsentPopup({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[8000] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[9500] flex items-center justify-center p-4"
       style={{ background: "rgba(15,23,42,0.75)", backdropFilter: "blur(6px)" }}
     >
       <div
@@ -109,7 +146,7 @@ function WellnessPopup({
 }) {
   return (
     <div
-      className="fixed bottom-6 right-6 z-[8000] max-w-xs w-full"
+      className="fixed bottom-6 right-6 z-[9500] max-w-xs w-full"
       style={{ animation: "pageFadeIn 0.25s ease both" }}
     >
       <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-5 flex items-start gap-4">
@@ -140,6 +177,11 @@ export function StudyGuardian() {
   const { phase, running, skipPhase } = useTimer();
 
   const [popup, setPopup] = useState<PopupKind>(null);
+
+  // Request browser notification permission once when timer first starts
+  useEffect(() => {
+    if (running) requestNotifPermission();
+  }, [running]);
 
   // Refs that stay stable across re-renders
   const runningRef        = useRef(running);
@@ -192,6 +234,8 @@ export function StudyGuardian() {
       const idx = wellnessIdxRef.current % WELLNESS.length;
       wellnessIdxRef.current++;
       lastWellnessRef.current = Date.now();
+      playWellnessChime();
+      sendStudyNotification("Study Guardian 🌟", WELLNESS[idx].msg);
       setPopup({ kind: "wellness", idx });
     }, 90_000);
     return () => clearInterval(id);
@@ -226,6 +270,12 @@ export function StudyGuardian() {
         const sinceConfirm = lastConfirm ? Date.now() - lastConfirm : Infinity;
         if (sinceConfirm >= 30 * 60_000) {
           playAlertBeep();
+          sendStudyNotification(
+            phaseRef.current === "work" ? "Study Guardian 🤔" : "Study Guardian ☕",
+            phaseRef.current === "work"
+              ? "Are you still studying? Check in to keep your timer running."
+              : "Is your break over? Come back and start your next session.",
+          );
           setPopup({ kind: "absent", phase: phaseRef.current });
         }
       }

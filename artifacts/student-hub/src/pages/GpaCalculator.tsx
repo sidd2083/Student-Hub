@@ -25,9 +25,21 @@ const PRACTICAL_GRADES = [
   { label: "NG  (Below 8.75)", value: 0.0 },
 ];
 
+// Computer Science — Science stream ONLY: Theory 50 marks + Practical 50 marks
+const CS50_GRADES = [
+  { label: "A+  (90–100%  /  45–50)",   value: 4.0 },
+  { label: "A   (80–89%   /  40–45)",   value: 3.6 },
+  { label: "B+  (70–79%   /  35–40)",   value: 3.2 },
+  { label: "B   (60–69%   /  30–35)",   value: 2.8 },
+  { label: "C+  (50–59%   /  25–30)",   value: 2.4 },
+  { label: "C   (40–49%   /  20–25)",   value: 2.0 },
+  { label: "D   (35–39%   /  17.5–20)", value: 1.6 },
+  { label: "NG  (Below 35%)",            value: 0.0 },
+];
+
 // ── NEB subject types ──────────────────────────────────────────────────────────
-// Each subject carries 100 marks: Theory (75) + Practical/Internal (25)
-// Subject GPA = (theory_gp × 75 + practical_gp × 25) / 100
+// Most subjects: Theory (75) + Practical/Internal (25) = 100 marks
+// Computer Science (Science stream only): Theory (50) + Practical (50) = 100 marks
 
 const MANAGEMENT_OPTIONALS = [
   { value: "accountancy",  label: "Accountancy" },
@@ -45,6 +57,12 @@ const EMPTY: GradeInput = { theory: null, practical: null };
 function subjectGpa(g: GradeInput): number | null {
   if (g.theory === null || g.practical === null) return null;
   return (g.theory * 75 + g.practical * 25) / 100;
+}
+
+// Computer Science (Science stream): Theory 50 + Practical 50
+function subjectGpaCS(g: GradeInput): number | null {
+  if (g.theory === null || g.practical === null) return null;
+  return (g.theory * 50 + g.practical * 50) / 100;
 }
 
 function gpaBadge(gpa: number): { letter: string; label: string; color: string; bg: string } {
@@ -141,7 +159,8 @@ function ScienceCalculator() {
     { name: "Physics",  gpa: subjectGpa(s.physics)  },
     { name: "Chemistry",gpa: subjectGpa(s.chemistry)},
     { name: "Mathematics", gpa: subjectGpa(s.math)  },
-    { name: s.optional === "biology" ? "Biology" : "Computer Science", gpa: subjectGpa(s.optionalGrade) },
+    { name: s.optional === "biology" ? "Biology" : "Computer Science",
+      gpa: s.optional === "computer" ? subjectGpaCS(s.optionalGrade) : subjectGpa(s.optionalGrade) },
   ], [s]);
 
   const result = useMemo(() => {
@@ -177,12 +196,26 @@ function ScienceCalculator() {
             ))}
           </div>
         </div>
-        <div className="flex gap-3">
-          <GradeSelect label="Theory" sublabel="75 marks" grades={THEORY_GRADES}
-            value={s.optionalGrade.theory} onChange={t => setS(p => ({ ...p, optionalGrade: { ...p.optionalGrade, theory: t } }))} />
-          <GradeSelect label="Practical" sublabel="25 marks" grades={PRACTICAL_GRADES}
-            value={s.optionalGrade.practical} onChange={pr => setS(p => ({ ...p, optionalGrade: { ...p.optionalGrade, practical: pr } }))} />
-        </div>
+        {s.optional === "computer" && (
+          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5 mb-3">
+            Computer Science (NEB Science): Theory <strong>50 marks</strong> + Practical <strong>50 marks</strong> · GPA = (Theory GP × 50 + Practical GP × 50) ÷ 100
+          </div>
+        )}
+        {s.optional === "computer" ? (
+          <div className="flex gap-3">
+            <GradeSelect label="Theory" sublabel="50 marks" grades={CS50_GRADES}
+              value={s.optionalGrade.theory} onChange={t => setS(p => ({ ...p, optionalGrade: { ...p.optionalGrade, theory: t } }))} />
+            <GradeSelect label="Practical" sublabel="50 marks" grades={CS50_GRADES}
+              value={s.optionalGrade.practical} onChange={pr => setS(p => ({ ...p, optionalGrade: { ...p.optionalGrade, practical: pr } }))} />
+          </div>
+        ) : (
+          <div className="flex gap-3">
+            <GradeSelect label="Theory" sublabel="75 marks" grades={THEORY_GRADES}
+              value={s.optionalGrade.theory} onChange={t => setS(p => ({ ...p, optionalGrade: { ...p.optionalGrade, theory: t } }))} />
+            <GradeSelect label="Practical" sublabel="25 marks" grades={PRACTICAL_GRADES}
+              value={s.optionalGrade.practical} onChange={pr => setS(p => ({ ...p, optionalGrade: { ...p.optionalGrade, practical: pr } }))} />
+          </div>
+        )}
       </div>
 
       <ResultPanel result={result} subjectResults={subjectResults} />
