@@ -11,7 +11,7 @@ import { db, auth, googleProvider } from "@/lib/firebase";
 import {
   LayoutDashboard, BookOpen, FileText, Users,
   Shield, Plus, Trash2, LogOut, Megaphone, Upload, X, Image,
-  CheckCircle, AlertCircle, Award, Search, Type,
+  CheckCircle, AlertCircle, Award, Search, Type, Pencil,
 } from "lucide-react";
 
 const ADMIN_SESSION = "admin_session_v1";
@@ -286,6 +286,7 @@ function ManageNotes() {
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [saveMsg, setSaveMsg] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     grade: 10, subject: "", chapter: "", title: "",
     contentType: "text" as "text" | "pdf" | "image",
@@ -304,8 +305,19 @@ function ManageNotes() {
 
   const reset = () => {
     setShow(false);
+    setEditingId(null);
     setForm({ grade: 10, subject: "", chapter: "", title: "", contentType: "text", content: "" });
     setSaveStatus("idle");
+    setSaveMsg("");
+  };
+
+  const handleEdit = (note: FireNote) => {
+    setEditingId(note.id);
+    setForm({ grade: note.grade, subject: note.subject, chapter: note.chapter, title: note.title, contentType: note.contentType, content: note.content });
+    setShow(true);
+    setSaveStatus("idle");
+    setSaveMsg("");
+    setTimeout(() => document.querySelector(".note-form-top")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
   const handleSave = async () => {
@@ -314,8 +326,13 @@ function ManageNotes() {
     }
     setSaving(true); setSaveStatus("idle");
     try {
-      await addDoc(collection(db, "notes"), { ...form, createdAt: new Date().toISOString() });
-      setSaveStatus("success"); setSaveMsg(`Note "${form.title}" saved successfully!`);
+      if (editingId) {
+        await updateDoc(doc(db, "notes", editingId), { ...form, updatedAt: new Date().toISOString() });
+        setSaveStatus("success"); setSaveMsg(`Note "${form.title}" updated successfully!`);
+      } else {
+        await addDoc(collection(db, "notes"), { ...form, createdAt: new Date().toISOString() });
+        setSaveStatus("success"); setSaveMsg(`Note "${form.title}" saved successfully!`);
+      }
       loadNotes();
       setTimeout(() => reset(), 1800);
     } catch (err: any) {
@@ -324,6 +341,7 @@ function ManageNotes() {
   };
 
   const handleDelete = async (id: string) => {
+    if (editingId === id) reset();
     try {
       await deleteDoc(doc(db, "notes", id));
       setNotes(prev => prev.filter(n => n.id !== id));
@@ -334,14 +352,15 @@ function ManageNotes() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold text-gray-900">Manage Notes</h2>
-        <button onClick={() => setShow(s => !s)}
+        <button onClick={() => { reset(); setShow(s => !s); }}
           className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600 transition-all">
           <Plus className="w-4 h-4" /> Add Note
         </button>
       </div>
 
       {show && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6 space-y-4">
+        <div className="note-form-top bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6 space-y-4">
+          <p className="text-sm font-semibold text-gray-700">{editingId ? "✏️ Editing Note" : "Add New Note"}</p>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Grade</label>
@@ -410,7 +429,7 @@ function ManageNotes() {
           <div className="flex gap-2">
             <button onClick={handleSave} disabled={saving || !form.content}
               className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50">
-              {saving ? "Saving…" : "Save Note"}
+              {saving ? "Saving…" : editingId ? "Update Note" : "Save Note"}
             </button>
             <button onClick={reset} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
           </div>
@@ -420,14 +439,19 @@ function ManageNotes() {
       {loading
         ? <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
         : notes.map(n => (
-          <div key={n.id} className="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3 mb-2">
-            <div>
-              <p className="font-medium text-gray-900 text-sm">{n.title}</p>
+          <div key={n.id} className={`flex items-center justify-between bg-white rounded-xl border px-4 py-3 mb-2 transition-all ${editingId === n.id ? "border-blue-300 bg-blue-50" : "border-gray-100"}`}>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-gray-900 text-sm truncate">{n.title}</p>
               <p className="text-xs text-gray-500">Grade {n.grade} · {n.subject} · {n.chapter} · <span className="capitalize">{n.contentType}</span></p>
             </div>
-            <button onClick={() => handleDelete(n.id)} className="p-1.5 text-gray-400 hover:text-red-500">
-              <Trash2 className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1 flex-shrink-0 ml-3">
+              <button onClick={() => handleEdit(n)} title="Edit note" className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors">
+                <Pencil className="w-4 h-4" />
+              </button>
+              <button onClick={() => handleDelete(n.id)} title="Delete note" className="p-1.5 text-gray-400 hover:text-red-500 transition-colors">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         ))
       }
@@ -445,6 +469,8 @@ function ManagePyqs() {
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [saveMsg, setSaveMsg] = useState("");
   const [imgUploading, setImgUploading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const pendingRichContent = useRef<string | null>(null);
   const richEditorRef = useRef<HTMLDivElement>(null);
   const imgInputRef = useRef<HTMLInputElement>(null);
   const savedRangeRef = useRef<Range | null>(null);
@@ -469,12 +495,34 @@ function ManagePyqs() {
 
   useEffect(() => { loadPyqs(); }, [loadPyqs]);
 
+  // When editing a rich PYQ, fill the contenteditable editor after it mounts
+  useEffect(() => {
+    if (show && form.contentType === "rich" && richEditorRef.current && pendingRichContent.current !== null) {
+      richEditorRef.current.innerHTML = pendingRichContent.current;
+      pendingRichContent.current = null;
+    }
+  }, [show, form.contentType]);
+
   const reset = () => {
     setShow(false);
+    setEditingId(null);
+    pendingRichContent.current = null;
     setForm({ grade: 10, subject: "", title: "", year: new Date().getFullYear(), pdfUrl: "", fileType: "pdf", contentType: "file" });
     setSaveStatus("idle");
     setSaveMsg("");
     if (richEditorRef.current) richEditorRef.current.innerHTML = "";
+  };
+
+  const handleEdit = (pyq: FirePyq) => {
+    setEditingId(pyq.id);
+    const ct = pyq.contentType === "rich" ? "rich" : "file";
+    const ft = (pyq.fileType === "rich" ? "pdf" : pyq.fileType) as "pdf" | "image";
+    setForm({ grade: pyq.grade, subject: pyq.subject, title: pyq.title, year: pyq.year, pdfUrl: pyq.pdfUrl ?? "", fileType: ct === "rich" ? "rich" : ft, contentType: ct });
+    if (ct === "rich") pendingRichContent.current = pyq.content ?? "";
+    setShow(true);
+    setSaveStatus("idle");
+    setSaveMsg("");
+    setTimeout(() => document.querySelector(".pyq-form-top")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
   // Rich-text toolbar helper
@@ -564,14 +612,10 @@ function ManagePyqs() {
       setSaveStatus("error"); setSaveMsg("Please add some content in the editor."); return;
     }
 
-    // Check rich content size before hitting Firestore's 1MB limit
-    if (form.contentType === "rich") {
-      const richCheck = richEditorRef.current?.innerHTML ?? "";
-      if (richCheck.length > 900_000) {
-        setSaveStatus("error");
-        setSaveMsg(`Content too large (${Math.round(richCheck.length / 1000)}KB). Reduce images or text — Firestore limit is 1MB.`);
-        return;
-      }
+    if (form.contentType === "rich" && richContent.length > 900_000) {
+      setSaveStatus("error");
+      setSaveMsg(`Content too large (${Math.round(richContent.length / 1000)}KB). Reduce images or text — Firestore limit is 1MB.`);
+      return;
     }
 
     setSaving(true); setSaveStatus("idle");
@@ -582,14 +626,18 @@ function ManagePyqs() {
         title: form.title.trim(),
         year: form.year,
         contentType: form.contentType,
-        createdAt: new Date().toISOString(),
       };
-      if (form.contentType === "file") {
-        await addDoc(collection(db, "pyqs"), { ...base, pdfUrl: form.pdfUrl, fileType: form.fileType });
+      const payload = form.contentType === "file"
+        ? { ...base, pdfUrl: form.pdfUrl, fileType: form.fileType }
+        : { ...base, content: richContent, pdfUrl: "", fileType: "rich" };
+
+      if (editingId) {
+        await updateDoc(doc(db, "pyqs", editingId), { ...payload, updatedAt: new Date().toISOString() });
+        setSaveStatus("success"); setSaveMsg(`PYQ "${form.title.trim()}" updated successfully!`);
       } else {
-        await addDoc(collection(db, "pyqs"), { ...base, content: richContent, pdfUrl: "", fileType: "rich" });
+        await addDoc(collection(db, "pyqs"), { ...payload, createdAt: new Date().toISOString() });
+        setSaveStatus("success"); setSaveMsg(`PYQ "${form.title.trim()}" saved successfully!`);
       }
-      setSaveStatus("success"); setSaveMsg(`PYQ "${form.title.trim()}" saved successfully!`);
       loadPyqs();
       setTimeout(() => reset(), 1800);
     } catch (e: any) {
@@ -598,6 +646,7 @@ function ManagePyqs() {
   };
 
   const handleDelete = async (id: string) => {
+    if (editingId === id) reset();
     try {
       await deleteDoc(doc(db, "pyqs", id));
       setPyqs(prev => prev.filter(p => p.id !== id));
@@ -608,14 +657,15 @@ function ManagePyqs() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold text-gray-900">Manage PYQs</h2>
-        <button onClick={() => setShow(s => !s)}
+        <button onClick={() => { reset(); setShow(s => !s); }}
           className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600 transition-all">
           <Plus className="w-4 h-4" /> Add PYQ
         </button>
       </div>
 
       {show && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6 space-y-4">
+        <div className="pyq-form-top bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6 space-y-4">
+          <p className="text-sm font-semibold text-gray-700">{editingId ? "✏️ Editing PYQ" : "Add New PYQ"}</p>
           {/* Row 1: Grade + Year */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -754,7 +804,7 @@ function ManagePyqs() {
           <div className="flex gap-2">
             <button onClick={handleSave} disabled={saving}
               className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50">
-              {saving ? "Saving…" : "Save PYQ"}
+              {saving ? "Saving…" : editingId ? "Update PYQ" : "Save PYQ"}
             </button>
             <button onClick={reset} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
           </div>
@@ -764,16 +814,21 @@ function ManagePyqs() {
       {loading
         ? <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
         : pyqs.map(p => (
-          <div key={p.id} className="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3 mb-2">
-            <div>
-              <p className="font-medium text-gray-900 text-sm">{p.title}</p>
+          <div key={p.id} className={`flex items-center justify-between bg-white rounded-xl border px-4 py-3 mb-2 transition-all ${editingId === p.id ? "border-blue-300 bg-blue-50" : "border-gray-100"}`}>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-gray-900 text-sm truncate">{p.title}</p>
               <p className="text-xs text-gray-500">Grade {p.grade} · {p.subject} · {p.year} · {
                 p.contentType === "rich" ? "Rich Text" : p.fileType === "image" ? "Image" : "PDF"
               }</p>
             </div>
-            <button onClick={() => handleDelete(p.id)} className="p-1.5 text-gray-400 hover:text-red-500">
-              <Trash2 className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1 flex-shrink-0 ml-3">
+              <button onClick={() => handleEdit(p)} title="Edit PYQ" className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors">
+                <Pencil className="w-4 h-4" />
+              </button>
+              <button onClick={() => handleDelete(p.id)} title="Delete PYQ" className="p-1.5 text-gray-400 hover:text-red-500 transition-colors">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         ))
       }

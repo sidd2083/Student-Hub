@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Helmet } from "react-helmet-async";
 import { SoftGate } from "@/components/SoftGate";
 import { useTimer } from "@/context/TimerContext";
@@ -182,12 +182,38 @@ function PomodoroContent() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [running]);
 
+  // Sync React state with the browser's native fullscreen state so pressing
+  // Escape (handled by the browser) automatically collapses the overlay too.
   useEffect(() => {
-    if (!isFullscreen) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setIsFullscreen(false); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [isFullscreen]);
+    const onFsChange = () => {
+      const active = !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
+      setIsFullscreen(active);
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    document.addEventListener("webkitfullscreenchange", onFsChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFsChange);
+      document.removeEventListener("webkitfullscreenchange", onFsChange);
+    };
+  }, []);
+
+  const enterFullscreen = useCallback(async () => {
+    setIsFullscreen(true);
+    try {
+      const el = document.documentElement as any;
+      if (el.requestFullscreen) await el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+    } catch { /* overlay still shows even if native API is blocked */ }
+  }, []);
+
+  const exitFullscreen = useCallback(async () => {
+    setIsFullscreen(false);
+    try {
+      const doc = document as any;
+      if (doc.exitFullscreen) await doc.exitFullscreen();
+      else if (doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
+    } catch {}
+  }, []);
 
 
   const totalSecs = (() => {
@@ -210,7 +236,7 @@ function PomodoroContent() {
     return (
       <div className="fixed inset-0 z-[9000] bg-slate-950 flex flex-col items-center justify-center select-none">
         <button
-          onClick={() => setIsFullscreen(false)}
+          onClick={exitFullscreen}
           title="Exit fullscreen (Esc)"
           className="absolute top-5 right-5 p-2.5 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-all"
         >
@@ -289,7 +315,7 @@ function PomodoroContent() {
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setIsFullscreen(true)}
+            onClick={enterFullscreen}
             title="Fullscreen mode"
             className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
           >
