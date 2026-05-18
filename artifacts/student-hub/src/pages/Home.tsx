@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { BookOpen, FileText, BarChart2, MessageCircle, Timer, CheckSquare, Trophy, ArrowRight, LogIn, Sparkles } from "lucide-react";
+import { noteUrl, pyqUrl } from "@/lib/slugs";
 
 const features = [
   { icon: BookOpen,      label: "Study Notes",       desc: "Notes by grade, subject & chapter",  href: "/notes",      color: "bg-blue-50 text-blue-600",    public: true  },
@@ -194,7 +195,7 @@ export default function Home() {
             <ul className="grid gap-2" role="list">
               {notes.map(note => (
                 <li key={note.id}>
-                  <Link href={`/notes/${note.id}`} aria-label={`${note.title} — ${note.subject} Grade ${note.grade}`}>
+                  <Link href={noteUrl(note)} aria-label={`${note.title} — ${note.subject} Grade ${note.grade}`}>
                     <div className="flex items-center gap-4 bg-white rounded-2xl border border-gray-100 px-4 py-3.5 hover:border-blue-100 hover:shadow-sm transition-all">
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
                         note.contentType === "pdf" ? "bg-red-50" : note.contentType === "image" ? "bg-purple-50" : "bg-blue-50"
@@ -229,7 +230,7 @@ export default function Home() {
             <ul className="grid gap-2" role="list">
               {pyqs.map(pyq => (
                 <li key={pyq.id}>
-                  <Link href={`/pyq/${pyq.id}`} aria-label={`${pyq.title} — ${pyq.subject} ${pyq.year} Grade ${pyq.grade}`}>
+                  <Link href={pyqUrl(pyq)} aria-label={`${pyq.title} — ${pyq.subject} ${pyq.year} Grade ${pyq.grade}`}>
                     <div className="flex items-center gap-4 bg-white rounded-2xl border border-gray-100 px-4 py-3.5 hover:border-orange-100 hover:shadow-sm transition-all">
                       <div className="w-9 h-9 bg-orange-50 rounded-xl flex items-center justify-center flex-shrink-0" aria-hidden="true">
                         <FileText className="w-4 h-4 text-orange-500" />

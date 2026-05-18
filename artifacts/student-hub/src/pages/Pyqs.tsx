@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
+import { pyqUrl } from "@/lib/slugs";
 import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -425,7 +426,7 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
                   key={pyq.id}
                   onClick={() => {
                     if (rich) {
-                      setLocation(`/pyq/${pyq.id}`);
+                      setLocation(pyqUrl(pyq));
                     } else {
                       setViewer(pyq);
                     }

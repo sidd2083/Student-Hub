@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { getNepaliDate } from "@/lib/nepaliDate";
+import { extractFirestoreId, noteCanonical } from "@/lib/slugs";
 
 const NOTE_VIEWED_KEY = "studenthub_viewed_notes_session";
 
@@ -204,6 +205,10 @@ function SaveButton({ noteId, uid }: { noteId: string; uid: string }) {
 export default function NotePage() {
   const params = useParams<{ id: string }>();
   const id = params.id ?? "";
+  // Firestore auto-IDs are base62 (no hyphens). Slug URLs look like:
+  // /notes/{firestoreId}-grade-10-mathematics-quadratic-equations
+  // Splitting on the first '-' always yields the real document ID.
+  const firestoreId = extractFirestoreId(id);
   const [, setLocation] = useLocation();
   const { user, profile } = useAuth();
   const [note, setNote] = useState<NoteData | null>(null);
@@ -220,12 +225,12 @@ export default function NotePage() {
     if (scrollArea) scrollArea.scrollTop = 0;
     else window.scrollTo({ top: 0 });
 
-    if (!id) { setIsError(true); setLoading(false); return; }
+    if (!firestoreId) { setIsError(true); setLoading(false); return; }
 
     // Serve from in-memory cache instantly if already loaded this session
-    if (noteCache.has(id)) {
-      setNote(noteCache.get(id)!);
-      setSeoMeta(seoCache.has(id) ? seoCache.get(id)! : null);
+    if (noteCache.has(firestoreId)) {
+      setNote(noteCache.get(firestoreId)!);
+      setSeoMeta(seoCache.has(firestoreId) ? seoCache.get(firestoreId)! : null);
       setLoading(false);
       setIsError(false);
       return;
@@ -237,21 +242,21 @@ export default function NotePage() {
 
     // Fetch note + SEO meta in parallel — one round-trip instead of two sequential
     Promise.all([
-      getDoc(doc(db, "notes", id)),
-      getDoc(doc(db, "seo_meta", `note_${id}`)),
+      getDoc(doc(db, "notes", firestoreId)),
+      getDoc(doc(db, "seo_meta", `note_${firestoreId}`)),
     ])
       .then(([noteSnap, seoSnap]) => {
         if (!noteSnap.exists()) { setIsError(true); return; }
         const noteData = { id: noteSnap.id, ...noteSnap.data() } as NoteData;
-        noteCache.set(id, noteData);
+        noteCache.set(firestoreId, noteData);
         setNote(noteData);
         const seo = seoSnap.exists() ? (seoSnap.data() as SeoMeta) : null;
-        seoCache.set(id, seo);
+        seoCache.set(firestoreId, seo);
         setSeoMeta(seo);
       })
       .catch(() => setIsError(true))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [firestoreId]);
 
   // Once-per-session note view logging
   useEffect(() => {
@@ -259,8 +264,8 @@ export default function NotePage() {
     try {
       const stored = sessionStorage.getItem(NOTE_VIEWED_KEY);
       const viewed: string[] = stored ? JSON.parse(stored) : [];
-      if (!viewed.includes(id)) {
-        viewed.push(id);
+      if (!viewed.includes(firestoreId)) {
+        viewed.push(firestoreId);
         sessionStorage.setItem(NOTE_VIEWED_KEY, JSON.stringify(viewed));
         (async () => {
           try {
@@ -292,8 +297,7 @@ export default function NotePage() {
     return () => el.removeEventListener("scroll", handler);
   }, [note]);
 
-  const toSlug = (str: string) => str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  const canonicalSlug = note ? `grade-${note.grade}-${toSlug(note.subject)}-${toSlug(note.title)}` : "";
+  const computedCanonical = note ? noteCanonical(note) : "";
 
   const metaTitle = seoMeta?.seoTitle || (note
     ? `${note.title} — Grade ${note.grade} ${note.subject} Notes | Student Hub`
@@ -331,7 +335,7 @@ export default function NotePage() {
         {(seoMeta?.twitterImage || seoMeta?.ogImage) && (
           <meta name="twitter:image" content={seoMeta.twitterImage || seoMeta.ogImage} />
         )}
-        <link rel="canonical" href={seoMeta?.canonicalUrl || `https://studenthubnp.com/notes/${id}-${canonicalSlug}`} />
+        <link rel="canonical" href={seoMeta?.canonicalUrl || computedCanonical || `https://studenthubnp.com/notes/${firestoreId}`} />
         {seoMeta?.structuredData && (() => {
           try { JSON.parse(seoMeta.structuredData); return <script type="application/ld+json">{seoMeta.structuredData}</script>; }
           catch { return null; }

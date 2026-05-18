@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
+import { noteUrl, pyqUrl, SITE_URL, toSlug } from "@/lib/slugs";
 import {
   collection, getDocs, doc, query, where, orderBy,
   setDoc, getDoc, addDoc, deleteDoc, updateDoc,
@@ -1205,7 +1206,7 @@ const emptySeo = (): SeoMeta => ({
   canonicalUrl: "", gscVerification: "", structuredData: "",
 });
 type SeoKind = "note" | "pyq";
-interface SeoEditTarget { id: string; defaultTitle: string; kind: SeoKind }
+interface SeoEditTarget { id: string; defaultTitle: string; kind: SeoKind; grade: number; subject: string }
 
 function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => void }) {
   const docId = `${target.kind}_${target.id}`;
@@ -1214,6 +1215,11 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [tab, setTab] = useState<"basic" | "social" | "advanced">("basic");
+
+  // Build the auto-generated canonical URL from the target metadata.
+  // This is what the page will use if no custom canonical is saved.
+  const kindPath = target.kind === "note" ? "notes" : "pyq";
+  const autoCanonical = `${SITE_URL}/${kindPath}/${target.id}-grade-${target.grade}-${toSlug(target.subject)}-${toSlug(target.defaultTitle)}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -1224,10 +1230,16 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
           new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 4000)),
         ]);
         if (cancelled) return;
-        if (snap.exists()) setForm({ ...emptySeo(), ...(snap.data() as SeoMeta) });
-        else setForm({ ...emptySeo(), seoTitle: target.defaultTitle });
+        if (snap.exists()) {
+          const existing = { ...emptySeo(), ...(snap.data() as SeoMeta) };
+          // Auto-fill canonical URL if it hasn't been set yet
+          if (!existing.canonicalUrl) existing.canonicalUrl = autoCanonical;
+          setForm(existing);
+        } else {
+          setForm({ ...emptySeo(), seoTitle: target.defaultTitle, canonicalUrl: autoCanonical });
+        }
       } catch {
-        if (!cancelled) setForm({ ...emptySeo(), seoTitle: target.defaultTitle });
+        if (!cancelled) setForm({ ...emptySeo(), seoTitle: target.defaultTitle, canonicalUrl: autoCanonical });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -1254,8 +1266,8 @@ function SeoEditor({ target, onClose }: { target: SeoEditTarget; onClose: () => 
       "@type": target.kind === "note" ? "Article" : "Course",
       "name": form.seoTitle || target.defaultTitle,
       "description": form.description,
-      "url": form.canonicalUrl || `${baseUrl}/${target.kind}s/${target.id}`,
-      "publisher": { "@type": "Organization", "name": "Student Hub", "url": baseUrl },
+      "url": form.canonicalUrl || autoCanonical,
+      "publisher": { "@type": "Organization", "name": "Student Hub", "url": SITE_URL },
       "educationalLevel": "High School",
       "inLanguage": "en-NP",
     };
@@ -1467,11 +1479,13 @@ function SeoPanel() {
     ]).then(([notesSnap, pyqsSnap]) => {
       setNoteItems(notesSnap.docs.map(d => {
         const data = d.data();
-        return { id: d.id, title: data.title, grade: data.grade, subject: data.subject, kind: "note" as SeoKind, url: `${baseUrl}/notes/${d.id}` };
+        return { id: d.id, title: data.title, grade: data.grade, subject: data.subject, kind: "note" as SeoKind,
+          url: `${SITE_URL}${noteUrl({ id: d.id, grade: data.grade, subject: data.subject ?? "", title: data.title ?? "" })}` };
       }));
       setPyqItems(pyqsSnap.docs.map(d => {
         const data = d.data();
-        return { id: d.id, title: data.title, grade: data.grade, subject: data.subject, kind: "pyq" as SeoKind, url: `${baseUrl}/pyq/${d.id}` };
+        return { id: d.id, title: data.title, grade: data.grade, subject: data.subject, kind: "pyq" as SeoKind,
+          url: `${SITE_URL}${pyqUrl({ id: d.id, grade: data.grade, subject: data.subject ?? "", title: data.title ?? "", year: data.year ?? 0 })}` };
       }));
     }).catch(console.error)
     .finally(() => setLoadingItems(false));
@@ -1658,7 +1672,7 @@ function SeoPanel() {
                   <a href={item.url} target="_blank" rel="noopener noreferrer"
                     className="text-xs text-blue-400 hover:text-blue-600 transition-colors">Open ↗</a>
                   <button
-                    onClick={() => setEditing({ id: item.id, defaultTitle: item.title, kind: item.kind })}
+                    onClick={() => setEditing({ id: item.id, defaultTitle: item.title, kind: item.kind, grade: item.grade, subject: item.subject })}
                     className="px-3 py-1.5 bg-purple-50 text-purple-600 text-xs font-semibold rounded-lg hover:bg-purple-100 transition-all">
                     Edit SEO
                   </button>

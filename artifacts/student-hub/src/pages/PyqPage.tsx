@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
+import { extractFirestoreId, pyqCanonical } from "@/lib/slugs";
 import {
   ArrowLeft, FileText, ImageIcon, ExternalLink, ZoomIn, X,
   BookOpen, Maximize2, Minimize2, ChevronRight, Bookmark,
@@ -323,6 +324,10 @@ function SaveButton({ pyqId, uid }: { pyqId: string; uid: string }) {
 export default function PyqPage() {
   const params = useParams<{ id: string }>();
   const id = params.id ?? "";
+  // Firestore auto-IDs are base62 (no hyphens). Slug URLs look like:
+  // /pyq/{firestoreId}-grade-10-mathematics-2080-quadratic-equations
+  // Splitting on the first '-' always yields the real document ID.
+  const firestoreId = extractFirestoreId(id);
   const [, setLocation] = useLocation();
   const { user, profile } = useAuth();
 
@@ -337,12 +342,12 @@ export default function PyqPage() {
   const richRef   = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!id) { setIsError(true); setLoading(false); return; }
+    if (!firestoreId) { setIsError(true); setLoading(false); return; }
 
     // Serve from in-memory cache instantly if already loaded this session
-    if (pyqCache.has(id)) {
-      setPyq(pyqCache.get(id)!);
-      setSeoMeta(pyqSeoCache.has(id) ? pyqSeoCache.get(id)! : null);
+    if (pyqCache.has(firestoreId)) {
+      setPyq(pyqCache.get(firestoreId)!);
+      setSeoMeta(pyqSeoCache.has(firestoreId) ? pyqSeoCache.get(firestoreId)! : null);
       setLoading(false);
       setIsError(false);
       return;
@@ -352,21 +357,21 @@ export default function PyqPage() {
 
     // Fetch PYQ + SEO meta in parallel — one round-trip instead of two sequential
     Promise.all([
-      getDoc(doc(db, "pyqs", id)),
-      getDoc(doc(db, "seo_meta", `pyq_${id}`)),
+      getDoc(doc(db, "pyqs", firestoreId)),
+      getDoc(doc(db, "seo_meta", `pyq_${firestoreId}`)),
     ])
       .then(([pyqSnap, seoSnap]) => {
         if (!pyqSnap.exists()) { setIsError(true); return; }
         const pyqData = { id: pyqSnap.id, ...pyqSnap.data() } as FirePyq;
-        pyqCache.set(id, pyqData);
+        pyqCache.set(firestoreId, pyqData);
         setPyq(pyqData);
         const seo = seoSnap.exists() ? (seoSnap.data() as SeoMeta) : null;
-        pyqSeoCache.set(id, seo);
+        pyqSeoCache.set(firestoreId, seo);
         setSeoMeta(seo);
       })
       .catch(() => setIsError(true))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [firestoreId]);
 
   useEffect(() => {
     const el = mainRef.current;
@@ -415,7 +420,7 @@ export default function PyqPage() {
           {(seoMeta?.twitterImage || seoMeta?.ogImage) && (
             <meta name="twitter:image" content={seoMeta!.twitterImage || seoMeta!.ogImage} />
           )}
-          <link rel="canonical" href={seoMeta?.canonicalUrl || `https://studenthubnp.com/pyq/${id}`} />
+          <link rel="canonical" href={seoMeta?.canonicalUrl || (pyq ? pyqCanonical(pyq) : `https://studenthubnp.com/pyq/${firestoreId}`)} />
           {seoMeta?.structuredData && (() => {
             try { JSON.parse(seoMeta.structuredData); return <script type="application/ld+json">{seoMeta.structuredData}</script>; }
             catch { return null; }

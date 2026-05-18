@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
+import { noteUrl } from "@/lib/slugs";
 import { collection, query, where, getDocs, getDoc, doc, updateDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { setAiContext } from "@/lib/aiContext";
@@ -167,7 +168,7 @@ function NoteViewer({ note, onClose, uid }: { note: NoteView; onClose: () => voi
               </button>
             )}
             <Link
-              href={`/notes/${note.id}`}
+              href={noteUrl(note)}
               onClick={onClose}
               className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition-all"
             >
@@ -189,7 +190,7 @@ function NoteViewer({ note, onClose, uid }: { note: NoteView; onClose: () => voi
         </div>
         <div className="sm:hidden flex items-center justify-between px-4 py-2 bg-blue-50 border-b border-blue-100 flex-shrink-0">
           <span className="text-xs text-blue-700">Reading preview</span>
-          <Link href={`/notes/${note.id}`} onClick={onClose}
+          <Link href={noteUrl(note)} onClick={onClose}
             className="flex items-center gap-1 text-xs font-semibold text-blue-600">
             <ExternalLink className="w-3 h-3" /> View Full Note
           </Link>
@@ -387,7 +388,7 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
                 <div className="flex items-center gap-2 flex-shrink-0 ml-2 sm:ml-3">
                   <ContentTypeBadge type={note.contentType} />
                   <Link
-                    href={`/notes/${note.id}`}
+                    href={noteUrl(note)}
                     onClick={(e: React.MouseEvent) => e.stopPropagation()}
                     title="Open note page"
                     className="p-1 text-gray-300 hover:text-blue-400 transition-colors"
@@ -418,11 +419,11 @@ export default function Notes() {
         <meta property="og:url" content="https://studenthubnp.com/notes" />
         <meta property="og:title" content="Study Notes — Grade 9–12 | Student Hub" />
         <meta property="og:description" content="Free study notes for Grade 9–12 students in Nepal. Browse by subject and chapter." />
-        <meta property="og:image" content="https://studenthubnp.com/og-image.png" />
+        <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Study Notes — Student Hub Nepal" />
         <meta name="twitter:description" content="Free notes for Grade 9–12 Nepal students." />
-        <meta name="twitter:image" content="https://studenthubnp.com/og-image.png" />
+        <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
         <link rel="canonical" href="https://studenthubnp.com/notes" />
       </Helmet>
       <NotesContent isLoggedIn={!!(user || profile)} />
