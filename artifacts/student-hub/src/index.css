@@ -344,3 +344,10 @@ html.dark, body.dark, #root.dark {
 .dark .card-hover:hover {
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
+
+/* ── Pomodoro fullscreen: hide all chrome (header, sidebar, bottom nav) ── */
+body.pomo-fullscreen aside,
+body.pomo-fullscreen header,
+body.pomo-fullscreen nav {
+  display: none !important;
+}
