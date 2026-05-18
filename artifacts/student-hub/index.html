@@ -7,14 +7,18 @@
     <!-- ── Primary SEO ───────────────────────────────────────────────────── -->
     <title>Student Hub — Free Study Platform for Nepal Grade 9–12</title>
     <meta name="description" content="Free study platform for Grade 9–12 students in Nepal. Notes, PYQs, MCQ practice, AI tutor, Pomodoro timer, and progress tracking for SEE and NEB exams." />
-    <meta name="keywords" content="student hub nepal, grade 10 notes, SEE preparation, NEB notes, PYQ nepal, free notes nepal, MCQ practice nepal, study tracker nepal, SEE 2081, NEB 2081" />
+    <meta name="keywords" content="student hub nepal, grade 10 notes, SEE preparation, NEB notes, PYQ nepal, free notes nepal, MCQ practice nepal, study tracker nepal, SEE 2081, NEB 2081, grade 9 notes nepal, grade 11 notes nepal, grade 12 notes nepal, NEB exam preparation" />
     <meta name="author" content="Student Hub Nepal" />
     <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
     <meta name="language" content="English" />
+    <meta name="revisit-after" content="3 days" />
+    <meta name="rating" content="general" />
 
     <!-- ── Geo / Region ───────────────────────────────────────────────────── -->
     <meta name="geo.region" content="NP" />
     <meta name="geo.placename" content="Nepal" />
+    <meta name="geo.position" content="27.7172;85.3240" />
+    <meta name="ICBM" content="27.7172, 85.3240" />
 
     <!-- ── Open Graph (Facebook / WhatsApp / LinkedIn) ───────────────────── -->
     <meta property="og:type" content="website" />
@@ -26,6 +30,7 @@
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Student Hub Nepal — Free Study Platform" />
+    <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:locale" content="en_NP" />
 
     <!-- ── Twitter / X Card ──────────────────────────────────────────────── -->
@@ -40,7 +45,8 @@
 
     <!-- ── PWA / Icons ───────────────────────────────────────────────────── -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" type="image/png" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#3B82F6" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -49,11 +55,9 @@
     <meta name="apple-mobile-web-app-title" content="Student Hub" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
 
-    <!-- ── Performance: preconnect external origins ──────────────────────── -->
-    <!-- Fonts -->
+    <!-- ── Performance: preconnect critical origins FIRST ───────────────── -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Firebase — full preconnect (not just dns-prefetch) for the hot paths -->
     <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
     <link rel="preconnect" href="https://firebase.googleapis.com" crossorigin />
     <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
@@ -63,34 +67,95 @@
     <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com" />
     <link rel="dns-prefetch" href="https://www.googleapis.com" />
 
-    <!-- ── JSON-LD Structured Data ────────────────────────────────────────── -->
+    <!-- ── Preload OG image so it renders immediately on share preview ───── -->
+    <link rel="preload" href="/opengraph.jpg" as="image" />
+
+    <!-- ── JSON-LD Structured Data — Website + Organization + WebPage ────── -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebSite",
-      "name": "Student Hub Nepal",
-      "url": "https://studenthubnp.com",
-      "description": "Free study platform for Grade 9–12 students in Nepal. Notes, PYQs, MCQ practice, AI tutor, Pomodoro timer, and progress tracking for SEE and NEB exams.",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://studenthubnp.com/notes?q={search_term_string}",
-        "query-input": "required name=search_term_string"
-      },
-      "publisher": {
-        "@type": "Organization",
-        "name": "Student Hub Nepal",
-        "url": "https://studenthubnp.com",
-        "logo": {
-          "@type": "ImageObject",
-          "url": "https://studenthubnp.com/icon-512.png"
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://studenthubnp.com/#website",
+          "name": "Student Hub Nepal",
+          "url": "https://studenthubnp.com",
+          "description": "Free study platform for Grade 9–12 students in Nepal. Notes, PYQs, MCQ practice, AI tutor, Pomodoro timer, and progress tracking for SEE and NEB exams.",
+          "inLanguage": "en-NP",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://studenthubnp.com/notes?q={search_term_string}"
+            },
+            "query-input": "required name=search_term_string"
+          },
+          "publisher": {
+            "@id": "https://studenthubnp.com/#organization"
+          }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://studenthubnp.com/#organization",
+          "name": "Student Hub Nepal",
+          "url": "https://studenthubnp.com",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://studenthubnp.com/icon-512.png",
+            "width": 512,
+            "height": 512
+          },
+          "description": "Free educational platform built for Grade 9–12 students across Nepal.",
+          "foundingDate": "2024",
+          "areaServed": {
+            "@type": "Country",
+            "name": "Nepal"
+          },
+          "sameAs": []
+        },
+        {
+          "@type": "WebPage",
+          "@id": "https://studenthubnp.com/#webpage",
+          "url": "https://studenthubnp.com/",
+          "name": "Student Hub — Free Study Platform for Grade 9–12 Students in Nepal",
+          "isPartOf": { "@id": "https://studenthubnp.com/#website" },
+          "about": { "@id": "https://studenthubnp.com/#organization" },
+          "description": "Free notes, past papers (PYQs), MCQ practice, AI study assistant and progress tracking for Grade 9–12 students in Nepal.",
+          "inLanguage": "en-NP",
+          "image": {
+            "@type": "ImageObject",
+            "url": "https://studenthubnp.com/opengraph.jpg",
+            "width": 1200,
+            "height": 630
+          }
+        },
+        {
+          "@type": "EducationalOrganization",
+          "name": "Student Hub Nepal",
+          "url": "https://studenthubnp.com",
+          "description": "Free online study platform for Nepali high school students preparing for SEE and NEB examinations.",
+          "educationalCredentialAwarded": "Study support for Grade 9–12 NEB/SEE examinations",
+          "areaServed": {
+            "@type": "Country",
+            "name": "Nepal"
+          }
         }
-      }
+      ]
     }
     </script>
 
-    <!-- ── Hide boot-splash on desktop/laptop (md+) ─────────────────────── -->
+    <!-- ── Critical CSS: boot splash + shimmer animation ────────────────── -->
     <style>
       @media (min-width: 768px) { #boot-splash { display: none !important; } }
+      @keyframes shimmer {
+        0%   { background-position: -200% center; }
+        100% { background-position:  200% center; }
+      }
+      @keyframes page-fade {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      .page-fade { animation: page-fade 0.18s ease-out both; }
     </style>
 
     <!-- ── Font: non-render-blocking, display=swap ───────────────────────── -->
@@ -124,18 +189,13 @@
       /* ── 2. Block DevTools keyboard shortcuts ─────────────────────────── */
       document.addEventListener('keydown', function(e){
         var k = e.key, ctrl = e.ctrlKey || e.metaKey, shift = e.shiftKey;
-        // F12
         if (k === 'F12'){ e.preventDefault(); e.stopPropagation(); return false; }
-        // Ctrl+Shift+I/J/C  (Inspector / Console / Element picker)
         if (ctrl && shift && 'IJCijc'.indexOf(k) !== -1){ e.preventDefault(); e.stopPropagation(); return false; }
-        // Ctrl+U  (View Source)
         if (ctrl && (k === 'u' || k === 'U') && !shift){ e.preventDefault(); e.stopPropagation(); return false; }
-        // Ctrl+S  (Save page HTML)
         if (ctrl && (k === 's' || k === 'S') && !shift){ e.preventDefault(); e.stopPropagation(); return false; }
       }, true);
 
       /* ── 3. DevTools open-detection via debugger timing ──────────────── */
-      /* Only active on the real domain — skipped on localhost / Replit dev */
       var h = location.hostname;
       var isProd = h !== 'localhost' && h !== '127.0.0.1' && h.indexOf('.replit.dev') === -1 && h.indexOf('.repl.co') === -1;
 
@@ -180,9 +240,7 @@
 
         function _check(){
           var t = performance.now();
-          /* jshint ignore:start */
-          debugger; // paused here means DevTools is open
-          /* jshint ignore:end */
+          debugger;
           if (performance.now() - t > 150){
             if (!_dt.open){ _dt.open = true; _showBlock(); }
           } else {

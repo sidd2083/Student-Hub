@@ -2,35 +2,43 @@ User-agent: *
 
 # ── Public content — index everything ──────────────────────────────────────
 Allow: /$
-Allow: /notes
+Allow: /notes$
+Allow: /notes/$
 Allow: /notes/
-Allow: /pyqs
-Allow: /pyqs/
+Allow: /pyqs$
+Allow: /pyqs/$
 Allow: /pyq/
-Allow: /mcq
-Allow: /about
-Allow: /contact
-Allow: /privacy
-Allow: /terms
-Allow: /tools
-Allow: /tools/
+Allow: /mcq$
+Allow: /mcq/$
+Allow: /tools$
+Allow: /tools/$
+Allow: /tools/gpa-calculator$
+Allow: /tools/attendance-calculator$
+Allow: /about$
+Allow: /contact$
+Allow: /privacy$
+Allow: /terms$
 
 # ── Private / authenticated routes — do not index ───────────────────────────
 Disallow: /dashboard
-Disallow: /dashboard/
 Disallow: /todo
 Disallow: /pomodoro
 Disallow: /ai
 Disallow: /leaderboard
 Disallow: /settings
 Disallow: /admin
-Disallow: /admin/
 Disallow: /saved
 Disallow: /report
 Disallow: /login
 Disallow: /setup-profile
 Disallow: /onboarding
 Disallow: /api/
+
+# ── Assets that are not pages ────────────────────────────────────────────────
+Disallow: /assets/
+
+# ── Crawl-delay hint for polite bots (Googlebot ignores this, others respect it)
+Crawl-delay: 1
 
 # ── Sitemap ──────────────────────────────────────────────────────────────────
 Sitemap: https://studenthubnp.com/sitemap.xml

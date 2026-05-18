@@ -17,7 +17,7 @@ const features = [
 ];
 
 const SITE_URL = "https://studenthubnp.com";
-const OG_IMAGE = `${SITE_URL}/og-image.png`;
+const OG_IMAGE = `${SITE_URL}/opengraph.jpg`;
 
 const jsonLd = {
   "@context": "https://schema.org",

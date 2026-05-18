@@ -40,18 +40,23 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
     target: "esnext",
+    minify: "esbuild",
     cssMinify: true,
     reportCompressedSize: false,
     modulePreload: { polyfill: false },
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
+        // Aggressive cache-busting: each chunk gets a content hash
+        entryFileNames: "assets/[name]-[hash].js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash][extname]",
         manualChunks(id) {
-          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/")) {
+          // React core — loaded first, always cached
+          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/") || id.includes("node_modules/scheduler/")) {
             return "vendor-react";
           }
-          // Split Firebase into sub-chunks so the browser can download and
-          // cache each piece independently — auth/app loads fast on first visit,
-          // firestore (biggest) loads in parallel while auth resolves.
+          // Firebase — split so auth (small, critical) loads before firestore (huge)
           if (id.includes("node_modules/@firebase/firestore") || id.includes("node_modules/firebase/firestore")) {
             return "vendor-firebase-firestore";
           }
@@ -64,17 +69,25 @@ export default defineConfig({
           if (id.includes("node_modules/@firebase/") || id.includes("node_modules/firebase/")) {
             return "vendor-firebase-core";
           }
-          if (id.includes("node_modules/lucide-react/")) {
+          // UI icons — large, but only needed after first paint
+          if (id.includes("node_modules/lucide-react/") || id.includes("node_modules/react-icons/")) {
             return "vendor-icons";
           }
+          // Animation — only loaded on pages that use it
           if (id.includes("node_modules/framer-motion/")) {
             return "vendor-motion";
           }
+          // Radix primitives
           if (id.includes("node_modules/@radix-ui/")) {
             return "vendor-radix";
           }
+          // Router + data fetching
           if (id.includes("node_modules/wouter/") || id.includes("node_modules/@tanstack/")) {
             return "vendor-router";
+          }
+          // Charts (heavy, only on report/leaderboard pages)
+          if (id.includes("node_modules/recharts/") || id.includes("node_modules/d3-")) {
+            return "vendor-charts";
           }
         },
       },

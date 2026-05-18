@@ -1,9 +1,10 @@
-const CACHE_NAME = "student-hub-v6";
+const CACHE_NAME = "student-hub-v7";
 const SHELL_ASSETS = [
   "/",
   "/manifest.json",
   "/icon-192.png",
   "/icon-512.png",
+  "/favicon.svg",
 ];
 
 self.addEventListener("install", (event) => {
@@ -21,17 +22,41 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// Detect hashed assets — Vite outputs files like /assets/vendor-react-Abc123.js
+function isHashedAsset(url) {
+  return (
+    url.pathname.startsWith("/assets/") &&
+    /\.[a-f0-9]{8,}\.(js|css|woff2?|png|jpg|svg|webp)$/.test(url.pathname)
+  );
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
   if (request.method !== "GET") return;
   if (url.origin !== self.location.origin) return;
-
   if (url.pathname.startsWith("/api/")) return;
   if (url.pathname.startsWith("/@") || url.pathname.includes("__vite") || url.pathname.includes("hot-update")) return;
 
-  // Navigation requests — network-first so fresh HTML always wins
+  // ── Hashed assets (JS/CSS/fonts/images with content hash in filename)
+  // Cache-first: these never change for the same hash, serve instantly from cache.
+  if (isHashedAsset(url)) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((res) => {
+          if (res.ok) {
+            caches.open(CACHE_NAME).then((c) => c.put(request, res.clone()));
+          }
+          return res;
+        });
+      })
+    );
+    return;
+  }
+
+  // ── Navigation requests — network-first so fresh HTML always wins
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
@@ -46,7 +71,28 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // JS/CSS/images — network-first with cache fallback (ensures fresh bundles)
+  // ── Static shell assets (icons, manifest) — cache-first
+  if (
+    url.pathname === "/manifest.json" ||
+    url.pathname === "/favicon.svg" ||
+    url.pathname === "/icon-192.png" ||
+    url.pathname === "/icon-512.png" ||
+    url.pathname === "/opengraph.jpg" ||
+    url.pathname === "/robots.txt"
+  ) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((res) => {
+          if (res.ok) caches.open(CACHE_NAME).then((c) => c.put(request, res.clone()));
+          return res;
+        });
+      })
+    );
+    return;
+  }
+
+  // ── Everything else — network-first with cache fallback
   event.respondWith(
     fetch(request)
       .then((res) => {
