@@ -78,8 +78,7 @@
     <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com" />
     <link rel="dns-prefetch" href="https://www.googleapis.com" />
 
-    <!-- ── Preload OG image so it renders immediately on share preview ───── -->
-    <link rel="preload" href="/opengraph.jpg" as="image" />
+    <!-- OG image: not preloaded — it's only used by crawlers, not render-critical -->
 
     <!-- ── JSON-LD Structured Data — Website + Organization + WebPage ────── -->
     <script type="application/ld+json">
@@ -259,11 +258,10 @@
           else if (!open && _dt.open){ _dt.open = false; _hideBlock(); }
         }
 
-        /* requestAnimationFrame — runs only when tab is visible, costs nothing */
-        (function _loop(){
-          _check();
-          requestAnimationFrame(_loop);
-        })();
+        /* Use resize event + low-frequency interval — far cheaper than rAF */
+        window.addEventListener('resize', _check, { passive: true });
+        setTimeout(_check, 800);
+        setInterval(_check, 3000);
       }
     })();
     </script>

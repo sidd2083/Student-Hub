@@ -94,13 +94,13 @@ export default function AttendanceCalculator() {
     <>
       <Helmet>
         <title>Attendance Calculator — How Many Classes Can I Miss or Bunk? | Free Online Tool</title>
-        <meta name="description" content="Free online attendance calculator: instantly find your attendance percentage, exactly how many classes you can miss or bunk, and how many you need to reach 75%, 80%, or any required %. Works for college students in India, USA, Australia, Canada, UK — no sign-up." />
+        <meta name="description" content="Attendance calculator: find your % instantly, see how many classes you can miss or bunk, and exactly how many to attend to reach 75%. Free — no sign-up, instant results." />
         <meta name="keywords" content="attendance calculator, how many classes can i miss, how many classes can i bunk, bunk calculator, 75 attendance calculator, attendance percentage calculator, class attendance calculator, college attendance calculator, attendance calculator india, attendance calculator australia, attendance calculator usa, attendance calculator canada, attendance calculator uk, attendance shortage calculator, 75 percent attendance rule, how many classes can i skip, minimum attendance calculator, attendance calculator online free, lecture attendance calculator, bunking calculator college, how many lectures can i miss, attendance calculator for 75 percent, college bunk calculator, student attendance tracker" />
         <meta name="author" content="Student Hub" />
         <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
 
         <meta property="og:title" content="Attendance Calculator — How Many Classes Can I Miss or Bunk? | Free Online Tool" />
-        <meta property="og:description" content="Free attendance calculator: find your attendance %, how many classes you can bunk/miss, or how many you need to reach 75%, 80%, or any required percentage. India, USA, Australia, UK, Canada." />
+        <meta property="og:description" content="Find your attendance % instantly, see how many classes you can miss or bunk, and exactly how many to attend to reach 75%. Free — no sign-up, instant results." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://studenthubnp.com/tools/attendance-calculator" />
         <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
@@ -109,7 +109,7 @@ export default function AttendanceCalculator() {
 
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Attendance Calculator — How Many Classes Can I Miss or Bunk?" />
-        <meta name="twitter:description" content="Free online attendance calculator. Enter your classes and instantly see how many you can miss or bunk — works for 75%, 80%, 85%, 90% rules." />
+        <meta name="twitter:description" content="Find your attendance % instantly, see how many classes you can miss or bunk, and exactly how many to attend to reach 75%. Free — no sign-up, instant results." />
         <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
 
         <link rel="canonical" href="https://studenthubnp.com/tools/attendance-calculator" />
