@@ -65,6 +65,8 @@
     <link rel="apple-touch-icon" href="/icon-192.png" />
 
     <!-- ── Performance: preconnect critical origins FIRST ───────────────── -->
+    <link rel="preconnect" href="https://www.googletagmanager.com" />
+    <link rel="preconnect" href="https://www.google-analytics.com" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
@@ -209,6 +211,8 @@
       var isProd = h !== 'localhost' && h !== '127.0.0.1' && h.indexOf('.replit.dev') === -1 && h.indexOf('.repl.co') === -1;
 
       if (isProd) {
+        /* Detect DevTools via window-size difference — zero performance cost,
+           no debugger statement, no setInterval hammering the main thread.   */
         var _dt = { open: false };
 
         function _showBlock(){
@@ -248,16 +252,18 @@
         }
 
         function _check(){
-          var t = performance.now();
-          debugger;
-          if (performance.now() - t > 150){
-            if (!_dt.open){ _dt.open = true; _showBlock(); }
-          } else {
-            if (_dt.open){ _dt.open = false; _hideBlock(); }
-          }
+          var wDiff = window.outerWidth - window.innerWidth;
+          var hDiff = window.outerHeight - window.innerHeight;
+          var open = wDiff > 160 || hDiff > 160;
+          if (open && !_dt.open){ _dt.open = true; _showBlock(); }
+          else if (!open && _dt.open){ _dt.open = false; _hideBlock(); }
         }
 
-        setInterval(_check, 1200);
+        /* requestAnimationFrame — runs only when tab is visible, costs nothing */
+        (function _loop(){
+          _check();
+          requestAnimationFrame(_loop);
+        })();
       }
     })();
     </script>

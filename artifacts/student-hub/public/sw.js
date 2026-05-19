@@ -1,4 +1,4 @@
-const CACHE_NAME = "student-hub-v7";
+const CACHE_NAME = "student-hub-v8";
 const SHELL_ASSETS = [
   "/",
   "/manifest.json",
@@ -22,7 +22,6 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Detect hashed assets — Vite outputs files like /assets/vendor-react-Abc123.js
 function isHashedAsset(url) {
   return (
     url.pathname.startsWith("/assets/") &&
@@ -39,8 +38,7 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/")) return;
   if (url.pathname.startsWith("/@") || url.pathname.includes("__vite") || url.pathname.includes("hot-update")) return;
 
-  // ── Hashed assets (JS/CSS/fonts/images with content hash in filename)
-  // Cache-first: these never change for the same hash, serve instantly from cache.
+  // ── Hashed assets — cache-first forever (content hash guarantees freshness)
   if (isHashedAsset(url)) {
     event.respondWith(
       caches.match(request).then((cached) => {
@@ -56,22 +54,26 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // ── Navigation requests — network-first so fresh HTML always wins
+  // ── Navigation requests — stale-while-revalidate:
+  //    Serve from cache INSTANTLY, then update cache in background.
+  //    This makes repeat visits feel instant even on slow connections.
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request)
-        .then((res) => {
-          if (res.ok) {
-            caches.open(CACHE_NAME).then((c) => c.put("/", res.clone()));
-          }
-          return res;
+      caches.open(CACHE_NAME).then((cache) =>
+        cache.match("/").then((cached) => {
+          const fetchPromise = fetch(request).then((res) => {
+            if (res.ok) cache.put("/", res.clone());
+            return res;
+          });
+          // Return cached immediately if available, otherwise wait for network
+          return cached || fetchPromise;
         })
-        .catch(() => caches.match("/"))
+      )
     );
     return;
   }
 
-  // ── Static shell assets (icons, manifest) — cache-first
+  // ── Static shell assets — cache-first
   if (
     url.pathname === "/manifest.json" ||
     url.pathname === "/favicon.svg" ||
@@ -92,7 +94,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // ── Everything else — network-first with cache fallback
+  // ── Everything else — network with cache fallback
   event.respondWith(
     fetch(request)
       .then((res) => {
