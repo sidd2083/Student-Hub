@@ -9,7 +9,7 @@ import { db } from "@/lib/firebase";
 import {
   BookOpen, BarChart2, FileText, CheckSquare,
   Timer, MessageCircle, Flame, Megaphone, X, Bookmark,
-  ChevronDown,
+  ChevronDown, ChevronRight,
 } from "lucide-react";
 import { SiteGuide } from "@/components/SiteGuide";
 
@@ -126,9 +126,11 @@ function AchievementsCard({
             {total} badge{total !== 1 ? "s" : ""} earned
           </p>
         </div>
-        <Link href="/badges"
-          className="text-purple-200 text-xs font-medium hover:text-white transition-colors flex-shrink-0">
-          See all →
+        <Link href="/badges">
+          <div className="flex items-center gap-1 bg-white/20 hover:bg-white/30 active:bg-white/40 transition-all text-white text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0 cursor-pointer">
+            View all
+            <ChevronRight className="w-3.5 h-3.5" />
+          </div>
         </Link>
       </div>
 

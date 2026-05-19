@@ -11,21 +11,21 @@ import {
 import { useState, useEffect } from "react";
 
 const sidebarNav = [
-  { href: "/dashboard",   icon: LayoutDashboard, label: "Dashboard"  },
-  { href: "/notes",       icon: BookOpen,         label: "Notes"      },
-  { href: "/pyqs",        icon: FileText,         label: "PYQ"        },
-  { href: "/saved",       icon: Bookmark,         label: "Saved"      },
-  { href: "/ai",          icon: MessageCircle,    label: "Nep AI"     },
-  { href: "/pomodoro",    icon: Timer,            label: "Pomodoro"   },
-  { href: "/todo",        icon: CheckSquare,      label: "To-do"      },
-  { href: "/report",      icon: BarChart2,        label: "Report Card"},
-  { href: "/leaderboard", icon: Trophy,           label: "Leaderboard"},
+  { href: "/dashboard",   icon: LayoutDashboard, label: "Dashboard"       },
+  { href: "/notes",       icon: BookOpen,         label: "Notes"           },
+  { href: "/pyqs",        icon: FileText,         label: "Imp Questions"   },
+  { href: "/saved",       icon: Bookmark,         label: "Saved"           },
+  { href: "/ai",          icon: MessageCircle,    label: "Nep AI"          },
+  { href: "/pomodoro",    icon: Timer,            label: "Pomodoro"        },
+  { href: "/todo",        icon: CheckSquare,      label: "To-do"           },
+  { href: "/report",      icon: BarChart2,        label: "Report Card"     },
+  { href: "/leaderboard", icon: Trophy,           label: "Leaderboard"     },
 ];
 
 const bottomNavItems = [
   { href: "/dashboard", icon: Home,     label: "Home",    isTools: false },
   { href: "/notes",     icon: BookOpen, label: "Notes",   isTools: false },
-  { href: "/pyqs",      icon: FileText, label: "PYQ",     isTools: false },
+  { href: "/pyqs",      icon: FileText, label: "Imp Q's", isTools: false },
   { href: "",           icon: Wrench,   label: "Tools",   isTools: true  },
   { href: "/settings",  icon: User,     label: "Profile", isTools: false },
 ];
