@@ -2,6 +2,27 @@ import { useEffect, useRef, useState } from "react";
 import { useTimer } from "@/context/TimerContext";
 import type { Phase } from "@/context/TimerContext";
 
+// ─── Focus tracker — module-level so Pomodoro can read it ────────────────────
+// Tracks focused vs distracted time for the current session.
+export const focusTracker = {
+  sessionStartMs: 0,
+  totalDistractedMs: 0,
+  active: false,
+  start()                  { this.sessionStartMs = Date.now(); this.totalDistractedMs = 0; this.active = true; },
+  stop()                   { this.active = false; },
+  addDistracted(ms: number){ this.totalDistractedMs = Math.min(this.totalDistractedMs + ms, Date.now() - this.sessionStartMs); },
+  score(): number {
+    if (!this.active || !this.sessionStartMs) return 100;
+    const elapsed = Date.now() - this.sessionStartMs;
+    if (elapsed < 90_000) return 100; // < 90s — don't show yet
+    return Math.max(0, Math.round(((elapsed - this.totalDistractedMs) / elapsed) * 100));
+  },
+  elapsedMins(): number {
+    if (!this.sessionStartMs) return 0;
+    return Math.round((Date.now() - this.sessionStartMs) / 60_000);
+  },
+};
+
 // ─── Shared AudioContext ──────────────────────────────────────────────────────
 // One context per page-load. Browsers require a user gesture to unlock audio —
 // starting the Pomodoro timer counts as that gesture so this is always safe.
@@ -253,12 +274,16 @@ export function StudyGuardian() {
   useEffect(() => { settingsRef.current = settings; }, [settings]);
   useEffect(() => { popupRef.current    = popup;    }, [popup]);
 
-  // Track when timer starts/stops
+  // Track when timer starts/stops — also feed the focus tracker
   useEffect(() => {
     if (running) {
-      if (!timerStartedAtRef.current) timerStartedAtRef.current = Date.now();
+      if (!timerStartedAtRef.current) {
+        timerStartedAtRef.current = Date.now();
+        focusTracker.start();
+      }
     } else {
       timerStartedAtRef.current = null;
+      focusTracker.stop();
     }
   }, [running]);
 
@@ -375,6 +400,7 @@ export function StudyGuardian() {
           if (sinceConfirm < 30 * 60_000) return;
 
           // 3–60 min away → play alert + show popup
+          focusTracker.addDistracted(awayMs);
           playImmediateAlert();
           sendNotification(
             "⚠️ Student Hub — Study check",

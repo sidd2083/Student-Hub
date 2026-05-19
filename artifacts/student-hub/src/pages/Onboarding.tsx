@@ -16,7 +16,7 @@ export default function Onboarding() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return setError("Please enter your name.");
-    if (!grade) return setError("Please select your grade.");
+    if (grade === "") return setError("Please select your grade.");
     if (!agreed) return setError("Please accept the Terms & Conditions.");
     if (!user) return setError("No session — please refresh and try again.");
 
@@ -121,7 +121,7 @@ export default function Onboarding() {
               <label className="block text-sm font-semibold text-gray-700 mb-3">
                 Select Your Grade <span className="text-red-400">*</span>
               </label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-2 mb-2">
                 {[9, 10, 11, 12].map((g) => (
                   <button
                     key={g}
@@ -140,6 +140,21 @@ export default function Onboarding() {
                   </button>
                 ))}
               </div>
+              <button
+                type="button"
+                data-testid="grade-btn-other"
+                disabled={saving}
+                onClick={() => setGrade(0)}
+                className={`w-full py-3 rounded-2xl border-2 transition-all flex items-center justify-center gap-2 disabled:opacity-60 ${
+                  grade === 0
+                    ? "border-blue-500 bg-blue-50 text-blue-600 shadow-sm"
+                    : "border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50/50"
+                }`}
+              >
+                <span className="text-base font-bold leading-none">🎓</span>
+                <span className="text-sm font-semibold">Others</span>
+                <span className="text-[10px] text-gray-400">(Teacher, Parent, or other grade)</span>
+              </button>
             </div>
 
             <label className="flex items-start gap-3 cursor-pointer pt-1">
@@ -190,7 +205,7 @@ export default function Onboarding() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-5">
-          Student Hub · Grades 9–12 · Secure & private
+          Student Hub · Grades 9–12 & Others · Secure & private
         </p>
       </div>
     </div>

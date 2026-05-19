@@ -43,6 +43,7 @@ const Terms        = lazy(() => import("@/pages/Terms"));
 const Tools               = lazy(() => import("@/pages/Tools"));
 const GpaCalculator       = lazy(() => import("@/pages/GpaCalculator"));
 const AttendanceCalculator = lazy(() => import("@/pages/AttendanceCalculator"));
+const Badges              = lazy(() => import("@/pages/Badges"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -145,6 +146,7 @@ function AppRoutes() {
         <Route path="/saved"       component={Saved} />
         <Route path="/mcq"         component={McqPractice} />
 
+        <Route path="/badges"      component={Badges} />
         <Route path="/dashboard">
           <PrivateRoute><Dashboard /></PrivateRoute>
         </Route>

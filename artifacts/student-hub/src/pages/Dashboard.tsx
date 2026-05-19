@@ -126,7 +126,10 @@ function AchievementsCard({
             {total} badge{total !== 1 ? "s" : ""} earned
           </p>
         </div>
-        <span className="text-purple-200 text-xs font-medium">{total} / ∞</span>
+        <Link href="/badges"
+          className="text-purple-200 text-xs font-medium hover:text-white transition-colors flex-shrink-0">
+          See all →
+        </Link>
       </div>
 
       <div className="bg-white px-4 sm:px-5 py-4">
@@ -336,9 +339,11 @@ export default function Dashboard() {
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
               {greeting()}, {profile?.name?.split(" ")[0]}
             </h1>
-            <span className="px-2.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-              Grade {profile?.grade}
-            </span>
+            {profile?.grade != null && profile.grade >= 9 && (
+              <span className="px-2.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                Grade {profile.grade}
+              </span>
+            )}
           </div>
           <p className="text-gray-500 text-sm">Ready to learn something new today?</p>
         </div>
@@ -378,7 +383,10 @@ export default function Dashboard() {
         {statsLoaded && !hasBadges && (
           <div className="mb-6 sm:mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100 rounded-2xl p-4">
             <p className="text-sm font-medium text-blue-800 mb-0.5">🎯 Earn your first badge!</p>
-            <p className="text-xs text-blue-600">Study for 3 hours with the Pomodoro timer to unlock the 🌱 Beginner badge.</p>
+            <p className="text-xs text-blue-600 mb-2">Study for 3 hours with the Pomodoro timer to unlock the 🌱 Beginner badge.</p>
+            <Link href="/badges" className="text-xs font-semibold text-blue-500 hover:text-blue-700 transition-colors">
+              View all badges →
+            </Link>
           </div>
         )}
 

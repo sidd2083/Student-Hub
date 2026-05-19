@@ -298,7 +298,7 @@ const pyqsCache = new Map<number, Pyq[]>();
 function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   const { profile, user } = useAuth();
   const [, setLocation] = useLocation();
-  const [grade, setGrade]         = useState<number>(profile?.grade || 10);
+  const [grade, setGrade]         = useState<number>(typeof profile?.grade === "number" ? profile.grade : 10);
   const [subject, setSubject]     = useState("");
   const [yearFilter, setYearFilter] = useState<string>("");
   const [search, setSearch]       = useState("");
@@ -364,6 +364,7 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
             onChange={e => { setGrade(Number(e.target.value)); setSubject(""); setYearFilter(""); }}
             className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
             {[9, 10, 11, 12].map(g => <option key={g} value={g}>Grade {g}</option>)}
+            <option value={0}>Others</option>
           </select>
 
           <select value={yearFilter} onChange={e => setYearFilter(e.target.value)}

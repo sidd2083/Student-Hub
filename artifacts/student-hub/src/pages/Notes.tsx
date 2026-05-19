@@ -257,7 +257,7 @@ const notesCache = new Map<number, NoteView[]>();
 
 function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   const { user, profile } = useAuth();
-  const [grade, setGrade] = useState<number>(profile?.grade || 10);
+  const [grade, setGrade] = useState<number>(typeof profile?.grade === "number" ? profile.grade : 10);
   const [subject, setSubject] = useState<string>("");
   const [selectedNote, setSelectedNote] = useState<NoteView | null>(null);
   const [notes, setNotes] = useState<NoteView[]>([]);
@@ -335,6 +335,7 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
             className="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {[9, 10, 11, 12].map((g) => <option key={g} value={g}>Grade {g}</option>)}
+            <option value={0}>Others</option>
           </select>
 
           <div className="flex flex-wrap gap-1.5 sm:gap-2">
