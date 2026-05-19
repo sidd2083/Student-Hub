@@ -243,8 +243,9 @@ function WellnessPopup({
 
 // ─── Main StudyGuardian ───────────────────────────────────────────────────────
 export function StudyGuardian() {
-  const { phase, running, settings, skipPhase } = useTimer();
+  const { phase, running, settings, skipPhase, pause, start } = useTimer();
   const [popup, setPopup] = useState<PopupKind>(null);
+  const wasRunningRef = useRef(false);
 
   // Request notification permission the moment the timer starts
   useEffect(() => { if (running) requestNotifPermission(); }, [running]);
@@ -301,6 +302,20 @@ export function StudyGuardian() {
     EVENTS.forEach(ev => window.addEventListener(ev, touch, { passive: true }));
     return () => EVENTS.forEach(ev => window.removeEventListener(ev, touch));
   }, []);
+
+  // ── Pause timer when popup shows, resume when popup clears ───────────────
+  useEffect(() => {
+    if (popup !== null) {
+      wasRunningRef.current = runningRef.current;
+      if (runningRef.current) pause();
+    } else {
+      if (wasRunningRef.current) {
+        wasRunningRef.current = false;
+        start();
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [popup]);
 
   // ── Wellness check — every 90 s ───────────────────────────────────────────
   // Only triggers after 1.5 h of cumulative study AND 20 min of idle,

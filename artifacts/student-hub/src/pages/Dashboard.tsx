@@ -16,7 +16,7 @@ import { SiteGuide } from "@/components/SiteGuide";
 const sections = [
   { href: "/notes",      icon: BookOpen,      label: "Notes",              desc: "Study materials by subject",  color: "bg-blue-50 text-blue-600"    },
   { href: "/report",     icon: BarChart2,     label: "Report Card",        desc: "Track your study progress",   color: "bg-purple-50 text-purple-600" },
-  { href: "/pyqs",       icon: FileText,      label: "Previous Questions", desc: "Past exam papers",            color: "bg-orange-50 text-orange-600" },
+  { href: "/pyqs",       icon: FileText,      label: "Important Questions & PYQ", desc: "Past exam papers & key questions", color: "bg-orange-50 text-orange-600" },
   { href: "/todo",       icon: CheckSquare,   label: "To-Do",              desc: "Track your tasks",            color: "bg-green-50 text-green-600"   },
   { href: "/pomodoro",   icon: Timer,         label: "Pomodoro Timer",     desc: "Focus and study",             color: "bg-red-50 text-red-600"       },
   { href: "/ai",         icon: MessageCircle, label: "Nep AI",             desc: "AI study assistant",          color: "bg-indigo-50 text-indigo-600" },

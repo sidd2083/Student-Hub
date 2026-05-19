@@ -14,9 +14,21 @@ export default function Contact() {
   return (
     <>
       <Helmet>
-        <title>Contact Us — Student Hub</title>
-        <meta name="description" content="Get in touch with the Student Hub team. Send us your feedback, suggestions, or questions." />
-        <meta property="og:title" content="Contact Us — Student Hub" />
+        <title>Contact Student Hub Nepal — Send Us Your Feedback or Questions</title>
+        <meta name="description" content="Contact the Student Hub Nepal team. Have a question, suggestion, or found an issue? Reach out by email or phone — we respond within 24 hours. Built for Grade 9–12 students across Nepal." />
+        <meta name="keywords" content="contact student hub nepal, student hub contact, student hub nepal feedback, student hub nepal support, contact student hub" />
+        <meta name="robots" content="index, follow" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://studenthubnp.com/contact" />
+        <meta property="og:title" content="Contact Student Hub Nepal — Send Us Your Feedback or Questions" />
+        <meta property="og:description" content="Get in touch with the Student Hub Nepal team. Questions, suggestions, or feedback — we'd love to hear from you. Free study platform for Grade 9–12 students in Nepal." />
+        <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta property="og:site_name" content="Student Hub Nepal" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Contact Student Hub Nepal" />
+        <meta name="twitter:description" content="Reach out to the Student Hub Nepal team with your questions, suggestions, or feedback. We respond within 24 hours." />
+        <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <link rel="canonical" href="https://studenthubnp.com/contact" />
       </Helmet>
 
       <div className="min-h-screen bg-gray-50">

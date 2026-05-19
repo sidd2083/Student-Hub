@@ -5,15 +5,20 @@ export default function About() {
   return (
     <>
       <Helmet>
-        <title>About — Student Hub</title>
-        <meta name="description" content="Student Hub is a free study platform for Grade 9–12 students in Nepal. Access notes, past papers, Nep AI, and progress tracking." />
+        <title>About Student Hub Nepal — Free Study Platform for Grade 9–12 Students</title>
+        <meta name="description" content="Student Hub Nepal is a free study platform built for Grade 9–12 students preparing for SEE and NEB exams. Access notes, PYQs, Nep AI tutor, Pomodoro timer, and progress tracking — all free, no sign-up needed." />
+        <meta name="keywords" content="about student hub nepal, student hub nepal, free study platform nepal, NEB study platform, SEE preparation nepal, grade 9 10 11 12 notes nepal, free education nepal" />
+        <meta name="robots" content="index, follow" />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://studenthubnp.com/about" />
-        <meta property="og:title" content="About — Student Hub Nepal" />
-        <meta property="og:description" content="Free study platform for Nepali students. Notes, PYQs, Nep AI, and progress tracking — all in one place." />
-        <meta property="og:image" content="https://studenthubnp.com/og-image.png" />
+        <meta property="og:title" content="About Student Hub Nepal — Free Study Platform for Grade 9–12 Students" />
+        <meta property="og:description" content="Student Hub Nepal is a free study platform for Grade 9–12 students. Notes, PYQs, Nep AI, Pomodoro timer, and progress tracking — built for SEE and NEB exam preparation." />
+        <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta property="og:site_name" content="Student Hub Nepal" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:image" content="https://studenthubnp.com/og-image.png" />
+        <meta name="twitter:title" content="About Student Hub Nepal — Free Study Platform for Grade 9–12" />
+        <meta name="twitter:description" content="Free study platform for Grade 9–12 students in Nepal. Notes, PYQs, Nep AI, and progress tracking for SEE and NEB exams." />
+        <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
         <link rel="canonical" href="https://studenthubnp.com/about" />
       </Helmet>
 

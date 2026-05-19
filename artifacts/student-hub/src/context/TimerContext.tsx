@@ -123,6 +123,27 @@ function playBeep(type: "work" | "break" = "work") {
   } catch {}
 }
 
+function sendPhaseNotification(completedPhase: Phase) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  try {
+    if (completedPhase === "work") {
+      new Notification("🎉 Focus session complete!", {
+        body: "Great work! Time for a well-earned break.",
+        icon: "/icon-192.png",
+        tag: "pomodoro-phase",
+        silent: false,
+      });
+    } else {
+      new Notification("⏰ Break over — time to focus!", {
+        body: "Your break is done. Let's get back to studying!",
+        icon: "/icon-192.png",
+        tag: "pomodoro-phase",
+        silent: false,
+      });
+    }
+  } catch {}
+}
+
 export function TimerProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
 
@@ -304,6 +325,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       setPhase(nextP);
       setSeconds(nextSecs);
       playBeep("break");
+      sendPhaseNotification("work");
     } else {
       const nextSecs = phaseSeconds("work", s);
       phaseRef.current = "work";
@@ -311,6 +333,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       setPhase("work");
       setSeconds(nextSecs);
       playBeep("work");
+      sendPhaseNotification(currentPhase);
     }
   }, [phaseSeconds]);
 
