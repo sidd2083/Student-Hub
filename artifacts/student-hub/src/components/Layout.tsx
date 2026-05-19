@@ -6,12 +6,13 @@ import {
   BookOpen, FileText, CheckSquare, Timer,
   MessageCircle, Trophy, LayoutDashboard, LogOut,
   Shield, Settings, User, Home, Wrench, ArrowLeft, X, BarChart2,
-  Pause, Play, Bookmark, Download, Calculator,
+  Pause, Play, Bookmark, Download, Calculator, Zap,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
 const sidebarNav = [
   { href: "/dashboard",   icon: LayoutDashboard, label: "Dashboard"       },
+  { href: "/missions",    icon: Zap,             label: "Daily Missions"  },
   { href: "/notes",       icon: BookOpen,         label: "Notes"           },
   { href: "/pyqs",        icon: FileText,         label: "Imp Questions"   },
   { href: "/saved",       icon: Bookmark,         label: "Saved"           },
@@ -220,7 +221,13 @@ export function Layout({ children }: LayoutProps) {
               </Link>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <Link href="/missions">
+              <div className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-yellow-600 bg-yellow-50 hover:bg-yellow-100 rounded-lg transition-all cursor-pointer">
+                <Zap className="w-3.5 h-3.5" />
+                <span className="hidden xs:inline">Missions</span>
+              </div>
+            </Link>
             {isInstallable && (
               <button
                 onClick={installApp}

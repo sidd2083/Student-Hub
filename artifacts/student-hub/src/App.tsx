@@ -44,6 +44,7 @@ const Tools               = lazy(() => import("@/pages/Tools"));
 const GpaCalculator       = lazy(() => import("@/pages/GpaCalculator"));
 const AttendanceCalculator = lazy(() => import("@/pages/AttendanceCalculator"));
 const Badges              = lazy(() => import("@/pages/Badges"));
+const DailyMissions       = lazy(() => import("@/pages/DailyMissions"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -143,6 +144,7 @@ function AppRoutes() {
         <Route path="/todo"        component={Todo} />
         <Route path="/pomodoro"    component={Pomodoro} />
         <Route path="/leaderboard" component={Leaderboard} />
+        <Route path="/missions"    component={DailyMissions} />
         <Route path="/saved"       component={Saved} />
         <Route path="/mcq"         component={McqPractice} />
 

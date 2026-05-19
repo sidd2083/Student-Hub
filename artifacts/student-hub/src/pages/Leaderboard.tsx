@@ -19,6 +19,7 @@ interface LeaderEntry {
   totalStudyTime: number;
   todayStudyTime: number;
   lastActiveDate: string;
+  lastMissionsCompletedDate?: string;
   role: string;
   badges?: CustomBadge[];
 }
@@ -135,6 +136,7 @@ function LeaderboardContent() {
           totalStudyTime: data.totalStudyTime ?? 0,
           todayStudyTime: actualToday,
           lastActiveDate: lastActive,
+          lastMissionsCompletedDate: data.lastMissionsCompletedDate ?? "",
           role: data.role ?? "user",
           badges: data.badges ?? [],
         };
@@ -236,11 +238,14 @@ function LeaderboardContent() {
 
             const hasBadge = topBadge || custom;
 
+            const missionsDoneToday = entry.lastMissionsCompletedDate === getNepaliDate();
+
             return (
               <div key={entry.uid}
                 className={`flex items-center gap-3 sm:gap-4 rounded-2xl border px-4 sm:px-5 py-3.5 transition-all ${
                   isMe ? "border-blue-200 bg-blue-50 shadow-sm" : "border-gray-100 bg-white hover:border-gray-200"
-                }`}
+                } ${missionsDoneToday ? "ring-2 ring-yellow-300 shadow-yellow-100 shadow-md" : ""}`}
+                style={missionsDoneToday ? { background: isMe ? undefined : "linear-gradient(135deg,#fffbeb 0%,#fff 60%)" } : {}}
               >
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${medal(i)}`}>
                   {i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}
@@ -251,6 +256,11 @@ function LeaderboardContent() {
                       {entry.name}
                       {isMe && <span className="text-xs font-normal text-blue-400 ml-1">(you)</span>}
                     </p>
+                    {missionsDoneToday && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 flex items-center gap-0.5">
+                        🔥 Missions done
+                      </span>
+                    )}
                     {hasBadge && <RowBadge badge={topBadge} custom={custom} />}
                   </div>
                   <p className="text-xs text-gray-400 mt-0.5">{entry.grade === 0 ? "Others" : `Grade ${entry.grade}`}</p>

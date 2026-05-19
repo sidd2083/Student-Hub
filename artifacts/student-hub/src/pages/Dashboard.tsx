@@ -12,6 +12,7 @@ import {
   ChevronDown, ChevronRight,
 } from "lucide-react";
 import { SiteGuide } from "@/components/SiteGuide";
+import { DailyMissionWidget } from "@/components/DailyMissionWidget";
 
 const sections = [
   { href: "/notes",      icon: BookOpen,      label: "Notes",              desc: "Study materials by subject",  color: "bg-blue-50 text-blue-600"    },
@@ -349,6 +350,8 @@ export default function Dashboard() {
           </div>
           <p className="text-gray-500 text-sm">Ready to learn something new today?</p>
         </div>
+
+        {uid && <DailyMissionWidget />}
 
         <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-5 sm:mb-6">
           <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
