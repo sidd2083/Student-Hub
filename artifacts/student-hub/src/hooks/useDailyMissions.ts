@@ -19,6 +19,8 @@ export interface Mission {
   completedAt?: string;
   emoji: string;
   startedAt?: number;
+  actionLink?: string;
+  actionLabel?: string;
 }
 
 interface CachedMissionState {
@@ -26,8 +28,10 @@ interface CachedMissionState {
   allCompleted: boolean;
   studyMinsAtStart: number;
   level: MissionLevel;
+  version?: number;
 }
 
+const MISSION_VERSION = 2;
 const CACHE_KEY  = (uid: string, date: string) => `sh_dm_${uid}_${date}`;
 export const POMODORO_MISSION_KEY = "sh_mission_timer";
 
@@ -41,11 +45,14 @@ export interface PomodoroMissionPreset {
 function readCache(uid: string, date: string): CachedMissionState | null {
   try {
     const raw = localStorage.getItem(CACHE_KEY(uid, date));
-    return raw ? (JSON.parse(raw) as CachedMissionState) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedMissionState;
+    if (parsed.version !== MISSION_VERSION) return null;
+    return parsed;
   } catch { return null; }
 }
 function writeCache(uid: string, date: string, s: CachedMissionState) {
-  try { localStorage.setItem(CACHE_KEY(uid, date), JSON.stringify(s)); } catch {}
+  try { localStorage.setItem(CACHE_KEY(uid, date), JSON.stringify({ ...s, version: MISSION_VERSION })); } catch {}
 }
 
 function seededRand(seed: string): () => number {
@@ -69,133 +76,189 @@ export function getUserLevel(streak: number, totalStudyMins: number): MissionLev
   return "beginner";
 }
 
-// ─── Fun challenges ───────────────────────────────────────────────────────────
-// Mix of physical + academic. All short, clear, actionable.
-const FUN_CHALLENGES = [
-  { text: "Do 20 push-ups right now before you open your books",                                      emoji: "💪" },
-  { text: "Walk outside for 10 minutes between sessions — it clears your head better than scrolling", emoji: "🚶" },
-  { text: "Stretch your neck and shoulders for 5 minutes before your first Pomodoro today",           emoji: "🤸" },
-  { text: "Put your phone in another room for your whole study session. Pick it up when done",         emoji: "📵" },
-  { text: "Drink a glass of cold water right now, then open your hardest subject",                    emoji: "💧" },
-  { text: "Take 10 slow deep breaths before starting — it actually sharpens your focus",              emoji: "🧘" },
-  { text: "Without looking at your notes, write everything you know about one topic on paper",         emoji: "📝" },
-  { text: "Do 3 Pomodoro sessions in a row today with no phone between them",                         emoji: "⏱️" },
-  { text: "Write a one-page summary of everything you studied this week — from memory only",           emoji: "🧠" },
-  { text: "Pick the topic you have been avoiding and study it for 30 minutes today",                  emoji: "🔍" },
-  { text: "Make 10 questions about a chapter and try to answer all of them without notes",             emoji: "📋" },
-  { text: "Open your hardest subject first today — not social media, not the easy stuff. Hardest first", emoji: "⚡" },
-  { text: "Before sleeping tonight, write 5 things you learned today without looking at your notes",   emoji: "🌙" },
-  { text: "Rewrite your messy notes for one subject in a neat and organized way",                     emoji: "🗒️" },
-  { text: "Time yourself solving 5 past questions — then do 5 more and try to beat your own time",    emoji: "⏰" },
-  { text: "Close your book and say one full chapter out loud to yourself — notice what you forgot",   emoji: "🗣️" },
-  { text: "Write all formulas and key facts for one subject on a single sheet — from memory",         emoji: "📊" },
-  { text: "Start studying 30 minutes earlier than usual today",                                       emoji: "🚀" },
-  { text: "Look at your last test mistakes and write exactly what went wrong and the right answer",    emoji: "🔎" },
-  { text: "Close your notes and answer 10 questions about today's topic from memory",                 emoji: "✅" },
-];
+// ─── Mission 1: Pomodoro Cycle ────────────────────────────────────────────────
+// One cycle = 25 min focus + 5 min break + 25 min focus + 10 min long break
+// targetMinutes tracks actual study/focus minutes (not break time)
+function getPomodoroMission(level: MissionLevel, grade: number): Mission {
+  const isBoard = grade === 10 || grade === 12;
+  const targetMinutes =
+    level === "beginner"     ? 50  :   // 1 full cycle (25+25)
+    level === "intermediate" ? 100 :   // 2 full cycles
+                               150;    // 3 full cycles (advanced)
 
-// ─── Academic: Grade 9-10 SEE ─────────────────────────────────────────────────
-const ACADEMIC_BEGINNER_SEE = [
-  { text: "Write every formula from one Math or Science chapter — no peeking at your book",           emoji: "🔬" },
-  { text: "Pick any subject and solve 10 practice questions — check every answer after",              emoji: "📝" },
-  { text: "Re-read one Social Studies or English chapter and write 5 key points from memory",         emoji: "📖" },
-  { text: "Write the meaning of 10 important terms in your own words — no dictionary",               emoji: "✏️" },
-  { text: "Open your weakest SEE subject and read one chapter slowly, all the way through, twice",    emoji: "🔍" },
-  { text: "List every chapter you have not studied yet for SEE — then study the first one on the list", emoji: "📋" },
-];
-const ACADEMIC_INTERMEDIATE_SEE = [
-  { text: "Solve one full section of a SEE model paper — no notes, no looking at answers",            emoji: "⏱️" },
-  { text: "Write full answers for 5 long questions from a SEE chapter — from memory",                 emoji: "📄" },
-  { text: "Summarize one full chapter in your own words — keep it to one page",                      emoji: "🗒️" },
-  { text: "Answer 20 practice MCQs and explain why each wrong answer was wrong",                      emoji: "✅" },
-  { text: "Draw a topic map for one chapter from memory, then check it against your notes",           emoji: "🗺️" },
-  { text: "Look at your last practice test — write down every mistake and the correct answer",        emoji: "🔎" },
-];
-const ACADEMIC_ADVANCED_SEE = [
-  { text: "Attempt one full SEE subject paper from start to finish — treat it like the real exam",    emoji: "🏆" },
-  { text: "Write complete answers for every 5-mark question in one SEE chapter — no notes",           emoji: "📚" },
-  { text: "Cover your notes and say one full SEE chapter from memory — spot every gap",               emoji: "🧠" },
-  { text: "Check your answers against an official SEE mark scheme — be completely honest",            emoji: "🎯" },
-  { text: "Pick your 3 weakest SEE topics, make a 3-day plan, and start Day 1 today",                emoji: "💡" },
-  { text: "Write full answers for all likely long questions in one SEE subject — time yourself",      emoji: "📊" },
-];
+  const cycles = level === "beginner" ? 1 : level === "intermediate" ? 2 : 3;
+  const cycleWord = cycles === 1 ? "one full cycle" : `${cycles} full cycles`;
 
-// ─── Academic: Grade 11-12 Board ─────────────────────────────────────────────
-const ACADEMIC_BEGINNER_BOARD = [
-  { text: "Write all key formulas and laws from one Physics or Chemistry chapter",                    emoji: "⚗️" },
-  { text: "Solve 10 board-level questions from any subject and check every mistake",                  emoji: "📝" },
-  { text: "Read your hardest board subject chapter from start to finish — no distractions",           emoji: "🔍" },
-  { text: "Write the full derivation of one important formula step by step — no looking",             emoji: "🔬" },
-  { text: "List all board topics you feel unsure about — then start studying the first one",          emoji: "📋" },
-  { text: "Write 8 important definitions in your own words — not copied from the textbook",           emoji: "✏️" },
-];
-const ACADEMIC_INTERMEDIATE_BOARD = [
-  { text: "Solve one full section of a past NEB board paper — no notes, time yourself",              emoji: "⏱️" },
-  { text: "Write complete long answers for 3 probable board questions — from memory",                 emoji: "📄" },
-  { text: "Summarize one full board chapter in your own words — keep it to two pages",               emoji: "🗒️" },
-  { text: "Answer 20 board-level MCQs and explain why each wrong answer was wrong",                  emoji: "✅" },
-  { text: "List every concept in your weakest chapter that you cannot fully explain yet",             emoji: "🔎" },
-  { text: "Write a full 10-mark answer for a high-weightage topic — from memory",                    emoji: "🖊️" },
-];
-const ACADEMIC_ADVANCED_BOARD = [
-  { text: "Attempt one full NEB board past paper from start to finish — time yourself strictly",     emoji: "🏆" },
-  { text: "Write model answers for all high-weightage questions in one board chapter",               emoji: "📚" },
-  { text: "Cover your notes and explain one full topic out loud to yourself — find every gap",        emoji: "🗣️" },
-  { text: "Check your answers against official NEB mark schemes — grade yourself honestly",           emoji: "🎯" },
-  { text: "Identify your 3 riskiest board topics, make a focused plan, and start today",             emoji: "💡" },
-  { text: "Finish your most feared board chapter: full read, notes, and 5 practice questions",       emoji: "📊" },
-];
-
-// ─── Academic: General ───────────────────────────────────────────────────────
-const ACADEMIC_BEGINNER_GENERAL = [
-  { text: "Make flashcards for 5 key terms from a chapter you find difficult",                        emoji: "🃏" },
-  { text: "Re-read your class notes from today and mark everything you did not understand",           emoji: "👀" },
-  { text: "Write the key points of one chapter from memory — then check against your notes",          emoji: "🧠" },
-  { text: "Write all formulas or definitions from one chapter — no looking at your notes",            emoji: "✏️" },
-  { text: "Pick your most confusing topic and read it twice, slowly",                                emoji: "🔍" },
-  { text: "List all chapters in your syllabus and mark which ones need the most work",               emoji: "📋" },
-];
-const ACADEMIC_INTERMEDIATE_GENERAL = [
-  { text: "Write full model answers for 3 past exam questions — no notes, no shortcuts",              emoji: "📄" },
-  { text: "Summarize a full chapter in your own words — keep it to one page",                        emoji: "🗒️" },
-  { text: "Solve 15 practice MCQs and explain why each wrong answer was wrong",                      emoji: "✅" },
-  { text: "Draw a mind map for one topic from memory — then check against your notes",               emoji: "🗺️" },
-  { text: "Look at your last 2 tests and write every mistake — explain why you made each one",        emoji: "🔎" },
-  { text: "Write a complete answer from memory for a topic likely to appear in your next exam",       emoji: "🖊️" },
-];
-const ACADEMIC_ADVANCED_GENERAL = [
-  { text: "Attempt 20 practice questions under strict timed conditions — no stopping",               emoji: "🏆" },
-  { text: "Explain 3 complex topics out loud from memory — catch every gap",                         emoji: "🗣️" },
-  { text: "Write complete answers for all likely long questions in one full chapter",                emoji: "📚" },
-  { text: "Compare your notes with your textbook and fill every gap you find",                       emoji: "🔗" },
-  { text: "Pick your 3 weakest topics, make a focused study plan, and do Day 1 today",              emoji: "💡" },
-  { text: "Attempt a full past exam section with no help — check answers after",                     emoji: "📊" },
-];
-
-// ─── Mission text by grade + level ───────────────────────────────────────────
-function getFocusText(level: MissionLevel, grade: number, mins: number): string {
-  const isSEE   = grade === 10;
-  const isBoard = grade === 12;
-  if (isSEE) {
-    if (level === "beginner")     return `Study your hardest SEE subject for ${mins} minutes — phone away, full focus`;
-    if (level === "intermediate") return `${mins} minutes on your weakest SEE topic — notes out, no distractions`;
-    return `${mins}-min deep study on the SEE topic you are least confident about`;
+  let text: string;
+  if (level === "beginner") {
+    text = isBoard
+      ? `Complete one full Pomodoro cycle — 25 min study, 5 min break, 25 min study, then 10 min rest. This is your most important mission today.`
+      : `Complete one full Pomodoro cycle — 25 min focus, 5 min break, 25 min focus, then 10 min rest. Start the timer and do it now.`;
+  } else if (level === "intermediate") {
+    text = isBoard
+      ? `Complete two full Pomodoro cycles for your board prep — 25 min study, 5 min break, 25 min study, 10 min rest. Repeat twice.`
+      : `Complete two full Pomodoro cycles today — 25 min focus, 5 min break, 25 min focus, 10 min rest. Then repeat the whole thing.`;
+  } else {
+    text = isBoard
+      ? `Complete three full Pomodoro cycles — 25 min study, 5 min break, 25 min study, 10 min rest. Do this three times for serious board prep.`
+      : `Complete three full Pomodoro cycles today. Each cycle: 25 min focus → 5 min break → 25 min focus → 10 min rest. Do all ${cycleWord}.`;
   }
-  if (isBoard) {
-    if (level === "beginner")     return `Spend ${mins} minutes on the board subject you feel least confident about`;
-    if (level === "intermediate") return `${mins} minutes focused on your hardest board exam topic`;
-    return `${mins}-min study on your weakest board chapter — exam conditions`;
-  }
-  if (level === "beginner")     return `Study the subject you find hardest for ${mins} minutes — phone away`;
-  if (level === "intermediate") return `${mins} minutes on your most difficult topic — zero distractions`;
-  return `${mins}-min focused study on the topic you struggle with most`;
+
+  return {
+    id: "pomodoro_cycle",
+    text,
+    difficulty: level === "beginner" ? "easy" : level === "intermediate" ? "mid" : "hard",
+    type: "pomodoro",
+    targetMinutes,
+    completed: false,
+    emoji: "⏱️",
+  };
 }
 
-function getSchoolTaskText(grade: number): string {
-  if (grade === 10) return "Finish your homework and review today's class notes for SEE prep";
-  if (grade === 12) return "Finish your assignments and review today's lecture notes for boards";
-  if (grade === 11) return "Finish your assignments and review what you learned in class today";
-  return "Finish your homework or any pending assignment";
+// ─── Mission 2: School Assignment + Notes ─────────────────────────────────────
+function getSchoolTaskMission(grade: number): Mission {
+  let text: string;
+  if (grade === 9) {
+    text = "Finish all your homework for tomorrow. If you are stuck on any topic, open Notes to find help — it is all there for you.";
+  } else if (grade === 10) {
+    text = "Finish your homework and any pending SEE preparation tasks today. Open the Notes section if you need to revise any chapter quickly.";
+  } else if (grade === 11) {
+    text = "Complete all your school assignments for today. Open Notes below to review any topic or chapter you are unclear about.";
+  } else {
+    text = "Finish your board revision assignments for today. Use the Notes section to quickly revise any chapter before you write your answers.";
+  }
+  return {
+    id: "school_task",
+    text,
+    difficulty: "easy",
+    type: "manual",
+    completed: false,
+    emoji: "📚",
+    actionLink: "/notes",
+    actionLabel: "Open Notes",
+  };
+}
+
+// ─── Mission 3: Subject Study Time ───────────────────────────────────────────
+function getSubjectStudyMission(level: MissionLevel, grade: number): Mission {
+  const minsMap: Record<number, Record<MissionLevel, number>> = {
+    9:  { beginner: 25, intermediate: 40, advanced: 60  },
+    10: { beginner: 30, intermediate: 50, advanced: 75  },
+    11: { beginner: 30, intermediate: 50, advanced: 75  },
+    12: { beginner: 40, intermediate: 60, advanced: 90  },
+  };
+  const gradeKey = [9, 10, 11, 12].includes(grade) ? grade : 10;
+  const mins = minsMap[gradeKey][level];
+
+  let text: string;
+  if (grade === 10) {
+    if (level === "beginner")     text = `Pick one SEE subject you find hard and study it for ${mins} minutes — phone away, full focus.`;
+    else if (level === "intermediate") text = `Study your most difficult SEE subject for ${mins} minutes using the Pomodoro timer. No distractions.`;
+    else                          text = `${mins} minutes of serious SEE preparation on your weakest subject. Exam conditions — no shortcuts.`;
+  } else if (grade === 12) {
+    if (level === "beginner")     text = `Choose one board subject you have not revised yet and study it for ${mins} minutes — focused and phone-free.`;
+    else if (level === "intermediate") text = `${mins} minutes on your hardest board subject. Write key points as you study — do not just read.`;
+    else                          text = `${mins} minutes of board exam preparation on the subject you struggle with most. Full concentration.`;
+  } else if (grade === 11) {
+    if (level === "beginner")     text = `Pick the subject you find most difficult and study it for ${mins} minutes — understand it, do not just memorize.`;
+    else if (level === "intermediate") text = `Study your most challenging subject for ${mins} minutes. Focus on understanding concepts, not just reading.`;
+    else                          text = `${mins} minutes of deep study on the subject you struggle with most. Write notes as you go.`;
+  } else {
+    if (level === "beginner")     text = `Pick any one subject you find hard and study it for ${mins} minutes — no phone, just the book and your notebook.`;
+    else if (level === "intermediate") text = `${mins} minutes on your weakest subject using the Pomodoro timer. Focus completely — no distractions.`;
+    else                          text = `${mins} minutes of focused study on the subject you find hardest. Write notes as you go.`;
+  }
+
+  return {
+    id: "subject_study",
+    text,
+    difficulty: level === "beginner" ? "easy" : level === "intermediate" ? "mid" : "hard",
+    type: "pomodoro",
+    targetMinutes: mins,
+    completed: false,
+    emoji: "📖",
+  };
+}
+
+// ─── Mission 4: Wellness / Life ───────────────────────────────────────────────
+// Real, home-related, logical, not weird. Nothing study-related.
+const WELLNESS_MISSIONS: Array<{ text: string; emoji: string }> = [
+  { text: "Go for a 10 minute walk outside or around your building. Moving your body makes your brain sharper — this is not optional.", emoji: "🚶" },
+  { text: "Do 10 minutes of light exercise right now — jumping jacks, stretching, or simple push-ups. Your body needs to move after sitting for hours.", emoji: "💪" },
+  { text: "Spend 20 minutes with your family this evening — eat together or just sit and talk. You study better when you feel settled at home.", emoji: "🏠" },
+  { text: "Drink at least 3 full glasses of water today while you study. Put a glass of water on your desk right now and start.", emoji: "💧" },
+  { text: "Clean and organize your study table before your next session. A cluttered desk makes your brain work harder than it needs to.", emoji: "🧹" },
+  { text: "Put your phone in another room for your next full study session. You can pick it up when you finish — not before.", emoji: "📵" },
+  { text: "Eat a proper meal this evening before your study session. Not biscuits or chips — a real meal. Your brain runs on food.", emoji: "🍽️" },
+  { text: "Take 10 minutes to tidy your room before you sit down to study. Starting with a small win builds your study momentum.", emoji: "🏡" },
+  { text: "Spend 10 minutes outside in daylight between study sessions — even just standing on the balcony. Sunlight resets your energy.", emoji: "☀️" },
+  { text: "Plan tomorrow's study schedule right now — write which subjects you will study and for how long. Preparation beats panic every time.", emoji: "📋" },
+];
+
+// ─── Mission 5: Grade-specific mission ───────────────────────────────────────
+function getGradeMission(level: MissionLevel, grade: number, rand: () => number): Mission {
+  const isBoardYear = grade === 10 || grade === 12;
+
+  if (isBoardYear) {
+    const examName = grade === 10 ? "SEE" : "NEB";
+    const questionCount = level === "beginner" ? 5 : level === "intermediate" ? 10 : 15;
+    let text: string;
+    let diff: MissionDifficulty;
+
+    if (level === "beginner") {
+      text = `Open the Important Questions section and solve ${questionCount} questions from your weakest ${examName} subject. Check every answer after you finish.`;
+      diff = "easy";
+    } else if (level === "intermediate") {
+      text = `Solve ${questionCount} important ${examName} questions from the PYQ section without looking at the answers first. Grade yourself honestly after.`;
+      diff = "mid";
+    } else {
+      text = `Attempt one full set of important ${examName} questions under exam conditions — no notes, time yourself. Review your mistakes after.`;
+      diff = "hard";
+    }
+
+    return {
+      id: "grade_mission",
+      text,
+      difficulty: diff,
+      type: "manual",
+      completed: false,
+      emoji: level === "advanced" ? "🏆" : level === "intermediate" ? "📄" : "📝",
+      actionLink: "/pyqs",
+      actionLabel: "Open Important Questions",
+    };
+  }
+
+  // Grades 9 and 11 — class-based revision missions
+  const grade11 = grade === 11;
+  const gradeLabel = grade11 ? "Grade 11" : "Grade 9";
+
+  const options: Array<{ text: string; emoji: string }> = grade11
+    ? [
+        { text: "Write down everything you remember from today's school lessons — from memory, without looking at your notebook. Then check what you missed.", emoji: "✏️" },
+        { text: "Revise your class notes from the last 3 days across all subjects. Write the key points for each subject from memory.", emoji: "📝" },
+        { text: "Read ahead in your hardest subject for tomorrow's class. Come to school prepared with at least one question to ask your teacher.", emoji: "📖" },
+        { text: "Go through your notes from this week and mark every topic you do not fully understand. Start studying the first one on your list.", emoji: "🔍" },
+        { text: "Pick any one subject from today's class and write a one-page summary of what you learned — in your own words, not copied.", emoji: "🗒️" },
+      ]
+    : [
+        { text: "Write down everything you remember from today's school lessons — from memory, without opening your notebook. Then check what you missed.", emoji: "✏️" },
+        { text: "Revise your class notes from the last 3 days. Write the key points for each subject from memory without peeking.", emoji: "📝" },
+        { text: "Read the next chapter in your hardest subject before your teacher covers it. Come to class tomorrow prepared.", emoji: "📖" },
+        { text: "Go through this week's notes and mark every topic you do not understand. Start studying the first one on your list right now.", emoji: "🔍" },
+        { text: "Pick one subject from today's class and write a summary of what you learned — in your own words, not copied from the book.", emoji: "🗒️" },
+      ];
+
+  const chosen = pick(options, rand);
+  const diff: MissionDifficulty = level === "advanced" ? "hard" : level === "intermediate" ? "mid" : "easy";
+
+  return {
+    id: "grade_mission",
+    text: chosen.text,
+    difficulty: diff,
+    type: "manual",
+    completed: false,
+    emoji: chosen.emoji,
+  };
 }
 
 // ─── Mission builder ──────────────────────────────────────────────────────────
@@ -209,68 +272,38 @@ export function buildMissions(
   const rand = seededRand(uid + date);
 
   if (isSaturday) {
-    const shortStudy = level === "beginner" ? 20 : level === "intermediate" ? 30 : 45;
+    const shortMins = level === "beginner" ? 25 : level === "intermediate" ? 50 : 75;
     return [
       {
         id: "school_task",
-        text: "It's Saturday — finish any pending assignment or review this week's lessons",
+        text: "It is Saturday — finish any pending homework or assignment from this week. Open Notes if you need help with any topic.",
         difficulty: "easy", type: "manual", completed: false, emoji: "📚",
+        actionLink: "/notes", actionLabel: "Open Notes",
       },
       {
-        id: "study_time",
-        text: `Study for ${shortStudy} minutes today — even a little keeps your momentum going`,
+        id: "pomodoro_cycle",
+        text: `Complete ${level === "beginner" ? "one" : "two"} Pomodoro cycle${level === "beginner" ? "" : "s"} today — 25 min study, 5 min break, 25 min study. Even on Saturday, a little focus keeps your momentum going.`,
         difficulty: "easy", type: "pomodoro",
-        targetMinutes: shortStudy, completed: false, emoji: "⏰",
+        targetMinutes: shortMins, completed: false, emoji: "⏱️",
       },
     ];
   }
 
-  const studyTarget = level === "beginner" ? 30 : level === "intermediate" ? 60 : 90;
-  const focusTarget = level === "beginner" ? 25 : level === "intermediate" ? 40 : 60;
-
-  const isSEE   = grade === 10;
-  const isBoard = grade === 12;
-
-  const academicPool = isSEE
-    ? (level === "beginner" ? ACADEMIC_BEGINNER_SEE : level === "intermediate" ? ACADEMIC_INTERMEDIATE_SEE : ACADEMIC_ADVANCED_SEE)
-    : isBoard
-    ? (level === "beginner" ? ACADEMIC_BEGINNER_BOARD : level === "intermediate" ? ACADEMIC_INTERMEDIATE_BOARD : ACADEMIC_ADVANCED_BOARD)
-    : (level === "beginner" ? ACADEMIC_BEGINNER_GENERAL : level === "intermediate" ? ACADEMIC_INTERMEDIATE_GENERAL : ACADEMIC_ADVANCED_GENERAL);
-
-  const fun      = pick(FUN_CHALLENGES, rand);
-  const academic = pick(academicPool, rand);
-  const studyDiff: MissionDifficulty = level === "beginner" ? "easy" : "mid";
-  const focusDiff: MissionDifficulty = level === "advanced" ? "hard" : "mid";
-  const acadDiff: MissionDifficulty  = level === "advanced" ? "hard" : level === "intermediate" ? "mid" : "easy";
+  const wellnessItem = pick(WELLNESS_MISSIONS, rand);
 
   return [
+    getPomodoroMission(level, grade),
+    getSchoolTaskMission(grade),
+    getSubjectStudyMission(level, grade),
     {
-      id: "study_time",
-      text: `Study for ${studyTarget} minutes using the Pomodoro timer — tracked automatically`,
-      difficulty: studyDiff, type: "pomodoro",
-      targetMinutes: studyTarget, completed: false, emoji: "⏰",
+      id: "wellness",
+      text: wellnessItem.text,
+      difficulty: "easy",
+      type: "manual",
+      completed: false,
+      emoji: wellnessItem.emoji,
     },
-    {
-      id: "school_task",
-      text: getSchoolTaskText(grade),
-      difficulty: "easy", type: "manual", completed: false, emoji: "📚",
-    },
-    {
-      id: "focus",
-      text: getFocusText(level, grade, focusTarget),
-      difficulty: focusDiff, type: "pomodoro",
-      targetMinutes: focusTarget, completed: false, emoji: "🎯",
-    },
-    {
-      id: "fun",
-      text: fun.text,
-      difficulty: "easy", type: "manual", completed: false, emoji: fun.emoji,
-    },
-    {
-      id: "academic",
-      text: academic.text,
-      difficulty: acadDiff, type: "manual", completed: false, emoji: academic.emoji,
-    },
+    getGradeMission(level, grade, rand),
   ];
 }
 
@@ -279,13 +312,12 @@ export function useDailyMissions() {
   const { user, profile } = useAuth();
   const { savedMinutesToday } = useTimer();
 
-  // Recompute date every second so midnight NPT triggers a refresh
   const [date, setDate] = useState(() => getNepaliDate());
   useEffect(() => {
     const id = setInterval(() => {
       const today = getNepaliDate();
       setDate(prev => (prev !== today ? today : prev));
-    }, 30_000); // check every 30s
+    }, 30_000);
     return () => clearInterval(id);
   }, []);
 
@@ -327,26 +359,46 @@ export function useDailyMissions() {
         if (!mounted) return;
 
         if (snap.exists()) {
-          const data  = snap.data();
-          const sm    = data.missions as Mission[];
-          const done  = data.allCompleted ?? false;
-          const start = data.studyMinutesAtStart ?? 0;
-          setMissions(sm);
-          setAllCompleted(done);
-          setStudyMinsAtStart(start);
-          writeCache(uid, date, { missions: sm, allCompleted: done, studyMinsAtStart: start, level: data.level ?? level });
+          const data = snap.data();
+          // If missions were generated with an older version, regenerate them
+          if ((data.version ?? 1) < MISSION_VERSION) {
+            await deleteDoc(docRef).catch(() => {});
+            const grade       = profile?.grade ?? 10;
+            const newMissions = buildMissions(uid, date, level, grade, isSaturday);
+            const cacheData: CachedMissionState = {
+              missions: newMissions, allCompleted: false,
+              studyMinsAtStart: savedMinutesToday, level, version: MISSION_VERSION,
+            };
+            setMissions(newMissions);
+            setAllCompleted(false);
+            setStudyMinsAtStart(savedMinutesToday);
+            writeCache(uid, date, cacheData);
+            setDoc(docRef, {
+              uid, date, level, grade, isSaturday, version: MISSION_VERSION,
+              missions: newMissions, completedCount: 0, allCompleted: false,
+              studyMinutesAtStart: savedMinutesToday,
+            }).catch(e => console.error("[DailyMissions] Firestore write:", e));
+          } else {
+            const sm    = data.missions as Mission[];
+            const done  = data.allCompleted ?? false;
+            const start = data.studyMinutesAtStart ?? 0;
+            setMissions(sm);
+            setAllCompleted(done);
+            setStudyMinsAtStart(start);
+            writeCache(uid, date, { missions: sm, allCompleted: done, studyMinsAtStart: start, level: data.level ?? level, version: MISSION_VERSION });
+          }
         } else {
           const grade       = profile?.grade ?? 10;
           const newMissions = buildMissions(uid, date, level, grade, isSaturday);
           const cacheData: CachedMissionState = {
             missions: newMissions, allCompleted: false,
-            studyMinsAtStart: savedMinutesToday, level,
+            studyMinsAtStart: savedMinutesToday, level, version: MISSION_VERSION,
           };
           setMissions(newMissions);
           setStudyMinsAtStart(savedMinutesToday);
           writeCache(uid, date, cacheData);
           setDoc(docRef, {
-            uid, date, level, grade: profile?.grade ?? 10, isSaturday,
+            uid, date, level, grade: profile?.grade ?? 10, isSaturday, version: MISSION_VERSION,
             missions: newMissions, completedCount: 0, allCompleted: false,
             studyMinutesAtStart: savedMinutesToday,
           }).catch(e => console.error("[DailyMissions] Firestore write:", e));
@@ -356,7 +408,7 @@ export function useDailyMissions() {
         if (uid) {
           const newMissions = buildMissions(uid, date, level, profile?.grade ?? 10, isSaturday);
           setMissions(newMissions);
-          writeCache(uid, date, { missions: newMissions, allCompleted: false, studyMinsAtStart: savedMinutesToday, level });
+          writeCache(uid, date, { missions: newMissions, allCompleted: false, studyMinsAtStart: savedMinutesToday, level, version: MISSION_VERSION });
         }
       } finally {
         if (mounted) setLoading(false);
@@ -367,14 +419,12 @@ export function useDailyMissions() {
   }, [uid, fetchTrigger]);
 
   // ── Auto-complete Pomodoro missions ────────────────────────────────────────
-  // OVERLAP FIX: "focus" uses studyMinsAtStart fallback so it auto-completes
-  // together with "study_time" when both have overlapping targets.
   useEffect(() => {
     if (!uid || missions.length === 0) return;
     for (const m of missions) {
       if (m.type !== "pomodoro" || m.completed || !m.targetMinutes) continue;
       if (completingRef.current.has(m.id)) continue;
-      const minutesDone = m.id === "study_time" || m.startedAt === undefined
+      const minutesDone = m.id === "pomodoro_cycle" || m.id === "study_time" || m.startedAt === undefined
         ? Math.max(0, savedMinutesToday - studyMinsAtStart)
         : Math.max(0, savedMinutesToday - m.startedAt);
       if (minutesDone >= m.targetMinutes) {
@@ -433,7 +483,7 @@ export function useDailyMissions() {
 
   function missionProgress(m: Mission): number {
     if (!m.targetMinutes || m.completed) return m.completed ? 100 : 0;
-    const minutesDone = m.id === "study_time" || m.startedAt === undefined
+    const minutesDone = m.id === "pomodoro_cycle" || m.id === "study_time" || m.startedAt === undefined
       ? Math.max(0, savedMinutesToday - studyMinsAtStart)
       : Math.max(0, savedMinutesToday - m.startedAt);
     return Math.min(100, (minutesDone / m.targetMinutes) * 100);

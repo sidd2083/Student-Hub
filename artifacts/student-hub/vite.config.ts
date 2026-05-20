@@ -101,6 +101,21 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    warmup: {
+      clientFiles: [
+        "./src/main.tsx",
+        "./src/App.tsx",
+        "./src/pages/Home.tsx",
+        "./src/pages/Dashboard.tsx",
+        "./src/pages/DailyMissions.tsx",
+        "./src/pages/Notes.tsx",
+        "./src/pages/Pomodoro.tsx",
+        "./src/components/Layout.tsx",
+        "./src/components/AppShell.tsx",
+        "./src/context/AuthContext.tsx",
+        "./src/lib/firebase.ts",
+      ],
+    },
     proxy: {
       "/api": {
         target: "http://localhost:8080",

@@ -56,6 +56,23 @@ const queryClient = new QueryClient({
   },
 });
 
+// ── Idle-time route prefetching ────────────────────────────────────────────────
+// Preloads the JS chunks for the most-visited pages while the browser is idle,
+// so navigation feels instant rather than waiting for a chunk download.
+if (typeof requestIdleCallback !== "undefined") {
+  requestIdleCallback(() => {
+    // These are the most common navigation targets after login
+    void import("@/pages/Dashboard");
+    void import("@/pages/Notes");
+    void import("@/pages/DailyMissions");
+  }, { timeout: 3000 });
+  requestIdleCallback(() => {
+    void import("@/pages/Pomodoro");
+    void import("@/pages/NepAi");
+    void import("@/pages/Pyqs");
+  }, { timeout: 6000 });
+}
+
 function scrollToTop() {
   const scrollArea = document.querySelector(".main-scroll-area") as HTMLElement | null;
   if (scrollArea) {

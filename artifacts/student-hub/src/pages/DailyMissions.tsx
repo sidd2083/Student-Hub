@@ -5,7 +5,7 @@ import { useDailyMissions } from "@/hooks/useDailyMissions";
 import { SoftGate } from "@/components/SoftGate";
 import {
   CheckCircle2, Circle, Zap, BookOpen,
-  AlertTriangle, Trophy, ChevronRight, Sparkles, Timer, ArrowRight, ShieldAlert, RotateCcw,
+  AlertTriangle, Trophy, ChevronRight, Sparkles, Timer, ArrowRight, ShieldAlert, RotateCcw, ExternalLink,
 } from "lucide-react";
 import type { Mission, MissionDifficulty, MissionLevel } from "@/hooks/useDailyMissions";
 
@@ -34,14 +34,16 @@ function PomodoroMissionCard({
   onStart: (id: string, text: string, mins: number) => void;
 }) {
   const [, navigate] = useLocation();
-  const mins = mission.targetMinutes ?? 30;
+  const mins = mission.targetMinutes ?? 50;
 
   const handleGo = () => {
     onStart(mission.id, mission.text, mins);
     navigate("/pomodoro");
   };
 
-  const fmtMins = (m: number) => m >= 60 ? `${Math.floor(m / 60)}h ${m % 60 > 0 ? `${m % 60}m` : ""}`.trim() : `${m} min`;
+  const fmtMins = (m: number) => m >= 60 ? `${Math.floor(m / 60)}h${m % 60 > 0 ? ` ${m % 60}m` : ""}` : `${m} min`;
+  const cycles = Math.round(mins / 50);
+  const cycleLabel = cycles >= 2 ? `${cycles} cycles` : "1 cycle";
 
   return (
     <div className={`rounded-2xl border p-4 transition-all ${
@@ -58,7 +60,7 @@ function PomodoroMissionCard({
               {diffLabel(mission.difficulty)}
             </span>
             <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-              <Timer className="w-2.5 h-2.5" /> Pomodoro · {fmtMins(mins)}
+              <Timer className="w-2.5 h-2.5" /> Pomodoro · {fmtMins(mins)} · {cycleLabel}
             </span>
           </div>
 
@@ -71,7 +73,7 @@ function PomodoroMissionCard({
           {!mission.completed && (
             <div className="mb-3">
               <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] text-gray-400">Auto-tracked from Pomodoro</span>
+                <span className="text-[10px] text-gray-400">Auto-tracked from Pomodoro timer</span>
                 <span className="text-[10px] font-semibold text-blue-600">{Math.round(progress)}%</span>
               </div>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -89,7 +91,7 @@ function PomodoroMissionCard({
               className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 active:scale-95 text-white text-xs font-semibold rounded-xl transition-all"
             >
               <Timer className="w-3.5 h-3.5" />
-              Open Pomodoro Timer
+              Start Pomodoro Timer
               <ArrowRight className="w-3 h-3" />
             </button>
           )}
@@ -176,6 +178,16 @@ function ManualMissionCard({
             {mission.text}
           </p>
 
+          {/* Action link button — e.g. Open Notes or Open Important Questions */}
+          {mission.actionLink && !mission.completed && (
+            <Link href={mission.actionLink}>
+              <button className="mt-2.5 flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 text-gray-600 hover:text-blue-600 text-[11px] font-semibold rounded-lg transition-all active:scale-95">
+                <ExternalLink className="w-3 h-3" />
+                {mission.actionLabel ?? "Open"}
+              </button>
+            </Link>
+          )}
+
           {mission.completed && mission.completedAt && (
             <p className="text-[10px] text-green-500 mt-1">
               ✓ Done at {new Date(mission.completedAt).toLocaleTimeString("en-NP", {
@@ -233,6 +245,16 @@ function ManualMissionCard({
   );
 }
 
+// ─── Mission type label ───────────────────────────────────────────────────────
+function missionTypeLabel(id: string): string {
+  if (id === "pomodoro_cycle") return "Pomodoro";
+  if (id === "school_task")    return "School";
+  if (id === "subject_study")  return "Study";
+  if (id === "wellness")       return "Wellness";
+  if (id === "grade_mission")  return "Special";
+  return "";
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 function DailyMissionsContent() {
   const {
@@ -276,8 +298,8 @@ function DailyMissionsContent() {
 
       {isSaturday && (
         <div className="mb-5 bg-amber-50 border border-amber-100 rounded-2xl p-4">
-          <p className="text-sm font-semibold text-amber-800 mb-0.5">🎉 Saturday — take it easy!</p>
-          <p className="text-xs text-amber-600">Just 2 light missions today. Rest and come back stronger tomorrow.</p>
+          <p className="text-sm font-semibold text-amber-800 mb-0.5">🎉 Saturday — take it a little easier!</p>
+          <p className="text-xs text-amber-600">Just 2 light missions today. Rest well and come back strong tomorrow.</p>
         </div>
       )}
 
@@ -318,7 +340,7 @@ function DailyMissionsContent() {
           {missions.map((m, i) => (
             <div
               key={m.id}
-              title={m.text}
+              title={missionTypeLabel(m.id)}
               className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
                 m.completed ? "bg-green-500 text-white"
                 : i === completedCount ? "bg-blue-100 text-blue-600 ring-2 ring-blue-300"
@@ -346,10 +368,10 @@ function DailyMissionsContent() {
       <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 mb-4">
         <div className="flex items-center gap-2 mb-2">
           <BookOpen className="w-4 h-4 text-gray-400" />
-          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">About honesty</p>
+          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">A note on honesty</p>
         </div>
-        <p className="text-xs text-gray-500 leading-relaxed mb-1">
-          Ticking something you didn't do only cheats one person — <strong className="text-gray-700">you</strong>. Pomodoro missions are auto-tracked so there's nothing to fake there. For manual ones, the 3-second confirm is a moment of real reflection. Use it well.
+        <p className="text-xs text-gray-500 leading-relaxed">
+          Ticking something you didn't do only cheats one person — <strong className="text-gray-700">you</strong>. Pomodoro missions are tracked automatically so there's nothing to fake there. For manual ones, the 3-second confirm is your moment of real reflection — use it well.
         </p>
       </div>
 
@@ -361,7 +383,7 @@ function DailyMissionsContent() {
         <ul className="space-y-1 text-xs text-blue-600">
           <li>🔥 Get an animated gold glow on the leaderboard</li>
           <li>📈 Level up: Beginner → Intermediate → Advanced</li>
-          <li>🎯 Build a daily habit that actually sticks</li>
+          <li>🎯 Build a daily study habit that actually sticks</li>
         </ul>
       </div>
 
@@ -371,7 +393,7 @@ function DailyMissionsContent() {
           <RotateCcw className="w-3.5 h-3.5" /> Reset today's missions
         </p>
         <p className="text-xs text-gray-400 mb-3 leading-relaxed">
-          Clears your missions for today and generates a fresh set. Useful if something went wrong or you want to test.
+          Clears today's missions and generates a fresh set. Useful if something went wrong.
         </p>
 
         {!showResetConfirm ? (
