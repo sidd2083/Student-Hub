@@ -183,37 +183,29 @@ function LeaderboardContent() {
 
   return (
     <>
-      {/* Inject keyframe animations for mission glow */}
+      {/* Leaderboard glow — GPU-only animations (no box-shadow/text-shadow repaints) */}
       <style>{`
-        @keyframes missionRowGlow {
-          0%, 100% {
-            box-shadow: 0 0 10px rgba(251,191,36,0.5), 0 0 30px rgba(251,146,60,0.2), 0 2px 8px rgba(0,0,0,0.06);
-            border-color: rgba(251,191,36,0.65);
-          }
-          50% {
-            box-shadow: 0 0 20px rgba(251,146,60,0.75), 0 0 50px rgba(251,146,60,0.35), 0 4px 14px rgba(0,0,0,0.1);
-            border-color: rgba(251,146,60,0.95);
-          }
-        }
         @keyframes missionFireFloat {
           0%, 100% { transform: translateY(0) scale(1) rotate(-3deg); }
           33%       { transform: translateY(-4px) scale(1.2) rotate(3deg); }
           66%       { transform: translateY(-2px) scale(1.1) rotate(-1deg); }
         }
-        @keyframes missionNameGlow {
-          0%, 100% { color: #92400e; text-shadow: 0 0 8px rgba(251,191,36,0.4); }
-          50%       { color: #b45309; text-shadow: 0 0 16px rgba(251,146,60,0.7); }
-        }
+        /* Row uses static outline + background — zero animation cost, smooth scroll */
         .mission-glow-row {
-          animation: missionRowGlow 2.2s ease-in-out infinite;
-          background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 40%, #fff7ed 70%, #fff 100%) !important;
+          outline: 2px solid rgba(251,191,36,0.8);
+          outline-offset: -1px;
+          background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 55%, #fff7ed 100%) !important;
+          contain: layout style;
         }
+        /* Name: static amber color, no animation */
         .mission-glow-row .mission-name {
-          animation: missionNameGlow 2.2s ease-in-out infinite;
+          color: #b45309 !important;
           font-weight: 700 !important;
         }
+        /* Fire: transform-only = cheap GPU composite */
         .mission-fire-icon {
-          animation: missionFireFloat 1.6s ease-in-out infinite;
+          animation: missionFireFloat 1.8s ease-in-out infinite;
+          will-change: transform;
           display: inline-block;
         }
       `}</style>
