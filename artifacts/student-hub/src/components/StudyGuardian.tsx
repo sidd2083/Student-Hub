@@ -155,6 +155,7 @@ const WELLNESS = [
 type PopupKind =
   | { kind: "absent"; phase: Phase; awayMins: number }
   | { kind: "wellness"; idx: number }
+  | { kind: "idle_on_page"; idleMins: number }
   | null;
 
 // ─── AbsentPopup ──────────────────────────────────────────────────────────────
@@ -269,6 +270,9 @@ export function StudyGuardian() {
   const lastWellnessRef   = useRef<number | null>(null);
   const wellnessIdxRef    = useRef<number>(0);
 
+  // Idle-on-page state (timer running, tab visible, but user not interacting)
+  const lastIdleCheckRef  = useRef<number | null>(null);
+
   // Sync refs
   useEffect(() => { runningRef.current  = running;  }, [running]);
   useEffect(() => { phaseRef.current    = phase;    }, [phase]);
@@ -339,6 +343,37 @@ export function StudyGuardian() {
     return () => clearInterval(id);
   }, []);
 
+  // ── Idle-on-page detection ────────────────────────────────────────────────
+  // Catches students who leave the Pomodoro page open while doing something else
+  // (tab stays visible — existing tab-away logic won't catch this case).
+  // Fires if: timer running + tab visible + no activity for 12 min + work phase.
+  // Cooldown: once per 25 min so it doesn't nag real students who just aren't moving.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!runningRef.current)       return;
+      if (document.hidden)           return; // tab-away logic handles hidden tab
+      if (popupRef.current !== null) return;
+      if (phaseRef.current !== "work") return;
+
+      const idleMs = Date.now() - lastActivityRef.current;
+      if (idleMs < 12 * 60_000) return; // < 12 min idle → still probably studying
+
+      // Cooldown: don't show more than once per 25 min
+      if (lastIdleCheckRef.current && Date.now() - lastIdleCheckRef.current < 25 * 60_000) return;
+
+      const idleMins = Math.round(idleMs / 60_000);
+      lastIdleCheckRef.current = Date.now();
+      focusTracker.addDistracted(idleMs);
+      playImmediateAlert();
+      sendNotification(
+        "⚠️ Student Hub — Still studying?",
+        `Your timer has been running for ${idleMins} min with no activity. Still focused?`,
+      );
+      setPopup({ kind: "idle_on_page", idleMins });
+    }, 2 * 60_000); // check every 2 minutes
+    return () => clearInterval(id);
+  }, []);
+
   // ── Tab-away detection ────────────────────────────────────────────────────
   useEffect(() => {
     const handle = () => {
@@ -351,17 +386,12 @@ export function StudyGuardian() {
         const s      = settingsRef.current;
 
         if (isWork) {
-          // How long has this timer been running?
-          // < 30 s (brand-new session, left instantly): alarm at 1 min — catches "open and immediately leave"
-          // < 5 min (still warming up): alarm at 2 min
-          // 5 min+ (genuinely running): alarm at 3 min — don't disturb real students briefly switching tabs
-          const runningForMs  = timerStartedAtRef.current
-            ? Date.now() - timerStartedAtRef.current
-            : Infinity;
-          const firstAlarmMin = runningForMs < 30_000 ? 1 : runningForMs < 300_000 ? 2 : 3;
+          // Always wait at least 5 minutes before any alarm — brief tab switches are normal
+          // Alarms: 5, 6, 7, 8, 9, 10, 11, 12, 13 minutes away
+          const firstAlarmMin = 5;
 
           // Schedule beeps at: first alarm, then every 60 s for 8 more rounds
-          // (covers up to ~11 minutes of being away with continuous noise).
+          // (covers up to ~13 minutes of being away with continuous noise).
           const alarmMinutes = Array.from({ length: 9 }, (_, i) => firstAlarmMin + i);
           alarmHandleRef.current = scheduleAlarms(alarmMinutes);
 
@@ -407,8 +437,8 @@ export function StudyGuardian() {
         }
 
         if (isWork) {
-          // < 3 min away → normal brief tab switch, ignore
-          if (awayMs < 3 * 60_000) return;
+          // < 5 min away → normal brief tab switch, completely ignore
+          if (awayMs < 5 * 60_000) return;
 
           // User recently confirmed they're studying → don't nag for 30 min
           const sinceConfirm = lastConfirmedRef.current
@@ -416,7 +446,7 @@ export function StudyGuardian() {
             : Infinity;
           if (sinceConfirm < 30 * 60_000) return;
 
-          // 3–60 min away → play alert + show popup
+          // 5–60 min away → play alert + show popup
           focusTracker.addDistracted(awayMs);
           playImmediateAlert();
           sendNotification(
@@ -449,6 +479,12 @@ export function StudyGuardian() {
   };
   const handleAbsentNo = () => { skipPhase(); setPopup(null); };
   const handleWellnessDismiss = () => { lastActivityRef.current = Date.now(); setPopup(null); };
+  const handleIdleStillStudying = () => {
+    lastConfirmedRef.current = Date.now();
+    lastActivityRef.current  = Date.now();
+    setPopup(null);
+  };
+  const handleIdlePause = () => { pause(); setPopup(null); };
 
   if (!popup) return null;
 
@@ -466,6 +502,47 @@ export function StudyGuardian() {
   if (popup.kind === "wellness") {
     const { emoji, msg } = WELLNESS[popup.idx];
     return <WellnessPopup emoji={emoji} message={msg} onDismiss={handleWellnessDismiss} />;
+  }
+
+  if (popup.kind === "idle_on_page") {
+    return (
+      <div
+        className="fixed inset-0 z-[9500] flex items-center justify-center p-4"
+        style={{ background: "rgba(15,23,42,0.85)", backdropFilter: "blur(8px)" }}
+      >
+        <div
+          className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-7 text-center"
+          style={{ animation: "pageFadeIn 0.2s ease both" }}
+        >
+          <div className="text-5xl mb-3">👀</div>
+          <h2 className="text-xl font-bold text-gray-900 mb-1">Still there?</h2>
+          <p className="text-xs font-medium text-gray-400 mb-4 uppercase tracking-wide">
+            No activity for {popup.idleMins} minutes
+          </p>
+          <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+            Your timer is running but nothing has happened on screen for a while.
+            Are you actively studying, or did you step away?
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={handleIdlePause}
+              className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition-all text-sm"
+            >
+              Pause timer ⏸️
+            </button>
+            <button
+              onClick={handleIdleStillStudying}
+              className="flex-1 py-3 rounded-2xl bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-all text-sm shadow-lg shadow-blue-200"
+            >
+              I'm studying 📚
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-4">
+            Clicking "I'm studying" records you as present
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return null;

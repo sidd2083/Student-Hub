@@ -72,26 +72,26 @@ export function getUserLevel(streak: number, totalStudyMins: number): MissionLev
   return "beginner";
 }
 
-// ─── Fun challenges — all doable at home, no school-dependent tasks ───────────
+// ─── Fun challenges — academic & productivity focused, all home-doable ───────
 const FUN_CHALLENGES = [
-  { text: "Drink 8 glasses of water today — start with one glass right now before you study",        emoji: "💧" },
-  { text: "Do 15 jumping jacks or push-ups right now before you open your books",                    emoji: "💪" },
-  { text: "Put your phone in another room for your entire study session today — no exceptions",       emoji: "🔕" },
-  { text: "Take a 10-minute walk outside, clear your head, then come back fresh",                    emoji: "🚶" },
-  { text: "Write down 3 specific things you learned today and 1 thing you want to understand better", emoji: "📝" },
-  { text: "Clean and organize your study desk completely — a clean desk = a clear mind",              emoji: "🧹" },
-  { text: "Commit to sleeping before 10:30 PM tonight — rest is half of studying",                   emoji: "😴" },
-  { text: "Eat a proper meal or healthy snack before your next study session — fuel your brain",      emoji: "🍱" },
-  { text: "Do 5 minutes of slow deep breathing before you open your books — in through nose, out through mouth", emoji: "🧘" },
-  { text: "Write your top 3 study goals for tomorrow before you sleep tonight",                       emoji: "🎯" },
-  { text: "No social media at all during your study time today — close every app",                    emoji: "📵" },
-  { text: "Stretch your neck, shoulders and back right now — 3 minutes only",                        emoji: "🤸" },
-  { text: "Write a 5-sentence summary of everything you studied today — in your own words",           emoji: "📓" },
-  { text: "Step outside for 5 minutes between sessions — fresh air resets your focus",               emoji: "🌤️" },
-  { text: "Set a specific time to stop studying tonight and actually stick to it",                    emoji: "⏰" },
-  { text: "Read one page of anything you enjoy — fiction, news, manga — to reward yourself",         emoji: "📰" },
-  { text: "Spend 15 minutes with your family this evening — real conversation, no phones",            emoji: "🏠" },
-  { text: "Close your eyes for 5 minutes and do nothing — your brain needs micro-breaks too",        emoji: "🌙" },
+  { text: "Feynman Technique: write one full topic from scratch on paper — no notes, no peeking",    emoji: "📝" },
+  { text: "Do 3 back-to-back Pomodoro sessions today with your phone in another room the whole time", emoji: "⏱️" },
+  { text: "Write a full-page summary of everything you've studied this week — from memory only",      emoji: "🧠" },
+  { text: "Find the one concept you've been avoiding and spend 30 focused minutes on it today",       emoji: "🔍" },
+  { text: "Make your own practice test for one topic from memory — then actually take it and score it", emoji: "📋" },
+  { text: "Study your hardest subject in your very first study session today — hardest first always", emoji: "💪" },
+  { text: "Turn off all notifications and keep your phone face-down for your entire study session",   emoji: "📵" },
+  { text: "Before sleeping, write 5 things you learned today completely from memory — no looking",    emoji: "🌙" },
+  { text: "Rewrite your class notes for one subject in a cleaner, better-organized format",          emoji: "🗒️" },
+  { text: "Time yourself solving 5 past exam questions — then beat your own time with 5 more",       emoji: "⏰" },
+  { text: "Identify your single biggest study weakness today and spend 45 minutes attacking it",      emoji: "🎯" },
+  { text: "Cover your notes and recite one entire chapter out loud — as if explaining to yourself",  emoji: "🗣️" },
+  { text: "Create a perfect one-page formula and fact sheet for one subject — from memory only",      emoji: "📊" },
+  { text: "Active recall drill: close notes and answer 10 self-made questions about today's topic",  emoji: "✅" },
+  { text: "Pick the topic with the highest exam weightage and read it three times today",             emoji: "📚" },
+  { text: "Start studying 30 minutes earlier than usual today — your future self will thank you",     emoji: "⚡" },
+  { text: "Write model answers for 3 probable exam questions — no hints, full answers only",          emoji: "🖊️" },
+  { text: "Review your last 3 test mistakes — write exactly why you made each one and the fix",      emoji: "🔎" },
 ];
 
 // ─── Academic: Grade 9-10 / SEE preparation ──────────────────────────────────
