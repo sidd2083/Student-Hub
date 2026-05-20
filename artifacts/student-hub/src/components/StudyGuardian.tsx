@@ -154,7 +154,6 @@ const WELLNESS = [
 // ─── Popup types ──────────────────────────────────────────────────────────────
 type PopupKind =
   | { kind: "absent"; phase: Phase; awayMins: number }
-  | { kind: "auto_paused"; pausedMins: number }
   | { kind: "wellness"; idx: number }
   | { kind: "idle_on_page"; idleMins: number }
   | null;
@@ -259,14 +258,11 @@ export function StudyGuardian() {
   const popupRef          = useRef<PopupKind>(null);
 
   // Tab-away state
-  const hiddenAtRef        = useRef<number | null>(null);
-  const alarmHandleRef     = useRef<AlarmHandle | null>(null);
-  const notifTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastConfirmedRef   = useRef<number | null>(null);
-  const timerStartedAtRef  = useRef<number | null>(null); // when timer last became running
-  // Auto-pause anti-cheat: timer auto-pauses after 2 min of tab-away during a work session
-  const autoPauseTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const autoPausedAtRef    = useRef<number | null>(null);
+  const hiddenAtRef       = useRef<number | null>(null);
+  const alarmHandleRef    = useRef<AlarmHandle | null>(null);
+  const notifTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastConfirmedRef  = useRef<number | null>(null);
+  const timerStartedAtRef = useRef<number | null>(null); // when timer last became running
 
   // Wellness state
   const lastActivityRef   = useRef<number>(Date.now());
@@ -348,22 +344,22 @@ export function StudyGuardian() {
   }, []);
 
   // ── Idle-on-page detection ────────────────────────────────────────────────
-  // Catches students who leave the Pomodoro page open while doing something else
-  // (tab stays visible — existing tab-away logic won't catch this case).
-  // Fires if: timer running + tab visible + no activity for 12 min + work phase.
-  // Cooldown: once per 25 min so it doesn't nag real students who just aren't moving.
+  // Catches students who start the timer on the Pomodoro page then do nothing —
+  // tab stays visible so tab-away logic doesn't fire, but they're not studying.
+  // Fires if: timer running + tab visible + work phase + no mouse/key/touch for 6 min.
+  // Cooldown: 20 min so genuine slow readers don't get nagged repeatedly.
   useEffect(() => {
     const id = setInterval(() => {
-      if (!runningRef.current)       return;
-      if (document.hidden)           return; // tab-away logic handles hidden tab
-      if (popupRef.current !== null) return;
+      if (!runningRef.current)         return;
+      if (document.hidden)             return; // tab-away logic handles hidden tab
+      if (popupRef.current !== null)   return;
       if (phaseRef.current !== "work") return;
 
       const idleMs = Date.now() - lastActivityRef.current;
-      if (idleMs < 12 * 60_000) return; // < 12 min idle → still probably studying
+      if (idleMs < 6 * 60_000) return; // < 6 min idle → still probably studying
 
-      // Cooldown: don't show more than once per 25 min
-      if (lastIdleCheckRef.current && Date.now() - lastIdleCheckRef.current < 25 * 60_000) return;
+      // Cooldown: don't show more than once per 20 min
+      if (lastIdleCheckRef.current && Date.now() - lastIdleCheckRef.current < 20 * 60_000) return;
 
       const idleMins = Math.round(idleMs / 60_000);
       lastIdleCheckRef.current = Date.now();
@@ -371,23 +367,14 @@ export function StudyGuardian() {
       playImmediateAlert();
       sendNotification(
         "⚠️ Student Hub — Still studying?",
-        `Your timer has been running for ${idleMins} min with no activity. Still focused?`,
+        `No activity for ${idleMins} min while your timer runs. Still focused?`,
       );
       setPopup({ kind: "idle_on_page", idleMins });
-    }, 2 * 60_000); // check every 2 minutes
+    }, 60_000); // check every 1 minute
     return () => clearInterval(id);
   }, []);
 
   // ── Tab-away detection ────────────────────────────────────────────────────
-  //
-  // WORK PHASE — Anti-cheat auto-pause:
-  //   • Tab hidden while work session running → start 2-min grace timer
-  //   • If still hidden after 2 min → pause() the timer so no more study
-  //     minutes accumulate. Play beeps and send notification.
-  //   • When tab comes back → if auto-paused, show "Resume?" popup.
-  //     If tab came back within 2 min (grace), just clear and continue.
-  //
-  // BREAK PHASE — No auto-pause; only a reminder if away 2× break duration.
   useEffect(() => {
     const handle = () => {
       if (document.hidden) {
@@ -399,80 +386,60 @@ export function StudyGuardian() {
         const s      = settingsRef.current;
 
         if (isWork) {
-          // Auto-pause after 2 minutes — timer stops counting, exploit closed
-          autoPauseTimerRef.current = setTimeout(() => {
-            if (!document.hidden) return;        // user came back — grace timer wins
-            if (!runningRef.current) return;     // already paused for another reason
-            pause();
-            autoPausedAtRef.current = Date.now();
-            // Kill scheduled beeps — the pause IS the feedback
-            cancelAlarms(alarmHandleRef.current);
-            alarmHandleRef.current = null;
-            if (notifTimerRef.current) { clearTimeout(notifTimerRef.current); notifTimerRef.current = null; }
-            sendNotification("⏸️ Timer paused", "Your Pomodoro was paused because you left the page.");
-          }, 2 * 60_000);
-
-          // Schedule audio alarms starting at 2 min (fires together with auto-pause)
-          // and then every 60 s up to 13 min (audible even from another room)
-          const alarmMinutes = Array.from({ length: 9 }, (_, i) => 2 + i);
+          // Alarms: 5, 6, 7, 8, 9, 10, 11, 12, 13 minutes away
+          const firstAlarmMin = 5;
+          const alarmMinutes  = Array.from({ length: 9 }, (_, i) => firstAlarmMin + i);
           alarmHandleRef.current = scheduleAlarms(alarmMinutes);
-
-          // Browser notification at 2 min
           notifTimerRef.current = setTimeout(() => {
             if (document.hidden) {
               sendNotification(
-                "⚠️ Student Hub — Pausing timer",
-                "You've been away 2 minutes. Timer is now paused.",
+                "⚠️ Student Hub — Focus check",
+                "You've been away from your study session. Come back and stay focused!",
               );
             }
-          }, 2 * 60_000);
-
+          }, firstAlarmMin * 60 * 1_000);
         } else {
-          // Break phase: only beep if they stay away 2× longer than the break
           const breakMins = phaseRef.current === "shortBreak"
-            ? s.shortBreakMins
-            : s.longBreakMins;
+            ? s.shortBreakMins : s.longBreakMins;
           alarmHandleRef.current = scheduleAlarms([breakMins * 2]);
         }
 
       } else {
         // ── Tab came back ────────────────────────────────────────────────
-        // Cancel everything first
         cancelAlarms(alarmHandleRef.current);
         alarmHandleRef.current = null;
-        if (notifTimerRef.current)   { clearTimeout(notifTimerRef.current);   notifTimerRef.current = null; }
-        if (autoPauseTimerRef.current) { clearTimeout(autoPauseTimerRef.current); autoPauseTimerRef.current = null; }
+        if (notifTimerRef.current) { clearTimeout(notifTimerRef.current); notifTimerRef.current = null; }
 
         const hiddenAt = hiddenAtRef.current;
         hiddenAtRef.current = null;
+        if (!hiddenAt || !runningRef.current) return;
 
-        // If the auto-pause already fired, show "resume?" popup
-        if (autoPausedAtRef.current) {
-          const pausedForMs  = Date.now() - autoPausedAtRef.current;
-          const pausedMins   = Math.max(1, Math.round(pausedForMs / 60_000));
-          autoPausedAtRef.current = null;
-          if (hiddenAt) {
-            playImmediateAlert();
-            setPopup({ kind: "auto_paused", pausedMins });
-          }
+        const awayMs   = Date.now() - hiddenAt;
+        const awayMins = Math.max(1, Math.round(awayMs / 60_000));
+        const isWork   = phaseRef.current === "work";
+
+        // ≥ 60 min away → auto-skip phase silently
+        if (awayMs >= 60 * 60_000) {
+          skipPhase();
+          lastConfirmedRef.current = null;
           return;
         }
 
-        if (!hiddenAt || !runningRef.current) return;
-
-        const awayMs = Date.now() - hiddenAt;
-        const isWork = phaseRef.current === "work";
-
         if (isWork) {
-          // Tab was hidden < 2 min (grace period, auto-pause didn't fire) — do nothing
-          return;
+          if (awayMs < 5 * 60_000) return; // brief switch — ignore
+
+          const sinceConfirm = lastConfirmedRef.current
+            ? Date.now() - lastConfirmedRef.current : Infinity;
+          if (sinceConfirm < 30 * 60_000) return; // recently confirmed — don't nag
+
+          focusTracker.addDistracted(awayMs);
+          playImmediateAlert();
+          sendNotification("⚠️ Student Hub — Study check", `You were away ${awayMins} min. Still studying?`);
+          setPopup({ kind: "absent", phase: phaseRef.current, awayMins });
         } else {
-          // Break phase: popup if they stayed away 2× the break duration
           const breakMins = phaseRef.current === "shortBreak"
-            ? settingsRef.current.shortBreakMins
-            : settingsRef.current.longBreakMins;
+            ? settingsRef.current.shortBreakMins : settingsRef.current.longBreakMins;
           if (awayMs < breakMins * 2 * 60_000) return;
-          const awayMins = Math.max(1, Math.round(awayMs / 60_000));
           playImmediateAlert();
           setPopup({ kind: "absent", phase: phaseRef.current, awayMins });
         }
@@ -481,14 +448,9 @@ export function StudyGuardian() {
 
     document.addEventListener("visibilitychange", handle);
     return () => document.removeEventListener("visibilitychange", handle);
-  }, [skipPhase, pause]);
+  }, [skipPhase]);
 
   // ── Popup handlers ────────────────────────────────────────────────────────
-  const handleAutoPausedResume = () => {
-    lastActivityRef.current = Date.now();
-    setPopup(null); // popup clear triggers start() via the pause/resume effect
-  };
-  const handleAutoPausedSkip = () => { skipPhase(); setPopup(null); };
   const handleAbsentYes = () => {
     lastConfirmedRef.current = Date.now();
     lastActivityRef.current  = Date.now();
@@ -504,48 +466,6 @@ export function StudyGuardian() {
   const handleIdlePause = () => { pause(); setPopup(null); };
 
   if (!popup) return null;
-
-  if (popup.kind === "auto_paused") {
-    const mins = popup.pausedMins;
-    return (
-      <div
-        className="fixed inset-0 z-[9500] flex items-center justify-center p-4"
-        style={{ background: "rgba(15,23,42,0.85)", backdropFilter: "blur(8px)" }}
-      >
-        <div
-          className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-7 text-center"
-          style={{ animation: "pageFadeIn 0.2s ease both" }}
-        >
-          <div className="text-5xl mb-3">⏸️</div>
-          <h2 className="text-xl font-bold text-gray-900 mb-1">Timer paused</h2>
-          <p className="text-xs font-medium text-gray-400 mb-4 uppercase tracking-wide">
-            You were away {mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins} min`}
-          </p>
-          <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-            Your Pomodoro was <strong className="text-gray-700">automatically paused</strong> because you left this tab.
-            No study time was counted while you were gone — only actual study time counts.
-          </p>
-          <div className="flex gap-3">
-            <button
-              onClick={handleAutoPausedSkip}
-              className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition-all text-sm"
-            >
-              Skip to break ⏩
-            </button>
-            <button
-              onClick={handleAutoPausedResume}
-              className="flex-1 py-3 rounded-2xl bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-all text-sm shadow-lg shadow-blue-200"
-            >
-              Resume timer ▶️
-            </button>
-          </div>
-          <p className="text-xs text-gray-400 mt-4">
-            Timer resumes from where it paused
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   if (popup.kind === "absent") {
     return (
