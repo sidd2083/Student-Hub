@@ -351,12 +351,14 @@ export function StudyGuardian() {
         const s      = settingsRef.current;
 
         if (isWork) {
-          // How long has this timer been running? If user JUST started (<60 s)
-          // and immediately switched tabs, catch them faster (2 min vs 3 min grace).
+          // How long has this timer been running?
+          // < 30 s (brand-new session, left instantly): alarm at 1 min — catches "open and immediately leave"
+          // < 5 min (still warming up): alarm at 2 min
+          // 5 min+ (genuinely running): alarm at 3 min — don't disturb real students briefly switching tabs
           const runningForMs  = timerStartedAtRef.current
             ? Date.now() - timerStartedAtRef.current
             : Infinity;
-          const firstAlarmMin = runningForMs < 60_000 ? 2 : 3;
+          const firstAlarmMin = runningForMs < 30_000 ? 1 : runningForMs < 300_000 ? 2 : 3;
 
           // Schedule beeps at: first alarm, then every 60 s for 8 more rounds
           // (covers up to ~11 minutes of being away with continuous noise).

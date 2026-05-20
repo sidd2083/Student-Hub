@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useDailyMissions } from "@/hooks/useDailyMissions";
 import { SoftGate } from "@/components/SoftGate";
 import {
   CheckCircle2, Circle, Zap, BookOpen,
-  AlertTriangle, Trophy, ChevronRight, Sparkles, Timer, ArrowRight,
+  AlertTriangle, Trophy, ChevronRight, Sparkles, Timer, ArrowRight, ShieldAlert,
 } from "lucide-react";
 import type { Mission, MissionDifficulty, MissionLevel } from "@/hooks/useDailyMissions";
 
@@ -26,14 +26,7 @@ function levelLabel(l: MissionLevel) {
   return "🔥 Advanced";
 }
 
-const CONFIRM_LINES: Record<string, string> = {
-  school_task: "Actually finished your homework? That discipline is real. 📚",
-  fun:         "Small healthy habits today — huge life changes tomorrow. Honest? ✨",
-  academic:    "Your brain just got stronger. Honest work builds real results. 🧠",
-};
-
 // ─── Pomodoro Mission Card ─────────────────────────────────────────────────────
-// For timed missions — shows progress bar + "Go to Pomodoro" button, NO manual tick
 function PomodoroMissionCard({
   mission,
   progress,
@@ -44,7 +37,7 @@ function PomodoroMissionCard({
   onStart: (id: string, text: string, mins: number) => void;
 }) {
   const [, navigate] = useLocation();
-  const isStarted = mission.startedAt !== undefined || mission.id === "study_time";
+  const isStarted = mission.startedAt !== undefined || mission.id === "study_time" || mission.id === "focus";
   const mins      = mission.targetMinutes ?? 30;
 
   const handleGo = () => {
@@ -59,7 +52,6 @@ function PomodoroMissionCard({
       mission.completed ? "bg-green-50 border-green-100" : "bg-white border-gray-100 shadow-sm"
     }`}>
       <div className="flex items-start gap-3">
-        {/* Status icon — auto, no manual tick */}
         <div className={`mt-0.5 flex-shrink-0 ${mission.completed ? "text-green-500" : "text-blue-300"}`}>
           {mission.completed
             ? <CheckCircle2 className="w-6 h-6" />
@@ -83,12 +75,11 @@ function PomodoroMissionCard({
             {mission.text}
           </p>
 
-          {/* Progress bar */}
           {!mission.completed && (
             <div className="mb-3">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-[10px] text-gray-400">
-                  {isStarted ? "Session progress" : "Not started yet"}
+                  {isStarted ? "Session progress (auto-tracked)" : "Not started yet"}
                 </span>
                 {isStarted && (
                   <span className="text-[10px] font-semibold text-blue-600">{Math.round(progress)}%</span>
@@ -103,7 +94,6 @@ function PomodoroMissionCard({
             </div>
           )}
 
-          {/* CTA button */}
           {!mission.completed && (
             <button
               onClick={handleGo}
@@ -132,23 +122,68 @@ function PomodoroMissionCard({
 function ManualMissionCard({
   mission,
   onComplete,
+  blockedUntil,
 }: {
   mission: Mission;
   onComplete: (id: string) => void;
+  blockedUntil: number;
 }) {
-  const [confirming, setConfirming] = useState(false);
+  const [confirming, setConfirming]         = useState(false);
+  const [confirmCountdown, setConfirmCountdown] = useState(3);
+  const [blockSecsLeft, setBlockSecsLeft]   = useState(() =>
+    Math.max(0, Math.ceil((blockedUntil - Date.now()) / 1000))
+  );
+
+  // Countdown before "Yes I did it!" becomes clickable
+  useEffect(() => {
+    if (!confirming) { setConfirmCountdown(3); return; }
+    setConfirmCountdown(3);
+    const id = setInterval(() => {
+      setConfirmCountdown(prev => {
+        if (prev <= 1) { clearInterval(id); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [confirming]);
+
+  // Anti-cheat block countdown
+  useEffect(() => {
+    if (!blockedUntil) return;
+    const update = () => {
+      const s = Math.max(0, Math.ceil((blockedUntil - Date.now()) / 1000));
+      setBlockSecsLeft(s);
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [blockedUntil]);
+
+  const isBlocked = blockSecsLeft > 0;
+
+  const CONFIRM_LINES: Record<string, string> = {
+    school_task: "Did you actually finish it? Real discipline shows in exam results. 📚",
+    fun:         "Did you genuinely do this? Small healthy habits compound into big results. ✨",
+    academic:    "Did you actually complete this? Your brain grows only when you do the work. 🧠",
+  };
 
   return (
     <div className={`rounded-2xl border p-4 transition-all ${
-      mission.completed ? "bg-green-50 border-green-100" : "bg-white border-gray-100 shadow-sm"
+      mission.completed
+        ? "bg-green-50 border-green-100"
+        : isBlocked
+        ? "bg-red-50 border-red-100"
+        : "bg-white border-gray-100 shadow-sm"
     }`}>
       <div className="flex items-start gap-3">
         <button
-          onClick={() => !mission.completed && setConfirming(true)}
-          disabled={mission.completed}
+          onClick={() => !mission.completed && !isBlocked && setConfirming(true)}
+          disabled={mission.completed || isBlocked}
           className={`mt-0.5 flex-shrink-0 transition-transform ${
             mission.completed
               ? "text-green-500"
+              : isBlocked
+              ? "text-red-300 cursor-not-allowed"
               : "text-gray-300 hover:text-blue-400 hover:scale-110 active:scale-95 cursor-pointer"
           }`}
         >
@@ -176,26 +211,47 @@ function ManualMissionCard({
               })}
             </p>
           )}
+
+          {/* Anti-cheat block banner */}
+          {isBlocked && !mission.completed && (
+            <div className="mt-2 flex items-center gap-2 bg-red-100 border border-red-200 rounded-xl px-3 py-2">
+              <ShieldAlert className="w-4 h-4 text-red-500 flex-shrink-0" />
+              <p className="text-xs font-semibold text-red-700">
+                Completing too fast! Wait {blockSecsLeft}s before marking another task.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
-      {confirming && (
+      {/* Confirmation dialog */}
+      {confirming && !mission.completed && (
         <div className="mt-3 pt-3 border-t border-gray-100">
           <div className="flex items-start gap-2 mb-3">
             <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-xs font-semibold text-gray-800 mb-0.5">Are you sure you completed this?</p>
+              <p className="text-xs font-semibold text-gray-800 mb-0.5">Are you sure you actually did this?</p>
               <p className="text-xs text-gray-500 leading-relaxed italic">
-                {CONFIRM_LINES[mission.id] ?? "Your honesty is your biggest strength. Be real with yourself. 💪"}
+                {CONFIRM_LINES[mission.id] ?? "Your honesty is your biggest strength. The only person you cheat is yourself. 💪"}
               </p>
             </div>
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => { setConfirming(false); onComplete(mission.id); }}
-              className="flex-1 py-2 text-xs font-semibold bg-green-500 hover:bg-green-600 text-white rounded-xl transition-all"
+              onClick={() => {
+                if (confirmCountdown === 0) {
+                  setConfirming(false);
+                  onComplete(mission.id);
+                }
+              }}
+              disabled={confirmCountdown > 0}
+              className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all ${
+                confirmCountdown > 0
+                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                  : "bg-green-500 hover:bg-green-600 text-white"
+              }`}
             >
-              Yes, I did it! ✓
+              {confirmCountdown > 0 ? `Yes, I did it! (${confirmCountdown}s)` : "Yes, I did it! ✓"}
             </button>
             <button
               onClick={() => setConfirming(false)}
@@ -215,7 +271,7 @@ function DailyMissionsContent() {
   const {
     missions, loading, completeMission, startMission, missionProgress,
     completedCount, allCompleted, progressPct,
-    isSaturday, level, date,
+    isSaturday, level, date, blockedUntil,
   } = useDailyMissions();
 
   if (loading && missions.length === 0) {
@@ -246,7 +302,6 @@ function DailyMissionsContent() {
         <p className="text-sm text-gray-500">{todayLabel} · {levelLabel(level)}</p>
       </div>
 
-      {/* Saturday holiday banner */}
       {isSaturday && (
         <div className="mb-5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-4">
           <p className="text-sm font-semibold text-amber-800 mb-0.5">🎉 It's Saturday — enjoy your day!</p>
@@ -256,7 +311,6 @@ function DailyMissionsContent() {
         </div>
       )}
 
-      {/* All complete celebration */}
       {allCompleted && (
         <div
           className="mb-5 rounded-2xl p-4 text-center"
@@ -265,7 +319,7 @@ function DailyMissionsContent() {
           <div className="text-3xl mb-1">🏆</div>
           <p className="text-white font-bold text-base mb-0.5">All missions complete!</p>
           <p className="text-purple-200 text-xs leading-relaxed">
-            Your name on the leaderboard is now glowing 🔥. Incredible discipline!
+            Your name is glowing on the leaderboard 🔥. That discipline is real!
           </p>
           <Link href="/leaderboard">
             <div className="mt-3 inline-flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-semibold px-4 py-2 rounded-full transition-all cursor-pointer">
@@ -328,6 +382,7 @@ function DailyMissionsContent() {
               key={m.id}
               mission={m}
               onComplete={completeMission}
+              blockedUntil={blockedUntil}
             />
           )
         )}
@@ -340,13 +395,10 @@ function DailyMissionsContent() {
           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">A note on honesty</p>
         </div>
         <p className="text-xs text-gray-500 leading-relaxed mb-2">
-          These missions have no cameras, no verification — that's intentional.
-          Ticking something you didn't do only cheats one person: <strong className="text-gray-700">you</strong>.
+          These missions have no cameras — that's intentional. Ticking something you didn't do only cheats one person: <strong className="text-gray-700">you</strong>.
         </p>
         <p className="text-xs text-gray-500 leading-relaxed mb-2">
-          We are just a platform pushing you toward your goals. The Pomodoro
-          missions auto-track so there's nothing to fake there. For the rest —
-          your effort compounds, your results don't lie.
+          Pomodoro missions auto-track — nothing to fake there. For manual missions, the 3-second confirmation is a small moment of real reflection. Use it honestly.
         </p>
         <p className="text-xs font-semibold text-gray-700">Study smart. Be real. 💪</p>
       </div>
@@ -357,7 +409,7 @@ function DailyMissionsContent() {
           <Trophy className="w-3.5 h-3.5" /> Complete all missions to:
         </p>
         <ul className="space-y-1 text-xs text-blue-600">
-          <li>🔥 Get a special glow + badge on the leaderboard</li>
+          <li>🔥 Get a blazing animated glow on the leaderboard</li>
           <li>⚡ Build a daily study habit that actually sticks</li>
           <li>📈 Level up: Beginner → Intermediate → Advanced</li>
           <li>🎯 Stay consistently ahead of your class</li>
