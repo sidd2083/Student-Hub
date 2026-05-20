@@ -72,26 +72,32 @@ export function getUserLevel(streak: number, totalStudyMins: number): MissionLev
   return "beginner";
 }
 
-// ─── Fun challenges — academic & productivity focused, all home-doable ───────
+// ─── Fun challenges — best-of-the-best mix: physical boosts + academic wins ──
+// Physical challenges are ones that directly help brain performance and focus.
+// Academic challenges are proven high-output study techniques.
 const FUN_CHALLENGES = [
-  { text: "Feynman Technique: write one full topic from scratch on paper — no notes, no peeking",    emoji: "📝" },
-  { text: "Do 3 back-to-back Pomodoro sessions today with your phone in another room the whole time", emoji: "⏱️" },
-  { text: "Write a full-page summary of everything you've studied this week — from memory only",      emoji: "🧠" },
-  { text: "Find the one concept you've been avoiding and spend 30 focused minutes on it today",       emoji: "🔍" },
-  { text: "Make your own practice test for one topic from memory — then actually take it and score it", emoji: "📋" },
-  { text: "Study your hardest subject in your very first study session today — hardest first always", emoji: "💪" },
-  { text: "Turn off all notifications and keep your phone face-down for your entire study session",   emoji: "📵" },
-  { text: "Before sleeping, write 5 things you learned today completely from memory — no looking",    emoji: "🌙" },
-  { text: "Rewrite your class notes for one subject in a cleaner, better-organized format",          emoji: "🗒️" },
-  { text: "Time yourself solving 5 past exam questions — then beat your own time with 5 more",       emoji: "⏰" },
-  { text: "Identify your single biggest study weakness today and spend 45 minutes attacking it",      emoji: "🎯" },
-  { text: "Cover your notes and recite one entire chapter out loud — as if explaining to yourself",  emoji: "🗣️" },
-  { text: "Create a perfect one-page formula and fact sheet for one subject — from memory only",      emoji: "📊" },
-  { text: "Active recall drill: close notes and answer 10 self-made questions about today's topic",  emoji: "✅" },
-  { text: "Pick the topic with the highest exam weightage and read it three times today",             emoji: "📚" },
-  { text: "Start studying 30 minutes earlier than usual today — your future self will thank you",     emoji: "⚡" },
-  { text: "Write model answers for 3 probable exam questions — no hints, full answers only",          emoji: "🖊️" },
-  { text: "Review your last 3 test mistakes — write exactly why you made each one and the fix",      emoji: "🔎" },
+  // ── Physical (brain-boosting, not weird) ──────────────────────────────────
+  { text: "Do 20 push-ups or jumping jacks right now — getting blood to your brain makes you sharper",  emoji: "💪" },
+  { text: "Take a 10-minute walk outside between study sessions — walking literally clears mental fog",  emoji: "🚶" },
+  { text: "Stretch your shoulders, neck and back for 5 minutes before your first Pomodoro today",       emoji: "🤸" },
+  { text: "Put your phone in a different room for your entire study session — pick it up only after finishing", emoji: "📵" },
+  { text: "Drink a full glass of cold water right now, then start your most important subject",          emoji: "💧" },
+  { text: "Do 30 seconds of deep breathing right before you start — in through nose, out through mouth", emoji: "🧘" },
+  // ── Academic / productivity ────────────────────────────────────────────────
+  { text: "Feynman Technique: write one full topic from scratch on paper — no notes, no peeking",       emoji: "📝" },
+  { text: "Do 3 back-to-back Pomodoro sessions today with your phone in another room the whole time",   emoji: "⏱️" },
+  { text: "Write a full-page summary of everything you've studied this week — from memory only",         emoji: "🧠" },
+  { text: "Find the one concept you've been avoiding and spend 30 focused minutes on it today",          emoji: "🔍" },
+  { text: "Make your own practice test for one topic from memory — take it, score it, review gaps",      emoji: "📋" },
+  { text: "Study your hardest subject in your very first session today — hardest subject always first",  emoji: "⚡" },
+  { text: "Before sleeping, write 5 things you learned today completely from memory — no notes allowed", emoji: "🌙" },
+  { text: "Rewrite your class notes for one subject in a cleaner, better-organized, readable format",   emoji: "🗒️" },
+  { text: "Time yourself solving 5 past exam questions — then beat your own time with 5 more",          emoji: "⏰" },
+  { text: "Cover your notes and recite one entire chapter out loud — find every single gap in recall",   emoji: "🗣️" },
+  { text: "Create a perfect one-page formula and fact sheet for one subject — from memory only",         emoji: "📊" },
+  { text: "Active recall drill: close your notes and answer 10 self-made questions about today's topic", emoji: "✅" },
+  { text: "Start studying 30 minutes earlier than usual today — that extra time compounds over months",  emoji: "🚀" },
+  { text: "Review your last 3 test mistakes — write exactly why you made each one and the correct fix",  emoji: "🔎" },
 ];
 
 // ─── Academic: Grade 9-10 / SEE preparation ──────────────────────────────────
