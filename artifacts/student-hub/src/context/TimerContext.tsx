@@ -253,7 +253,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           if (data.todayMinutes !== undefined) {
             setSavedMinutesToday(data.todayMinutes);
           }
-          console.log(`[Timer] Saved ${mins} min via backend.`);
           return;
         }
 
@@ -286,7 +285,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       }, { merge: true });
 
       setSavedMinutesToday(newToday);
-      console.log(`[Timer] Saved ${mins} min to Firestore (fallback). Total today: ${newToday}`);
 
       const logId = `${uid}_${today}`;
       const logRef = doc(db, "study_logs", logId);

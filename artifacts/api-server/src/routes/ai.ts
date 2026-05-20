@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { GoogleGenAI } from "@google/genai";
 import { logger } from "../lib/logger";
+import { requireAuth, perUserWriteLimit } from "../lib/auth-middleware";
 
 const router = Router();
 
@@ -64,6 +65,75 @@ interface ChatContext {
   weeklyMins?: number;
 }
 
+// ── Input validation constants ─────────────────────────────────────────────────
+const MAX_MESSAGE_LENGTH = 4000;
+const MAX_HISTORY_ITEMS  = 20;
+const MAX_HISTORY_CONTENT_LENGTH = 2000;
+const MAX_TASK_TEXT_LENGTH = 500;
+const MAX_TASKS = 100;
+
+/**
+ * Sanitize the context object the client sends with each message.
+ * Strips unexpected fields and clamps numeric values to sane ranges,
+ * preventing prompt-injection via crafted stat/task payloads.
+ */
+function sanitizeContext(raw: unknown): ChatContext | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const out: ChatContext = {};
+
+  if (r.stats && typeof r.stats === "object") {
+    const s = r.stats as Record<string, unknown>;
+    out.stats = {
+      streak:         Math.max(0, Math.min(Number(s.streak)         || 0, 3650)),
+      totalStudyTime: Math.max(0, Math.min(Number(s.totalStudyTime) || 0, 999_999)),
+      todayStudyTime: Math.max(0, Math.min(Number(s.todayStudyTime) || 0, 1440)),
+      lastActiveDate: typeof s.lastActiveDate === "string"
+        ? s.lastActiveDate.slice(0, 10).replace(/[^0-9-]/g, "")
+        : undefined,
+    };
+  }
+
+  if (Array.isArray(r.tasks)) {
+    out.tasks = (r.tasks as unknown[])
+      .slice(0, MAX_TASKS)
+      .filter((t): t is { completed: boolean; text: string } =>
+        t !== null && typeof t === "object" &&
+        typeof (t as Record<string,unknown>).text === "string"
+      )
+      .map(t => ({
+        completed: t.completed === true,
+        text: String(t.text).slice(0, MAX_TASK_TEXT_LENGTH),
+      }));
+  }
+
+  if (typeof r.weeklyMins === "number" && Number.isFinite(r.weeklyMins)) {
+    out.weeklyMins = Math.max(0, Math.min(Math.round(r.weeklyMins), 10_080));
+  }
+
+  return out;
+}
+
+/**
+ * Validate and sanitize the chat history array.
+ * Limits item count and per-message content length to prevent
+ * token stuffing and prompt injection via history manipulation.
+ */
+function sanitizeHistory(raw: unknown): ChatMessage[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .slice(0, MAX_HISTORY_ITEMS)
+    .filter((h): h is ChatMessage =>
+      h !== null && typeof h === "object" &&
+      (h.role === "user" || h.role === "assistant") &&
+      typeof h.content === "string"
+    )
+    .map(h => ({
+      role: h.role,
+      content: h.content.slice(0, MAX_HISTORY_CONTENT_LENGTH),
+    }));
+}
+
 function buildSystemContent(context?: ChatContext): string {
   if (!context) return SYSTEM_PROMPT;
   const parts: string[] = ["\n\n--- STUDENT'S CURRENT DATA ---"];
@@ -105,99 +175,111 @@ function buildContents(history: ChatMessage[], message: string) {
   ];
 }
 
+// ── Public status endpoint — no auth required ──────────────────────────────────
 router.get("/ai/status", (_req: Request, res: Response) => {
   const hasKey = !!(process.env.AI_INTEGRATIONS_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY);
   res.json({ ok: hasKey, gemini: hasKey, backend: hasKey ? "gemini" : "none" });
 });
 
-router.post("/ai/chat", async (req: Request, res: Response) => {
-  try {
-    const { message, history = [], context, stream: wantStream = false } = req.body as {
-      message?: string;
-      history?: ChatMessage[];
-      context?: ChatContext;
-      stream?: boolean;
-    };
-
-    if (!message?.trim()) {
-      return res.status(400).json({ error: "message is required" });
-    }
-
-    const apiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(503).json({
-        error: "Nep AI is not configured. Please set GEMINI_API_KEY in your environment.",
-      });
-    }
-
-    const systemContent = buildSystemContent(context);
-    const contents = buildContents(history, message);
-
-    // Always generate via non-streaming (most reliable with proxy),
-    // then emit the result as a single SSE chunk so the frontend works unchanged.
-    let replyText = "";
+// ── AI chat — requires authentication + per-user rate limit ───────────────────
+router.post(
+  "/ai/chat",
+  requireAuth,
+  perUserWriteLimit(15),
+  async (req: Request, res: Response) => {
     try {
-      const ai = createGenAI();
-      const result = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents,
-        config: {
-          systemInstruction: systemContent,
-          maxOutputTokens: 8192,
-          temperature: 0.8,
-        },
-      });
-      replyText = result.text ?? "";
-    } catch (genErr) {
-      const msg = String(genErr);
-      logger.error({ err: genErr }, "[AI] generateContent error");
-      if (msg.includes("429") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("rate")) {
-        const userMsg = "Nep AI is a bit busy right now — please try again in a moment.";
-        if (wantStream) {
-          res.setHeader("Content-Type", "text/event-stream");
-          res.setHeader("Cache-Control", "no-cache");
-          res.flushHeaders();
-          res.write(`data: ${JSON.stringify({ chunk: userMsg })}\n\n`);
-          res.write("data: [DONE]\n\n");
-          return res.end();
+      const rawBody = req.body as Record<string, unknown>;
+
+      const rawMessage = rawBody.message;
+      const wantStream = rawBody.stream === true;
+
+      // Validate message — must be a non-empty string within length limit
+      if (typeof rawMessage !== "string" || !rawMessage.trim()) {
+        return res.status(400).json({ error: "message is required" });
+      }
+      if (rawMessage.length > MAX_MESSAGE_LENGTH) {
+        return res.status(400).json({
+          error: `Message too long — maximum ${MAX_MESSAGE_LENGTH} characters.`,
+        });
+      }
+      const message = rawMessage.trim();
+
+      // Sanitize history and context — strips unexpected fields and bounds values
+      const history = sanitizeHistory(rawBody.history);
+      const context = sanitizeContext(rawBody.context);
+
+      const apiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({
+          error: "Nep AI is not configured. Please set GEMINI_API_KEY in your environment.",
+        });
+      }
+
+      const systemContent = buildSystemContent(context);
+      const contents = buildContents(history, message);
+
+      let replyText = "";
+      try {
+        const ai = createGenAI();
+        const result = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents,
+          config: {
+            systemInstruction: systemContent,
+            maxOutputTokens: 8192,
+            temperature: 0.8,
+          },
+        });
+        replyText = result.text ?? "";
+      } catch (genErr) {
+        const msg = String(genErr);
+        logger.error({ err: genErr, uid: req.uid }, "[AI] generateContent error");
+        if (msg.includes("429") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("rate")) {
+          const userMsg = "Nep AI is a bit busy right now — please try again in a moment.";
+          if (wantStream) {
+            res.setHeader("Content-Type", "text/event-stream");
+            res.setHeader("Cache-Control", "no-cache");
+            res.flushHeaders();
+            res.write(`data: ${JSON.stringify({ chunk: userMsg })}\n\n`);
+            res.write("data: [DONE]\n\n");
+            return res.end();
+          }
+          return res.status(429).json({ error: userMsg });
         }
-        return res.status(429).json({ error: userMsg });
+        throw genErr;
       }
-      throw genErr;
-    }
 
-    if (!replyText) {
-      replyText = "I wasn't able to generate a response. Please try again.";
-    }
-
-    // Return as SSE stream if requested, or plain JSON
-    if (wantStream) {
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache, no-transform");
-      res.setHeader("X-Accel-Buffering", "no");
-      res.flushHeaders();
-
-      // Emit in small chunks so the frontend renders progressively
-      const CHUNK_SIZE = 80;
-      for (let i = 0; i < replyText.length; i += CHUNK_SIZE) {
-        const piece = replyText.slice(i, i + CHUNK_SIZE);
-        res.write(`data: ${JSON.stringify({ chunk: piece })}\n\n`);
+      if (!replyText) {
+        replyText = "I wasn't able to generate a response. Please try again.";
       }
+
+      if (wantStream) {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache, no-transform");
+        res.setHeader("X-Accel-Buffering", "no");
+        res.flushHeaders();
+
+        const CHUNK_SIZE = 80;
+        for (let i = 0; i < replyText.length; i += CHUNK_SIZE) {
+          const piece = replyText.slice(i, i + CHUNK_SIZE);
+          res.write(`data: ${JSON.stringify({ chunk: piece })}\n\n`);
+        }
+        res.write("data: [DONE]\n\n");
+        return res.end();
+      }
+
+      return res.json({ reply: replyText });
+    } catch (err) {
+      logger.error({ err }, "[AI] Unhandled error");
+      const msg = "Nep AI ran into an issue. Please try again.";
+      if (!res.headersSent) {
+        return res.status(500).json({ error: msg });
+      }
+      res.write(`data: ${JSON.stringify({ chunk: msg })}\n\n`);
       res.write("data: [DONE]\n\n");
       return res.end();
     }
-
-    return res.json({ reply: replyText });
-  } catch (err) {
-    logger.error({ err }, "[AI] Unhandled error");
-    const msg = "Nep AI ran into an issue. Please try again.";
-    if (!res.headersSent) {
-      return res.status(500).json({ error: msg });
-    }
-    res.write(`data: ${JSON.stringify({ chunk: msg })}\n\n`);
-    res.write("data: [DONE]\n\n");
-    return res.end();
-  }
-});
+  },
+);
 
 export default router;

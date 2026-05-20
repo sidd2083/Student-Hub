@@ -2,6 +2,13 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    // Shared helper — must be signed in, file ≤ 5 MB, only images or PDF
+    function isValidUpload() {
+      return request.auth != null
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.+|application/pdf');
+    }
+
     // ── Content files (notes / PYQs) ─────────────────────────────────────────
     // Public read so students can view without signing in.
     // Write requires authentication, max 5 MB, images + PDF only.
@@ -9,24 +16,21 @@ service firebase.storage {
     //       so the admin upload flow is unaffected.
     match /notes/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null
-        && request.resource.size <= 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.+|application/pdf');
+      allow write: if isValidUpload();
     }
 
     match /pyqs/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null
-        && request.resource.size <= 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.+|application/pdf');
+      allow write: if isValidUpload();
     }
 
     // ── All other paths ───────────────────────────────────────────────────────
     // Requires authentication for both read and write.
+    // Write additionally enforces size limit AND content-type restriction
+    // to prevent arbitrary file uploads (scripts, executables, etc.)
     match /{allPaths=**} {
       allow read:  if request.auth != null;
-      allow write: if request.auth != null
-        && request.resource.size <= 5 * 1024 * 1024;
+      allow write: if isValidUpload();
     }
   }
 }

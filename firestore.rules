@@ -17,9 +17,10 @@ service cloud.firestore {
 
     // ── Users ────────────────────────────────────────────────────────────────
     // • Any signed-in user may read profiles (needed for leaderboard).
-    // • Owners may update their own doc BUT cannot change `role` or `uid`.
+    // • Owners may update their own doc BUT cannot change server-managed or
+    //   privileged fields — those are only written by the Admin SDK or admins.
     // • Numeric fields are bounded to prevent stat injection.
-    // • Only admins may elevate roles or delete accounts.
+    // • Only admins may elevate roles, modify badges, or delete accounts.
     match /users/{uid} {
       allow read: if isSignedIn();
 
@@ -35,14 +36,22 @@ service cloud.firestore {
 
       allow update: if isAdmin()
         || (isOwner(uid)
-          // Block self-role-escalation and uid tampering
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'uid'])
-          // Clamp totalStudyTime: must not decrease, max +240 min per write
+          // ── Privileged / server-only fields — never writable by the client ──
+          // role: no privilege escalation
+          // uid: no identity spoofing
+          // badges: server / admin only — prevents fake badge injection
+          // hasEarnedStreakToday: internal streak guard, server-only
+          && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['role', 'uid', 'badges', 'hasEarnedStreakToday'])
+
+          // ── Bounded numeric fields ────────────────────────────────────────
+          // totalStudyTime: must not decrease, max +240 min per write
           && (!('totalStudyTime' in request.resource.data)
               || (request.resource.data.totalStudyTime is int
                   && request.resource.data.totalStudyTime >= resource.data.get('totalStudyTime', 0)
                   && request.resource.data.totalStudyTime <= resource.data.get('totalStudyTime', 0) + 240))
-          // Streak: can only stay same, increase by 1, or reset to 0
+
+          // streak: can only stay same, increase by 1, or reset to 0
           && (!('streak' in request.resource.data)
               || (request.resource.data.streak is int
                   && request.resource.data.streak >= 0
@@ -50,11 +59,18 @@ service cloud.firestore {
                   && (request.resource.data.streak == resource.data.get('streak', 0)
                       || request.resource.data.streak == resource.data.get('streak', 0) + 1
                       || request.resource.data.streak == 0)))
-          // todayStudyTime: 0-1440 (one full day)
+
+          // todayStudyTime: 0–1440 (one full day in minutes)
           && (!('todayStudyTime' in request.resource.data)
               || (request.resource.data.todayStudyTime is int
                   && request.resource.data.todayStudyTime >= 0
-                  && request.resource.data.todayStudyTime <= 1440)));
+                  && request.resource.data.todayStudyTime <= 1440))
+
+          // lastActiveDate: must be a valid YYYY-MM-DD string if provided
+          && (!('lastActiveDate' in request.resource.data)
+              || (request.resource.data.lastActiveDate is string
+                  && request.resource.data.lastActiveDate.size() == 10
+                  && request.resource.data.lastActiveDate.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}'))));
 
       allow delete: if isAdmin();
     }
@@ -69,7 +85,9 @@ service cloud.firestore {
         && request.resource.data.text.size() <= 500;
       allow update: if isSignedIn()
         && resource.data.uid == request.auth.uid
-        && request.resource.data.uid == request.auth.uid;
+        && request.resource.data.uid == request.auth.uid
+        // uid cannot be changed on update
+        && request.resource.data.uid == resource.data.uid;
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
@@ -88,6 +106,8 @@ service cloud.firestore {
       allow update: if isSignedIn()
         && resource.data.uid == request.auth.uid
         && request.resource.data.uid == request.auth.uid
+        // uid cannot change on update
+        && request.resource.data.uid == resource.data.uid
         && request.resource.data.studyMinutes is int
         && request.resource.data.studyMinutes >= 0
         && request.resource.data.studyMinutes <= 1440;
@@ -129,8 +149,10 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.itemType is string
+        && request.resource.data.itemType.size() > 0
         && request.resource.data.itemType.size() <= 20
         && request.resource.data.itemId is string
+        && request.resource.data.itemId.size() > 0
         && request.resource.data.itemId.size() <= 100;
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }

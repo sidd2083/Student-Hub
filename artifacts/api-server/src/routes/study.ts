@@ -15,13 +15,9 @@ router.post(
   perUserWriteLimit(30),
   async (req: Request, res: Response) => {
     try {
-      const { uid, minutes } = req.body as { uid?: string; minutes?: number };
-
-      // uid in body must match the verified token uid — prevents forging other users' stats
-      if (!uid || uid !== req.uid) {
-        logger.warn({ bodyUid: uid, tokenUid: req.uid }, "[Study] uid mismatch");
-        return res.status(403).json({ error: "Forbidden: uid does not match authenticated user." });
-      }
+      // Always derive the uid from the verified Firebase token — never trust client-provided uid
+      const uid = req.uid!;
+      const { minutes } = req.body as { minutes?: number };
 
       if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes < 1) {
         return res.status(400).json({ error: "minutes must be a positive number." });

@@ -6,7 +6,7 @@ import { Send, MessageCircle, Sparkles, BookOpen, BarChart2, ListChecks } from "
 import { useSearch, useLocation } from "wouter";
 import { consumeAiContext } from "@/lib/aiContext";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 
 interface Message { role: "user" | "assistant"; content: string }
 
@@ -171,9 +171,16 @@ async function streamAI(
   ctx: StudyContext | null,
   onChunk: (text: string) => void,
 ): Promise<string> {
+  // Attach the Firebase ID token so the backend can verify the caller
+  let token: string | undefined;
+  try { token = await auth.currentUser?.getIdToken(); } catch { /* unauthenticated */ }
+
   const res = await fetch("/api/ai/chat", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ message, history, context: ctx, stream: true }),
   });
 

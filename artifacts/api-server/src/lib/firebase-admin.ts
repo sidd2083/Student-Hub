@@ -1,6 +1,9 @@
 import { initializeApp, getApps, cert, App } from "firebase-admin/app";
 import { getFirestore, Firestore } from "firebase-admin/firestore";
 import { getStorage, Storage } from "firebase-admin/storage";
+import pino from "pino";
+
+const log = pino({ level: process.env.LOG_LEVEL ?? "info" });
 
 let db: Firestore | null = null;
 let adminStorage: Storage | null = null;
@@ -20,7 +23,7 @@ function init() {
   }
 
   if (!serviceAccountJson) {
-    console.warn("[Firebase Admin] FIREBASE_SERVICE_ACCOUNT_JSON not set — Admin Firestore unavailable. Set this secret to enable backend study saves.");
+    log.warn("[Firebase Admin] FIREBASE_SERVICE_ACCOUNT_JSON not set — Admin Firestore unavailable. Set this secret to enable backend study saves.");
     return;
   }
 
@@ -33,9 +36,9 @@ function init() {
     app = initializeApp(appConfig);
     db = getFirestore(app);
     adminStorage = getStorage(app);
-    console.log("[Firebase Admin] Initialized with service account ✅");
+    log.info("[Firebase Admin] Initialized with service account");
   } catch (err) {
-    console.error("[Firebase Admin] Init failed:", err);
+    log.error({ err }, "[Firebase Admin] Init failed");
   }
 }
 
