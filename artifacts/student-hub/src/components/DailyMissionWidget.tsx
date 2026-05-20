@@ -1,9 +1,9 @@
 import { Link } from "wouter";
 import { useDailyMissions } from "@/hooks/useDailyMissions";
-import { CheckCircle2, Circle, Zap, ChevronRight, Timer } from "lucide-react";
+import { CheckCircle2, Circle, Zap, ChevronRight, Timer, Loader2 } from "lucide-react";
 import type { MissionLevel } from "@/hooks/useDailyMissions";
 
-function levelColor(l: MissionLevel) {
+function levelGradient(l: MissionLevel) {
   if (l === "beginner")     return "from-green-500 to-emerald-600";
   if (l === "intermediate") return "from-blue-500 to-indigo-600";
   return "from-purple-500 to-violet-700";
@@ -14,13 +14,13 @@ export function DailyMissionWidget() {
     missions, loading, completedCount, allCompleted, progressPct, level, isSaturday,
   } = useDailyMissions();
 
-  if (loading) {
+  // Only show a tiny inline spinner on first-ever visit (no cache yet).
+  // On repeat visits this renders instantly from localStorage — no layout shift.
+  if (loading && missions.length === 0) {
     return (
-      <div className="mb-5 sm:mb-6 rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden animate-pulse">
-        <div className="h-14 bg-gray-100" />
-        <div className="p-4 space-y-2">
-          {[1, 2, 3].map(i => <div key={i} className="h-8 rounded-xl bg-gray-50" />)}
-        </div>
+      <div className="mb-5 sm:mb-6 rounded-2xl border border-gray-100 bg-white shadow-sm p-4 flex items-center gap-3">
+        <Loader2 className="w-4 h-4 text-blue-400 animate-spin flex-shrink-0" />
+        <p className="text-sm text-gray-500">Loading your daily missions…</p>
       </div>
     );
   }
@@ -30,7 +30,7 @@ export function DailyMissionWidget() {
   return (
     <div className="mb-5 sm:mb-6 rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       {/* Header */}
-      <div className={`bg-gradient-to-r ${levelColor(level)} px-4 py-3 flex items-center gap-2`}>
+      <div className={`bg-gradient-to-r ${levelGradient(level)} px-4 py-3 flex items-center gap-2`}>
         <Zap className="w-4 h-4 text-white flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-white font-bold text-sm leading-tight">
@@ -38,7 +38,7 @@ export function DailyMissionWidget() {
           </p>
           <p className="text-white/70 text-[11px] leading-tight">
             {allCompleted
-              ? "All done! You're glowing on the leaderboard 🔥"
+              ? "All done! Your name is glowing on the leaderboard 🔥"
               : `${completedCount}/${missions.length} completed`}
           </p>
         </div>
@@ -54,12 +54,12 @@ export function DailyMissionWidget() {
         <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-700 bg-gradient-to-r ${
-              allCompleted ? "from-purple-500 to-violet-600" : levelColor(level)
+              allCompleted ? "from-purple-500 to-violet-600" : levelGradient(level)
             }`}
             style={{ width: `${progressPct}%` }}
           />
         </div>
-        <div className="flex justify-between mt-1 mb-2">
+        <div className="flex justify-between mt-1.5 mb-2">
           {missions.map((m, i) => (
             <div
               key={m.id}
@@ -78,7 +78,7 @@ export function DailyMissionWidget() {
         </div>
       </div>
 
-      {/* Mission list — show up to 3 */}
+      {/* Mission list — first 3 */}
       <div className="bg-white px-4 pb-4 space-y-1.5">
         {missions.slice(0, 3).map(m => (
           <div
@@ -87,13 +87,13 @@ export function DailyMissionWidget() {
               m.completed ? "bg-green-50" : "bg-gray-50"
             }`}
           >
-            {m.completed ? (
-              <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-            ) : (
-              <Circle className="w-4 h-4 text-gray-300 flex-shrink-0" />
-            )}
+            {m.completed
+              ? <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+              : <Circle       className="w-4 h-4 text-gray-300 flex-shrink-0" />}
             <span className="text-base leading-none flex-shrink-0">{m.emoji}</span>
-            <span className={`flex-1 min-w-0 truncate font-medium ${m.completed ? "text-gray-400 line-through" : "text-gray-700"}`}>
+            <span className={`flex-1 min-w-0 truncate font-medium ${
+              m.completed ? "text-gray-400 line-through" : "text-gray-700"
+            }`}>
               {m.text}
             </span>
             {m.type === "pomodoro" && !m.completed && (
@@ -104,7 +104,7 @@ export function DailyMissionWidget() {
         {missions.length > 3 && (
           <Link href="/missions">
             <div className="text-xs text-blue-500 hover:underline text-center py-1 cursor-pointer">
-              +{missions.length - 3} more missions →
+              +{missions.length - 3} more mission{missions.length - 3 > 1 ? "s" : ""} →
             </div>
           </Link>
         )}
