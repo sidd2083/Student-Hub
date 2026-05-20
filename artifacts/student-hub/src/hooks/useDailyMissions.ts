@@ -18,6 +18,7 @@ export interface Mission {
   completed: boolean;
   completedAt?: string;
   emoji: string;
+  startedAt?: number; // savedMinutesToday recorded when user clicked "Go to Pomodoro"
 }
 
 interface CachedMissionState {
@@ -27,21 +28,28 @@ interface CachedMissionState {
   level: MissionLevel;
 }
 
-// ─── localStorage cache ───────────────────────────────────────────────────────
-const LS_KEY = (uid: string, date: string) => `sh_dm_${uid}_${date}`;
+// ─── localStorage helpers ─────────────────────────────────────────────────────
+const CACHE_KEY  = (uid: string, date: string) => `sh_dm_${uid}_${date}`;
+export const POMODORO_MISSION_KEY = "sh_mission_timer";
+
+export interface PomodoroMissionPreset {
+  missionId: string;
+  missionText: string;
+  targetMinutes: number;
+  date: string;
+}
 
 function readCache(uid: string, date: string): CachedMissionState | null {
   try {
-    const raw = localStorage.getItem(LS_KEY(uid, date));
+    const raw = localStorage.getItem(CACHE_KEY(uid, date));
     return raw ? (JSON.parse(raw) as CachedMissionState) : null;
   } catch { return null; }
 }
-
 function writeCache(uid: string, date: string, s: CachedMissionState) {
-  try { localStorage.setItem(LS_KEY(uid, date), JSON.stringify(s)); } catch {}
+  try { localStorage.setItem(CACHE_KEY(uid, date), JSON.stringify(s)); } catch {}
 }
 
-// ─── Seeded random (deterministic per uid+date) ───────────────────────────────
+// ─── Seeded random ────────────────────────────────────────────────────────────
 function seededRand(seed: string): () => number {
   let h = 0xdeadbeef;
   for (let i = 0; i < seed.length; i++) {
@@ -57,7 +65,7 @@ function pick<T>(arr: T[], rand: () => number): T {
   return arr[Math.floor(rand() * arr.length)];
 }
 
-// ─── User level ───────────────────────────────────────────────────────────────
+// ─── Level detection ──────────────────────────────────────────────────────────
 export function getUserLevel(streak: number, totalStudyMins: number): MissionLevel {
   if (streak >= 30 || totalStudyMins >= 1200) return "advanced";
   if (streak >= 7  || totalStudyMins >= 300)  return "intermediate";
@@ -65,54 +73,58 @@ export function getUserLevel(streak: number, totalStudyMins: number): MissionLev
 }
 
 // ─── Mission pools ────────────────────────────────────────────────────────────
-const SUBJECTS_LOWER = ["Mathematics", "Science", "English", "Nepali", "Social Studies", "Optional Maths"];
-const SUBJECTS_UPPER = ["Mathematics", "Physics", "Chemistry", "Biology", "English", "Accountancy", "Economics", "Computer Science"];
-
 const FUN_CHALLENGES = [
-  { text: "Drink at least 8 glasses of water today",                   emoji: "💧" },
-  { text: "Do 10 jumping jacks or push-ups right now",                 emoji: "💪" },
-  { text: "Spend 20 minutes with your family this evening",            emoji: "🏠" },
-  { text: "Take a 10-minute walk outside",                             emoji: "🚶" },
-  { text: "Write down 3 things you learned today",                     emoji: "📝" },
-  { text: "No social media for 2 hours today",                         emoji: "📵" },
-  { text: "Clean and organize your study desk",                        emoji: "🧹" },
-  { text: "Sleep before 10:30 PM tonight",                             emoji: "😴" },
-  { text: "Eat a proper meal before your study session",               emoji: "🍱" },
-  { text: "Stretch for 5 minutes after each study session",            emoji: "🧘" },
-  { text: "No phone for 30 minutes while studying",                    emoji: "🔕" },
-  { text: "Write your study goals for tomorrow before sleeping",       emoji: "🎯" },
-  { text: "Drink a glass of water right now",                          emoji: "🥤" },
-  { text: "Take a 5-minute break after every 25 minutes of study",    emoji: "⏸️" },
+  { text: "Drink at least 8 glasses of water today",                       emoji: "💧" },
+  { text: "Do 10 jumping jacks or push-ups right now",                     emoji: "💪" },
+  { text: "Spend 20 minutes with your family this evening",                emoji: "🏠" },
+  { text: "Take a 10-minute walk outside and clear your head",             emoji: "🚶" },
+  { text: "Write down 3 things you learned or are grateful for today",     emoji: "📝" },
+  { text: "No social media for 2 hours during study time",                 emoji: "📵" },
+  { text: "Clean and organize your study desk right now",                  emoji: "🧹" },
+  { text: "Sleep before 10:30 PM tonight",                                 emoji: "😴" },
+  { text: "Eat a proper meal before your next study session",              emoji: "🍱" },
+  { text: "Do 5 minutes of deep breathing before you start studying",      emoji: "🧘" },
+  { text: "No phone during your study session today",                      emoji: "🔕" },
+  { text: "Write down your 3 study goals for tomorrow before sleeping",    emoji: "🎯" },
+  { text: "Help a classmate understand something you learned today",       emoji: "🤝" },
+  { text: "Read something outside your syllabus for 15 minutes",          emoji: "📰" },
+  { text: "Take a proper break — step outside for 5 minutes between sessions", emoji: "🌤️" },
 ];
 
 const ACADEMIC_BEGINNER = [
-  { text: "Read your textbook for 20 minutes on any subject",          emoji: "📖" },
-  { text: "Memorize 5 key definitions or formulas",                    emoji: "🧠" },
-  { text: "Solve 5 practice problems from any chapter",                emoji: "✏️" },
-  { text: "Make short notes on one topic you find difficult",          emoji: "📋" },
-  { text: "Re-read today's class notes once, carefully",               emoji: "👀" },
-  { text: "Look up and understand 3 new terms from your textbook",     emoji: "🔍" },
+  { text: "Make flashcards for 5 key terms you struggle to remember",                        emoji: "🃏" },
+  { text: "Re-read your class notes from today and circle what you didn't understand",       emoji: "👀" },
+  { text: "Write the key points of one chapter from memory, then verify with your notes",    emoji: "🧠" },
+  { text: "Watch an educational video (10–15 min) related to your syllabus",                 emoji: "🎥" },
+  { text: "Write down all formulas or definitions from one chapter without looking",         emoji: "✏️" },
+  { text: "Pick your most confusing topic and read it twice, slowly and carefully",          emoji: "🔍" },
 ];
 
 const ACADEMIC_INTERMEDIATE = [
-  { text: "Revise yesterday's lessons and write key points from memory", emoji: "📝" },
-  { text: "Solve 10 MCQs from any subject chapter",                    emoji: "✅" },
-  { text: "Write answers for 2 long-answer questions from your notes", emoji: "📄" },
-  { text: "Create a summary sheet for one full chapter",               emoji: "🗂️" },
-  { text: "Review your last test and identify 3 weak areas",           emoji: "🔎" },
-  { text: "Solve a complete exercise from your Maths or Science book", emoji: "📐" },
+  { text: "Write full model answers for 3 past exam questions",                              emoji: "📄" },
+  { text: "Summarize an entire chapter in your own words — keep it to 1 page",              emoji: "🗒️" },
+  { text: "Solve 15 practice MCQs and carefully review every wrong answer",                 emoji: "✅" },
+  { text: "Build a mind map for one topic from memory, then check against your notes",       emoji: "🗺️" },
+  { text: "Review your last 2 tests — write down every mistake and why you made it",        emoji: "🔎" },
+  { text: "Practice writing a 200-word answer from memory without looking at your notes",   emoji: "🖊️" },
 ];
 
 const ACADEMIC_ADVANCED = [
-  { text: "Complete a full chapter revision with self-written notes",  emoji: "📚" },
-  { text: "Attempt past exam questions from any one subject",          emoji: "🏆" },
-  { text: "Explain a concept out loud for 10 minutes (Feynman technique)", emoji: "🗣️" },
-  { text: "Write 3 model answers under timed conditions (20 min each)", emoji: "⏱️" },
-  { text: "Identify your weakest topic and study it for 45 minutes",  emoji: "💡" },
-  { text: "Solve MCQs + subjective from one complete chapter",         emoji: "📊" },
+  { text: "Attempt a 20-question mock test under strict timed conditions",                   emoji: "🏆" },
+  { text: "Feynman technique: explain 3 complex topics out loud as if teaching someone",     emoji: "🗣️" },
+  { text: "Write model answers for all likely long questions in one chapter or unit",        emoji: "📚" },
+  { text: "Compare your notes with another source and fill every gap you find",             emoji: "🔗" },
+  { text: "Create a focused study plan for your 3 weakest topics and start the first one", emoji: "💡" },
+  { text: "Attempt a full section of a past board exam paper without any help",             emoji: "📊" },
 ];
 
-// ─── Mission generation ───────────────────────────────────────────────────────
+const FOCUS_TEXT: Record<MissionLevel, string> = {
+  beginner:     "Pick any subject you find hard and study it with full concentration — no distractions",
+  intermediate: "Deep-focus on your most challenging topic — phone away, notes out",
+  advanced:     "Intensive study session on your weakest topic — take notes as you go",
+};
+
+// ─── Mission builder ──────────────────────────────────────────────────────────
 export function buildMissions(
   uid: string,
   date: string,
@@ -120,33 +132,33 @@ export function buildMissions(
   grade: number,
   isSaturday: boolean,
 ): Mission[] {
-  const rand    = seededRand(uid + date);
-  const subjects = grade >= 11 ? SUBJECTS_UPPER : SUBJECTS_LOWER;
-  const subject  = pick(subjects, rand);
+  const rand = seededRand(uid + date);
+  void grade; // grade kept in signature for future personalization (stream detection)
 
   if (isSaturday) {
     const shortStudy = level === "beginner" ? 20 : level === "intermediate" ? 30 : 45;
     return [
       {
         id: "school_task",
-        text: "It's Saturday! Do any pending assignment or review this week's lessons",
+        text: "It's Saturday! Finish any pending assignment or review this week's lessons",
         difficulty: "easy", type: "manual", completed: false, emoji: "📚",
       },
       {
         id: "study_time",
-        text: `Study for ${shortStudy} minutes today — a little goes a long way!`,
+        text: `Study for ${shortStudy} minutes today — a little still goes a long way`,
         difficulty: "easy", type: "pomodoro",
         targetMinutes: shortStudy, completed: false, emoji: "⏰",
       },
     ];
   }
 
-  const studyTarget = level === "beginner" ? 30 : level === "intermediate" ? 60 : 90;
-  const focusTarget = level === "beginner" ? 30 : level === "intermediate" ? 45 : 75;
+  // Study time targets by level
+  const studyTarget  = level === "beginner" ? 30 : level === "intermediate" ? 60 : 90;
+  const focusTarget  = level === "beginner" ? 30 : level === "intermediate" ? 45 : 75;
 
   const studyDiff: MissionDifficulty    = level === "beginner" ? "easy" : "mid";
   const focusDiff: MissionDifficulty    = level === "advanced" ? "hard" : "mid";
-  const academicDiff: MissionDifficulty = level === "advanced" ? "hard" : "mid";
+  const academicDiff: MissionDifficulty = level === "advanced" ? "hard" : level === "intermediate" ? "mid" : "easy";
 
   const academicPool =
     level === "beginner" ? ACADEMIC_BEGINNER :
@@ -158,19 +170,19 @@ export function buildMissions(
   return [
     {
       id: "study_time",
-      text: `Study for ${studyTarget} minutes using the Pomodoro timer`,
+      text: `Study for ${studyTarget} minutes using the Pomodoro timer — auto-tracked`,
       difficulty: studyDiff, type: "pomodoro",
       targetMinutes: studyTarget, completed: false, emoji: "⏰",
     },
     {
       id: "school_task",
-      text: "Complete your school homework or pending assignment",
+      text: "Complete your school homework or any pending assignment",
       difficulty: "easy", type: "manual", completed: false, emoji: "📚",
     },
     {
       id: "focus",
-      text: `Study ${subject} for ${focusTarget} minutes without any distractions`,
-      difficulty: focusDiff, type: "manual",
+      text: FOCUS_TEXT[level],
+      difficulty: focusDiff, type: "pomodoro",
       targetMinutes: focusTarget, completed: false, emoji: "🎯",
     },
     {
@@ -194,17 +206,18 @@ export function useDailyMissions() {
   const date       = getNepaliDate();
   const isSaturday = new Date(Date.now() + NPT_OFFSET_MS).getUTCDay() === 6;
 
-  // Use profile.uid (instant from localStorage cache) || firebase user uid
+  // profile?.uid is available instantly from localStorage cache
   const uid = (user?.uid ?? (profile as Record<string, unknown> | null)?.["uid"] as string | undefined) ?? null;
 
   const level = useMemo(() => {
     const d = profile as Record<string, unknown> | null;
-    const streak   = (d?.["streak"]         as number | undefined) ?? 0;
-    const studyMin = (d?.["totalStudyTime"] as number | undefined) ?? 0;
-    return getUserLevel(streak, studyMin);
+    return getUserLevel(
+      (d?.["streak"]         as number | undefined) ?? 0,
+      (d?.["totalStudyTime"] as number | undefined) ?? 0,
+    );
   }, [profile]);
 
-  // ── Initialise from localStorage cache instantly (no Firestore wait) ────────
+  // Init from localStorage cache for instant load
   const cached = uid ? readCache(uid, date) : null;
 
   const [missions,         setMissions]         = useState<Mission[]>(cached?.missions ?? []);
@@ -213,77 +226,51 @@ export function useDailyMissions() {
   const [studyMinsAtStart, setStudyMinsAtStart] = useState(cached?.studyMinsAtStart ?? 0);
 
   const completingRef = useRef<Set<string>>(new Set());
-  const syncedRef     = useRef(false); // prevent double Firestore sync
+  const syncedRef     = useRef(false);
 
-  // ── Sync with Firestore (background, non-blocking) ───────────────────────
+  // ── Firestore background sync ─────────────────────────────────────────────
   useEffect(() => {
     if (!uid || syncedRef.current) return;
     syncedRef.current = true;
-
     let mounted = true;
     (async () => {
       try {
         const docId  = `${uid}_${date}`;
         const docRef = doc(db, "daily_missions", docId);
         const snap   = await getDoc(docRef);
-
         if (!mounted) return;
 
         if (snap.exists()) {
           const data = snap.data();
-          const serverMissions = data.missions as Mission[];
-          const serverDone     = data.allCompleted ?? false;
-          const serverStart    = data.studyMinutesAtStart ?? 0;
-
-          // Update state and cache with server data
-          setMissions(serverMissions);
-          setAllCompleted(serverDone);
-          setStudyMinsAtStart(serverStart);
-          writeCache(uid, date, {
-            missions: serverMissions,
-            allCompleted: serverDone,
-            studyMinsAtStart: serverStart,
-            level: data.level ?? level,
-          });
+          const sm   = data.missions as Mission[];
+          const done = data.allCompleted ?? false;
+          const start = data.studyMinutesAtStart ?? 0;
+          setMissions(sm);
+          setAllCompleted(done);
+          setStudyMinsAtStart(start);
+          writeCache(uid, date, { missions: sm, allCompleted: done, studyMinsAtStart: start, level: data.level ?? level });
         } else {
-          // First time today — generate and store missions
           const grade       = profile?.grade ?? 10;
           const newMissions = buildMissions(uid, date, level, grade, isSaturday);
           const cacheData: CachedMissionState = {
-            missions: newMissions,
-            allCompleted: false,
-            studyMinsAtStart: savedMinutesToday,
-            level,
+            missions: newMissions, allCompleted: false,
+            studyMinsAtStart: savedMinutesToday, level,
           };
-
-          // Update state immediately (don't wait for Firestore write)
           setMissions(newMissions);
           setStudyMinsAtStart(savedMinutesToday);
           writeCache(uid, date, cacheData);
-
-          // Write to Firestore in background
           setDoc(docRef, {
-            uid, date, level,
-            grade,
-            isSaturday,
-            missions: newMissions,
-            completedCount: 0,
-            allCompleted: false,
+            uid, date, level, grade: profile?.grade ?? 10, isSaturday,
+            missions: newMissions, completedCount: 0, allCompleted: false,
             studyMinutesAtStart: savedMinutesToday,
-          }).catch(e => console.error("[DailyMissions] Firestore write failed:", e));
+          }).catch(e => console.error("[DailyMissions] Firestore write:", e));
         }
       } catch (e) {
-        console.error("[DailyMissions] Firestore sync failed:", e);
-        // If Firestore fails but we have no cache, generate missions locally
-        if (!cached) {
-          const grade       = profile?.grade ?? 10;
-          if (!mounted) return;
-          const newMissions = buildMissions(uid, date, level, grade, isSaturday);
+        console.error("[DailyMissions] Firestore sync:", e);
+        if (!cached && uid) {
+          const newMissions = buildMissions(uid, date, level, profile?.grade ?? 10, isSaturday);
           setMissions(newMissions);
-          writeCache(uid, date, {
-            missions: newMissions, allCompleted: false,
-            studyMinsAtStart: savedMinutesToday, level,
-          });
+          writeCache(uid, date, { missions: newMissions, allCompleted: false, studyMinsAtStart: savedMinutesToday, level });
         }
       } finally {
         if (mounted) setLoading(false);
@@ -293,20 +280,52 @@ export function useDailyMissions() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
 
-  // ── Auto-track Pomodoro study mission ─────────────────────────────────────
+  // ── Auto-track Pomodoro missions ──────────────────────────────────────────
   useEffect(() => {
-    const sm = missions.find(m => m.id === "study_time" && !m.completed);
-    if (!sm?.targetMinutes || !uid) return;
-    const done = Math.max(0, savedMinutesToday - studyMinsAtStart);
-    if (done >= sm.targetMinutes && !completingRef.current.has("study_time")) {
-      completingRef.current.add("study_time");
-      _doComplete(uid, date, missions, "study_time", setMissions, setAllCompleted);
+    if (!uid || missions.length === 0) return;
+
+    for (const m of missions) {
+      if (m.type !== "pomodoro" || m.completed || !m.targetMinutes) continue;
+      if (completingRef.current.has(m.id)) continue;
+
+      let minutesDone = 0;
+      if (m.id === "study_time") {
+        minutesDone = Math.max(0, savedMinutesToday - studyMinsAtStart);
+      } else if (m.startedAt !== undefined) {
+        minutesDone = Math.max(0, savedMinutesToday - m.startedAt);
+      }
+
+      if (minutesDone >= m.targetMinutes) {
+        completingRef.current.add(m.id);
+        _doComplete(uid, date, missions, m.id, setMissions, setAllCompleted);
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savedMinutesToday, studyMinsAtStart, missions]);
+  }, [savedMinutesToday, missions, studyMinsAtStart]);
+
+  // ── Start a Pomodoro mission (records start time + sets timer preset) ─────
+  const startMission = useCallback((
+    missionId: string,
+    missionText: string,
+    targetMinutes: number,
+  ) => {
+    if (!uid) return;
+    const preset: PomodoroMissionPreset = { missionId, missionText, targetMinutes, date };
+    try { localStorage.setItem(POMODORO_MISSION_KEY, JSON.stringify(preset)); } catch {}
+
+    setMissions(prev => {
+      const updated = prev.map(m =>
+        m.id === missionId ? { ...m, startedAt: savedMinutesToday } : m,
+      );
+      const cached2 = readCache(uid, date);
+      if (cached2) writeCache(uid, date, { ...cached2, missions: updated });
+      updateDoc(doc(db, "daily_missions", `${uid}_${date}`), { missions: updated }).catch(() => {});
+      return updated;
+    });
+  }, [uid, date, savedMinutesToday]);
 
   // ── Manual complete ───────────────────────────────────────────────────────
-  const completeMission = useCallback(async (missionId: string) => {
+  const completeMission = useCallback((missionId: string) => {
     if (!uid || completingRef.current.has(missionId)) return;
     completingRef.current.add(missionId);
     _doComplete(uid, date, missions, missionId, setMissions, setAllCompleted);
@@ -314,20 +333,28 @@ export function useDailyMissions() {
 
   const completedCount = missions.filter(m => m.completed).length;
   const progressPct    = missions.length > 0 ? (completedCount / missions.length) * 100 : 0;
-  const studyMission   = missions.find(m => m.id === "study_time");
-  const studyProgress  = studyMission?.targetMinutes
-    ? Math.min(100, (Math.max(0, savedMinutesToday - studyMinsAtStart) / studyMission.targetMinutes) * 100)
-    : 0;
+
+  // Per-mission Pomodoro progress
+  function missionProgress(m: Mission): number {
+    if (!m.targetMinutes || m.completed) return m.completed ? 100 : 0;
+    if (m.id === "study_time") {
+      return Math.min(100, (Math.max(0, savedMinutesToday - studyMinsAtStart) / m.targetMinutes) * 100);
+    }
+    if (m.startedAt !== undefined) {
+      return Math.min(100, (Math.max(0, savedMinutesToday - m.startedAt) / m.targetMinutes) * 100);
+    }
+    return 0;
+  }
 
   return {
-    missions, loading, completeMission,
+    missions, loading, completeMission, startMission, missionProgress,
     completedCount, allCompleted, progressPct,
-    isSaturday, level, studyProgress, date,
+    isSaturday, level, date,
     savedMinutesToday, studyMinsAtStart,
   };
 }
 
-// ─── Complete helper (module-level to keep hook lean) ────────────────────────
+// ─── Complete helper ──────────────────────────────────────────────────────────
 function _doComplete(
   uid: string,
   date: string,
@@ -337,31 +364,23 @@ function _doComplete(
   setAllCompleted: React.Dispatch<React.SetStateAction<boolean>>,
 ) {
   setMissions(prev => {
-    const updated     = prev.map(m =>
+    const updated = prev.map(m =>
       m.id === missionId ? { ...m, completed: true, completedAt: new Date().toISOString() } : m,
     );
-    const count       = updated.filter(m => m.completed).length;
-    const isDone      = count === updated.length && updated.length > 0;
+    const count  = updated.filter(m => m.completed).length;
+    const isDone = count === updated.length && updated.length > 0;
     if (isDone) setAllCompleted(true);
 
-    // Update localStorage cache immediately
     const cached = readCache(uid, date);
-    if (cached) {
-      writeCache(uid, date, { ...cached, missions: updated, allCompleted: isDone });
-    }
+    if (cached) writeCache(uid, date, { ...cached, missions: updated, allCompleted: isDone });
 
-    // Firestore write in background
-    const docRef = doc(db, "daily_missions", `${uid}_${date}`);
-    updateDoc(docRef, { missions: updated, completedCount: count, allCompleted: isDone })
-      .catch(() => {
-        // Firestore update failed — local cache still has correct state
-      });
+    updateDoc(doc(db, "daily_missions", `${uid}_${date}`), {
+      missions: updated, completedCount: count, allCompleted: isDone,
+    }).catch(() => {});
 
     if (isDone) {
-      updateDoc(doc(db, "users", uid), { lastMissionsCompletedDate: date })
-        .catch(() => {});
+      updateDoc(doc(db, "users", uid), { lastMissionsCompletedDate: date }).catch(() => {});
     }
-
     return updated;
   });
 }

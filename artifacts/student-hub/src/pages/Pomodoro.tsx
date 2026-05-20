@@ -8,8 +8,11 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   Play, Pause, RotateCcw, Timer, CheckSquare,
-  SkipForward, Settings, X, Eye, Maximize2, Minimize2,
+  SkipForward, Settings, X, Eye, Maximize2, Minimize2, Zap,
 } from "lucide-react";
+import { POMODORO_MISSION_KEY } from "@/hooks/useDailyMissions";
+import type { PomodoroMissionPreset } from "@/hooks/useDailyMissions";
+import { getNepaliDate } from "@/lib/nepaliDate";
 import type { Phase } from "@/context/TimerContext";
 import { focusTracker } from "@/components/StudyGuardian";
 
@@ -158,13 +161,14 @@ function PomodoroContent() {
   const {
     phase, seconds, running, sessionsCompleted,
     settings, savedMinutesToday,
-    start, pause, reset, skipPhase,
+    start, pause, reset, skipPhase, updateSettings,
   } = useTimer();
   const [activeTask, setActiveTask] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [pendingTasks, setPendingTasks] = useState<Array<{ id: string; text: string }>>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [focusScore, setFocusScore] = useState<{ score: number; mins: number } | null>(null);
+  const [missionPreset, setMissionPreset] = useState<PomodoroMissionPreset | null>(null);
 
   // Poll focus tracker every 10 s — only show after 90 s of active session
   useEffect(() => {
@@ -179,6 +183,25 @@ function PomodoroContent() {
     const id = setInterval(update, 10_000);
     return () => clearInterval(id);
   }, [running]);
+
+  // Read mission preset from localStorage (set when user clicked "Go to Pomodoro" from missions page)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(POMODORO_MISSION_KEY);
+      if (!raw) return;
+      const preset = JSON.parse(raw) as PomodoroMissionPreset;
+      if (preset.date !== getNepaliDate()) {
+        localStorage.removeItem(POMODORO_MISSION_KEY);
+        return;
+      }
+      setMissionPreset(preset);
+      // Pre-set the work timer to the mission's target duration (only if not running)
+      if (!running) {
+        updateSettings({ workMins: preset.targetMinutes });
+      }
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -366,6 +389,30 @@ function PomodoroContent() {
       </div>
 
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+
+      {/* Mission active banner */}
+      {missionPreset && (
+        <div className="mb-4 bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-2xl px-4 py-3 flex items-start gap-3">
+          <Zap className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold text-yellow-800 mb-0.5">
+              Mission active · {missionPreset.targetMinutes} min timer set
+            </p>
+            <p className="text-xs text-yellow-700 leading-snug line-clamp-2">
+              {missionPreset.missionText}
+            </p>
+            <p className="text-[10px] text-yellow-600 mt-1">
+              This mission auto-completes once you finish the session ✓
+            </p>
+          </div>
+          <button
+            onClick={() => { setMissionPreset(null); localStorage.removeItem(POMODORO_MISSION_KEY); }}
+            className="text-yellow-400 hover:text-yellow-600 flex-shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {savedMinutesToday > 0 && (
         <div className="flex gap-3 mb-4 px-4 py-2.5 bg-blue-50 border border-blue-100 rounded-2xl">
