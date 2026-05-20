@@ -14,11 +14,15 @@ export interface Mission {
   text: string;
   difficulty: MissionDifficulty;
   type: MissionType;
+  // Minutes-based missions (subject_study)
   targetMinutes?: number;
+  startedAt?: number;           // savedMinutesToday when mission was started
+  // Session-based missions (pomodoro_cycle) — 1 session = one 25-min work block
+  targetSessions?: number;
+  sessionsAtStart?: number;     // sessionsCompleted when mission was started
   completed: boolean;
   completedAt?: string;
   emoji: string;
-  startedAt?: number;
   actionLink?: string;
   actionLabel?: string;
 }
@@ -31,7 +35,8 @@ interface CachedMissionState {
   version?: number;
 }
 
-const MISSION_VERSION = 2;
+// Bump this whenever mission structure changes to force a regeneration for all users
+const MISSION_VERSION = 3;
 const CACHE_KEY  = (uid: string, date: string) => `sh_dm_${uid}_${date}`;
 export const POMODORO_MISSION_KEY = "sh_mission_timer";
 
@@ -77,31 +82,33 @@ export function getUserLevel(streak: number, totalStudyMins: number): MissionLev
 }
 
 // ─── Mission 1: Pomodoro Cycle ────────────────────────────────────────────────
-// One cycle = 25 min focus + 5 min break + 25 min focus + 10 min long break
-// targetMinutes tracks actual study/focus minutes (not break time)
+// Tracked by SESSIONS (work blocks), not by total minutes.
+// 1 session  = one 25-min focus block.
+// 1 cycle    = 2 sessions  (25 min work → 5 min break → 25 min work).
+// The timer auto-switches between phases when this mission is started.
+// targetSessions: 2 (beginner/1 cycle) | 4 (intermediate/2 cycles) | 6 (advanced/3 cycles)
 function getPomodoroMission(level: MissionLevel, grade: number): Mission {
-  const isBoard = grade === 10 || grade === 12;
-  const targetMinutes =
-    level === "beginner"     ? 50  :   // 1 full cycle (25+25)
-    level === "intermediate" ? 100 :   // 2 full cycles
-                               150;    // 3 full cycles (advanced)
+  const isBoardYear = grade === 10 || grade === 12;
+  const examName    = grade === 10 ? "SEE" : "NEB";
 
-  const cycles = level === "beginner" ? 1 : level === "intermediate" ? 2 : 3;
-  const cycleWord = cycles === 1 ? "one full cycle" : `${cycles} full cycles`;
+  // Each cycle = 2 work sessions. Auto-switch handles breaks.
+  const targetSessions = level === "beginner" ? 2 : level === "intermediate" ? 4 : 6;
+  const cycles         = targetSessions / 2; // 1, 2, or 3
+  const cycleWord      = cycles === 1 ? "1 full cycle" : `${cycles} full cycles`;
 
   let text: string;
   if (level === "beginner") {
-    text = isBoard
-      ? `Complete one full Pomodoro cycle — 25 min study, 5 min break, 25 min study, then 10 min rest. This is your most important mission today.`
-      : `Complete one full Pomodoro cycle — 25 min focus, 5 min break, 25 min focus, then 10 min rest. Start the timer and do it now.`;
+    text = isBoardYear
+      ? `Complete 1 full Pomodoro cycle for your ${examName} prep — 25 min study, 5 min break, then 25 min study. Enable auto-switch in the timer and it handles the phases for you.`
+      : `Complete 1 full Pomodoro cycle — 25 min focus, 5 min break, then 25 min focus. Start the timer and let it switch phases automatically. Just stay at your desk.`;
   } else if (level === "intermediate") {
-    text = isBoard
-      ? `Complete two full Pomodoro cycles for your board prep — 25 min study, 5 min break, 25 min study, 10 min rest. Repeat twice.`
-      : `Complete two full Pomodoro cycles today — 25 min focus, 5 min break, 25 min focus, 10 min rest. Then repeat the whole thing.`;
+    text = isBoardYear
+      ? `Complete 2 full Pomodoro cycles for ${examName} preparation — 25 min study → 5 min break → 25 min study, done twice. The timer auto-switches between focus and break for you.`
+      : `Complete 2 full Pomodoro cycles today — 25 min focus → 5 min break → 25 min focus, twice in a row. The timer switches phases automatically.`;
   } else {
-    text = isBoard
-      ? `Complete three full Pomodoro cycles — 25 min study, 5 min break, 25 min study, 10 min rest. Do this three times for serious board prep.`
-      : `Complete three full Pomodoro cycles today. Each cycle: 25 min focus → 5 min break → 25 min focus → 10 min rest. Do all ${cycleWord}.`;
+    text = isBoardYear
+      ? `Complete 3 full Pomodoro cycles for serious ${examName} preparation. 25 min study → 5 min break → 25 min study, three times. The timer auto-switches — your only job is to keep studying.`
+      : `Complete 3 full Pomodoro cycles today. Each cycle: 25 min focus → 5 min break → 25 min focus. The timer switches automatically. ${cycleWord}, full concentration.`;
   }
 
   return {
@@ -109,13 +116,15 @@ function getPomodoroMission(level: MissionLevel, grade: number): Mission {
     text,
     difficulty: level === "beginner" ? "easy" : level === "intermediate" ? "mid" : "hard",
     type: "pomodoro",
-    targetMinutes,
+    targetSessions,
+    targetMinutes: targetSessions * 25, // kept for display reference only
     completed: false,
     emoji: "⏱️",
   };
 }
 
 // ─── Mission 2: School Assignment + Notes ─────────────────────────────────────
+// Each grade has a different school context — no board exam for grades 9 and 11.
 function getSchoolTaskMission(grade: number): Mission {
   let text: string;
   if (grade === 9) {
@@ -123,7 +132,7 @@ function getSchoolTaskMission(grade: number): Mission {
   } else if (grade === 10) {
     text = "Finish your homework and any pending SEE preparation tasks today. Open the Notes section if you need to revise any chapter quickly.";
   } else if (grade === 11) {
-    text = "Complete all your school assignments for today. Open Notes below to review any topic or chapter you are unclear about.";
+    text = "Complete all your school assignments for today. Open Notes below to review any +2 topic or chapter you are unclear about.";
   } else {
     text = "Finish your board revision assignments for today. Use the Notes section to quickly revise any chapter before you write your answers.";
   }
@@ -139,7 +148,8 @@ function getSchoolTaskMission(grade: number): Mission {
   };
 }
 
-// ─── Mission 3: Subject Study Time ───────────────────────────────────────────
+// ─── Mission 3: Subject Study Time ────────────────────────────────────────────
+// Tracked by minutes. Grade 9 and 11 do NOT mention board exams.
 function getSubjectStudyMission(level: MissionLevel, grade: number): Mission {
   const minsMap: Record<number, Record<MissionLevel, number>> = {
     9:  { beginner: 25, intermediate: 40, advanced: 60  },
@@ -160,9 +170,9 @@ function getSubjectStudyMission(level: MissionLevel, grade: number): Mission {
     else if (level === "intermediate") text = `${mins} minutes on your hardest board subject. Write key points as you study — do not just read.`;
     else                          text = `${mins} minutes of board exam preparation on the subject you struggle with most. Full concentration.`;
   } else if (grade === 11) {
-    if (level === "beginner")     text = `Pick the subject you find most difficult and study it for ${mins} minutes — understand it, do not just memorize.`;
-    else if (level === "intermediate") text = `Study your most challenging subject for ${mins} minutes. Focus on understanding concepts, not just reading.`;
-    else                          text = `${mins} minutes of deep study on the subject you struggle with most. Write notes as you go.`;
+    if (level === "beginner")     text = `Pick the +2 subject you find most difficult and study it for ${mins} minutes — understand it, do not just memorize.`;
+    else if (level === "intermediate") text = `Study your most challenging +2 subject for ${mins} minutes. Focus on understanding concepts, not just reading.`;
+    else                          text = `${mins} minutes of deep study on the hardest +2 subject for you. Write your own notes as you go.`;
   } else {
     if (level === "beginner")     text = `Pick any one subject you find hard and study it for ${mins} minutes — no phone, just the book and your notebook.`;
     else if (level === "intermediate") text = `${mins} minutes on your weakest subject using the Pomodoro timer. Focus completely — no distractions.`;
@@ -181,7 +191,6 @@ function getSubjectStudyMission(level: MissionLevel, grade: number): Mission {
 }
 
 // ─── Mission 4: Wellness / Life ───────────────────────────────────────────────
-// Real, home-related, logical, not weird. Nothing study-related.
 const WELLNESS_MISSIONS: Array<{ text: string; emoji: string }> = [
   { text: "Go for a 10 minute walk outside or around your building. Moving your body makes your brain sharper — this is not optional.", emoji: "🚶" },
   { text: "Do 10 minutes of light exercise right now — jumping jacks, stretching, or simple push-ups. Your body needs to move after sitting for hours.", emoji: "💪" },
@@ -195,25 +204,25 @@ const WELLNESS_MISSIONS: Array<{ text: string; emoji: string }> = [
   { text: "Plan tomorrow's study schedule right now — write which subjects you will study and for how long. Preparation beats panic every time.", emoji: "📋" },
 ];
 
-// ─── Mission 5: Grade-specific mission ───────────────────────────────────────
+// ─── Mission 5: Grade-specific mission ────────────────────────────────────────
+// Grade 10 and 12: board exam year → PYQ / important questions practice.
+// Grade 9 and 11: NO board exam → class-based learning, concept mastery.
 function getGradeMission(level: MissionLevel, grade: number, rand: () => number): Mission {
   const isBoardYear = grade === 10 || grade === 12;
+  const diff: MissionDifficulty = level === "advanced" ? "hard" : level === "intermediate" ? "mid" : "easy";
 
+  // ── Board year grades (10 = SEE, 12 = NEB) ────────────────────────────────
   if (isBoardYear) {
-    const examName = grade === 10 ? "SEE" : "NEB";
+    const examName      = grade === 10 ? "SEE" : "NEB";
     const questionCount = level === "beginner" ? 5 : level === "intermediate" ? 10 : 15;
     let text: string;
-    let diff: MissionDifficulty;
 
     if (level === "beginner") {
       text = `Open the Important Questions section and solve ${questionCount} questions from your weakest ${examName} subject. Check every answer after you finish.`;
-      diff = "easy";
     } else if (level === "intermediate") {
-      text = `Solve ${questionCount} important ${examName} questions from the PYQ section without looking at the answers first. Grade yourself honestly after.`;
-      diff = "mid";
+      text = `Solve ${questionCount} important ${examName} questions from the Important Questions section without looking at the answers first. Grade yourself honestly after.`;
     } else {
-      text = `Attempt one full set of important ${examName} questions under exam conditions — no notes, time yourself. Review your mistakes after.`;
-      diff = "hard";
+      text = `Attempt one full set of important ${examName} questions under timed exam conditions — no notes, no phone. Review every mistake after you finish.`;
     }
 
     return {
@@ -228,29 +237,39 @@ function getGradeMission(level: MissionLevel, grade: number, rand: () => number)
     };
   }
 
-  // Grades 9 and 11 — class-based revision missions
-  const grade11 = grade === 11;
-  const gradeLabel = grade11 ? "Grade 11" : "Grade 9";
+  // ── Grade 11 — First year of NEB +2, no board exam ────────────────────────
+  // Focus: adapting to college-level content, concept mastery, derivations, lab work
+  if (grade === 11) {
+    const options: Array<{ text: string; emoji: string }> = [
+      { text: "Write a lab report for your most recent Physics or Chemistry practical — proper format: aim, method, result, conclusion. Do it from memory first.", emoji: "🔬" },
+      { text: "Pick the hardest derivation from your current Physics or Math chapter and derive it from scratch without looking at the book.", emoji: "📐" },
+      { text: "Make a structured mind map for the most complex chapter you are studying right now. Connect all the key concepts — no loose ends.", emoji: "🗺️" },
+      { text: "Read ahead in your hardest subject and write bullet notes on the next chapter before your teacher covers it in class.", emoji: "📖" },
+      { text: "Go through your current chapter in your weakest subject and write out every definition, law, and formula — in your own words.", emoji: "✏️" },
+      { text: "Solve all the exercise questions at the end of the chapter you studied today. Do not skip any — check each answer after.", emoji: "📝" },
+    ];
+    const chosen = pick(options, rand);
+    return {
+      id: "grade_mission",
+      text: chosen.text,
+      difficulty: diff,
+      type: "manual",
+      completed: false,
+      emoji: chosen.emoji,
+    };
+  }
 
-  const options: Array<{ text: string; emoji: string }> = grade11
-    ? [
-        { text: "Write down everything you remember from today's school lessons — from memory, without looking at your notebook. Then check what you missed.", emoji: "✏️" },
-        { text: "Revise your class notes from the last 3 days across all subjects. Write the key points for each subject from memory.", emoji: "📝" },
-        { text: "Read ahead in your hardest subject for tomorrow's class. Come to school prepared with at least one question to ask your teacher.", emoji: "📖" },
-        { text: "Go through your notes from this week and mark every topic you do not fully understand. Start studying the first one on your list.", emoji: "🔍" },
-        { text: "Pick any one subject from today's class and write a one-page summary of what you learned — in your own words, not copied.", emoji: "🗒️" },
-      ]
-    : [
-        { text: "Write down everything you remember from today's school lessons — from memory, without opening your notebook. Then check what you missed.", emoji: "✏️" },
-        { text: "Revise your class notes from the last 3 days. Write the key points for each subject from memory without peeking.", emoji: "📝" },
-        { text: "Read the next chapter in your hardest subject before your teacher covers it. Come to class tomorrow prepared.", emoji: "📖" },
-        { text: "Go through this week's notes and mark every topic you do not understand. Start studying the first one on your list right now.", emoji: "🔍" },
-        { text: "Pick one subject from today's class and write a summary of what you learned — in your own words, not copied from the book.", emoji: "🗒️" },
-      ];
-
+  // ── Grade 9 — Foundation year, no board exam ──────────────────────────────
+  // Focus: building study habits, understanding core concepts, completing exercises
+  const options: Array<{ text: string; emoji: string }> = [
+    { text: "Write down everything you remember from today's most important lesson — from memory, without opening your notebook. Then check what you missed.", emoji: "✏️" },
+    { text: "Complete all the exercise questions at the end of the chapter you studied today. Write full solutions — do not just circle answers.", emoji: "📝" },
+    { text: "Read the next chapter in your hardest subject before your teacher covers it. Come to class tomorrow prepared with at least one question to ask.", emoji: "📖" },
+    { text: "Write out all the key formulas from today's Math or Science lesson in your formula notebook. Quiz yourself on each one after.", emoji: "🔢" },
+    { text: "Go through this week's notes and mark every topic you do not understand. Start studying the first one on your list right now.", emoji: "🔍" },
+    { text: "Pick one subject from today's class and write a clear one-page summary of what you learned — in your own words, not copied.", emoji: "🗒️" },
+  ];
   const chosen = pick(options, rand);
-  const diff: MissionDifficulty = level === "advanced" ? "hard" : level === "intermediate" ? "mid" : "easy";
-
   return {
     id: "grade_mission",
     text: chosen.text,
@@ -272,7 +291,7 @@ export function buildMissions(
   const rand = seededRand(uid + date);
 
   if (isSaturday) {
-    const shortMins = level === "beginner" ? 25 : level === "intermediate" ? 50 : 75;
+    // Saturday = lighter set. 1 cycle for all levels (just 2 sessions).
     return [
       {
         id: "school_task",
@@ -282,9 +301,9 @@ export function buildMissions(
       },
       {
         id: "pomodoro_cycle",
-        text: `Complete ${level === "beginner" ? "one" : "two"} Pomodoro cycle${level === "beginner" ? "" : "s"} today — 25 min study, 5 min break, 25 min study. Even on Saturday, a little focus keeps your momentum going.`,
+        text: `Complete 1 Pomodoro cycle today — 25 min study, 5 min break, then 25 min study. Even on Saturday, a little focus keeps your momentum going. The timer switches automatically.`,
         difficulty: "easy", type: "pomodoro",
-        targetMinutes: shortMins, completed: false, emoji: "⏱️",
+        targetSessions: 2, targetMinutes: 50, completed: false, emoji: "⏱️",
       },
     ];
   }
@@ -310,7 +329,7 @@ export function buildMissions(
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useDailyMissions() {
   const { user, profile } = useAuth();
-  const { savedMinutesToday } = useTimer();
+  const { savedMinutesToday, sessionsCompleted } = useTimer();
 
   const [date, setDate] = useState(() => getNepaliDate());
   useEffect(() => {
@@ -360,7 +379,7 @@ export function useDailyMissions() {
 
         if (snap.exists()) {
           const data = snap.data();
-          // If missions were generated with an older version, regenerate them
+          // If missions were generated with an older version, regenerate
           if ((data.version ?? 1) < MISSION_VERSION) {
             await deleteDoc(docRef).catch(() => {});
             const grade       = profile?.grade ?? 10;
@@ -419,35 +438,55 @@ export function useDailyMissions() {
   }, [uid, fetchTrigger]);
 
   // ── Auto-complete Pomodoro missions ────────────────────────────────────────
+  // pomodoro_cycle: tracked by sessions completed (work blocks)
+  // subject_study:  tracked by minutes studied
   useEffect(() => {
     if (!uid || missions.length === 0) return;
     for (const m of missions) {
-      if (m.type !== "pomodoro" || m.completed || !m.targetMinutes) continue;
+      if (m.type !== "pomodoro" || m.completed) continue;
       if (completingRef.current.has(m.id)) continue;
-      const minutesDone = m.id === "pomodoro_cycle" || m.id === "study_time" || m.startedAt === undefined
-        ? Math.max(0, savedMinutesToday - studyMinsAtStart)
-        : Math.max(0, savedMinutesToday - m.startedAt);
-      if (minutesDone >= m.targetMinutes) {
-        completingRef.current.add(m.id);
-        _doComplete(uid, date, missions, m.id, setMissions, setAllCompleted);
+
+      if (m.id === "pomodoro_cycle" && m.targetSessions) {
+        // Session-based: count completed work sessions since mission was started
+        const sessAtStart  = m.sessionsAtStart ?? 0;
+        const sessionsDone = Math.max(0, sessionsCompleted - sessAtStart);
+        if (sessionsDone >= m.targetSessions) {
+          completingRef.current.add(m.id);
+          _doComplete(uid, date, missions, m.id, setMissions, setAllCompleted);
+        }
+      } else if (m.targetMinutes) {
+        // Minute-based: count study minutes since mission was started
+        const minutesDone = m.startedAt === undefined
+          ? Math.max(0, savedMinutesToday - studyMinsAtStart)
+          : Math.max(0, savedMinutesToday - m.startedAt);
+        if (minutesDone >= m.targetMinutes) {
+          completingRef.current.add(m.id);
+          _doComplete(uid, date, missions, m.id, setMissions, setAllCompleted);
+        }
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savedMinutesToday, missions, studyMinsAtStart]);
+  }, [savedMinutesToday, sessionsCompleted, missions, studyMinsAtStart]);
 
   // ── Start a Pomodoro mission ───────────────────────────────────────────────
+  // Records the current savedMinutesToday and sessionsCompleted on the mission
+  // so auto-complete can measure progress from the moment it was started.
   const startMission = useCallback((missionId: string, missionText: string, targetMinutes: number) => {
     if (!uid) return;
     const preset: PomodoroMissionPreset = { missionId, missionText, targetMinutes, date };
     try { localStorage.setItem(POMODORO_MISSION_KEY, JSON.stringify(preset)); } catch {}
     setMissions(prev => {
-      const updated = prev.map(m => m.id === missionId ? { ...m, startedAt: savedMinutesToday } : m);
+      const updated = prev.map(m => m.id === missionId ? {
+        ...m,
+        startedAt: savedMinutesToday,
+        sessionsAtStart: sessionsCompleted,
+      } : m);
       const c = readCache(uid, date);
       if (c) writeCache(uid, date, { ...c, missions: updated });
       updateDoc(doc(db, "daily_missions", `${uid}_${date}`), { missions: updated }).catch(() => {});
       return updated;
     });
-  }, [uid, date, savedMinutesToday]);
+  }, [uid, date, savedMinutesToday, sessionsCompleted]);
 
   // ── Manual complete (with anti-cheat) ─────────────────────────────────────
   const completeMission = useCallback((missionId: string) => {
@@ -481,9 +520,19 @@ export function useDailyMissions() {
   const completedCount = missions.filter(m => m.completed).length;
   const progressPct    = missions.length > 0 ? (completedCount / missions.length) * 100 : 0;
 
+  // Returns 0–100 progress for a given mission.
+  // pomodoro_cycle uses sessions; other pomodoro missions use minutes.
   function missionProgress(m: Mission): number {
-    if (!m.targetMinutes || m.completed) return m.completed ? 100 : 0;
-    const minutesDone = m.id === "pomodoro_cycle" || m.id === "study_time" || m.startedAt === undefined
+    if (m.completed) return 100;
+
+    if (m.id === "pomodoro_cycle" && m.targetSessions) {
+      const sessAtStart  = m.sessionsAtStart ?? 0;
+      const sessionsDone = Math.max(0, sessionsCompleted - sessAtStart);
+      return Math.min(100, (sessionsDone / m.targetSessions) * 100);
+    }
+
+    if (!m.targetMinutes) return 0;
+    const minutesDone = m.startedAt === undefined
       ? Math.max(0, savedMinutesToday - studyMinsAtStart)
       : Math.max(0, savedMinutesToday - m.startedAt);
     return Math.min(100, (minutesDone / m.targetMinutes) * 100);
