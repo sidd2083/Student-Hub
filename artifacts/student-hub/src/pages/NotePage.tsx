@@ -7,11 +7,11 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import {
-  getDoc, doc, setDoc, updateDoc, deleteDoc,
+  getDoc, getDocs, doc, setDoc, updateDoc, deleteDoc, collection, query, where, limit,
 } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { getNepaliDate } from "@/lib/nepaliDate";
-import { extractFirestoreId, noteCanonical } from "@/lib/slugs";
+import { extractFirestoreId, noteCanonical, noteUrl } from "@/lib/slugs";
 
 const NOTE_VIEWED_KEY = "studenthub_viewed_notes_session";
 
@@ -218,6 +218,7 @@ export default function NotePage() {
   const [scrollPct, setScrollPct] = useState(0);
   const [seoMeta, setSeoMeta] = useState<SeoMeta | null>(null);
   const [focusMode, setFocusMode] = useState(false);
+  const [similarNotes, setSimilarNotes] = useState<NoteData[]>([]);
   const mainRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -296,6 +297,26 @@ export default function NotePage() {
     el.addEventListener("scroll", handler);
     return () => el.removeEventListener("scroll", handler);
   }, [note]);
+
+  // Fetch similar notes (same subject + grade) for internal linking
+  useEffect(() => {
+    if (!note) return;
+    setSimilarNotes([]);
+    getDocs(
+      query(
+        collection(db, "notes"),
+        where("grade", "==", note.grade),
+        where("subject", "==", note.subject),
+        limit(7)
+      )
+    ).then((snap) => {
+      const list = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as NoteData))
+        .filter(n => n.id !== firestoreId)
+        .slice(0, 6);
+      setSimilarNotes(list);
+    }).catch(() => {});
+  }, [firestoreId, note?.subject, note?.grade]);
 
   const computedCanonical = note ? noteCanonical(note) : "";
 

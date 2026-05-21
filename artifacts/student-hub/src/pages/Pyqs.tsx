@@ -347,8 +347,8 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
           <p className="text-gray-500 text-sm">Past exam papers for SEE (Grade 10) and NEB (Grade 11 &amp; 12) — Science, Maths, English and more. Free, no login needed.</p>
         </div>
 
-        {/* Static SEO content — always visible to search crawlers */}
-        <section className="mb-5 bg-orange-50/60 border border-orange-100 rounded-2xl p-4 sm:p-5 text-sm text-gray-700 leading-relaxed" aria-label="About these papers">
+        {/* Static SEO content — shown to guests for crawlers; logged-in users see the filters directly */}
+        {!isLoggedIn && <section className="mb-5 bg-orange-50/60 border border-orange-100 rounded-2xl p-4 sm:p-5 text-sm text-gray-700 leading-relaxed" aria-label="About these papers">
           <p className="mb-3">
             <strong>Previous Year Question papers (PYQs)</strong> are the most effective way to prepare for <strong>SEE</strong> and <strong>NEB board exams</strong> in Nepal.
             Student Hub Nepal provides free past papers for <strong>Grade 9, 10, 11 and 12</strong> across all provinces — covering
@@ -365,7 +365,7 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
             <span>✓ 2076–2081 BS years</span>
             <span>✓ All major subjects</span>
           </div>
-        </section>
+        </section>}
 
         {!isLoggedIn && (
           <div className="mb-5 bg-blue-50 border border-blue-100 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">

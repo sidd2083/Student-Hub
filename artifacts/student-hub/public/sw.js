@@ -1,4 +1,4 @@
-const CACHE_NAME = "student-hub-v9";
+const CACHE_NAME = "student-hub-v10";
 const SHELL_ASSETS = [
   "/",
   "/manifest.json",
@@ -19,6 +19,8 @@ self.addEventListener("activate", (event) => {
     caches.keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({ type: "window", includeUncontrolled: true }))
+      .then((clients) => Promise.all(clients.map((c) => c.navigate(c.url))))
   );
 });
 
@@ -38,7 +40,6 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/")) return;
   if (url.pathname.startsWith("/@") || url.pathname.includes("__vite") || url.pathname.includes("hot-update")) return;
 
-  // ── Hashed assets — cache-first forever (content hash guarantees freshness)
   if (isHashedAsset(url)) {
     event.respondWith(
       caches.match(request).then((cached) => {
@@ -54,9 +55,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // ── Navigation requests — stale-while-revalidate:
-  //    Serve from cache INSTANTLY, then update cache in background.
-  //    This makes repeat visits feel instant even on slow connections.
   if (request.mode === "navigate") {
     event.respondWith(
       caches.open(CACHE_NAME).then((cache) =>
@@ -65,7 +63,6 @@ self.addEventListener("fetch", (event) => {
             if (res.ok) cache.put("/", res.clone());
             return res;
           });
-          // Return cached immediately if available, otherwise wait for network
           return cached || fetchPromise;
         })
       )
@@ -73,7 +70,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // ── Static shell assets — cache-first
   if (
     url.pathname === "/manifest.json" ||
     url.pathname === "/favicon.svg" ||
@@ -94,7 +90,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // ── Everything else — network with cache fallback
   event.respondWith(
     fetch(request)
       .then((res) => {

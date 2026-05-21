@@ -315,8 +315,8 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
           <p className="text-gray-500 text-sm">Free study materials for Grade 9, 10, 11 &amp; 12 Nepal students — Maths, Science, English, Social Studies and more. Organised by grade, subject and chapter.</p>
         </div>
 
-        {/* Static SEO content — always visible to search crawlers */}
-        <section className="mb-5 bg-blue-50/60 border border-blue-100 rounded-2xl p-4 sm:p-5 text-sm text-gray-700 leading-relaxed" aria-label="About these notes">
+        {/* Static SEO content — shown to guests for crawlers; logged-in users see the filters directly */}
+        {!isLoggedIn && <section className="mb-5 bg-blue-50/60 border border-blue-100 rounded-2xl p-4 sm:p-5 text-sm text-gray-700 leading-relaxed" aria-label="About these notes">
           <p className="mb-3">
             <strong>Student Hub Nepal</strong> offers free study notes for <strong>SEE (Grade 10)</strong> and <strong>NEB (Grade 11 &amp; 12)</strong> students across Nepal.
             Notes cover <strong>Compulsory Maths, Optional Maths, Science, English, Social Studies, Nepali, Physics, Chemistry, Biology, Computer Science</strong> and more.
@@ -333,7 +333,7 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
             <span>✓ PDF, image &amp; text formats</span>
             <span>✓ Chapter-wise organisation</span>
           </div>
-        </section>
+        </section>}
 
         {!isLoggedIn && (
           <div className="mb-5 bg-blue-50 border border-blue-100 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
