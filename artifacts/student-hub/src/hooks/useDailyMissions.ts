@@ -399,12 +399,31 @@ export function useDailyMissions() {
             }).catch(e => console.error("[DailyMissions] Firestore write:", e));
           } else {
             const sm    = data.missions as Mission[];
-            const done  = data.allCompleted ?? false;
             const start = data.studyMinutesAtStart ?? 0;
-            setMissions(sm);
+
+            // Merge Firestore data with local cache.
+            // Firestore can lag behind localStorage (e.g. startMission wrote
+            // sessionsAtStart locally then the user navigated away before the
+            // Firestore updateDoc confirmed). Always prefer the more-advanced
+            // local state so mission progress and completion are never lost.
+            const localCached = readCache(uid, date);
+            const mergedMissions: Mission[] = sm.map(m => {
+              const local = localCached?.missions.find(lm => lm.id === m.id);
+              if (!local) return m;
+              return {
+                ...m,
+                completed:      m.completed  || local.completed,
+                completedAt:    m.completedAt ?? local.completedAt,
+                sessionsAtStart: m.sessionsAtStart ?? local.sessionsAtStart,
+                startedAt:      m.startedAt  ?? local.startedAt,
+              };
+            });
+            const done = (data.allCompleted ?? false) || (localCached?.allCompleted ?? false);
+
+            setMissions(mergedMissions);
             setAllCompleted(done);
             setStudyMinsAtStart(start);
-            writeCache(uid, date, { missions: sm, allCompleted: done, studyMinsAtStart: start, level: data.level ?? level, version: MISSION_VERSION });
+            writeCache(uid, date, { missions: mergedMissions, allCompleted: done, studyMinsAtStart: start, level: data.level ?? level, version: MISSION_VERSION });
           }
         } else {
           const grade       = profile?.grade ?? 10;

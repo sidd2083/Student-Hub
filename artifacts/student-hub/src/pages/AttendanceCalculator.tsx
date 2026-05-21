@@ -93,23 +93,23 @@ export default function AttendanceCalculator() {
   return (
     <>
       <Helmet>
-        <title>Attendance Calculator — How Many Classes Can I Miss? | Free</title>
-        <meta name="description" content="Don't guess — know exactly how many classes you can bunk! Instant attendance %, bunk count &amp; recovery plan for 75%, 80%, or any rule. Free, no login. Used worldwide." />
-        <meta name="keywords" content="attendance calculator, how many classes can i miss, how many classes can i bunk, bunk calculator, 75 attendance calculator, attendance percentage calculator, class attendance calculator, college attendance calculator, attendance calculator india, attendance calculator australia, attendance calculator usa, attendance calculator canada, attendance calculator uk, attendance shortage calculator, 75 percent attendance rule, how many classes can i skip, minimum attendance calculator, attendance calculator online free, lecture attendance calculator, bunking calculator college, how many lectures can i miss, attendance calculator for 75 percent, college bunk calculator, student attendance tracker, attendance recovery calculator, how many classes to attend to recover, attendance shortage recovery, 80 percent attendance calculator, 85 percent attendance calculator, bunk class calculator, attendance percentage formula, college attendance shortage" />
+        <title>Attendance Calculator — How Many Classes Can I Bunk? | Free</title>
+        <meta name="description" content="Don't guess — know exactly how many classes you can bunk! Instant attendance % + bunk count for India's 75% UGC rule, CBSE, DU, Mumbai University &amp; worldwide. Free, no login." />
+        <meta name="keywords" content="attendance calculator, how many classes can i miss, how many classes can i bunk, bunk calculator, 75 attendance calculator, attendance percentage calculator, class attendance calculator, college attendance calculator, attendance calculator india, 75 attendance rule india, UGC 75 attendance rule, CBSE attendance calculator, DU attendance calculator, Delhi university attendance calculator, Mumbai university attendance calculator, Anna university attendance calculator, VTU attendance calculator, Osmania university attendance calculator, Pune university attendance calculator, attendance calculator for indian college students, india college bunk calculator, how many classes can i bunk india, 75 percent attendance india, attendance shortage india, attendance calculator australia, attendance calculator usa, attendance calculator canada, attendance calculator uk, attendance shortage calculator, 75 percent attendance rule, how many classes can i skip, minimum attendance calculator, attendance calculator online free, lecture attendance calculator, bunking calculator college, how many lectures can i miss, attendance calculator for 75 percent, college bunk calculator, attendance recovery calculator, how many classes to attend to recover, attendance shortage recovery, 80 percent attendance calculator, 85 percent attendance calculator, bunk class calculator, attendance percentage formula, college attendance shortage, CBSE 75 attendance, attendance calculator for college students india" />
         <meta name="author" content="Student Hub" />
         <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
 
-        <meta property="og:title" content="Attendance Calculator — How Many Classes Can I Miss? | Free" />
-        <meta property="og:description" content="Know exactly how many classes you can bunk! Instant attendance %, bunk count &amp; recovery plan for 75%, 80%, or any rule. Free, no login. Used worldwide." />
+        <meta property="og:title" content="Attendance Calculator — How Many Classes Can I Bunk? | Free" />
+        <meta property="og:description" content="Know exactly how many classes you can bunk! Instant attendance % + bunk count for India's 75% UGC rule, CBSE, DU, Mumbai University &amp; worldwide. Free, no login." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://studenthubnp.com/tools/attendance-calculator" />
         <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
-        <meta property="og:image:alt" content="Free Attendance Calculator — How Many Classes Can I Miss or Bunk?" />
+        <meta property="og:image:alt" content="Free Attendance Calculator — How Many Classes Can I Miss or Bunk? India &amp; Worldwide" />
         <meta property="og:site_name" content="Student Hub" />
 
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Attendance Calculator — How Many Classes Can I Miss? | Free" />
-        <meta name="twitter:description" content="Know exactly how many classes you can bunk! Instant attendance %, bunk count &amp; recovery plan for 75%, 80%, or any rule. Free, worldwide." />
+        <meta name="twitter:title" content="Attendance Calculator — How Many Classes Can I Bunk? | Free" />
+        <meta name="twitter:description" content="Know exactly how many classes you can bunk! Instant attendance % + bunk count for India 75% UGC rule, CBSE, DU, Mumbai University &amp; worldwide. Free." />
         <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
 
         <link rel="canonical" href="https://studenthubnp.com/tools/attendance-calculator" />
