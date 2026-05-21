@@ -476,7 +476,7 @@ export function useDailyMissions() {
   // ── Start a Pomodoro mission ───────────────────────────────────────────────
   // Records the current savedMinutesToday and sessionsCompleted on the mission
   // so auto-complete can measure progress from the moment it was started.
-  const startMission = useCallback((missionId: string, missionText: string, targetMinutes: number) => {
+  const startMission = useCallback((missionId: string, missionText: string, targetMinutes: number, sessionsAtStartOverride?: number) => {
     if (!uid) return;
     const preset: PomodoroMissionPreset = { missionId, missionText, targetMinutes, date };
     try { localStorage.setItem(POMODORO_MISSION_KEY, JSON.stringify(preset)); } catch {}
@@ -484,7 +484,7 @@ export function useDailyMissions() {
       const updated = prev.map(m => m.id === missionId ? {
         ...m,
         startedAt: savedMinutesToday,
-        sessionsAtStart: naturalSessionsCompleted,
+        sessionsAtStart: sessionsAtStartOverride !== undefined ? sessionsAtStartOverride : naturalSessionsCompleted,
       } : m);
       const c = readCache(uid, date);
       if (c) writeCache(uid, date, { ...c, missions: updated });
@@ -559,6 +559,10 @@ function _doComplete(
   setMissions: React.Dispatch<React.SetStateAction<Mission[]>>,
   setAllCompleted: React.Dispatch<React.SetStateAction<boolean>>,
 ) {
+  // Clear the mission banner from Pomodoro page when the cycle mission completes
+  if (missionId === "pomodoro_cycle") {
+    try { localStorage.removeItem(POMODORO_MISSION_KEY); } catch {}
+  }
   setMissions(prev => {
     const updated = prev.map(m =>
       m.id === missionId ? { ...m, completed: true, completedAt: new Date().toISOString() } : m,

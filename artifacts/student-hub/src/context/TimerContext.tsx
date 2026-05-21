@@ -559,8 +559,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     const missionSettings: TimerSettings = {
       workMins: 25,
       shortBreakMins: 5,
-      longBreakMins: 15,
-      sessionsBeforeLongBreak: 4,
+      longBreakMins: 10,
+      sessionsBeforeLongBreak: 2,
       sessionsBeforeShortBreak: 2,
       autoSwitch: true,
     };

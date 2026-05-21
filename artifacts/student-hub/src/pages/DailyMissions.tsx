@@ -32,7 +32,7 @@ function PomodoroMissionCard({
 }: {
   mission: Mission;
   progress: number;
-  onStart: (id: string, text: string, mins: number) => void;
+  onStart: (id: string, text: string, mins: number, sessionsAtStartOverride?: number) => void;
 }) {
   const [, navigate] = useLocation();
   const { naturalSessionsCompleted, running, restartForMission } = useTimer();
@@ -54,10 +54,13 @@ function PomodoroMissionCard({
   const handleGo = () => {
     // If the timer isn't running, reset it to a clean work phase with auto-switch on
     // so the student arrives at a ready 25:00 timer — no confusion.
-    if (!running) {
+    const wasRunning = running;
+    if (!wasRunning) {
       restartForMission();
     }
-    onStart(mission.id, mission.text, mins);
+    // Pass 0 as sessionsAtStart when we just restarted (timer reset to 0),
+    // otherwise use current value. This fixes the progress bar tracking bug.
+    onStart(mission.id, mission.text, mins, wasRunning ? undefined : 0);
     navigate("/pomodoro");
   };
 

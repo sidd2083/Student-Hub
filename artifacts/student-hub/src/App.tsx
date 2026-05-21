@@ -120,7 +120,7 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
   }, [location]);
 
   return (
-    <div key={location} className="page-fade" style={{ minHeight: "100%" }}>
+    <div className="page-fade" style={{ minHeight: "100%" }}>
       <Suspense fallback={<PageLoadingFallback />}>
         {children}
       </Suspense>
