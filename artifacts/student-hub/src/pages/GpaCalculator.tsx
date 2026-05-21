@@ -718,15 +718,14 @@ export default function GpaCalculator() {
           </ul>
 
           <h2 className="text-xl font-bold text-gray-900 pt-2">Frequently Asked Questions — NEB GPA Calculator Nepal</h2>
-          {FAQ_SCHEMA.mainEntity.map((faq, i) => (
-            <details key={i} className="border border-gray-100 rounded-xl p-4 group">
-              <summary className="font-semibold text-gray-900 cursor-pointer text-sm list-none flex items-center justify-between">
-                {faq.name}
-                <span className="text-gray-400 group-open:rotate-180 transition-transform text-lg leading-none select-none">+</span>
-              </summary>
-              <p className="mt-3 text-sm text-gray-600 leading-relaxed">{faq.acceptedAnswer.text}</p>
-            </details>
-          ))}
+          <div className="space-y-4">
+            {FAQ_SCHEMA.mainEntity.map((faq, i) => (
+              <div key={i} className="border border-gray-100 rounded-xl p-4">
+                <h3 className="font-semibold text-gray-900 text-sm mb-2">{faq.name}</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">{faq.acceptedAnswer.text}</p>
+              </div>
+            ))}
+          </div>
         </article>
       </div>
     </>

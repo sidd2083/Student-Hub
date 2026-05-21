@@ -71,6 +71,15 @@ export default function Home() {
   const [notes, setNotes] = useState<PreviewNote[]>([]);
   const [pyqs, setPyqs] = useState<PreviewPyq[]>([]);
 
+  // Redirect authenticated users after auth state loads.
+  // Using useEffect (not render-time) so the page renders immediately for
+  // search crawlers, which see the full content on first paint.
+  useEffect(() => {
+    if (!loading && user) {
+      setLocation("/dashboard");
+    }
+  }, [loading, user, setLocation]);
+
   useEffect(() => {
     getDocs(query(collection(db, "notes"), where("grade", "==", 10)))
       .then(s => {
@@ -87,19 +96,6 @@ export default function Home() {
       })
       .catch(console.error);
   }, []);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" aria-label="Loading" />
-      </div>
-    );
-  }
-
-  if (user) {
-    window.location.replace("/dashboard");
-    return null;
-  }
 
   return (
     <>

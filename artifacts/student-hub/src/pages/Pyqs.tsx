@@ -344,8 +344,28 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
       <div className="p-4 sm:p-6 lg:p-8 max-w-full overflow-x-hidden">
         <div className="mb-5 sm:mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Previous Year Questions</h1>
-          <p className="text-gray-500 text-sm">Past exam papers — tap any card to view</p>
+          <p className="text-gray-500 text-sm">Past exam papers for SEE (Grade 10) and NEB (Grade 11 &amp; 12) — Science, Maths, English and more. Free, no login needed.</p>
         </div>
+
+        {/* Static SEO content — always visible to search crawlers */}
+        <section className="mb-5 bg-orange-50/60 border border-orange-100 rounded-2xl p-4 sm:p-5 text-sm text-gray-700 leading-relaxed" aria-label="About these papers">
+          <p className="mb-3">
+            <strong>Previous Year Question papers (PYQs)</strong> are the most effective way to prepare for <strong>SEE</strong> and <strong>NEB board exams</strong> in Nepal.
+            Student Hub Nepal provides free past papers for <strong>Grade 9, 10, 11 and 12</strong> across all provinces — covering
+            <strong> Compulsory Maths, Science, English, Social Studies, Physics, Chemistry, Biology</strong> and more.
+          </p>
+          <p className="mb-3">
+            Papers include SEE question papers from 2076, 2077, 2078, 2079, 2080, 2081 BS and NEB (Plus Two) past papers from multiple provinces.
+            Each paper can be viewed directly in the browser. No downloading or login required.
+          </p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-orange-700 font-medium mt-2">
+            <span>✓ Free to view instantly</span>
+            <span>✓ All provinces covered</span>
+            <span>✓ SEE &amp; NEB papers</span>
+            <span>✓ 2076–2081 BS years</span>
+            <span>✓ All major subjects</span>
+          </div>
+        </section>
 
         {!isLoggedIn && (
           <div className="mb-5 bg-blue-50 border border-blue-100 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
