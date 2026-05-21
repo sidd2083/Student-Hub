@@ -1,4 +1,4 @@
-const CACHE_NAME = "student-hub-v8";
+const CACHE_NAME = "student-hub-v9";
 const SHELL_ASSETS = [
   "/",
   "/manifest.json",
