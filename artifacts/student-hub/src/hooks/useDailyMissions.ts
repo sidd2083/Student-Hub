@@ -438,8 +438,10 @@ export function useDailyMissions() {
   }, [uid, fetchTrigger]);
 
   // ── Auto-complete Pomodoro missions ────────────────────────────────────────
-  // pomodoro_cycle: tracked by sessions completed (work blocks)
-  // subject_study:  tracked by minutes studied
+  // A mission only tracks progress AFTER the student explicitly presses
+  // "Start Pomodoro Timer" from its card. Until then startedAt / sessionsAtStart
+  // are undefined and we intentionally ignore any timer activity — this prevents
+  // one mission's timer use from accidentally completing a different mission.
   useEffect(() => {
     if (!uid || missions.length === 0) return;
     for (const m of missions) {
@@ -447,19 +449,21 @@ export function useDailyMissions() {
       if (completingRef.current.has(m.id)) continue;
 
       if (m.id === "pomodoro_cycle" && m.targetSessions) {
-        // Session-based: count naturally completed work sessions since mission was started.
-        // naturalSessionsCompleted never increments on Skip — only when timer hits zero.
-        const sessAtStart  = m.sessionsAtStart ?? 0;
-        const sessionsDone = Math.max(0, naturalSessionsCompleted - sessAtStart);
+        // Mission not started yet — student hasn't clicked "Start Pomodoro Timer"
+        // for this specific mission card. Do not track anything.
+        if (m.sessionsAtStart === undefined) continue;
+        // Session-based: count naturally completed work sessions since this mission
+        // was started. naturalSessionsCompleted never increments on Skip.
+        const sessionsDone = Math.max(0, naturalSessionsCompleted - m.sessionsAtStart);
         if (sessionsDone >= m.targetSessions) {
           completingRef.current.add(m.id);
           _doComplete(uid, date, missions, m.id, setMissions, setAllCompleted);
         }
       } else if (m.targetMinutes) {
-        // Minute-based: count study minutes since mission was started
-        const minutesDone = m.startedAt === undefined
-          ? Math.max(0, savedMinutesToday - studyMinsAtStart)
-          : Math.max(0, savedMinutesToday - m.startedAt);
+        // Mission not started yet — do not track any minutes until the student
+        // explicitly starts this mission from its card.
+        if (m.startedAt === undefined) continue;
+        const minutesDone = Math.max(0, savedMinutesToday - m.startedAt);
         if (minutesDone >= m.targetMinutes) {
           completingRef.current.add(m.id);
           _doComplete(uid, date, missions, m.id, setMissions, setAllCompleted);
@@ -522,20 +526,20 @@ export function useDailyMissions() {
   const progressPct    = missions.length > 0 ? (completedCount / missions.length) * 100 : 0;
 
   // Returns 0–100 progress for a given mission.
+  // Returns 0 until the student explicitly starts the mission from its card.
   // pomodoro_cycle uses sessions; other pomodoro missions use minutes.
   function missionProgress(m: Mission): number {
     if (m.completed) return 100;
 
     if (m.id === "pomodoro_cycle" && m.targetSessions) {
-      const sessAtStart  = m.sessionsAtStart ?? 0;
-      const sessionsDone = Math.max(0, naturalSessionsCompleted - sessAtStart);
+      if (m.sessionsAtStart === undefined) return 0;
+      const sessionsDone = Math.max(0, naturalSessionsCompleted - m.sessionsAtStart);
       return Math.min(100, (sessionsDone / m.targetSessions) * 100);
     }
 
     if (!m.targetMinutes) return 0;
-    const minutesDone = m.startedAt === undefined
-      ? Math.max(0, savedMinutesToday - studyMinsAtStart)
-      : Math.max(0, savedMinutesToday - m.startedAt);
+    if (m.startedAt === undefined) return 0;
+    const minutesDone = Math.max(0, savedMinutesToday - m.startedAt);
     return Math.min(100, (minutesDone / m.targetMinutes) * 100);
   }
 
