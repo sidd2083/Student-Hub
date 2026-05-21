@@ -1,0 +1,159 @@
+You are an expert Next.js SEO engineer.
+
+Fix ALL indexing, canonical, sitemap, and Google Search Console issues WITHOUT breaking UI, styling, fonts, or existing design system.
+
+IMPORTANT:
+- Do NOT change UI/UX design
+- Do NOT change fonts or layout
+- Only fix SEO, routing, indexing, and crawl structure
+
+========================
+CURRENT WEBSITE STRUCTURE
+========================
+
+Public pages:
+- /
+- /notes (list page)
+- /pyq (list page)
+- /notes/[id] (individual note pages)
+- /pyq/[id] (individual PYQ pages)
+- /tools/gpa-calculator
+- /tools/attendance-calculator
+
+Private pages (DO NOT index):
+- /dashboard/*
+- /app/*
+- user profile/private pages
+
+========================
+PROBLEM
+========================
+
+Google Search Console shows:
+- Duplicate without user-selected canonical
+- Crawled - currently not indexed
+- Discovered - not indexed
+- Only 2 pages indexed out of ~43
+
+Root cause:
+- Duplicate URLs for same content
+- Missing or incorrect canonical tags
+- Private pages being crawled
+- Sitemap includes wrong routes
+- Google confused between public and dashboard content
+
+========================
+GOAL
+========================
+
+Make ALL public pages indexable:
+✔ notes list page
+✔ all individual note pages
+✔ all PYQ pages
+✔ tool pages
+
+AND ensure:
+❌ dashboard pages NOT indexed
+❌ duplicate URLs removed
+❌ canonical properly defined
+
+========================
+CRITICAL FIXES
+========================
+
+1. CANONICAL TAG SYSTEM (VERY IMPORTANT)
+
+For every page:
+- Add correct canonical URL
+- Each note/PYQ page must have EXACT single canonical URL
+
+Example:
+- /notes/[id] → canonical = /notes/[id]
+- /pyq/[id] → canonical = /pyq/[id]
+
+Prevent duplicate versions of same page.
+
+2. BLOCK PRIVATE PAGES
+
+Add:
+- meta robots: noindex, nofollow
+
+For:
+- /dashboard/*
+- /app/*
+- all private/user-only pages
+
+These MUST NOT appear in Google.
+
+3. SITEMAP FIX
+
+Generate clean sitemap.xml:
+
+INCLUDE ONLY:
+- /
+- /notes
+- /pyq
+- /notes/[id]
+- /pyq/[id]
+- /tools/*
+
+EXCLUDE:
+- dashboard routes
+- app routes
+- duplicate or query-based URLs
+
+4. ROBOTS.TXT FIX
+
+Rules:
+- Allow: /
+- Allow: /notes/*
+- Allow: /pyq/*
+- Allow: /tools/*
+- Disallow: /dashboard/*
+- Disallow: /app/*
+- Disallow: private routes
+
+5. REMOVE DUPLICATE ROUTES
+
+Ensure:
+- Only ONE version of each page exists
+- No duplicate rendering of same content under different URLs
+- Avoid /home, /index duplicates
+
+Redirect duplicates using 301 redirects to canonical URL.
+
+6. INDEXING OPTIMIZATION
+
+For all public pages:
+- Add unique meta title
+- Add unique meta description
+- Add OpenGraph tags
+- Add Twitter card tags
+
+Ensure each note/PYQ page has dynamic SEO metadata based on content.
+
+7. PERFORMANCE + SEO FRIENDLY STRUCTURE
+
+- Ensure SSR or SSG for all note and PYQ pages
+- Avoid client-only rendering for indexable pages
+- Optimize for fast crawl speed
+- Ensure lightweight pages
+
+========================
+IMPORTANT RULES
+
+- Do NOT break UI or styling
+- Do NOT modify frontend design system
+- Only modify SEO, routing, metadata, indexing rules
+- Keep website visually EXACT same
+- Focus only on Google indexing fixes
+
+========================
+EXPECTED RESULT
+
+After fix:
+✔ All public pages indexed properly
+✔ No duplicate canonical errors
+✔ Sitemap fully valid
+✔ Search Console errors reduced to near zero
+✔ Dashboard completely hidden from Google
