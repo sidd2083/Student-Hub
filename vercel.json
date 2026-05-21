@@ -17,8 +17,17 @@
       "maxDuration": 5
     }
   },
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.studenthubnp.com" }],
+      "destination": "https://studenthubnp.com/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/(.*)",     "destination": "/index.html" }
+    { "source": "/sitemap.xml", "destination": "/api/index" },
+    { "source": "/api/(.*)",    "destination": "/api/index" },
+    { "source": "/(.*)",        "destination": "/index.html" }
   ]
 }

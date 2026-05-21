@@ -11,7 +11,6 @@ import studyRouter from "./study";
 import announcementsRouter from "./announcements";
 import savedRouter from "./saved";
 import uploadRouter from "./upload";
-
 const router: IRouter = Router();
 
 router.use(healthRouter);

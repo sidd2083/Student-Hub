@@ -5,10 +5,22 @@ import { rateLimit } from "express-rate-limit";
 import pino from "pino";
 import pinoHttp from "pino-http";
 import router from "./routes";
+import sitemapRouter from "./routes/sitemap";
 
 const app: Express = express();
 
 app.set("trust proxy", 1);
+
+// ── www → non-www canonical redirect ─────────────────────────────────────────
+// Runs before everything else so crawlers never index the www version.
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const host = req.headers.host ?? "";
+  if (host.startsWith("www.")) {
+    const canonical = `https://${host.slice(4)}${req.originalUrl}`;
+    return res.redirect(301, canonical);
+  }
+  next();
+});
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "same-site" },
@@ -45,6 +57,9 @@ app.use(cors({
 // File uploads use multer (memory buffer) which is separate from this limit.
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+// ── Sitemap — served at top-level /sitemap.xml (not under /api) ───────────────
+app.use(sitemapRouter);
 
 app.use("/api/ai", aiLimiter);
 app.use("/api", limiter, router);
