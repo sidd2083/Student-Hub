@@ -5,7 +5,7 @@
   <!-- ── Homepage ─────────────────────────────────────────────────────────── -->
   <url>
     <loc>https://studenthubnp.com/</loc>
-    <lastmod>2026-05-18</lastmod>
+    <lastmod>2026-05-21</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <image:image>
@@ -18,7 +18,7 @@
   <!-- ── Notes library ─────────────────────────────────────────────────────── -->
   <url>
     <loc>https://studenthubnp.com/notes</loc>
-    <lastmod>2026-05-18</lastmod>
+    <lastmod>2026-05-21</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
   </url>
@@ -26,7 +26,7 @@
   <!-- ── Past Year Questions ───────────────────────────────────────────────── -->
   <url>
     <loc>https://studenthubnp.com/pyqs</loc>
-    <lastmod>2026-05-18</lastmod>
+    <lastmod>2026-05-21</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.90</priority>
   </url>
@@ -34,7 +34,7 @@
   <!-- ── MCQ Practice ──────────────────────────────────────────────────────── -->
   <url>
     <loc>https://studenthubnp.com/mcq</loc>
-    <lastmod>2026-05-18</lastmod>
+    <lastmod>2026-05-21</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
@@ -42,31 +42,31 @@
   <!-- ── Tools hub ─────────────────────────────────────────────────────────── -->
   <url>
     <loc>https://studenthubnp.com/tools</loc>
-    <lastmod>2026-05-18</lastmod>
+    <lastmod>2026-05-21</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.90</priority>
   </url>
 
-  <!-- ── GPA Calculator — high-traffic long-tail keyword page ─────────────── -->
+  <!-- ── GPA Calculator — primary high-traffic page ────────────────────────── -->
   <url>
     <loc>https://studenthubnp.com/tools/gpa-calculator</loc>
-    <lastmod>2026-05-18</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.95</priority>
+    <lastmod>2026-05-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
   </url>
 
-  <!-- ── Attendance Calculator ─────────────────────────────────────────────── -->
+  <!-- ── Attendance / Bunk Calculator ──────────────────────────────────────── -->
   <url>
     <loc>https://studenthubnp.com/tools/attendance-calculator</loc>
-    <lastmod>2026-05-18</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.95</priority>
+    <lastmod>2026-05-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
   </url>
 
   <!-- ── About ─────────────────────────────────────────────────────────────── -->
   <url>
     <loc>https://studenthubnp.com/about</loc>
-    <lastmod>2026-05-18</lastmod>
+    <lastmod>2026-05-21</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.60</priority>
   </url>
@@ -74,7 +74,7 @@
   <!-- ── Contact ───────────────────────────────────────────────────────────── -->
   <url>
     <loc>https://studenthubnp.com/contact</loc>
-    <lastmod>2026-05-18</lastmod>
+    <lastmod>2026-05-21</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.50</priority>
   </url>
@@ -82,7 +82,7 @@
   <!-- ── Privacy Policy ───────────────────────────────────────────────────── -->
   <url>
     <loc>https://studenthubnp.com/privacy</loc>
-    <lastmod>2026-05-18</lastmod>
+    <lastmod>2026-05-21</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.40</priority>
   </url>
@@ -90,7 +90,7 @@
   <!-- ── Terms of Service ──────────────────────────────────────────────────── -->
   <url>
     <loc>https://studenthubnp.com/terms</loc>
-    <lastmod>2026-05-18</lastmod>
+    <lastmod>2026-05-21</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.40</priority>
   </url>
