@@ -14,21 +14,51 @@ export default function Contact() {
   return (
     <>
       <Helmet>
-        <title>Contact Student Hub Nepal — Send Us Your Feedback or Questions</title>
-        <meta name="description" content="Contact the Student Hub Nepal team. Have a question, suggestion, or found an issue? Reach out by email or phone — we respond within 24 hours. Built for Grade 9–12 students across Nepal." />
-        <meta name="keywords" content="contact student hub nepal, student hub contact, student hub nepal feedback, student hub nepal support, contact student hub" />
-        <meta name="robots" content="index, follow" />
+        <title>Contact Student Hub Nepal — We Reply Within 24 Hours</title>
+        <meta name="description" content="Questions, bugs or suggestions? The Student Hub Nepal team replies within 24 hours. Help us build Nepal's best free study platform for Grade 9–12 SEE &amp; NEB students." />
+        <meta name="keywords" content="contact student hub nepal, student hub nepal support, student hub nepal feedback, student hub nepal help, report bug student hub, suggest feature student hub, student hub nepal email, student hub nepal contact number, student hub nepal team" />
+        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+        <meta name="author" content="Student Hub Nepal" />
+        <meta name="geo.region" content="NP" />
+        <meta name="geo.placename" content="Nepal" />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://studenthubnp.com/contact" />
-        <meta property="og:title" content="Contact Student Hub Nepal — Send Us Your Feedback or Questions" />
-        <meta property="og:description" content="Get in touch with the Student Hub Nepal team. Questions, suggestions, or feedback — we'd love to hear from you. Free study platform for Grade 9–12 students in Nepal." />
+        <meta property="og:title" content="Contact Student Hub Nepal — We Reply Within 24 Hours" />
+        <meta property="og:description" content="Questions, bugs or suggestions for Student Hub Nepal? Our team replies within 24 hours. Help us improve Nepal's best free study platform." />
         <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta property="og:image:alt" content="Contact Student Hub Nepal — Free Study Platform Support" />
         <meta property="og:site_name" content="Student Hub Nepal" />
+        <meta property="og:locale" content="en_NP" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Contact Student Hub Nepal" />
-        <meta name="twitter:description" content="Reach out to the Student Hub Nepal team with your questions, suggestions, or feedback. We respond within 24 hours." />
+        <meta name="twitter:title" content="Contact Student Hub Nepal — We Reply Within 24 Hours" />
+        <meta name="twitter:description" content="Questions, bugs or suggestions? Student Hub Nepal team replies within 24 hours. Help us build Nepal's best free study platform." />
         <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
         <link rel="canonical" href="https://studenthubnp.com/contact" />
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "ContactPage",
+          "name": "Contact Student Hub Nepal",
+          "description": "Get in touch with the Student Hub Nepal team for questions, feedback, or support.",
+          "url": "https://studenthubnp.com/contact",
+          "publisher": {
+            "@type": "Organization",
+            "name": "Student Hub Nepal",
+            "url": "https://studenthubnp.com",
+            "contactPoint": {
+              "@type": "ContactPoint",
+              "contactType": "customer support",
+              "availableLanguage": ["English", "Nepali"],
+              "areaServed": "NP"
+            }
+          },
+          "breadcrumb": {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://studenthubnp.com" },
+              { "@type": "ListItem", "position": 2, "name": "Contact", "item": "https://studenthubnp.com/contact" }
+            ]
+          }
+        })}</script>
       </Helmet>
 
       <div className="min-h-screen bg-gray-50">

@@ -465,19 +465,67 @@ export default function Pyqs() {
   return (
     <>
       <Helmet>
-        <title>Previous Year Questions (PYQ) — Grade 9, 10, 11, 12 | Student Hub</title>
-        <meta name="description" content="Free previous year exam papers for Nepal students in Grades 9–12. Browse by grade, subject, and year. PDF and image formats available." />
-        <meta name="keywords" content="PYQ nepal, previous year questions, SEE question paper, NEB past paper, grade 10 exam paper" />
+        <title>Free SEE &amp; NEB Past Papers Nepal — PYQ Grade 9–12 | Student Hub</title>
+        <meta name="description" content="Free SEE &amp; NEB past year question papers for Class 9–12 Nepal students. Browse by subject &amp; year — Maths, Science, English, Social Studies. PDF &amp; images. No login needed." />
+        <meta name="keywords" content="SEE question paper nepal, NEB past papers nepal, previous year questions nepal, PYQ nepal, SEE model question 2080 2081 2082, grade 10 question paper nepal, class 10 exam paper nepal, SEE exam paper nepal, NEB question bank, grade 11 past papers nepal, grade 12 past papers nepal, class 11 question paper nepal, class 12 question paper nepal, SEE maths question paper, SEE science question paper, SEE english question paper, NEB maths past paper, NEB science past paper, important questions nepal, SEE purano question, NEB purano question, free past papers nepal, exam question paper nepal, board exam questions nepal" />
+        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+        <meta name="author" content="Student Hub Nepal" />
+        <meta name="geo.region" content="NP" />
+        <meta name="geo.placename" content="Nepal" />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://studenthubnp.com/pyqs" />
-        <meta property="og:title" content="Previous Year Questions — Grade 9–12 | Student Hub" />
-        <meta property="og:description" content="Free PYQs for Grade 9–12 students in Nepal. Browse by grade, subject, and year." />
-        <meta property="og:image" content="https://studenthubnp.com/og-image.png" />
+        <meta property="og:title" content="Free SEE &amp; NEB Past Papers Nepal — PYQ Grade 9–12 | Student Hub" />
+        <meta property="og:description" content="Free SEE &amp; NEB past year question papers for Class 9–12 Nepal students. Browse by subject &amp; year — Maths, Science, English. PDF &amp; images. No login." />
+        <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta property="og:image:alt" content="Free SEE and NEB Past Papers Nepal — Grade 9 to 12" />
+        <meta property="og:site_name" content="Student Hub Nepal" />
+        <meta property="og:locale" content="en_NP" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="PYQ Papers — Student Hub Nepal" />
-        <meta name="twitter:description" content="Free previous year question papers for Grade 9–12 Nepal students." />
-        <meta name="twitter:image" content="https://studenthubnp.com/og-image.png" />
+        <meta name="twitter:title" content="Free SEE &amp; NEB Past Papers Nepal — PYQ Grade 9–12 | Student Hub" />
+        <meta name="twitter:description" content="Free SEE &amp; NEB past question papers for Class 9–12 Nepal. Browse by subject &amp; year. PDF &amp; images. No login needed." />
+        <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
         <link rel="canonical" href="https://studenthubnp.com/pyqs" />
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebPage",
+          "name": "Free SEE & NEB Past Papers Nepal — PYQ Grade 9–12",
+          "description": "Free previous year question papers for SEE and NEB exams. Covers Grade 9, 10, 11, and 12 — all subjects, sorted by year.",
+          "url": "https://studenthubnp.com/pyqs",
+          "inLanguage": "en",
+          "publisher": {
+            "@type": "Organization",
+            "name": "Student Hub Nepal",
+            "url": "https://studenthubnp.com"
+          },
+          "breadcrumb": {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://studenthubnp.com" },
+              { "@type": "ListItem", "position": 2, "name": "Past Papers (PYQ)", "item": "https://studenthubnp.com/pyqs" }
+            ]
+          }
+        })}</script>
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "Where can I find free SEE question papers in Nepal?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Student Hub Nepal provides free SEE past question papers for all subjects including Maths, Science, English, and Social Studies — no login required." }
+            },
+            {
+              "@type": "Question",
+              "name": "Are NEB past papers available on Student Hub?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Yes. Student Hub Nepal has free NEB past papers for Grade 11 and Grade 12 students, available in PDF and image formats, sorted by subject and year." }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I download PYQ papers from Student Hub Nepal?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Browse by grade and subject, then tap any question paper to view it. You can open it in a new tab or download the PDF directly. No account needed." }
+            }
+          ]
+        })}</script>
       </Helmet>
       <PyqsContent isLoggedIn={!!(user || profile)} />
     </>

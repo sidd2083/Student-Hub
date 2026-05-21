@@ -5,21 +5,51 @@ export default function About() {
   return (
     <>
       <Helmet>
-        <title>About Student Hub Nepal — Free Study Platform for Grade 9–12 Students</title>
-        <meta name="description" content="Student Hub Nepal is a free study platform built for Grade 9–12 students preparing for SEE and NEB exams. Access notes, PYQs, Nep AI tutor, Pomodoro timer, and progress tracking — all free, no sign-up needed." />
-        <meta name="keywords" content="about student hub nepal, student hub nepal, free study platform nepal, NEB study platform, SEE preparation nepal, grade 9 10 11 12 notes nepal, free education nepal" />
-        <meta name="robots" content="index, follow" />
+        <title>About Student Hub Nepal — Nepal's #1 Free Study Platform</title>
+        <meta name="description" content="Student Hub Nepal is 100% free — notes, past papers, AI tutor &amp; Pomodoro for Grade 9–12 SEE &amp; NEB students. Built by Nepali students, for Nepali students. No fees, ever." />
+        <meta name="keywords" content="about student hub nepal, student hub nepal, free study platform nepal, best study platform nepal, NEB study platform, SEE preparation nepal, free education nepal, nepal study app, study platform grade 9 10 11 12, free learning nepal, Nep AI tutor, pomodoro study nepal, student hub mission, free notes nepal, free PYQ nepal, student hub features" />
+        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+        <meta name="author" content="Student Hub Nepal" />
+        <meta name="geo.region" content="NP" />
+        <meta name="geo.placename" content="Nepal" />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://studenthubnp.com/about" />
-        <meta property="og:title" content="About Student Hub Nepal — Free Study Platform for Grade 9–12 Students" />
-        <meta property="og:description" content="Student Hub Nepal is a free study platform for Grade 9–12 students. Notes, PYQs, Nep AI, Pomodoro timer, and progress tracking — built for SEE and NEB exam preparation." />
+        <meta property="og:title" content="About Student Hub Nepal — Nepal's #1 Free Study Platform" />
+        <meta property="og:description" content="Student Hub Nepal is 100% free — notes, past papers, AI tutor &amp; Pomodoro for Grade 9–12 SEE &amp; NEB students. Built for Nepali students." />
         <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta property="og:image:alt" content="Student Hub Nepal — Free Study Platform for Grade 9 to 12" />
         <meta property="og:site_name" content="Student Hub Nepal" />
+        <meta property="og:locale" content="en_NP" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="About Student Hub Nepal — Free Study Platform for Grade 9–12" />
-        <meta name="twitter:description" content="Free study platform for Grade 9–12 students in Nepal. Notes, PYQs, Nep AI, and progress tracking for SEE and NEB exams." />
+        <meta name="twitter:title" content="About Student Hub Nepal — Nepal's #1 Free Study Platform" />
+        <meta name="twitter:description" content="Student Hub Nepal is 100% free — notes, past papers, AI tutor &amp; Pomodoro for Grade 9–12 SEE &amp; NEB students. No fees, ever." />
         <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
         <link rel="canonical" href="https://studenthubnp.com/about" />
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          "name": "Student Hub Nepal",
+          "url": "https://studenthubnp.com",
+          "logo": "https://studenthubnp.com/opengraph.jpg",
+          "description": "Student Hub Nepal is a free study platform for Grade 9–12 students preparing for SEE and NEB exams in Nepal. Offers notes, past papers, AI tutor (Nep AI), Pomodoro timer, and progress tracking.",
+          "areaServed": "NP",
+          "foundingDate": "2024",
+          "sameAs": [],
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "customer support",
+            "email": "info@studenthubnp.com",
+            "availableLanguage": ["English", "Nepali"]
+          }
+        })}</script>
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://studenthubnp.com" },
+            { "@type": "ListItem", "position": 2, "name": "About", "item": "https://studenthubnp.com/about" }
+          ]
+        })}</script>
       </Helmet>
 
       <div className="min-h-screen bg-gray-50">
