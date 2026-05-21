@@ -35,7 +35,7 @@ function PomodoroMissionCard({
   onStart: (id: string, text: string, mins: number) => void;
 }) {
   const [, navigate] = useLocation();
-  const { naturalSessionsCompleted, updateSettings } = useTimer();
+  const { naturalSessionsCompleted, running, restartForMission } = useTimer();
 
   // Cycle missions (pomodoro_cycle) are tracked by sessions — skip-proof.
   // Other pomodoro missions (subject_study) are tracked by minutes.
@@ -52,8 +52,11 @@ function PomodoroMissionCard({
   const cycleLabel = cycles === 1 ? "1 cycle" : `${cycles} cycles`;
 
   const handleGo = () => {
-    // Enable auto-switch so Pomodoro phases run 25 min → break → 25 min automatically
-    updateSettings({ autoSwitch: true });
+    // If the timer isn't running, reset it to a clean work phase with auto-switch on
+    // so the student arrives at a ready 25:00 timer — no confusion.
+    if (!running) {
+      restartForMission();
+    }
     onStart(mission.id, mission.text, mins);
     navigate("/pomodoro");
   };

@@ -115,7 +115,6 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
 
   useEffect(() => {
-    scrollToTop();
     const raf = requestAnimationFrame(scrollToTop);
     return () => cancelAnimationFrame(raf);
   }, [location]);

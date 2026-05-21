@@ -391,20 +391,77 @@ function PomodoroContent() {
 
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
 
-      {/* Mission active banner */}
-      {missionPreset && (
-        <div className="mb-4 bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-2xl px-4 py-3 flex items-start gap-3">
-          <Zap className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold text-yellow-800 mb-0.5">
-              Mission active · Auto-switch ON · 25 min focus → break → 25 min focus
-            </p>
-            <p className="text-xs text-yellow-700 leading-snug line-clamp-2">
+      {/* Mission active banner — shown while timer hasn't started yet or is running */}
+      {missionPreset && !running && phase === "work" && (
+        <div className="mb-4 rounded-2xl overflow-hidden border border-yellow-200 shadow-sm">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-yellow-400 to-amber-400 px-4 py-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-white" />
+              <span className="text-xs font-bold text-white tracking-wide uppercase">Mission Mode — Auto-switch ON</span>
+            </div>
+            <button
+              onClick={() => { setMissionPreset(null); localStorage.removeItem(POMODORO_MISSION_KEY); }}
+              className="text-white/70 hover:text-white transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          {/* Cycle plan */}
+          <div className="bg-amber-50 px-4 py-3">
+            <p className="text-xs text-amber-800 font-medium mb-2.5 leading-snug line-clamp-2">
               {missionPreset.missionText}
             </p>
-            <p className="text-[10px] text-yellow-600 mt-1">
-              Complete each 25-min work block fully — skipping a session does not count ✓
+            {/* Visual cycle flow */}
+            {(() => {
+              const totalSessions = Math.round(missionPreset.targetMinutes / 25);
+              const cycles = Math.ceil(totalSessions / 2);
+              const steps: { label: string; color: string; icon: string }[] = [];
+              for (let c = 0; c < cycles; c++) {
+                steps.push({ label: "25 min\nFocus", color: "bg-blue-500", icon: "📚" });
+                if (c < cycles - 1) {
+                  steps.push({ label: "5 min\nBreak", color: "bg-green-500", icon: "☕" });
+                }
+              }
+              return (
+                <div className="flex items-center gap-1 flex-wrap">
+                  {steps.map((step, i) => (
+                    <div key={i} className="flex items-center gap-1">
+                      <div className={`flex flex-col items-center px-2.5 py-1.5 rounded-xl ${step.color} text-white`}>
+                        <span className="text-[10px]">{step.icon}</span>
+                        <span className="text-[9px] font-bold leading-tight text-center whitespace-pre">{step.label}</span>
+                      </div>
+                      {i < steps.length - 1 && (
+                        <span className="text-amber-400 text-xs font-bold">→</span>
+                      )}
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-1 ml-1">
+                    <span className="text-amber-400 text-xs font-bold">→</span>
+                    <div className="flex flex-col items-center px-2.5 py-1.5 rounded-xl bg-yellow-500 text-white">
+                      <span className="text-[10px]">🏆</span>
+                      <span className="text-[9px] font-bold leading-tight">Done!</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+            <p className="text-[10px] text-amber-600 mt-2">
+              Press <strong>Start</strong> below — the timer switches phases automatically. Just stay focused! ✓
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Compact mission banner while timer is running */}
+      {missionPreset && running && (
+        <div className="mb-4 bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-2xl px-4 py-2.5 flex items-center gap-3">
+          <Zap className="w-4 h-4 text-yellow-500 flex-shrink-0 animate-pulse" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold text-yellow-800">
+              Mission running · {phase === "work" ? "Focus time! 📚" : "Break time ☕"}
+            </p>
+            <p className="text-[10px] text-yellow-600">Timer switches automatically — stay at your desk</p>
           </div>
           <button
             onClick={() => { setMissionPreset(null); localStorage.removeItem(POMODORO_MISSION_KEY); }}
@@ -477,7 +534,11 @@ function PomodoroContent() {
           <button
             onClick={running ? pause : start}
             className={`px-10 py-3.5 rounded-xl font-semibold transition-all flex items-center gap-2 ${
-              running ? "bg-gray-800 text-white hover:bg-gray-700" : `${colors.bg} text-white hover:opacity-90`
+              running
+                ? "bg-gray-800 text-white hover:bg-gray-700"
+                : missionPreset
+                  ? `${colors.bg} text-white shadow-lg shadow-blue-200 scale-105 hover:opacity-90 animate-pulse`
+                  : `${colors.bg} text-white hover:opacity-90`
             }`}
           >
             {running ? <><Pause className="w-5 h-5" /> Pause</> : <><Play className="w-5 h-5" /> Start</>}

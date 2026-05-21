@@ -40,6 +40,14 @@ interface TimerContextType {
   reset: () => void;
   skipPhase: () => void;
   updateSettings: (s: Partial<TimerSettings>) => void;
+  /**
+   * Resets the timer to the work phase and enables auto-switch — without
+   * clearing session counts or today's saved minutes. Call this when the
+   * student navigates to Pomodoro from a mission so they always see a clean
+   * 25:00 ready to start, regardless of previous timer state.
+   * No-ops if the timer is already running.
+   */
+  restartForMission: () => void;
 }
 
 const TimerContext = createContext<TimerContextType | null>(null);
@@ -542,10 +550,26 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const restartForMission = useCallback(() => {
+    if (runningRef.current) return;
+    workWallStartRef.current    = null;
+    displayWallStartRef.current = null;
+    const newSecs = settingsRef.current.workMins * 60;
+    phaseRef.current   = "work";
+    secondsRef.current = newSecs;
+    setPhase("work");
+    setSeconds(newSecs);
+    setSettings(prev => {
+      const next = { ...prev, autoSwitch: true };
+      settingsRef.current = next;
+      return next;
+    });
+  }, []);
+
   return (
     <TimerContext.Provider value={{
       phase, seconds, running, sessionsCompleted, naturalSessionsCompleted, settings, savedMinutesToday,
-      start, pause, reset, skipPhase, updateSettings,
+      start, pause, reset, skipPhase, updateSettings, restartForMission,
     }}>
       {children}
     </TimerContext.Provider>
