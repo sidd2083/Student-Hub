@@ -161,7 +161,7 @@ function PomodoroContent() {
   const {
     phase, seconds, running, sessionsCompleted,
     settings, savedMinutesToday,
-    start, pause, reset, skipPhase, updateSettings,
+    start, pause, reset, skipPhase,
   } = useTimer();
   const [activeTask, setActiveTask] = useState("");
   const [showSettings, setShowSettings] = useState(false);
@@ -184,22 +184,20 @@ function PomodoroContent() {
     return () => clearInterval(id);
   }, [running]);
 
-  // Read mission preset from localStorage (set when user clicked "Go to Pomodoro" from missions page)
+  // Read mission preset from localStorage (set when user clicked "Go to Pomodoro" from missions page).
+  // restartForMission() already forced settings to 25/5/15 + autoSwitch:true before navigation,
+  // so we only need to read the preset here for the banner — no settings changes needed.
   useEffect(() => {
     try {
       const raw = localStorage.getItem(POMODORO_MISSION_KEY);
-      if (!raw) return;
+      if (!raw) { setMissionPreset(null); return; }
       const preset = JSON.parse(raw) as PomodoroMissionPreset;
       if (preset.date !== getNepaliDate()) {
         localStorage.removeItem(POMODORO_MISSION_KEY);
+        setMissionPreset(null);
         return;
       }
       setMissionPreset(preset);
-      // Enable auto-switch so phases flow 25 min → break → 25 min automatically.
-      // Do NOT override workMins — the standard 25 min cycle is correct.
-      if (!running) {
-        updateSettings({ autoSwitch: true });
-      }
     } catch {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -391,8 +389,8 @@ function PomodoroContent() {
 
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
 
-      {/* Mission active banner — shown while timer hasn't started yet or is running */}
-      {missionPreset && !running && phase === "work" && (
+      {/* Mission active banner — shown when timer is stopped (any phase) */}
+      {missionPreset && !running && (
         <div className="mb-4 rounded-2xl overflow-hidden border border-yellow-200 shadow-sm">
           {/* Header */}
           <div className="bg-gradient-to-r from-yellow-400 to-amber-400 px-4 py-2.5 flex items-center justify-between">

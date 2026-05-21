@@ -552,18 +552,35 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
   const restartForMission = useCallback(() => {
     if (runningRef.current) return;
+    // Force standard Pomodoro settings: 25 min focus / 5 min short break /
+    // 15 min long break / 4 sessions before long break / auto-switch ON.
+    // This overrides any custom settings the student may have set, so they
+    // always land on a clean 25:00 cycle ready to start from missions.
+    const missionSettings: TimerSettings = {
+      workMins: 25,
+      shortBreakMins: 5,
+      longBreakMins: 15,
+      sessionsBeforeLongBreak: 4,
+      sessionsBeforeShortBreak: 2,
+      autoSwitch: true,
+    };
+    settingsRef.current = missionSettings;
+    setSettings(missionSettings);
+
+    // Reset cycle so it starts fresh: Focus → Break → Focus → Break → … → Long Break
     workWallStartRef.current    = null;
     displayWallStartRef.current = null;
-    const newSecs = settingsRef.current.workMins * 60;
-    phaseRef.current   = "work";
-    secondsRef.current = newSecs;
+    totalWorkSecondsRef.current = 0;
+    savedMinutesRef.current     = 0;
+    sessionsRef.current         = 0;
+    naturalSessionsRef.current  = 0;
+    phaseRef.current            = "work";
+    secondsRef.current          = 25 * 60;
+
     setPhase("work");
-    setSeconds(newSecs);
-    setSettings(prev => {
-      const next = { ...prev, autoSwitch: true };
-      settingsRef.current = next;
-      return next;
-    });
+    setSeconds(25 * 60);
+    setSessionsCompleted(0);
+    setNaturalSessionsCompleted(0);
   }, []);
 
   return (
