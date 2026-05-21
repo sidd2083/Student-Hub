@@ -195,9 +195,10 @@ function PomodoroContent() {
         return;
       }
       setMissionPreset(preset);
-      // Pre-set the work timer to the mission's target duration (only if not running)
+      // Enable auto-switch so phases flow 25 min → break → 25 min automatically.
+      // Do NOT override workMins — the standard 25 min cycle is correct.
       if (!running) {
-        updateSettings({ workMins: preset.targetMinutes });
+        updateSettings({ autoSwitch: true });
       }
     } catch {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -396,13 +397,13 @@ function PomodoroContent() {
           <Zap className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <p className="text-xs font-bold text-yellow-800 mb-0.5">
-              Mission active · {missionPreset.targetMinutes} min timer set
+              Mission active · Auto-switch ON · 25 min focus → break → 25 min focus
             </p>
             <p className="text-xs text-yellow-700 leading-snug line-clamp-2">
               {missionPreset.missionText}
             </p>
             <p className="text-[10px] text-yellow-600 mt-1">
-              This mission auto-completes once you finish the session ✓
+              Complete each 25-min work block fully — skipping a session does not count ✓
             </p>
           </div>
           <button

@@ -329,7 +329,7 @@ export function buildMissions(
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useDailyMissions() {
   const { user, profile } = useAuth();
-  const { savedMinutesToday, sessionsCompleted } = useTimer();
+  const { savedMinutesToday, naturalSessionsCompleted } = useTimer();
 
   const [date, setDate] = useState(() => getNepaliDate());
   useEffect(() => {
@@ -447,9 +447,10 @@ export function useDailyMissions() {
       if (completingRef.current.has(m.id)) continue;
 
       if (m.id === "pomodoro_cycle" && m.targetSessions) {
-        // Session-based: count completed work sessions since mission was started
+        // Session-based: count naturally completed work sessions since mission was started.
+        // naturalSessionsCompleted never increments on Skip — only when timer hits zero.
         const sessAtStart  = m.sessionsAtStart ?? 0;
-        const sessionsDone = Math.max(0, sessionsCompleted - sessAtStart);
+        const sessionsDone = Math.max(0, naturalSessionsCompleted - sessAtStart);
         if (sessionsDone >= m.targetSessions) {
           completingRef.current.add(m.id);
           _doComplete(uid, date, missions, m.id, setMissions, setAllCompleted);
@@ -466,7 +467,7 @@ export function useDailyMissions() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savedMinutesToday, sessionsCompleted, missions, studyMinsAtStart]);
+  }, [savedMinutesToday, naturalSessionsCompleted, missions, studyMinsAtStart]);
 
   // ── Start a Pomodoro mission ───────────────────────────────────────────────
   // Records the current savedMinutesToday and sessionsCompleted on the mission
@@ -479,14 +480,14 @@ export function useDailyMissions() {
       const updated = prev.map(m => m.id === missionId ? {
         ...m,
         startedAt: savedMinutesToday,
-        sessionsAtStart: sessionsCompleted,
+        sessionsAtStart: naturalSessionsCompleted,
       } : m);
       const c = readCache(uid, date);
       if (c) writeCache(uid, date, { ...c, missions: updated });
       updateDoc(doc(db, "daily_missions", `${uid}_${date}`), { missions: updated }).catch(() => {});
       return updated;
     });
-  }, [uid, date, savedMinutesToday, sessionsCompleted]);
+  }, [uid, date, savedMinutesToday, naturalSessionsCompleted]);
 
   // ── Manual complete (with anti-cheat) ─────────────────────────────────────
   const completeMission = useCallback((missionId: string) => {
@@ -527,7 +528,7 @@ export function useDailyMissions() {
 
     if (m.id === "pomodoro_cycle" && m.targetSessions) {
       const sessAtStart  = m.sessionsAtStart ?? 0;
-      const sessionsDone = Math.max(0, sessionsCompleted - sessAtStart);
+      const sessionsDone = Math.max(0, naturalSessionsCompleted - sessAtStart);
       return Math.min(100, (sessionsDone / m.targetSessions) * 100);
     }
 

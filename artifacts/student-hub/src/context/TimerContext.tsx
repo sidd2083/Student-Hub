@@ -31,6 +31,8 @@ interface TimerContextType {
   seconds: number;
   running: boolean;
   sessionsCompleted: number;
+  /** Only increments when a work phase ends naturally (timer hits 0). Skip does NOT count. Use this for mission tracking. */
+  naturalSessionsCompleted: number;
   settings: TimerSettings;
   savedMinutesToday: number;
   start: () => void;
@@ -49,6 +51,7 @@ interface PersistedState {
   seconds: number;
   running: boolean;
   sessionsCompleted: number;
+  naturalSessionsCompleted: number;
   settings: TimerSettings;
   savedMinutesToday: number;
   totalWorkSeconds: number;
@@ -154,6 +157,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const [seconds, setSeconds] = useState(persisted?.seconds ?? (DEFAULT_SETTINGS.workMins * 60));
   const [running, setRunning] = useState(persisted?.running ?? false);
   const [sessionsCompleted, setSessionsCompleted] = useState(persisted?.sessionsCompleted ?? 0);
+  const [naturalSessionsCompleted, setNaturalSessionsCompleted] = useState(persisted?.naturalSessionsCompleted ?? 0);
   const [savedMinutesToday, setSavedMinutesToday] = useState(persisted?.savedMinutesToday ?? 0);
 
   // Accumulated work seconds (used for minute tracking)
@@ -173,6 +177,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const userRef     = useRef<string | null>(null);
   const settingsRef = useRef(persisted?.settings ?? DEFAULT_SETTINGS);
   const sessionsRef = useRef(persisted?.sessionsCompleted ?? 0);
+  const naturalSessionsRef = useRef(persisted?.naturalSessionsCompleted ?? 0);
   const secondsRef  = useRef(persisted?.seconds ?? (DEFAULT_SETTINGS.workMins * 60));
 
   useEffect(() => { userRef.current = user?.uid ?? null; }, [user]);
@@ -184,6 +189,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       seconds: secondsRef.current,
       running: runningRef.current,
       sessionsCompleted: sessionsRef.current,
+      naturalSessionsCompleted: naturalSessionsRef.current,
       settings: settingsRef.current,
       savedMinutesToday: savedMinutesRef.current,
       totalWorkSeconds: totalWorkSecondsRef.current,
@@ -305,7 +311,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     return s.longBreakMins * 60;
   }, []);
 
-  const nextPhase = useCallback((currentPhase: Phase, currentSessions: number, s: TimerSettings) => {
+  const nextPhase = useCallback((currentPhase: Phase, currentSessions: number, s: TimerSettings, natural: boolean) => {
     // Clear wall-clock tracking for the completed phase
     workWallStartRef.current   = null;
     displayWallStartRef.current = null;
@@ -314,6 +320,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       const newSessions = currentSessions + 1;
       setSessionsCompleted(newSessions);
       sessionsRef.current = newSessions;
+
+      // Only count as a "natural" session if the timer ran all the way to zero —
+      // not when the user pressed Skip. Mission tracking uses this exclusively.
+      if (natural) {
+        const newNatural = naturalSessionsRef.current + 1;
+        naturalSessionsRef.current = newNatural;
+        setNaturalSessionsCompleted(newNatural);
+      }
 
       const isLongBreak = newSessions % s.sessionsBeforeLongBreak === 0;
       const nextP: Phase = isLongBreak ? "longBreak" : "shortBreak";
@@ -372,6 +386,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           seconds: newDisplaySecs,
           running: runningRef.current,
           sessionsCompleted: sessionsRef.current,
+          naturalSessionsCompleted: naturalSessionsRef.current,
           settings: settingsRef.current,
           savedMinutesToday: savedMinutesRef.current,
           totalWorkSeconds: totalWorkSecondsRef.current,
@@ -400,7 +415,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        nextPhase(phaseRef.current, sessionsRef.current, settingsRef.current);
+        nextPhase(phaseRef.current, sessionsRef.current, settingsRef.current, true); // natural = timer ran to zero
 
         // Auto-switch: immediately start the new phase without user action
         if (settingsRef.current.autoSwitch) {
@@ -477,16 +492,19 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     savedMinutesRef.current = 0;
     phaseRef.current = "work";
     sessionsRef.current = 0;
+    naturalSessionsRef.current = 0;
     const resetSecs = settingsRef.current.workMins * 60;
     secondsRef.current = resetSecs;
     setPhase("work");
     setSessionsCompleted(0);
+    setNaturalSessionsCompleted(0);
     setSeconds(resetSecs);
     saveState({
       phase: "work",
       seconds: resetSecs,
       running: false,
       sessionsCompleted: 0,
+      naturalSessionsCompleted: 0,
       settings: settingsRef.current,
       savedMinutesToday: 0,
       totalWorkSeconds: 0,
@@ -507,7 +525,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     }
     runningRef.current = false;
     setRunning(false);
-    nextPhase(phaseRef.current, sessionsRef.current, settingsRef.current);
+    // natural = false: Skip should never count toward mission completion
+    nextPhase(phaseRef.current, sessionsRef.current, settingsRef.current, false);
   }, [saveMinutes, nextPhase]);
 
   const updateSettings = useCallback((partial: Partial<TimerSettings>) => {
@@ -525,7 +544,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <TimerContext.Provider value={{
-      phase, seconds, running, sessionsCompleted, settings, savedMinutesToday,
+      phase, seconds, running, sessionsCompleted, naturalSessionsCompleted, settings, savedMinutesToday,
       start, pause, reset, skipPhase, updateSettings,
     }}>
       {children}
