@@ -328,7 +328,10 @@ function DailyMissionsContent() {
 
   return (
     <div className="p-4 sm:p-6 max-w-lg mx-auto">
-      <Helmet><title>Daily Missions — Student Hub</title></Helmet>
+      <Helmet>
+        <title>Daily Missions — Student Hub</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
 
       <div className="mb-5">
         <div className="flex items-center gap-2 mb-1">

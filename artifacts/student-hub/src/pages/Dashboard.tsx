@@ -333,7 +333,10 @@ export default function Dashboard() {
 
   return (
     <>
-      <Helmet><title>Dashboard — Student Hub</title></Helmet>
+      <Helmet>
+        <title>Dashboard — Student Hub</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
       <SiteGuide />
       <div className="p-4 sm:p-6 lg:p-8">
 

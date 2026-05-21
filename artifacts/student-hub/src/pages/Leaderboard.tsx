@@ -360,6 +360,7 @@ export default function Leaderboard() {
       <Helmet>
         <title>Leaderboard — Student Hub</title>
         <meta name="description" content="Top students on Student Hub ranked by study time and streak." />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <SoftGate feature="the leaderboard">
         <LeaderboardContent />

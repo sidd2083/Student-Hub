@@ -205,6 +205,7 @@ export default function Todo() {
       <Helmet>
         <title>To-Do — Student Hub</title>
         <meta name="description" content="Track your study tasks with Student Hub's built-in to-do list." />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <SoftGate feature="the To-Do list">
         <TodoContent />

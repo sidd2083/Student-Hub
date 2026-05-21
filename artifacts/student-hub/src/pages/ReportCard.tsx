@@ -547,6 +547,7 @@ export default function ReportCard() {
       <Helmet>
         <title>Report Card — Student Hub</title>
         <meta name="description" content="Track your study progress, streaks, and performance on Student Hub." />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <SoftGate feature="Report Card">
         <ReportContent />

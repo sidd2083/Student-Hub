@@ -667,6 +667,7 @@ export default function NepAi() {
       <Helmet>
         <title>Nep AI — AI Study Assistant | Student Hub</title>
         <meta name="description" content="Ask Nep AI any academic question. Get instant answers for Grade 9–12 subjects in Nepal." />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <SoftGate feature="Nep AI">
         <NepAiContent />

@@ -11,7 +11,7 @@
     <image:image>
       <image:loc>https://studenthubnp.com/opengraph.jpg</image:loc>
       <image:title>Student Hub Nepal — Free Study Platform</image:title>
-      <image:caption>Free notes, PYQs, MCQ practice and AI tutor for Grade 9–12 students in Nepal</image:caption>
+      <image:caption>Free notes, PYQs, and AI tutor for Grade 9–12 students in Nepal</image:caption>
     </image:image>
   </url>
 
@@ -29,14 +29,6 @@
     <lastmod>2026-05-21</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.90</priority>
-  </url>
-
-  <!-- ── MCQ Practice ──────────────────────────────────────────────────────── -->
-  <url>
-    <loc>https://studenthubnp.com/mcq</loc>
-    <lastmod>2026-05-21</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
   </url>
 
   <!-- ── Tools hub ─────────────────────────────────────────────────────────── -->

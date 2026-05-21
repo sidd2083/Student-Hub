@@ -224,6 +224,7 @@ export default function Saved() {
       <Helmet>
         <title>Saved — Student Hub</title>
         <meta name="description" content="Your saved notes and past year questions on Student Hub." />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <SoftGate feature="Saved items">
         <SavedContent />

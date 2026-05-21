@@ -49,8 +49,9 @@
     <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
     <meta name="twitter:image:alt" content="Student Hub Nepal" />
 
-    <!-- ── Canonical ─────────────────────────────────────────────────────── -->
-    <link rel="canonical" href="https://studenthubnp.com/" />
+    <!-- ── Canonical: set per-page by react-helmet-async; no static fallback ──
+         A static canonical here would incorrectly claim every route is the
+         homepage. Each page component sets its own <link rel="canonical">. -->
 
     <!-- ── PWA / Icons ───────────────────────────────────────────────────── -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

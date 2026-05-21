@@ -83,6 +83,7 @@ export default function Login() {
       <Helmet>
         <title>Login — Student Hub | Free Study Platform for Nepal Students</title>
         <meta name="description" content="Sign in to Student Hub — access notes, past papers, Nep AI, and study progress tracking. Free for Grade 9–12 students in Nepal." />
+        <meta name="robots" content="noindex, nofollow" />
         <meta property="og:title" content="Student Hub — Free Study Platform" />
         <meta property="og:description" content="Notes, PYQs, Nep AI and study tracking for Grade 9–12 students in Nepal." />
       </Helmet>

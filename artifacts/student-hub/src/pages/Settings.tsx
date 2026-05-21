@@ -76,6 +76,7 @@ export default function Settings() {
       <Helmet>
         <title>Settings — Student Hub</title>
         <meta name="description" content="Manage your Student Hub profile, grade, and appearance settings." />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <div className="px-4 pt-4 pb-36 sm:p-8 max-w-2xl mx-auto">
           <div className="mb-8">

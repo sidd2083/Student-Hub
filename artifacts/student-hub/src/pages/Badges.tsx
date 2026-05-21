@@ -107,6 +107,7 @@ export default function Badges() {
       <Helmet>
         <title>Badges — Student Hub</title>
         <meta name="description" content="See all badges you can earn on Student Hub by studying and building streaks." />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
       <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">

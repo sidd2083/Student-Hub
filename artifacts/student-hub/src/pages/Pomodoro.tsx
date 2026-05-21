@@ -624,6 +624,7 @@ export default function Pomodoro() {
       <Helmet>
         <title>Pomodoro Timer — Student Hub</title>
         <meta name="description" content="Focus timer with automatic breaks. Study time saved live to the leaderboard." />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <SoftGate feature="the Pomodoro timer">
         <PomodoroContent />

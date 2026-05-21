@@ -8,12 +8,10 @@ Allow: /notes/
 Allow: /pyqs$
 Allow: /pyqs/$
 Allow: /pyq/
-Allow: /mcq$
-Allow: /mcq/$
 Allow: /tools$
 Allow: /tools/$
-Allow: /tools/gpa-calculator$
-Allow: /tools/attendance-calculator$
+Allow: /tools/gpa-calculator
+Allow: /tools/attendance-calculator
 Allow: /about$
 Allow: /contact$
 Allow: /privacy$
@@ -32,6 +30,9 @@ Disallow: /report
 Disallow: /login
 Disallow: /setup-profile
 Disallow: /onboarding
+Disallow: /missions
+Disallow: /badges
+Disallow: /mcq
 Disallow: /api/
 
 # ── Assets that are not pages ────────────────────────────────────────────────

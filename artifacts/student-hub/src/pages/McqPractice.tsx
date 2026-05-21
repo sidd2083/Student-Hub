@@ -298,6 +298,7 @@ export default function McqPractice() {
       <Helmet>
         <title>MCQ Practice — Student Hub</title>
         <meta name="description" content="Practice multiple-choice questions by grade and subject. Improve your SEE and NEB exam scores." />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <SoftGate feature="MCQ Practice">
         <McqContent />
