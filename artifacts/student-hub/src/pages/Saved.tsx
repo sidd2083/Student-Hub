@@ -22,14 +22,17 @@ interface SavedItem {
   pdfUrl?: string;
 }
 
+const savedCache = new Map<string, SavedItem[]>();
+
 function SavedContent() {
   const { user } = useAuth();
-  const [items, setItems] = useState<SavedItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const uid = user?.uid ?? "";
+  const [items, setItems] = useState<SavedItem[]>(() => savedCache.get(uid) ?? []);
+  const [loading, setLoading] = useState(() => !savedCache.has(uid));
 
   const load = useCallback(async () => {
     if (!user?.uid) return;
-    setLoading(true);
+    if (!savedCache.has(user.uid)) setLoading(true);
     try {
       const q = query(collection(db, "saved_items"), where("uid", "==", user.uid));
       const snap = await getDocs(q);
@@ -71,7 +74,9 @@ function SavedContent() {
         return item;
       }));
 
-      setItems(enriched.sort((a, b) => (b.savedAt || "").localeCompare(a.savedAt || "")));
+      const sorted = enriched.sort((a, b) => (b.savedAt || "").localeCompare(a.savedAt || ""));
+      savedCache.set(user.uid, sorted);
+      setItems(sorted);
     } catch (e) {
       console.error("[Saved] Load failed:", e);
     } finally {

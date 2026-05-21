@@ -24,6 +24,9 @@ interface LeaderEntry {
   badges?: CustomBadge[];
 }
 
+let leaderboardCache: { data: LeaderEntry[]; ts: number } | null = null;
+const LEADER_CACHE_TTL = 5 * 60_000;
+
 type SortKey = "totalStudyTime" | "streak" | "todayStudyTime";
 
 function fmtTime(mins: number) {
@@ -120,14 +123,16 @@ function FireBadge() {
 
 function LeaderboardContent() {
   const { user } = useAuth();
-  const [entries, setEntries]         = useState<LeaderEntry[]>([]);
-  const [loading, setLoading]         = useState(true);
+  const [entries, setEntries]         = useState<LeaderEntry[]>(() => leaderboardCache?.data ?? []);
+  const [loading, setLoading]         = useState(() => !leaderboardCache);
   const [sortBy, setSortBy]           = useState<SortKey>("totalStudyTime");
   const [gradeFilter, setGradeFilter] = useState<number | "all">("all");
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(() => leaderboardCache ? new Date(leaderboardCache.ts) : null);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    const now = Date.now();
+    if (leaderboardCache && now - leaderboardCache.ts < LEADER_CACHE_TTL) return;
+    if (!leaderboardCache) setLoading(true);
     try {
       const today     = getNepaliDate();
       const yesterday = getNepaliYesterday();
@@ -151,8 +156,9 @@ function LeaderboardContent() {
           badges: data.badges ?? [],
         };
       }).filter(e => e.name && typeof e.grade === "number" && e.role !== "admin");
+      leaderboardCache = { data: list, ts: now };
       setEntries(list);
-      setLastUpdated(new Date());
+      setLastUpdated(new Date(now));
     } catch (e) {
       console.error("[Leaderboard] Load failed:", e);
     } finally {

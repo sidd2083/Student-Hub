@@ -298,13 +298,14 @@ const pyqsCache = new Map<number, Pyq[]>();
 function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   const { profile, user } = useAuth();
   const [, setLocation] = useLocation();
-  const [grade, setGrade]         = useState<number>(typeof profile?.grade === "number" ? profile.grade : 10);
+  const initGrade = typeof profile?.grade === "number" ? profile.grade : 10;
+  const [grade, setGrade]         = useState<number>(initGrade);
   const [subject, setSubject]     = useState("");
   const [yearFilter, setYearFilter] = useState<string>("");
   const [search, setSearch]       = useState("");
   const [viewer, setViewer]       = useState<Pyq | null>(null);
-  const [pyqs, setPyqs]           = useState<Pyq[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const [pyqs, setPyqs]           = useState<Pyq[]>(() => pyqsCache.get(initGrade) ?? []);
+  const [loading, setLoading]     = useState(() => !pyqsCache.has(initGrade));
 
   useEffect(() => {
     setSubject("");

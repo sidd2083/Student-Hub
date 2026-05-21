@@ -17,16 +17,19 @@ interface Task {
   createdAt: string;
 }
 
+const todoCache = new Map<string, Task[]>();
+
 function TodoContent() {
   const { user } = useAuth();
+  const uid = user?.uid ?? "";
   const [newTask, setNewTask] = useState("");
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [tasks, setTasks] = useState<Task[]>(() => todoCache.get(uid) ?? []);
+  const [loading, setLoading] = useState(() => !todoCache.has(uid));
   const [adding, setAdding] = useState(false);
 
   const loadTasks = useCallback(async () => {
     if (!user?.uid) return;
-    setLoading(true);
+    if (!todoCache.has(user.uid)) setLoading(true);
     try {
       const q = query(
         collection(db, "tasks"),
@@ -36,6 +39,7 @@ function TodoContent() {
       const list: Task[] = snap.docs
         .map(d => ({ id: d.id, ...d.data() } as Task))
         .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+      todoCache.set(user.uid, list);
       setTasks(list);
     } catch (e) {
       console.error("[Todo] Load failed:", e);
@@ -58,7 +62,9 @@ function TodoContent() {
         createdAt: new Date().toISOString(),
       };
       const ref = await addDoc(collection(db, "tasks"), data);
-      setTasks(prev => [{ id: ref.id, ...data }, ...prev]);
+      const updated = [{ id: ref.id, ...data }, ...tasks];
+      todoCache.set(user.uid, updated);
+      setTasks(updated);
       setNewTask("");
     } catch (e) {
       console.error("[Todo] Add failed:", e);
@@ -71,7 +77,11 @@ function TodoContent() {
     if (!user?.uid) return;
     try {
       await updateDoc(doc(db, "tasks", id), { completed: true });
-      setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: true } : t));
+      setTasks(prev => {
+        const next = prev.map(t => t.id === id ? { ...t, completed: true } : t);
+        todoCache.set(user.uid, next);
+        return next;
+      });
 
       // Log task completion to study_logs
       const today = getNepaliDate();
@@ -91,7 +101,11 @@ function TodoContent() {
   const handleDelete = async (id: string) => {
     try {
       await deleteDoc(doc(db, "tasks", id));
-      setTasks(prev => prev.filter(t => t.id !== id));
+      setTasks(prev => {
+        const next = prev.filter(t => t.id !== id);
+        if (user?.uid) todoCache.set(user.uid, next);
+        return next;
+      });
     } catch (e) {
       console.error("[Todo] Delete failed:", e);
     }

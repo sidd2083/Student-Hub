@@ -52,15 +52,15 @@ function PomodoroMissionCard({
   const cycleLabel = cycles === 1 ? "1 cycle" : `${cycles} cycles`;
 
   const handleGo = () => {
-    // If the timer isn't running, reset it to a clean work phase with auto-switch on
-    // so the student arrives at a ready 25:00 timer — no confusion.
-    const wasRunning = running;
-    if (!wasRunning) {
+    const missionAlreadyStarted = mission.sessionsAtStart !== undefined;
+
+    if (!running && !missionAlreadyStarted) {
+      // First time starting: reset timer to clean 25:00 + auto-switch, anchor sessions at 0
       restartForMission();
+      onStart(mission.id, mission.text, mins, 0);
     }
-    // Pass 0 as sessionsAtStart when we just restarted (timer reset to 0),
-    // otherwise use current value. This fixes the progress bar tracking bug.
-    onStart(mission.id, mission.text, mins, wasRunning ? undefined : 0);
+    // If mission already started (user paused and came back), just navigate —
+    // don't reset the timer or overwrite sessionsAtStart (that would lose progress)
     navigate("/pomodoro");
   };
 

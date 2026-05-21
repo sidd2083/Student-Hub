@@ -257,11 +257,12 @@ const notesCache = new Map<number, NoteView[]>();
 
 function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   const { user, profile } = useAuth();
-  const [grade, setGrade] = useState<number>(typeof profile?.grade === "number" ? profile.grade : 10);
+  const initGrade = typeof profile?.grade === "number" ? profile.grade : 10;
+  const [grade, setGrade] = useState<number>(initGrade);
   const [subject, setSubject] = useState<string>("");
   const [selectedNote, setSelectedNote] = useState<NoteView | null>(null);
-  const [notes, setNotes] = useState<NoteView[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [notes, setNotes] = useState<NoteView[]>(() => notesCache.get(initGrade) ?? []);
+  const [loading, setLoading] = useState(() => !notesCache.has(initGrade));
 
   useEffect(() => {
     setSubject("");
