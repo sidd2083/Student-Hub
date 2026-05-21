@@ -1,22 +1,5 @@
 User-agent: *
 
-# ── Public content — index everything ──────────────────────────────────────
-Allow: /$
-Allow: /notes$
-Allow: /notes/$
-Allow: /notes/
-Allow: /pyqs$
-Allow: /pyqs/$
-Allow: /pyq/
-Allow: /tools$
-Allow: /tools/$
-Allow: /tools/gpa-calculator
-Allow: /tools/attendance-calculator
-Allow: /about$
-Allow: /contact$
-Allow: /privacy$
-Allow: /terms$
-
 # ── Private / authenticated routes — do not index ───────────────────────────
 Disallow: /dashboard
 Disallow: /todo
@@ -35,8 +18,7 @@ Disallow: /badges
 Disallow: /mcq
 Disallow: /api/
 
-# ── Assets that are not pages ────────────────────────────────────────────────
-Disallow: /assets/
+# Note: /assets/ is intentionally NOT blocked — Googlebot needs JS/CSS to render the SPA.
 
 # ── Crawl-delay hint for polite bots (Googlebot ignores this, others respect it)
 Crawl-delay: 1

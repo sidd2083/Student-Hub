@@ -99,11 +99,13 @@ export default function About() {
             <h2 className="text-xl font-bold text-gray-900 mb-4">What We Offer</h2>
             <div className="space-y-3">
               {[
-                ["📚", "Notes", "Study notes organized by grade, subject, and chapter — text, PDF, and image formats."],
-                ["📄", "Previous Year Questions (PYQ)", "Past exam papers from various provinces and boards."],
+                ["📚", "Study Notes", "Free study notes for Grade 9–12 — Maths, Science, English, Social Studies, Physics, Chemistry, Biology, Computer Science. Text, PDF and image formats."],
+                ["📄", "Previous Year Questions (PYQ)", "Free SEE and NEB past papers from 2076 to 2081 BS, all subjects, all provinces."],
+                ["🧮", "NEB GPA Calculator", "Free GPA calculator for NEB Grade 11 & 12 — official 75% Theory + 25% Practical formula, Science & Management streams."],
+                ["📅", "Attendance Calculator", "Free attendance calculator — find your current attendance %, how many classes you can miss or bunk, and exactly how many to attend to recover."],
                 ["📊", "Report Card", "Track your study time, streak, and progress with daily analytics and badges."],
                 ["🤖", "Nep AI", "An AI study assistant that answers your academic questions in seconds."],
-                ["⏱", "Pomodoro Timer", "Built-in focus timer to help you study smarter."],
+                ["⏱", "Pomodoro Timer", "Built-in focus timer to help you study smarter with the 25-minute Pomodoro technique."],
                 ["✅", "To-Do", "Task manager to keep your study schedule on track."],
               ].map(([emoji, feature, desc]) => (
                 <div key={feature as string} className="flex gap-3 py-2 border-b border-gray-50 last:border-0">
@@ -117,12 +119,53 @@ export default function About() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-2">About Us</h2>
-            <p className="text-gray-600">
-              Student Hub is a product of <strong>Tufan Production</strong>, built to help Nepali students access
-              quality study materials without any barriers.
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 mb-8">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">About Us &amp; Our Expertise</h2>
+            <p className="text-gray-600 leading-relaxed mb-4">
+              Student Hub Nepal is a product of <strong>Tufan Production</strong> — a Nepal-based edtech team dedicated to making quality education free and accessible for every student across the country.
+              Launched in 2024, Student Hub is used daily by thousands of students preparing for <strong>SEE (Grade 10)</strong> and <strong>NEB (Grade 11 &amp; 12)</strong> board examinations.
             </p>
+            <p className="text-gray-600 leading-relaxed mb-4">
+              Our tools, notes and past papers are built with deep knowledge of the <strong>NEB curriculum</strong> and the <strong>Bikram Sambat (BS) academic calendar</strong>.
+              The <strong>NEB GPA Calculator</strong> uses the official NEB grading formula as published by the National Examinations Board of Nepal — the same formula used by exam centres across all provinces.
+              The <strong>Attendance Calculator</strong> covers the 75% UGC rule (India), Australia's ESOS Act 80% requirement, UK Student Visa attendance requirements and more.
+            </p>
+            <p className="text-gray-600 leading-relaxed mb-5">
+              All content is reviewed and updated every academic year to stay aligned with the latest NEB curriculum changes.
+              Our study notes are curated from reliable Nepali textbooks and reference materials approved for SEE and NEB examinations.
+            </p>
+            <div className="grid sm:grid-cols-3 gap-4 text-center">
+              {[
+                { num: "2024", label: "Year founded" },
+                { num: "NP", label: "Verified for Nepal" },
+                { num: "Free", label: "Always, no fees" },
+              ].map(({ num, label }) => (
+                <div key={label} className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-2xl font-black text-blue-600 mb-1">{num}</p>
+                  <p className="text-xs text-gray-500 font-medium">{label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6">
+            <h2 className="text-base font-bold text-gray-900 mb-3">Our most-used tools</h2>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <a href="/tools/gpa-calculator" className="flex items-center gap-3 bg-white rounded-xl p-3 border border-blue-100 hover:border-blue-300 transition-all">
+                <span className="text-2xl">🧮</span>
+                <div>
+                  <p className="font-semibold text-gray-900 text-sm">NEB GPA Calculator Nepal</p>
+                  <p className="text-xs text-gray-500">Grade 11 &amp; 12, Science &amp; Management 2082/2083</p>
+                </div>
+              </a>
+              <a href="/tools/attendance-calculator" className="flex items-center gap-3 bg-white rounded-xl p-3 border border-blue-100 hover:border-blue-300 transition-all">
+                <span className="text-2xl">📅</span>
+                <div>
+                  <p className="font-semibold text-gray-900 text-sm">Attendance Calculator</p>
+                  <p className="text-xs text-gray-500">How many classes can I miss or bunk?</p>
+                </div>
+              </a>
+            </div>
           </div>
         </main>
       </div>

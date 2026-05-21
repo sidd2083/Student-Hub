@@ -61,6 +61,29 @@ const BREADCRUMB_SCHEMA = {
   ],
 };
 
+const ARTICLE_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "Article",
+  headline: "Attendance Calculator — How Many Classes Can I Miss or Bunk? (Free 2026)",
+  description: "Free online attendance calculator. Find your attendance %, how many classes you can miss/bunk, and how many you need to attend to recover — for any required percentage.",
+  url: "https://studenthubnp.com/tools/attendance-calculator",
+  datePublished: "2024-06-01",
+  dateModified: "2026-05-21",
+  author: {
+    "@type": "Organization",
+    name: "Student Hub Nepal",
+    url: "https://studenthubnp.com"
+  },
+  publisher: {
+    "@type": "Organization",
+    name: "Student Hub Nepal",
+    logo: { "@type": "ImageObject", url: "https://studenthubnp.com/icon-512.png", width: 512, height: 512 }
+  },
+  mainEntityOfPage: { "@type": "WebPage", "@id": "https://studenthubnp.com/tools/attendance-calculator" },
+  image: { "@type": "ImageObject", url: "https://studenthubnp.com/opengraph.jpg", width: 1200, height: 630 },
+  keywords: "attendance calculator, how many classes can i miss, bunk calculator, 75% attendance rule, attendance percentage calculator",
+};
+
 function calcAttendance(total: number, attended: number, required: number) {
   if (total <= 0) return null;
   const current = (attended / total) * 100;
@@ -93,23 +116,31 @@ export default function AttendanceCalculator() {
   return (
     <>
       <Helmet>
-        <title>Attendance Calculator — How Many Classes Can I Bunk? | Free</title>
-        <meta name="description" content="Don't guess — know exactly how many classes you can bunk! Instant attendance % + bunk count for India's 75% UGC rule, CBSE, DU, Mumbai University &amp; worldwide. Free, no login." />
+        <title>Attendance Calculator — How Many Classes Can I Miss or Bunk? (Free 2026)</title>
+        <meta name="description" content="Free attendance calculator — know instantly how many classes you can miss or bunk, your current attendance %, and exactly how many classes you need to recover. Works for 75%, 80%, 85% or any % — India, Australia, UK, USA &amp; worldwide. No sign-up." />
         <meta name="keywords" content="attendance calculator, how many classes can i miss, how many classes can i bunk, bunk calculator, 75 attendance calculator, attendance percentage calculator, class attendance calculator, college attendance calculator, attendance calculator india, 75 attendance rule india, UGC 75 attendance rule, CBSE attendance calculator, DU attendance calculator, Delhi university attendance calculator, Mumbai university attendance calculator, Anna university attendance calculator, VTU attendance calculator, Osmania university attendance calculator, Pune university attendance calculator, attendance calculator for indian college students, india college bunk calculator, how many classes can i bunk india, 75 percent attendance india, attendance shortage india, attendance calculator australia, attendance calculator usa, attendance calculator canada, attendance calculator uk, attendance shortage calculator, 75 percent attendance rule, how many classes can i skip, minimum attendance calculator, attendance calculator online free, lecture attendance calculator, bunking calculator college, how many lectures can i miss, attendance calculator for 75 percent, college bunk calculator, attendance recovery calculator, how many classes to attend to recover, attendance shortage recovery, 80 percent attendance calculator, 85 percent attendance calculator, bunk class calculator, attendance percentage formula, college attendance shortage, CBSE 75 attendance, attendance calculator for college students india" />
-        <meta name="author" content="Student Hub" />
+        <meta name="author" content="Student Hub Nepal" />
         <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
 
-        <meta property="og:title" content="Attendance Calculator — How Many Classes Can I Bunk? | Free" />
-        <meta property="og:description" content="Know exactly how many classes you can bunk! Instant attendance % + bunk count for India's 75% UGC rule, CBSE, DU, Mumbai University &amp; worldwide. Free, no login." />
-        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Attendance Calculator — How Many Classes Can I Miss or Bunk? (Free 2026)" />
+        <meta property="og:description" content="Free attendance calculator — instantly find your attendance %, how many classes you can miss/bunk, and how many you need to recover. Works for 75%, 80%, 85% or any %. India, Australia, UK, USA. No sign-up." />
+        <meta property="og:type" content="article" />
         <meta property="og:url" content="https://studenthubnp.com/tools/attendance-calculator" />
         <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
-        <meta property="og:image:alt" content="Free Attendance Calculator — How Many Classes Can I Miss or Bunk? India &amp; Worldwide" />
-        <meta property="og:site_name" content="Student Hub" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="Free Attendance Calculator — How Many Classes Can I Miss or Bunk? Worldwide" />
+        <meta property="og:site_name" content="Student Hub Nepal" />
+        <meta property="og:locale" content="en_US" />
+        <meta property="article:published_time" content="2024-06-01" />
+        <meta property="article:modified_time" content="2026-05-21" />
+        <meta property="article:author" content="Student Hub Nepal" />
+        <meta property="article:section" content="Education Tools" />
+        <meta property="article:tag" content="Attendance Calculator, Bunk Calculator, College Attendance, 75% Rule" />
 
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Attendance Calculator — How Many Classes Can I Bunk? | Free" />
-        <meta name="twitter:description" content="Know exactly how many classes you can bunk! Instant attendance % + bunk count for India 75% UGC rule, CBSE, DU, Mumbai University &amp; worldwide. Free." />
+        <meta name="twitter:title" content="Attendance Calculator — How Many Classes Can I Miss or Bunk? Free 2026" />
+        <meta name="twitter:description" content="Free attendance calculator — instant attendance %, bunk count &amp; recovery classes. Works for 75%, 80%, 85% or any %. India UGC, Australia, UK, USA. No sign-up." />
         <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
 
         <link rel="canonical" href="https://studenthubnp.com/tools/attendance-calculator" />
@@ -117,6 +148,7 @@ export default function AttendanceCalculator() {
         <script type="application/ld+json">{JSON.stringify(HOWTO_SCHEMA)}</script>
         <script type="application/ld+json">{JSON.stringify(WEBAPP_SCHEMA)}</script>
         <script type="application/ld+json">{JSON.stringify(BREADCRUMB_SCHEMA)}</script>
+        <script type="application/ld+json">{JSON.stringify(ARTICLE_SCHEMA)}</script>
       </Helmet>
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
@@ -135,8 +167,14 @@ export default function AttendanceCalculator() {
             </div>
             <span className="text-xs font-semibold bg-green-100 text-green-700 px-2.5 py-1 rounded-full">Global · All Institutions</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Attendance Calculator</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Attendance Calculator — How Many Classes Can I Miss?</h1>
           <p className="text-gray-500 mt-1 text-sm leading-relaxed">Instantly find your attendance %, see how many classes you can bunk, and exactly how many you must attend to recover — for any required %, any institution, worldwide.</p>
+        </div>
+
+        {/* E-E-A-T trust bar */}
+        <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 mb-5">
+          <CheckCircle className="w-3.5 h-3.5 flex-shrink-0 text-green-500" />
+          <span>Works for <strong>all institutions worldwide</strong> · Last updated <strong>May 2026</strong> · India UGC 75%, Australia ESOS 80%, CBSE, DU, UK universities &amp; more · Free, no sign-up</span>
         </div>
 
         {/* Calculator Card */}

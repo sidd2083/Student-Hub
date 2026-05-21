@@ -7,7 +7,7 @@ import { noteUrl } from "@/lib/slugs";
 import { collection, query, where, getDocs, getDoc, doc, updateDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { setAiContext } from "@/lib/aiContext";
-import { BookOpen, ChevronRight, FileText, Image, Type, X, ExternalLink, ZoomIn, LogIn, Sparkles, Maximize2, Minimize2, Bookmark } from "lucide-react";
+import { BookOpen, ChevronRight, FileText, Image, Type, X, ExternalLink, ZoomIn, LogIn, Sparkles, Maximize2, Minimize2, Bookmark, Calculator, CalendarCheck } from "lucide-react";
 
 type NoteView = {
   id: string;
@@ -423,6 +423,31 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
             ))}
           </div>
         )}
+
+        {/* Tool recommendations — internal SEO links to high-value pages */}
+        <section className="mt-6 bg-white border border-gray-100 rounded-2xl shadow-sm p-4 sm:p-5" aria-label="Useful tools for Nepal students">
+          <h2 className="text-sm font-bold text-gray-900 mb-3">Useful tools for Nepal students</h2>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <Link href="/tools/gpa-calculator" className="flex items-center gap-3 bg-blue-50 hover:bg-blue-100 rounded-xl p-3 transition-all group">
+              <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors">
+                <Calculator className="w-4 h-4 text-blue-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-gray-900 text-sm">NEB GPA Calculator Nepal</p>
+                <p className="text-xs text-gray-500">Grade 11 &amp; 12, Science &amp; Management 2082/2083</p>
+              </div>
+            </Link>
+            <Link href="/tools/attendance-calculator" className="flex items-center gap-3 bg-green-50 hover:bg-green-100 rounded-xl p-3 transition-all group">
+              <div className="w-9 h-9 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-green-200 transition-colors">
+                <CalendarCheck className="w-4 h-4 text-green-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-gray-900 text-sm">Attendance Calculator</p>
+                <p className="text-xs text-gray-500">Know exactly how many classes you can miss</p>
+              </div>
+            </Link>
+          </div>
+        </section>
       </div>
     </>
   );

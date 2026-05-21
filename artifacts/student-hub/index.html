@@ -262,9 +262,30 @@
         /* Use resize event + low-frequency interval — far cheaper than rAF */
         window.addEventListener('resize', _check, { passive: true });
         setTimeout(_check, 800);
-        setInterval(_check, 3000);
+        setInterval(_check, 8000);
       }
     })();
     </script>
+    <!-- Fallback navigation for non-JS crawlers and accessibility -->
+    <noscript>
+      <style>body{background:#fff;font-family:system-ui,-apple-system,sans-serif;margin:0;padding:40px 20px}a{color:#3b82f6;text-decoration:none}a:hover{text-decoration:underline}li{margin-bottom:10px}</style>
+      <div style="max-width:720px;margin:0 auto">
+        <h1 style="font-size:26px;font-weight:700;color:#111827;margin-bottom:8px">Student Hub Nepal — Free Study Platform for Grade 9–12</h1>
+        <p style="color:#6b7280;line-height:1.6;margin-bottom:24px">Free study notes, past exam papers (PYQs), NEB GPA calculator, attendance calculator and more for Nepal's Grade 9–12 students preparing for SEE and NEB exams. Please enable JavaScript to use all features.</p>
+        <nav aria-label="Site navigation">
+          <ul style="list-style:none;padding:0">
+            <li><a href="/notes"><strong>Study Notes</strong> — Grade 9, 10, 11 &amp; 12, all subjects</a></li>
+            <li><a href="/pyqs"><strong>Previous Year Questions (PYQs)</strong> — SEE &amp; NEB past papers</a></li>
+            <li><a href="/tools/gpa-calculator"><strong>NEB GPA Calculator Nepal</strong> — Grade 11 &amp; 12, Science &amp; Management 2082/2083</a></li>
+            <li><a href="/tools/attendance-calculator"><strong>Attendance Calculator</strong> — How many classes can I miss or bunk?</a></li>
+            <li><a href="/tools"><strong>All Student Tools</strong> — NEB GPA, Attendance, and more</a></li>
+            <li><a href="/about">About Student Hub Nepal</a></li>
+            <li><a href="/contact">Contact Us</a></li>
+            <li><a href="/privacy">Privacy Policy</a></li>
+            <li><a href="/terms">Terms of Use</a></li>
+          </ul>
+        </nav>
+      </div>
+    </noscript>
   </body>
 </html>
