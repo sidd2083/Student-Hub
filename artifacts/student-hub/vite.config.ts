@@ -123,6 +123,22 @@ export default defineConfig({
         proxyTimeout: 120_000,
         timeout: 120_000,
       },
+      "/sitemap.xml": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+        proxyTimeout: 15_000,
+        timeout: 15_000,
+      },
+      "/sitemap-index.xml": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+        proxyTimeout: 10_000,
+        timeout: 10_000,
+      },
+      "/robots.txt": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
     },
   },
   preview: {

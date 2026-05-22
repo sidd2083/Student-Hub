@@ -1,96 +1,90 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 
-  <!-- ── Homepage ─────────────────────────────────────────────────────────── -->
+  <!-- Homepage -->
   <url>
     <loc>https://studenthubnp.com/</loc>
-    <lastmod>2026-05-21</lastmod>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
-    <image:image>
-      <image:loc>https://studenthubnp.com/opengraph.jpg</image:loc>
-      <image:title>Student Hub Nepal — Free Study Platform</image:title>
-      <image:caption>Free notes, PYQs, MCQ practice and AI tutor for Grade 9–12 students in Nepal</image:caption>
-    </image:image>
   </url>
 
-  <!-- ── Notes library ─────────────────────────────────────────────────────── -->
+  <!-- Notes library -->
   <url>
     <loc>https://studenthubnp.com/notes</loc>
-    <lastmod>2026-05-21</lastmod>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
   </url>
 
-  <!-- ── Past Year Questions ───────────────────────────────────────────────── -->
+  <!-- Past Year Questions -->
   <url>
     <loc>https://studenthubnp.com/pyqs</loc>
-    <lastmod>2026-05-21</lastmod>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.90</priority>
   </url>
 
-  <!-- ── MCQ Practice ──────────────────────────────────────────────────────── -->
+  <!-- MCQ Practice -->
   <url>
     <loc>https://studenthubnp.com/mcq</loc>
-    <lastmod>2026-05-21</lastmod>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
 
-  <!-- ── Tools hub ─────────────────────────────────────────────────────────── -->
+  <!-- Tools hub -->
   <url>
     <loc>https://studenthubnp.com/tools</loc>
-    <lastmod>2026-05-21</lastmod>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.90</priority>
   </url>
 
-  <!-- ── GPA Calculator — primary high-traffic page ────────────────────────── -->
+  <!-- GPA Calculator -->
   <url>
     <loc>https://studenthubnp.com/tools/gpa-calculator</loc>
-    <lastmod>2026-05-21</lastmod>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
 
-  <!-- ── Attendance / Bunk Calculator ──────────────────────────────────────── -->
+  <!-- Attendance Calculator -->
   <url>
     <loc>https://studenthubnp.com/tools/attendance-calculator</loc>
-    <lastmod>2026-05-21</lastmod>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
 
-  <!-- ── About ─────────────────────────────────────────────────────────────── -->
+  <!-- About -->
   <url>
     <loc>https://studenthubnp.com/about</loc>
-    <lastmod>2026-05-21</lastmod>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.60</priority>
   </url>
 
-  <!-- ── Contact ───────────────────────────────────────────────────────────── -->
+  <!-- Contact -->
   <url>
     <loc>https://studenthubnp.com/contact</loc>
-    <lastmod>2026-05-21</lastmod>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.50</priority>
   </url>
 
-  <!-- ── Privacy Policy ───────────────────────────────────────────────────── -->
+  <!-- Privacy Policy -->
   <url>
     <loc>https://studenthubnp.com/privacy</loc>
-    <lastmod>2026-05-21</lastmod>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.40</priority>
   </url>
 
-  <!-- ── Terms of Service ──────────────────────────────────────────────────── -->
+  <!-- Terms of Service -->
   <url>
     <loc>https://studenthubnp.com/terms</loc>
-    <lastmod>2026-05-21</lastmod>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.40</priority>
   </url>
