@@ -6,8 +6,23 @@ export default function Terms() {
   return (
     <>
       <Helmet>
-        <title>Terms &amp; Conditions — Student Hub</title>
-        <meta name="description" content="Terms and Conditions for using Student Hub — the free study platform for Nepal students." />
+        <title>Terms &amp; Conditions — Student Hub Nepal</title>
+        <meta name="description" content="Terms and Conditions for using Student Hub Nepal — the free study platform for Grade 9–12 students. Read our usage policy, content rules, and account guidelines." />
+        <meta name="keywords" content="student hub terms and conditions, student hub nepal terms, student hub usage policy" />
+        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+        <meta name="author" content="Student Hub Nepal" />
+        <link rel="canonical" href="https://studenthubnp.com/terms" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://studenthubnp.com/terms" />
+        <meta property="og:title" content="Terms &amp; Conditions — Student Hub Nepal" />
+        <meta property="og:description" content="Terms and Conditions for using Student Hub Nepal — the free study platform for Grade 9–12 students." />
+        <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta property="og:image:alt" content="Student Hub Nepal Terms and Conditions" />
+        <meta property="og:site_name" content="Student Hub Nepal" />
+        <meta property="og:locale" content="en_NP" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="Terms &amp; Conditions — Student Hub Nepal" />
+        <meta name="twitter:description" content="Terms and Conditions for using Student Hub Nepal — the free study platform for Grade 9–12 students." />
       </Helmet>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 mb-6 transition-colors">

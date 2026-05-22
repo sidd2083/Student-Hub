@@ -101,21 +101,26 @@ export default function Home() {
     <>
       <Helmet>
         <title>Student Hub — Free Study Platform for Grade 9–12 Students in Nepal</title>
-        <meta name="description" content="Free notes, past papers (PYQs), AI study assistant and progress tracking for Grade 9–12 students in Nepal. SEE and NEB exam preparation." />
-        <meta name="keywords" content="student hub nepal, grade 10 notes, SEE preparation, NEB notes, PYQ nepal, study tracker nepal, free notes nepal, SEE 2080" />
+        <meta name="description" content="Free notes, past papers (PYQs), AI study assistant and progress tracking for Grade 9–12 students in Nepal. SEE and NEB exam preparation. Includes NEB GPA Calculator and Attendance Calculator." />
+        <meta name="keywords" content="student hub nepal, grade 10 notes, SEE preparation, NEB notes, PYQ nepal, study tracker nepal, free notes nepal, SEE 2082, NEB 2082, NEB GPA calculator, attendance calculator, class 12 GPA calculator nepal, how many classes can i miss, NEB grade 12 calculator, free study platform nepal, grade 9 10 11 12 notes nepal" />
+        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
         <link rel="canonical" href={SITE_URL} />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={SITE_URL} />
         <meta property="og:title" content="Student Hub — Free Study Platform for Nepal Students" />
-        <meta property="og:description" content="Notes, PYQs, Nep AI and study tracking for Grade 9–12 students in Nepal. Free forever." />
+        <meta property="og:description" content="Notes, PYQs, Nep AI and study tracking for Grade 9–12 students in Nepal. NEB GPA Calculator, Attendance Calculator and more. Free forever." />
         <meta property="og:image" content={OG_IMAGE} />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="Student Hub Nepal — Free Study Platform for Grade 9 to 12" />
+        <meta property="og:image:type" content="image/jpeg" />
         <meta property="og:site_name" content="Student Hub Nepal" />
+        <meta property="og:locale" content="en_NP" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Student Hub — Free Study Platform for Nepal Students" />
-        <meta name="twitter:description" content="Notes, PYQs, Nep AI and study tracking for Grade 9–12 students in Nepal." />
+        <meta name="twitter:description" content="Notes, PYQs, Nep AI, NEB GPA Calculator and study tracking for Grade 9–12 students in Nepal." />
         <meta name="twitter:image" content={OG_IMAGE} />
+        <meta name="twitter:image:alt" content="Student Hub Nepal — Free Study Platform" />
         <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
       </Helmet>
 

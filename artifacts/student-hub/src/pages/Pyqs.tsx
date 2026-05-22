@@ -515,7 +515,7 @@ export default function Pyqs() {
         <title>Free SEE &amp; NEB Past Papers Nepal — PYQ Grade 9–12 | Student Hub</title>
         <meta name="description" content="Free SEE &amp; NEB past year question papers for Class 9–12 Nepal students. Browse by subject &amp; year — Maths, Science, English, Social Studies. PDF &amp; images. No login needed." />
         <meta name="keywords" content="SEE question paper nepal, NEB past papers nepal, previous year questions nepal, PYQ nepal, SEE model question 2080 2081 2082, grade 10 question paper nepal, class 10 exam paper nepal, SEE exam paper nepal, NEB question bank, grade 11 past papers nepal, grade 12 past papers nepal, class 11 question paper nepal, class 12 question paper nepal, SEE maths question paper, SEE science question paper, SEE english question paper, NEB maths past paper, NEB science past paper, important questions nepal, SEE purano question, NEB purano question, free past papers nepal, exam question paper nepal, board exam questions nepal" />
-        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
         <meta name="author" content="Student Hub Nepal" />
         <meta name="geo.region" content="NP" />
         <meta name="geo.placename" content="Nepal" />

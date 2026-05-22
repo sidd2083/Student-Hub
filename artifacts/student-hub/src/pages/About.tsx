@@ -8,7 +8,7 @@ export default function About() {
         <title>About Student Hub Nepal — Nepal's #1 Free Study Platform</title>
         <meta name="description" content="Student Hub Nepal is 100% free — notes, past papers, AI tutor &amp; Pomodoro for Grade 9–12 SEE &amp; NEB students. Built by Nepali students, for Nepali students. No fees, ever." />
         <meta name="keywords" content="about student hub nepal, student hub nepal, free study platform nepal, best study platform nepal, NEB study platform, SEE preparation nepal, free education nepal, nepal study app, study platform grade 9 10 11 12, free learning nepal, Nep AI tutor, pomodoro study nepal, student hub mission, free notes nepal, free PYQ nepal, student hub features" />
-        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
         <meta name="author" content="Student Hub Nepal" />
         <meta name="geo.region" content="NP" />
         <meta name="geo.placename" content="Nepal" />

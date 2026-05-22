@@ -17,7 +17,7 @@ export default function Contact() {
         <title>Contact Student Hub Nepal — We Reply Within 24 Hours</title>
         <meta name="description" content="Questions, bugs or suggestions? The Student Hub Nepal team replies within 24 hours. Help us build Nepal's best free study platform for Grade 9–12 SEE &amp; NEB students." />
         <meta name="keywords" content="contact student hub nepal, student hub nepal support, student hub nepal feedback, student hub nepal help, report bug student hub, suggest feature student hub, student hub nepal email, student hub nepal contact number, student hub nepal team" />
-        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
         <meta name="author" content="Student Hub Nepal" />
         <meta name="geo.region" content="NP" />
         <meta name="geo.placename" content="Nepal" />

@@ -464,7 +464,7 @@ export default function Notes() {
         <title>Free Class 9–12 Study Notes Nepal — SEE &amp; NEB | Student Hub</title>
         <meta name="description" content="Free Maths, Science, English &amp; Social Studies notes for Class 9, 10, 11 &amp; 12 Nepal students. PDF &amp; text format, organised by subject &amp; chapter. No login. Ace SEE &amp; NEB!" />
         <meta name="keywords" content="class 10 notes nepal, SEE notes nepal, grade 10 notes, NEB notes, free study notes nepal, class 9 notes nepal, grade 11 notes nepal, grade 12 notes nepal, class 10 science notes nepal, class 10 maths notes nepal, class 10 english notes nepal, class 10 social studies notes nepal, SEE preparation notes, NEB study notes, grade 9 notes nepal, class 11 science notes nepal, class 12 notes nepal, free notes nepal, कक्षा १० notes, school notes nepal, see exam notes, neb exam notes, student hub notes, study material nepal" />
-        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
         <meta name="author" content="Student Hub Nepal" />
         <meta name="geo.region" content="NP" />
         <meta name="geo.placename" content="Nepal" />

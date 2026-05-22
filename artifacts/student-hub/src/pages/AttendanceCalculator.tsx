@@ -42,11 +42,14 @@ const WEBAPP_SCHEMA = {
   url: "https://studenthubnp.com/tools/attendance-calculator",
   description: "Free online attendance calculator. Enter your classes attended and total classes held to instantly find your attendance percentage, how many classes you can bunk, and how many consecutive classes to attend to recover — for 75%, 80%, 85% or any required percentage. Used globally.",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  areaServed: "Worldwide",
+  availableOnDevice: "Web Browser",
   featureList: [
     "Instant attendance percentage calculation",
     "Bunk calculator — how many classes you can miss",
     "Recovery calculator — how many classes to attend to reach 75%",
     "Works for 75%, 80%, 85%, 90% or any custom requirement",
+    "Covers India UGC 75%, Australia ESOS 80%, UK UKVI 85–90%, USA F-1 rules",
     "Free, no login, no sign-up",
   ],
 };
@@ -120,7 +123,23 @@ export default function AttendanceCalculator() {
         <meta name="description" content="Free attendance calculator — know instantly how many classes you can miss or bunk, your current attendance %, and exactly how many classes you need to recover. Works for 75%, 80%, 85% or any % — India, Australia, UK, USA &amp; worldwide. No sign-up." />
         <meta name="keywords" content="attendance calculator, how many classes can i miss, how many classes can i bunk, bunk calculator, 75 attendance calculator, attendance percentage calculator, class attendance calculator, college attendance calculator, attendance calculator india, 75 attendance rule india, UGC 75 attendance rule, CBSE attendance calculator, DU attendance calculator, Delhi university attendance calculator, Mumbai university attendance calculator, Anna university attendance calculator, VTU attendance calculator, Osmania university attendance calculator, Pune university attendance calculator, attendance calculator for indian college students, india college bunk calculator, how many classes can i bunk india, 75 percent attendance india, attendance shortage india, attendance calculator australia, attendance calculator usa, attendance calculator canada, attendance calculator uk, attendance shortage calculator, 75 percent attendance rule, how many classes can i skip, minimum attendance calculator, attendance calculator online free, lecture attendance calculator, bunking calculator college, how many lectures can i miss, attendance calculator for 75 percent, college bunk calculator, attendance recovery calculator, how many classes to attend to recover, attendance shortage recovery, 80 percent attendance calculator, 85 percent attendance calculator, bunk class calculator, attendance percentage formula, college attendance shortage, CBSE 75 attendance, attendance calculator for college students india" />
         <meta name="author" content="Student Hub Nepal" />
-        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+
+        {/* Override site-wide Nepal geo tags — this is a global tool */}
+        <meta name="geo.region" content="" />
+        <meta name="geo.placename" content="" />
+        <meta name="geo.position" content="" />
+        <meta name="ICBM" content="" />
+
+        {/* hreflang — signals to Google that this page serves a global English audience */}
+        <link rel="alternate" hrefLang="en"    href="https://studenthubnp.com/tools/attendance-calculator" />
+        <link rel="alternate" hrefLang="en-IN" href="https://studenthubnp.com/tools/attendance-calculator" />
+        <link rel="alternate" hrefLang="en-AU" href="https://studenthubnp.com/tools/attendance-calculator" />
+        <link rel="alternate" hrefLang="en-GB" href="https://studenthubnp.com/tools/attendance-calculator" />
+        <link rel="alternate" hrefLang="en-US" href="https://studenthubnp.com/tools/attendance-calculator" />
+        <link rel="alternate" hrefLang="en-CA" href="https://studenthubnp.com/tools/attendance-calculator" />
+        <link rel="alternate" hrefLang="en-PK" href="https://studenthubnp.com/tools/attendance-calculator" />
+        <link rel="alternate" hrefLang="x-default" href="https://studenthubnp.com/tools/attendance-calculator" />
 
         <meta property="og:title" content="Attendance Calculator — How Many Classes Can I Miss or Bunk? (Free 2026)" />
         <meta property="og:description" content="Free attendance calculator — instantly find your attendance %, how many classes you can miss/bunk, and how many you need to recover. Works for 75%, 80%, 85% or any %. India, Australia, UK, USA. No sign-up." />
@@ -129,9 +148,14 @@ export default function AttendanceCalculator() {
         <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
-        <meta property="og:image:alt" content="Free Attendance Calculator — How Many Classes Can I Miss or Bunk? Worldwide" />
+        <meta property="og:image:alt" content="Free Attendance Calculator — How Many Classes Can I Miss or Bunk? Works Worldwide" />
+        <meta property="og:image:type" content="image/jpeg" />
         <meta property="og:site_name" content="Student Hub Nepal" />
         <meta property="og:locale" content="en_US" />
+        <meta property="og:locale:alternate" content="en_IN" />
+        <meta property="og:locale:alternate" content="en_AU" />
+        <meta property="og:locale:alternate" content="en_GB" />
+        <meta property="og:locale:alternate" content="en_CA" />
         <meta property="article:published_time" content="2024-06-01" />
         <meta property="article:modified_time" content="2026-05-22" />
         <meta property="article:author" content="Student Hub Nepal" />
@@ -142,6 +166,7 @@ export default function AttendanceCalculator() {
         <meta name="twitter:title" content="Attendance Calculator — How Many Classes Can I Miss or Bunk? Free 2026" />
         <meta name="twitter:description" content="Free attendance calculator — instant attendance %, bunk count &amp; recovery classes. Works for 75%, 80%, 85% or any %. India UGC, Australia, UK, USA. No sign-up." />
         <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta name="twitter:image:alt" content="Free Attendance Calculator — Works Worldwide for 75%, 80%, 85% rules" />
 
         <link rel="canonical" href="https://studenthubnp.com/tools/attendance-calculator" />
         <script type="application/ld+json">{JSON.stringify(FAQ_SCHEMA)}</script>

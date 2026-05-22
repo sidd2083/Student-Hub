@@ -6,8 +6,23 @@ export default function PrivacyPolicy() {
   return (
     <>
       <Helmet>
-        <title>Privacy Policy — Student Hub</title>
-        <meta name="description" content="Privacy Policy for Student Hub — how we collect, use and protect your data." />
+        <title>Privacy Policy — Student Hub Nepal</title>
+        <meta name="description" content="Privacy Policy for Student Hub Nepal — how we collect, use and protect your personal data. Covers Firebase Auth, Firestore, Google Analytics and cookies." />
+        <meta name="keywords" content="student hub privacy policy, student hub nepal privacy, student hub data policy" />
+        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+        <meta name="author" content="Student Hub Nepal" />
+        <link rel="canonical" href="https://studenthubnp.com/privacy" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://studenthubnp.com/privacy" />
+        <meta property="og:title" content="Privacy Policy — Student Hub Nepal" />
+        <meta property="og:description" content="Privacy Policy for Student Hub Nepal — how we collect, use and protect your personal data." />
+        <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta property="og:image:alt" content="Student Hub Nepal Privacy Policy" />
+        <meta property="og:site_name" content="Student Hub Nepal" />
+        <meta property="og:locale" content="en_NP" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="Privacy Policy — Student Hub Nepal" />
+        <meta name="twitter:description" content="Privacy Policy for Student Hub Nepal — how we collect, use and protect your personal data." />
       </Helmet>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 mb-6 transition-colors">
