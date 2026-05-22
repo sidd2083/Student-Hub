@@ -489,7 +489,7 @@ const ARTICLE_SCHEMA = {
   description: "Free NEB GPA Calculator for Grade 11 & 12 students in Nepal 2082/2083. Instant GPA using the official NEB grading formula — 75% Theory + 25% Practical.",
   url: "https://studenthubnp.com/tools/gpa-calculator",
   datePublished: "2024-06-01",
-  dateModified: "2026-05-21",
+  dateModified: "2026-05-22",
   author: {
     "@type": "Organization",
     name: "Student Hub Nepal",
@@ -534,7 +534,7 @@ export default function GpaCalculator() {
         <meta property="og:site_name" content="Student Hub Nepal" />
         <meta property="og:locale" content="en_NP" />
         <meta property="article:published_time" content="2024-06-01" />
-        <meta property="article:modified_time" content="2026-05-21" />
+        <meta property="article:modified_time" content="2026-05-22" />
         <meta property="article:author" content="Student Hub Nepal" />
         <meta property="article:section" content="Education Tools" />
         <meta property="article:tag" content="NEB GPA, Nepal Education, Grade 12, Grade 11" />

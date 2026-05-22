@@ -23,5 +23,8 @@ Disallow: /api/
 # ── Crawl-delay hint for polite bots (Googlebot ignores this, others respect it)
 Crawl-delay: 1
 
-# ── Sitemap ──────────────────────────────────────────────────────────────────
+# ── Sitemaps ─────────────────────────────────────────────────────────────────
+# Dynamic sitemap (includes all note + PYQ individual pages from database)
 Sitemap: https://studenthubnp.com/sitemap.xml
+# Static sitemap (always available — tools, notes listing, PYQs listing, home)
+Sitemap: https://studenthubnp.com/sitemap-static.xml

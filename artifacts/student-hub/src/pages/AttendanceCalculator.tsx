@@ -68,7 +68,7 @@ const ARTICLE_SCHEMA = {
   description: "Free online attendance calculator. Find your attendance %, how many classes you can miss/bunk, and how many you need to attend to recover — for any required percentage.",
   url: "https://studenthubnp.com/tools/attendance-calculator",
   datePublished: "2024-06-01",
-  dateModified: "2026-05-21",
+  dateModified: "2026-05-22",
   author: {
     "@type": "Organization",
     name: "Student Hub Nepal",
@@ -133,7 +133,7 @@ export default function AttendanceCalculator() {
         <meta property="og:site_name" content="Student Hub Nepal" />
         <meta property="og:locale" content="en_US" />
         <meta property="article:published_time" content="2024-06-01" />
-        <meta property="article:modified_time" content="2026-05-21" />
+        <meta property="article:modified_time" content="2026-05-22" />
         <meta property="article:author" content="Student Hub Nepal" />
         <meta property="article:section" content="Education Tools" />
         <meta property="article:tag" content="Attendance Calculator, Bunk Calculator, College Attendance, 75% Rule" />

@@ -4,7 +4,7 @@ import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { BookOpen, FileText, BarChart2, MessageCircle, Timer, CheckSquare, Trophy, ArrowRight, LogIn, Sparkles } from "lucide-react";
+import { BookOpen, FileText, BarChart2, MessageCircle, Timer, CheckSquare, Trophy, ArrowRight, LogIn, Sparkles, Calculator, CalendarCheck } from "lucide-react";
 import { noteUrl, pyqUrl } from "@/lib/slugs";
 
 const features = [
@@ -244,6 +244,57 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      {/* ── Tools Section ── sends homepage link equity to both calculator pages ── */}
+      <section className="bg-gradient-to-b from-blue-50/60 to-white py-12 px-4" aria-labelledby="tools-heading">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 id="tools-heading" className="text-xl font-bold text-gray-900">Free Student Calculators</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Instant tools — no account needed</p>
+            </div>
+            <Link href="/tools" className="flex items-center gap-1 text-sm text-blue-600 font-medium hover:underline" aria-label="See all free student tools">
+              All tools <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+            </Link>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Link href="/tools/gpa-calculator" aria-label="NEB GPA Calculator Nepal 2082 2083 — Grade 11 and 12, Science and Management">
+              <article className="group bg-white border border-blue-100 rounded-2xl p-5 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer h-full flex flex-col">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-11 h-11 bg-blue-50 rounded-2xl flex items-center justify-center">
+                    <Calculator className="w-5 h-5 text-blue-600" aria-hidden="true" />
+                  </div>
+                  <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full">Nepal · NEB 2082</span>
+                </div>
+                <h3 className="text-sm font-bold text-gray-900 mb-1.5">NEB GPA Calculator</h3>
+                <p className="text-xs text-gray-500 leading-relaxed flex-1">
+                  Calculate your <strong>Grade 11 &amp; 12 GPA</strong> using the official NEB formula (75% Theory + 25% Practical) for Science and Management. Check MBBS, IOE &amp; scholarship cutoffs.
+                </p>
+                <div className="flex items-center gap-1.5 mt-4 text-xs font-semibold text-blue-600 group-hover:gap-2.5 transition-all">
+                  Calculate GPA <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                </div>
+              </article>
+            </Link>
+            <Link href="/tools/attendance-calculator" aria-label="Attendance Calculator — How many classes can I miss or bunk?">
+              <article className="group bg-white border border-green-100 rounded-2xl p-5 hover:shadow-md hover:border-green-200 transition-all cursor-pointer h-full flex flex-col">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-11 h-11 bg-green-50 rounded-2xl flex items-center justify-center">
+                    <CalendarCheck className="w-5 h-5 text-green-600" aria-hidden="true" />
+                  </div>
+                  <span className="text-xs font-semibold bg-green-100 text-green-700 px-2.5 py-1 rounded-full">Global · All Colleges</span>
+                </div>
+                <h3 className="text-sm font-bold text-gray-900 mb-1.5">Attendance Calculator</h3>
+                <p className="text-xs text-gray-500 leading-relaxed flex-1">
+                  Find exactly <strong>how many classes you can miss or bunk</strong> and still stay safe — or how many you must attend to recover. Works for 75%, 80%, 85% or any required percentage.
+                </p>
+                <div className="flex items-center gap-1.5 mt-4 text-xs font-semibold text-green-600 group-hover:gap-2.5 transition-all">
+                  Check Attendance <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                </div>
+              </article>
+            </Link>
+          </div>
+        </div>
+      </section>
 
       <footer className="py-8 px-4 border-t border-gray-100 bg-white">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">

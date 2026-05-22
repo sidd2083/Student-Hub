@@ -53,6 +53,10 @@
          A static canonical here would incorrectly claim every route is the
          homepage. Each page component sets its own <link rel="canonical">. -->
 
+    <!-- ── Sitemaps — helps crawlers discover all pages immediately ────── -->
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml" title="Dynamic Sitemap (all pages)" />
+    <link rel="sitemap" type="application/xml" href="/sitemap-static.xml" title="Static Sitemap (tools + core pages)" />
+
     <!-- ── PWA / Icons ───────────────────────────────────────────────────── -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
