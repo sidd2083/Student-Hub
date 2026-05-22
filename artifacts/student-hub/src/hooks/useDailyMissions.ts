@@ -492,6 +492,23 @@ export function useDailyMissions() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedMinutesToday, naturalSessionsCompleted, missions, studyMinsAtStart]);
 
+  // ── Listen for external mission completions (from StudyGuardian) ───────────
+  // StudyGuardian runs at app level and completes missions while the user is on
+  // the Pomodoro page. When it does, it dispatches this event so the missions
+  // list refreshes from cache without a full Firestore round-trip.
+  useEffect(() => {
+    if (!uid) return;
+    const handler = () => {
+      const fresh = readCache(uid, date);
+      if (fresh) {
+        setMissions(fresh.missions);
+        setAllCompleted(fresh.allCompleted);
+      }
+    };
+    window.addEventListener("sh:missionCompleted", handler);
+    return () => window.removeEventListener("sh:missionCompleted", handler);
+  }, [uid, date]);
+
   // ── Start a Pomodoro mission ───────────────────────────────────────────────
   // Records the current savedMinutesToday and sessionsCompleted on the mission
   // so auto-complete can measure progress from the moment it was started.
@@ -499,18 +516,24 @@ export function useDailyMissions() {
     if (!uid) return;
     const preset: PomodoroMissionPreset = { missionId, missionText, targetMinutes, date };
     try { localStorage.setItem(POMODORO_MISSION_KEY, JSON.stringify(preset)); } catch {}
-    setMissions(prev => {
-      const updated = prev.map(m => m.id === missionId ? {
-        ...m,
-        startedAt: savedMinutesToday,
-        sessionsAtStart: sessionsAtStartOverride !== undefined ? sessionsAtStartOverride : naturalSessionsCompleted,
-      } : m);
-      const c = readCache(uid, date);
-      if (c) writeCache(uid, date, { ...c, missions: updated });
-      updateDoc(doc(db, "daily_missions", `${uid}_${date}`), { missions: updated }).catch(() => {});
-      return updated;
-    });
-  }, [uid, date, savedMinutesToday, naturalSessionsCompleted]);
+
+    const sessStart = sessionsAtStartOverride !== undefined ? sessionsAtStartOverride : naturalSessionsCompleted;
+    const updated = missions.map(m => m.id === missionId ? {
+      ...m,
+      startedAt: savedMinutesToday,
+      sessionsAtStart: sessStart,
+    } : m);
+
+    // Write cache SYNCHRONOUSLY before setMissions (async) so that if the user
+    // navigates away before React flushes the state update, the cache already
+    // has sessionsAtStart persisted. Without this the auto-complete check on
+    // remount would see sessionsAtStart=undefined and skip the mission.
+    const c = readCache(uid, date);
+    if (c) writeCache(uid, date, { ...c, missions: updated });
+
+    setMissions(() => updated);
+    updateDoc(doc(db, "daily_missions", `${uid}_${date}`), { missions: updated }).catch(() => {});
+  }, [uid, date, savedMinutesToday, naturalSessionsCompleted, missions]);
 
   // ── Manual complete (with anti-cheat) ─────────────────────────────────────
   const completeMission = useCallback((missionId: string) => {

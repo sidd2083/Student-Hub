@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useTimer } from "@/context/TimerContext";
 import type { Phase } from "@/context/TimerContext";
+import { useAuth } from "@/context/AuthContext";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { getNepaliDate } from "@/lib/nepaliDate";
+import { POMODORO_MISSION_KEY } from "@/hooks/useDailyMissions";
 
 // ─── Focus tracker — module-level so Pomodoro can read it ────────────────────
 // Tracks focused vs distracted time for the current session.
@@ -50,11 +55,14 @@ function scheduleAlarms(delayMinutes: number[]): AlarmHandle {
     const now  = ctx.currentTime;
     delayMinutes.forEach((min) => {
       const base = now + min * 60;
-      // Three-beep burst: escalating pitches, square wave = harsh & attention-grabbing
+      // Five-beep burst: escalating pitches, square wave = harsh & attention-grabbing
+      // Louder gain (0.85) so it cuts through even when the device is in another tab
       [
         { freq: 880,  off: 0.00 },
-        { freq: 1100, off: 0.32 },
-        { freq: 1320, off: 0.64 },
+        { freq: 1100, off: 0.28 },
+        { freq: 1320, off: 0.56 },
+        { freq: 1100, off: 0.84 },
+        { freq: 880,  off: 1.12 },
       ].forEach(({ freq, off }) => {
         const t = base + off;
         const osc  = ctx.createOscillator();
@@ -63,12 +71,11 @@ function scheduleAlarms(delayMinutes: number[]): AlarmHandle {
         gain.connect(ctx.destination);
         osc.type = "square";
         osc.frequency.value = freq;
-        // Silence → loud → silence  (sharp attack, quick decay)
         gain.gain.setValueAtTime(0, now);
-        gain.gain.setValueAtTime(0.55, t);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+        gain.gain.setValueAtTime(0.85, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
         osc.start(t);
-        osc.stop(t + 0.32);
+        osc.stop(t + 0.28);
         oscs.push(osc);
       });
     });
@@ -85,21 +92,27 @@ function cancelAlarms(handle: AlarmHandle | null) {
 }
 
 // ─── Immediate alert beep (plays when user returns to tab) ───────────────────
+// 5-beep burst at max volume so the user definitely notices the popup
 function playImmediateAlert() {
   try {
     const ctx = getCtx();
-    [{ freq: 660, t: 0.00 }, { freq: 880, t: 0.28 }, { freq: 1100, t: 0.56 }]
-      .forEach(({ freq, t }) => {
-        const osc  = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.type = "square";
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.4, ctx.currentTime + t);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.22);
-        osc.start(ctx.currentTime + t);
-        osc.stop(ctx.currentTime + t + 0.26);
-      });
+    [
+      { freq: 660,  t: 0.00 },
+      { freq: 880,  t: 0.24 },
+      { freq: 1100, t: 0.48 },
+      { freq: 880,  t: 0.72 },
+      { freq: 1100, t: 0.96 },
+    ].forEach(({ freq, t }) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "square";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.85, ctx.currentTime + t);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.20);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + 0.24);
+    });
   } catch {}
 }
 
@@ -242,11 +255,79 @@ function WellnessPopup({
   );
 }
 
+// ─── Persistent mission auto-complete (runs from app root, not DailyMissions) ─
+// useDailyMissions auto-complete only fires when the DailyMissions page is mounted.
+// This hook watches naturalSessionsCompleted / savedMinutesToday from TimerContext
+// (which persists across navigation) and completes missions directly in localStorage
+// + Firestore so the update is visible even while the user is on the Pomodoro page.
+// It dispatches "sh:missionCompleted" so the DailyMissions hook refreshes from cache.
+function useMissionAutoComplete() {
+  const { user } = useAuth();
+  const { naturalSessionsCompleted, savedMinutesToday } = useTimer();
+
+  useEffect(() => {
+    const uid = user?.uid;
+    if (!uid) return;
+    const date = getNepaliDate();
+    const cacheKey = `sh_dm_${uid}_${date}`;
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (!raw) return;
+      const cache = JSON.parse(raw) as { missions: any[]; allCompleted: boolean };
+      const missions: any[] = cache.missions ?? [];
+
+      let changed = false;
+      const updated = missions.map(m => {
+        if (m.type !== "pomodoro" || m.completed) return m;
+        let shouldComplete = false;
+        if (m.id === "pomodoro_cycle" && m.targetSessions !== undefined && m.sessionsAtStart !== undefined) {
+          const done = Math.max(0, naturalSessionsCompleted - m.sessionsAtStart);
+          shouldComplete = done >= m.targetSessions;
+        } else if (m.targetMinutes && m.startedAt !== undefined) {
+          const done = Math.max(0, savedMinutesToday - m.startedAt);
+          shouldComplete = done >= m.targetMinutes;
+        }
+        if (shouldComplete) {
+          changed = true;
+          return { ...m, completed: true, completedAt: new Date().toISOString() };
+        }
+        return m;
+      });
+
+      if (!changed) return;
+
+      const completedCount = updated.filter((m: any) => m.completed).length;
+      const allCompleted = completedCount === updated.length && updated.length > 0;
+
+      // Persist completion to localStorage immediately
+      localStorage.setItem(cacheKey, JSON.stringify({ ...cache, missions: updated, allCompleted }));
+      // Clear mission preset if pomodoro_cycle just completed
+      const cycleWasJustCompleted = updated.some((m: any) => m.id === "pomodoro_cycle" && m.completed) &&
+        missions.some((m: any) => m.id === "pomodoro_cycle" && !m.completed);
+      if (cycleWasJustCompleted) {
+        try { localStorage.removeItem(POMODORO_MISSION_KEY); } catch {}
+      }
+      // Notify the DailyMissions hook to refresh from cache
+      window.dispatchEvent(new CustomEvent("sh:missionCompleted"));
+      // Sync to Firestore in background
+      updateDoc(doc(db, "daily_missions", `${uid}_${date}`), {
+        missions: updated, completedCount, allCompleted,
+      }).catch(() => {});
+      if (allCompleted) {
+        updateDoc(doc(db, "users", uid), { lastMissionsCompletedDate: date }).catch(() => {});
+      }
+    } catch { /* ignore parse errors */ }
+  }, [naturalSessionsCompleted, savedMinutesToday, user?.uid]);
+}
+
 // ─── Main StudyGuardian ───────────────────────────────────────────────────────
 export function StudyGuardian() {
   const { phase, running, settings, skipPhase, pause, start } = useTimer();
   const [popup, setPopup] = useState<PopupKind>(null);
   const wasRunningRef = useRef(false);
+
+  // Persistent mission completion checker — runs regardless of which page is active
+  useMissionAutoComplete();
 
   // Request notification permission the moment the timer starts
   useEffect(() => { if (running) requestNotifPermission(); }, [running]);
@@ -386,9 +467,9 @@ export function StudyGuardian() {
         const s      = settingsRef.current;
 
         if (isWork) {
-          // Alarms: 5, 6, 7, 8, 9, 10, 11, 12, 13 minutes away
-          const firstAlarmMin = 5;
-          const alarmMinutes  = Array.from({ length: 9 }, (_, i) => firstAlarmMin + i);
+          // Alarms every minute from 1–15 min away so the user hears them early
+          const firstAlarmMin = 1;
+          const alarmMinutes  = Array.from({ length: 15 }, (_, i) => firstAlarmMin + i);
           alarmHandleRef.current = scheduleAlarms(alarmMinutes);
           notifTimerRef.current = setTimeout(() => {
             if (document.hidden) {

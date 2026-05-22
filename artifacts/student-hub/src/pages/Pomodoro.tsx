@@ -407,17 +407,25 @@ function PomodoroContent() {
           </div>
           {/* Cycle plan */}
           <div className="bg-amber-50 px-4 py-3">
-            <p className="text-xs text-amber-800 font-medium mb-2.5 leading-snug line-clamp-2">
+            <p className="text-xs text-amber-800 font-medium mb-2 leading-snug line-clamp-2">
               {missionPreset.missionText}
             </p>
-            {/* Visual cycle flow */}
+            {/* Target summary — makes minutes goal crystal-clear */}
+            <div className="flex items-center gap-2 mb-2.5">
+              <span className="inline-flex items-center gap-1 bg-amber-200 text-amber-900 text-xs font-bold px-2.5 py-1 rounded-full">
+                🎯 Goal: study {missionPreset.targetMinutes} min total
+              </span>
+              <span className="text-[10px] text-amber-600">
+                ({Math.ceil(missionPreset.targetMinutes / 25)} × 25-min session{Math.ceil(missionPreset.targetMinutes / 25) !== 1 ? "s" : ""})
+              </span>
+            </div>
+            {/* Visual cycle flow — one block per work+break pair */}
             {(() => {
-              const totalSessions = Math.round(missionPreset.targetMinutes / 25);
-              const cycles = Math.ceil(totalSessions / 2);
+              const totalSessions = Math.ceil(missionPreset.targetMinutes / 25);
               const steps: { label: string; color: string; icon: string }[] = [];
-              for (let c = 0; c < cycles; c++) {
+              for (let c = 0; c < totalSessions; c++) {
                 steps.push({ label: "25 min\nFocus", color: "bg-blue-500", icon: "📚" });
-                if (c < cycles - 1) {
+                if (c < totalSessions - 1) {
                   steps.push({ label: "5 min\nBreak", color: "bg-green-500", icon: "☕" });
                 }
               }
@@ -445,7 +453,7 @@ function PomodoroContent() {
               );
             })()}
             <p className="text-[10px] text-amber-600 mt-2">
-              Press <strong>Start</strong> below — the timer switches phases automatically. Just stay focused! ✓
+              Press <strong>Start</strong> below — the timer auto-switches phases. Each 25-min focus block counts toward your goal! ✓
             </p>
           </div>
         </div>
