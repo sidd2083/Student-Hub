@@ -4,17 +4,19 @@ import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { BookOpen, FileText, BarChart2, MessageCircle, Timer, CheckSquare, Trophy, ArrowRight, LogIn, Sparkles } from "lucide-react";
+import { BookOpen, FileText, BarChart2, MessageCircle, Timer, CheckSquare, Trophy, ArrowRight, LogIn, Sparkles, Calculator, CalendarCheck } from "lucide-react";
 import { noteUrl, pyqUrl } from "@/lib/slugs";
 
 const features = [
-  { icon: BookOpen,      label: "Study Notes",       desc: "Notes by grade, subject & chapter",  href: "/notes",      color: "bg-blue-50 text-blue-600",    public: true  },
-  { icon: FileText,      label: "PYQ Papers",        desc: "Past exam papers with viewer",        href: "/pyqs",       color: "bg-orange-50 text-orange-600", public: true  },
-  { icon: BarChart2,     label: "Report Card",       desc: "Track your study time and progress",  href: "/report",     color: "bg-purple-50 text-purple-600", public: false },
-  { icon: MessageCircle, label: "Nep AI",             desc: "AI study assistant for any topic",    href: "/ai",         color: "bg-indigo-50 text-indigo-600", public: false },
-  { icon: Timer,         label: "Pomodoro Timer",     desc: "Focus timer for study sessions",      href: "/pomodoro",   color: "bg-red-50 text-red-600",       public: false },
-  { icon: CheckSquare,   label: "To-Do List",         desc: "Track your study tasks",              href: "/todo",       color: "bg-green-50 text-green-600",   public: false },
-  { icon: Trophy,        label: "Leaderboard",        desc: "Top students by study time & streak", href: "/leaderboard",color: "bg-amber-50 text-amber-600",   public: false },
+  { icon: BookOpen,      label: "Study Notes",           desc: "Notes by grade, subject & chapter",   href: "/notes",                      color: "bg-blue-50 text-blue-600",    public: true  },
+  { icon: FileText,      label: "PYQ Papers",            desc: "Past exam papers with viewer",         href: "/pyqs",                       color: "bg-orange-50 text-orange-600", public: true  },
+  { icon: Calculator,    label: "GPA Calculator",        desc: "NEB Class 11 & 12 GPA calculator",     href: "/tools/gpa-calculator",       color: "bg-sky-50 text-sky-600",       public: true  },
+  { icon: CalendarCheck, label: "Bunk Calculator",       desc: "How many classes can I miss?",         href: "/tools/attendance-calculator",color: "bg-emerald-50 text-emerald-600", public: true },
+  { icon: BarChart2,     label: "Report Card",           desc: "Track your study time and progress",   href: "/report",                     color: "bg-purple-50 text-purple-600", public: false },
+  { icon: MessageCircle, label: "Nep AI",                desc: "AI study assistant for any topic",     href: "/ai",                         color: "bg-indigo-50 text-indigo-600", public: false },
+  { icon: Timer,         label: "Pomodoro Timer",        desc: "Focus timer for study sessions",       href: "/pomodoro",                   color: "bg-red-50 text-red-600",       public: false },
+  { icon: CheckSquare,   label: "To-Do List",            desc: "Track your study tasks",               href: "/todo",                       color: "bg-green-50 text-green-600",   public: false },
+  { icon: Trophy,        label: "Leaderboard",           desc: "Top students by study time & streak",  href: "/leaderboard",                color: "bg-amber-50 text-amber-600",   public: false },
 ];
 
 const SITE_URL = "https://studenthubnp.com";
@@ -105,8 +107,8 @@ export default function Home() {
     <>
       <Helmet>
         <title>Student Hub — Free Study Platform for Grade 9–12 Students in Nepal</title>
-        <meta name="description" content="Free notes, past papers (PYQs), AI study assistant and progress tracking for Grade 9–12 students in Nepal. SEE and NEB exam preparation." />
-        <meta name="keywords" content="student hub nepal, grade 10 notes, SEE preparation, NEB notes, PYQ nepal, study tracker nepal, free notes nepal, SEE 2080" />
+        <meta name="description" content="Free study platform for Grade 9–12 Nepal students. Notes, PYQs, NEB GPA Calculator, Bunk Calculator, MCQ practice and AI tutor — all free, no sign-up needed." />
+        <meta name="keywords" content="student hub nepal, grade 10 notes, SEE preparation, NEB notes, PYQ nepal, study tracker nepal, free notes nepal, SEE 2080, NEB GPA calculator, bunk calculator nepal, attendance calculator, gpa calculator nepal" />
         <link rel="canonical" href={SITE_URL} />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={SITE_URL} />
@@ -180,6 +182,68 @@ export default function Home() {
               </article>
             </Link>
           ))}
+        </div>
+      </section>
+
+      {/* ── Free Tools section — internal links boost tool page indexing ────── */}
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 py-12" aria-labelledby="tools-heading">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 id="tools-heading" className="text-xl font-bold text-gray-900">Free Study Tools</h2>
+            <p className="text-sm text-gray-500 mt-0.5">No sign-up needed — use instantly</p>
+          </div>
+          <Link href="/tools" className="flex items-center gap-1 text-sm text-blue-600 font-medium hover:underline" aria-label="See all free study tools">
+            See all <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* GPA Calculator */}
+          <Link href="/tools/gpa-calculator" aria-label="Free NEB GPA Calculator Nepal — Class 11 and 12">
+            <article className="group bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md hover:border-sky-100 hover:-translate-y-0.5 transition-all cursor-pointer h-full">
+              <div className="flex items-start gap-4">
+                <div className="w-11 h-11 bg-sky-50 rounded-xl flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                  <Calculator className="w-5 h-5 text-sky-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-gray-900 text-sm">GPA Calculator Nepal</h3>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-sky-50 text-sky-600 rounded-full border border-sky-100">Free</span>
+                  </div>
+                  <p className="text-xs text-gray-500 leading-snug mb-3">NEB Class 11 &amp; 12 GPA Calculator — Science &amp; Management. Uses the official NEB formula (75% Theory + 25% Practical).</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {["NEB Grade 12","Science","Management","2082/2083"].map(tag => (
+                      <span key={tag} className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">{tag}</span>
+                    ))}
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-sky-400 transition-colors flex-shrink-0 mt-0.5" aria-hidden="true" />
+              </div>
+            </article>
+          </Link>
+
+          {/* Bunk / Attendance Calculator */}
+          <Link href="/tools/attendance-calculator" aria-label="Free Bunk Calculator and Attendance Calculator">
+            <article className="group bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md hover:border-emerald-100 hover:-translate-y-0.5 transition-all cursor-pointer h-full">
+              <div className="flex items-start gap-4">
+                <div className="w-11 h-11 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                  <CalendarCheck className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-gray-900 text-sm">Bunk Calculator</h3>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100">Free</span>
+                  </div>
+                  <p className="text-xs text-gray-500 leading-snug mb-3">Attendance calculator — find exactly how many classes you can miss (bunk) while staying above 75%, 80%, or any required %. India, Nepal &amp; worldwide.</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {["75% Rule","India UGC","DU / IIT","Global"].map(tag => (
+                      <span key={tag} className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">{tag}</span>
+                    ))}
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-emerald-400 transition-colors flex-shrink-0 mt-0.5" aria-hidden="true" />
+              </div>
+            </article>
+          </Link>
         </div>
       </section>
 
