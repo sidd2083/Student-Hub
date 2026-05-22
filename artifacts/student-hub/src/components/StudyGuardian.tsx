@@ -41,6 +41,40 @@ function getCtx(): AudioContext {
   return _ctx;
 }
 
+// ─── Background keepalive ─────────────────────────────────────────────────────
+// Browsers SUSPEND the AudioContext when a tab goes to the background, which
+// stops ctx.currentTime from advancing — so pre-scheduled alarms never fire.
+// Keeping a completely-silent oscillator running prevents that suspension,
+// meaning the alarm bursts play on time even while the user is on YouTube/
+// Instagram/any other tab.
+let _keepaliveOsc: OscillatorNode | null = null;
+let _keepaliveGain: GainNode | null = null;
+
+function startAudioKeepalive() {
+  try {
+    if (_keepaliveOsc) return;             // already running
+    const ctx = getCtx();
+    _keepaliveGain = ctx.createGain();
+    _keepaliveGain.gain.value = 0;         // completely inaudible
+    _keepaliveGain.connect(ctx.destination);
+    _keepaliveOsc = ctx.createOscillator();
+    _keepaliveOsc.frequency.value = 1;     // 1 Hz — imperceptibly slow
+    _keepaliveOsc.connect(_keepaliveGain);
+    _keepaliveOsc.start();
+    ctx.resume();                           // ensure ctx is not suspended
+  } catch { /* Safari/old browser — fail silently */ }
+}
+
+function stopAudioKeepalive() {
+  try {
+    _keepaliveOsc?.stop();
+    _keepaliveOsc?.disconnect();
+    _keepaliveGain?.disconnect();
+  } catch {}
+  _keepaliveOsc  = null;
+  _keepaliveGain = null;
+}
+
 // ─── Pre-schedule beeps at future AudioContext times ─────────────────────────
 // The Web Audio scheduler runs in a dedicated real-time thread that keeps
 // ticking even when the browser throttles JS in background tabs.
@@ -463,6 +497,13 @@ export function StudyGuardian() {
         if (!runningRef.current) return;
         hiddenAtRef.current = Date.now();
 
+        // CRITICAL: start a silent oscillator BEFORE scheduling alarms.
+        // Browsers suspend the AudioContext in background tabs, which stops
+        // ctx.currentTime — meaning every pre-scheduled alarm is lost.
+        // A running (but inaudible) node keeps the context alive so alarms
+        // fire normally even while the user is on YouTube / Instagram / etc.
+        startAudioKeepalive();
+
         const isWork = phaseRef.current === "work";
         const s      = settingsRef.current;
 
@@ -487,6 +528,7 @@ export function StudyGuardian() {
 
       } else {
         // ── Tab came back ────────────────────────────────────────────────
+        stopAudioKeepalive();          // keepalive no longer needed
         cancelAlarms(alarmHandleRef.current);
         alarmHandleRef.current = null;
         if (notifTimerRef.current) { clearTimeout(notifTimerRef.current); notifTimerRef.current = null; }
