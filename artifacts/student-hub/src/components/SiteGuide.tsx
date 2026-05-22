@@ -99,6 +99,7 @@ export function SiteGuide() {
       const t = setTimeout(() => setVisible(true), 1200);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, []);
 
   const close = () => {

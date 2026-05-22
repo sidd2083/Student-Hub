@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useDailyMissions } from "@/hooks/useDailyMissions";
-import { useTimer } from "@/context/TimerContext";
 import { SoftGate } from "@/components/SoftGate";
 import {
   CheckCircle2, Circle, Zap, BookOpen,
@@ -32,35 +31,15 @@ function PomodoroMissionCard({
 }: {
   mission: Mission;
   progress: number;
-  onStart: (id: string, text: string, mins: number, sessionsAtStartOverride?: number) => void;
+  onStart: (id: string, text: string, mins: number) => void;
 }) {
   const [, navigate] = useLocation();
-  const { naturalSessionsCompleted, running, restartForMission } = useTimer();
-
-  // Cycle missions (pomodoro_cycle) are tracked by sessions — skip-proof.
-  // Other pomodoro missions (subject_study) are tracked by minutes.
-  const isSessionMission = mission.id === "pomodoro_cycle" && !!mission.targetSessions;
-  const targetSessions   = mission.targetSessions ?? 2;
-  const cycles           = targetSessions / 2;
-  const sessionsAtStart  = mission.sessionsAtStart ?? naturalSessionsCompleted;
-  const sessionsDone     = Math.max(0, naturalSessionsCompleted - sessionsAtStart);
-  const displayProgress  = isSessionMission
-    ? Math.min(100, (sessionsDone / targetSessions) * 100)
-    : Math.min(100, progress);
-
-  const mins = mission.targetMinutes ?? targetSessions * 25;
-  const cycleLabel = cycles === 1 ? "1 cycle" : `${cycles} cycles`;
+  const mins = mission.targetMinutes ?? 50;
 
   const handleGo = () => {
-    const missionAlreadyStarted = mission.sessionsAtStart !== undefined;
-
-    if (!running && !missionAlreadyStarted) {
-      // First time starting: reset timer to clean 25:00 + auto-switch, anchor sessions at 0
-      restartForMission();
-      onStart(mission.id, mission.text, mins, 0);
+    if (mission.startedAt === undefined) {
+      onStart(mission.id, mission.text, mins);
     }
-    // If mission already started (user paused and came back), just navigate —
-    // don't reset the timer or overwrite sessionsAtStart (that would lose progress)
     navigate("/pomodoro");
   };
 
@@ -78,15 +57,9 @@ function PomodoroMissionCard({
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${diffBadge(mission.difficulty)}`}>
               {diffLabel(mission.difficulty)}
             </span>
-            {isSessionMission ? (
-              <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <Timer className="w-2.5 h-2.5" /> {cycleLabel} · 25+5+25 min
-              </span>
-            ) : (
-              <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <Timer className="w-2.5 h-2.5" /> {mins} min focus
-              </span>
-            )}
+            <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <Timer className="w-2.5 h-2.5" /> {mins} min focus
+            </span>
           </div>
 
           <p className={`text-sm font-medium leading-snug mb-2.5 ${
@@ -98,33 +71,17 @@ function PomodoroMissionCard({
           {!mission.completed && (
             <div className="mb-3">
               <div className="flex justify-between items-center mb-1">
-                {isSessionMission ? (
-                  <span className="text-[10px] text-gray-400">
-                    {sessionsDone}/{targetSessions} sessions · skip does not count
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-gray-400">Auto-tracked from Pomodoro timer</span>
-                )}
-                <span className="text-[10px] font-semibold text-blue-600">{Math.round(displayProgress)}%</span>
+                <span className="text-[10px] text-gray-400">
+                  {mission.startedAt === undefined ? "Click below to start tracking" : "Auto-tracked from Pomodoro timer"}
+                </span>
+                <span className="text-[10px] font-semibold text-blue-600">{Math.round(progress)}%</span>
               </div>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-700"
-                  style={{ width: `${displayProgress}%` }}
+                  style={{ width: `${progress}%` }}
                 />
               </div>
-              {isSessionMission && (
-                <div className="mt-1.5 flex gap-1">
-                  {Array.from({ length: targetSessions }, (_, i) => (
-                    <div
-                      key={i}
-                      className={`flex-1 h-1.5 rounded-full transition-all ${
-                        i < sessionsDone ? "bg-blue-500" : "bg-gray-200"
-                      }`}
-                    />
-                  ))}
-                </div>
-              )}
             </div>
           )}
 
@@ -134,7 +91,7 @@ function PomodoroMissionCard({
               className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 active:scale-95 text-white text-xs font-semibold rounded-xl transition-all"
             >
               <Timer className="w-3.5 h-3.5" />
-              {sessionsDone > 0 ? "Continue in Pomodoro" : "Start Pomodoro Timer"}
+              {mission.startedAt !== undefined ? "Continue in Pomodoro" : "Go to Pomodoro"}
               <ArrowRight className="w-3 h-3" />
             </button>
           )}

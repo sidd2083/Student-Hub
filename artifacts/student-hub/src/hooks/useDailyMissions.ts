@@ -81,34 +81,29 @@ export function getUserLevel(streak: number, totalStudyMins: number): MissionLev
   return "beginner";
 }
 
-// ─── Mission 1: Pomodoro Cycle ────────────────────────────────────────────────
-// Tracked by SESSIONS (work blocks), not by total minutes.
-// 1 session  = one 25-min focus block.
-// 1 cycle    = 2 sessions  (25 min work → 5 min break → 25 min work).
-// The timer auto-switches between phases when this mission is started.
-// targetSessions: 2 (beginner/1 cycle) | 4 (intermediate/2 cycles) | 6 (advanced/3 cycles)
+// ─── Mission 1: Pomodoro Study ────────────────────────────────────────────────
+// Tracked by minutes — auto-completes when the timer logs enough study time.
+// targetMinutes: 50 (beginner) | 100 (intermediate) | 150 (advanced)
 function getPomodoroMission(level: MissionLevel, grade: number): Mission {
   const isBoardYear = grade === 10 || grade === 12;
   const examName    = grade === 10 ? "SEE" : "NEB";
 
-  // Each cycle = 2 work sessions. Auto-switch handles breaks.
-  const targetSessions = level === "beginner" ? 2 : level === "intermediate" ? 4 : 6;
-  const cycles         = targetSessions / 2; // 1, 2, or 3
-  const cycleWord      = cycles === 1 ? "1 full cycle" : `${cycles} full cycles`;
+  const minsMap: Record<MissionLevel, number> = { beginner: 50, intermediate: 100, advanced: 150 };
+  const mins = minsMap[level];
 
   let text: string;
   if (level === "beginner") {
     text = isBoardYear
-      ? `Complete 1 full Pomodoro cycle for your ${examName} prep — 25 min study, 5 min break, then 25 min study. Enable auto-switch in the timer and it handles the phases for you.`
-      : `Complete 1 full Pomodoro cycle — 25 min focus, 5 min break, then 25 min focus. Start the timer and let it switch phases automatically. Just stay at your desk.`;
+      ? `Study for ${mins} minutes using the Pomodoro timer for your ${examName} prep. Start the timer, stay at your desk, and let it track your focus time automatically.`
+      : `Study for ${mins} minutes using the Pomodoro timer today. Start the timer, pick one subject, and stay focused until it finishes.`;
   } else if (level === "intermediate") {
     text = isBoardYear
-      ? `Complete 2 full Pomodoro cycles for ${examName} preparation — 25 min study → 5 min break → 25 min study, done twice. The timer auto-switches between focus and break for you.`
-      : `Complete 2 full Pomodoro cycles today — 25 min focus → 5 min break → 25 min focus, twice in a row. The timer switches phases automatically.`;
+      ? `Log ${mins} minutes of focused Pomodoro study for ${examName} preparation today. Use the timer to stay on track — no phone, no distractions.`
+      : `Study for ${mins} minutes with the Pomodoro timer today. Focus on your hardest subject and let the timer log your progress.`;
   } else {
     text = isBoardYear
-      ? `Complete 3 full Pomodoro cycles for serious ${examName} preparation. 25 min study → 5 min break → 25 min study, three times. The timer auto-switches — your only job is to keep studying.`
-      : `Complete 3 full Pomodoro cycles today. Each cycle: 25 min focus → 5 min break → 25 min focus. The timer switches automatically. ${cycleWord}, full concentration.`;
+      ? `Complete ${mins} minutes of serious Pomodoro study for ${examName} preparation. Full concentration — timer running the whole time, no shortcuts.`
+      : `Study for ${mins} minutes using the Pomodoro timer. This is your deep work session — no distractions, full focus, every minute counts.`;
   }
 
   return {
@@ -116,8 +111,7 @@ function getPomodoroMission(level: MissionLevel, grade: number): Mission {
     text,
     difficulty: level === "beginner" ? "easy" : level === "intermediate" ? "mid" : "hard",
     type: "pomodoro",
-    targetSessions,
-    targetMinutes: targetSessions * 25, // kept for display reference only
+    targetMinutes: mins,
     completed: false,
     emoji: "⏱️",
   };
@@ -291,7 +285,6 @@ export function buildMissions(
   const rand = seededRand(uid + date);
 
   if (isSaturday) {
-    // Saturday = lighter set. 1 cycle for all levels (just 2 sessions).
     return [
       {
         id: "school_task",
@@ -301,9 +294,9 @@ export function buildMissions(
       },
       {
         id: "pomodoro_cycle",
-        text: `Complete 1 Pomodoro cycle today — 25 min study, 5 min break, then 25 min study. Even on Saturday, a little focus keeps your momentum going. The timer switches automatically.`,
+        text: `Study for 50 minutes using the Pomodoro timer today. Even on Saturday, a little focused study keeps your momentum going.`,
         difficulty: "easy", type: "pomodoro",
-        targetSessions: 2, targetMinutes: 50, completed: false, emoji: "⏱️",
+        targetMinutes: 50, completed: false, emoji: "⏱️",
       },
     ];
   }
@@ -457,40 +450,27 @@ export function useDailyMissions() {
   }, [uid, fetchTrigger]);
 
   // ── Auto-complete Pomodoro missions ────────────────────────────────────────
+  // All pomodoro missions are tracked by minutes.
   // A mission only tracks progress AFTER the student explicitly presses
-  // "Start Pomodoro Timer" from its card. Until then startedAt / sessionsAtStart
-  // are undefined and we intentionally ignore any timer activity — this prevents
-  // one mission's timer use from accidentally completing a different mission.
+  // "Go to Pomodoro" from its card (which sets startedAt). This prevents
+  // timer use from accidentally completing a mission the student hasn't started.
   useEffect(() => {
     if (!uid || missions.length === 0) return;
     for (const m of missions) {
       if (m.type !== "pomodoro" || m.completed) continue;
       if (completingRef.current.has(m.id)) continue;
-
-      if (m.id === "pomodoro_cycle" && m.targetSessions) {
-        // Mission not started yet — student hasn't clicked "Start Pomodoro Timer"
-        // for this specific mission card. Do not track anything.
-        if (m.sessionsAtStart === undefined) continue;
-        // Session-based: count naturally completed work sessions since this mission
-        // was started. naturalSessionsCompleted never increments on Skip.
-        const sessionsDone = Math.max(0, naturalSessionsCompleted - m.sessionsAtStart);
-        if (sessionsDone >= m.targetSessions) {
-          completingRef.current.add(m.id);
-          _doComplete(uid, date, missions, m.id, setMissions, setAllCompleted);
-        }
-      } else if (m.targetMinutes) {
-        // Mission not started yet — do not track any minutes until the student
-        // explicitly starts this mission from its card.
-        if (m.startedAt === undefined) continue;
-        const minutesDone = Math.max(0, savedMinutesToday - m.startedAt);
-        if (minutesDone >= m.targetMinutes) {
-          completingRef.current.add(m.id);
-          _doComplete(uid, date, missions, m.id, setMissions, setAllCompleted);
-        }
+      if (!m.targetMinutes) continue;
+      // Mission not started yet — do not track any minutes until the student
+      // explicitly starts this mission from its card.
+      if (m.startedAt === undefined) continue;
+      const minutesDone = Math.max(0, savedMinutesToday - m.startedAt);
+      if (minutesDone >= m.targetMinutes) {
+        completingRef.current.add(m.id);
+        _doComplete(uid, date, missions, m.id, setMissions, setAllCompleted);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savedMinutesToday, naturalSessionsCompleted, missions, studyMinsAtStart]);
+  }, [savedMinutesToday, missions, studyMinsAtStart]);
 
   // ── Listen for external mission completions (from StudyGuardian) ───────────
   // StudyGuardian runs at app level and completes missions while the user is on
@@ -510,30 +490,35 @@ export function useDailyMissions() {
   }, [uid, date]);
 
   // ── Start a Pomodoro mission ───────────────────────────────────────────────
-  // Records the current savedMinutesToday and sessionsCompleted on the mission
-  // so auto-complete can measure progress from the moment it was started.
-  const startMission = useCallback((missionId: string, missionText: string, targetMinutes: number, sessionsAtStartOverride?: number) => {
+  // Records the current savedMinutesToday on the mission so auto-complete can
+  // measure progress from the moment the student clicked "Go to Pomodoro".
+  const startMission = useCallback((missionId: string, _missionText: string, _targetMinutes: number) => {
     if (!uid) return;
-    const preset: PomodoroMissionPreset = { missionId, missionText, targetMinutes, date };
-    try { localStorage.setItem(POMODORO_MISSION_KEY, JSON.stringify(preset)); } catch {}
-
-    const sessStart = sessionsAtStartOverride !== undefined ? sessionsAtStartOverride : naturalSessionsCompleted;
     const updated = missions.map(m => m.id === missionId ? {
       ...m,
       startedAt: savedMinutesToday,
-      sessionsAtStart: sessStart,
     } : m);
 
     // Write cache SYNCHRONOUSLY before setMissions (async) so that if the user
     // navigates away before React flushes the state update, the cache already
-    // has sessionsAtStart persisted. Without this the auto-complete check on
-    // remount would see sessionsAtStart=undefined and skip the mission.
+    // has startedAt persisted.
     const c = readCache(uid, date);
-    if (c) writeCache(uid, date, { ...c, missions: updated });
+    writeCache(uid, date, { missions: updated, allCompleted: c?.allCompleted ?? false, studyMinsAtStart: c?.studyMinsAtStart ?? 0, level: c?.level ?? level, version: MISSION_VERSION });
 
     setMissions(() => updated);
-    updateDoc(doc(db, "daily_missions", `${uid}_${date}`), { missions: updated }).catch(() => {});
-  }, [uid, date, savedMinutesToday, naturalSessionsCompleted, missions]);
+    setDoc(doc(db, "daily_missions", `${uid}_${date}`), { missions: updated }, { merge: true }).catch(() => {});
+  }, [uid, date, savedMinutesToday, missions, level]);
+
+  // ── Anti-cheat: persist blockedUntil across page refreshes ────────────────
+  useEffect(() => {
+    if (!uid) return;
+    try {
+      const raw = localStorage.getItem(`sh_ac_${uid}`);
+      if (!raw) return;
+      const t = parseInt(raw, 10);
+      if (!isNaN(t) && t > Date.now()) setBlockedUntil(t);
+    } catch {}
+  }, [uid]);
 
   // ── Manual complete (with anti-cheat) ─────────────────────────────────────
   const completeMission = useCallback((missionId: string) => {
@@ -543,7 +528,9 @@ export function useDailyMissions() {
     const log = [...completionLogRef.current, now].filter(t => now - t < 10_000);
     completionLogRef.current = log;
     if (log.length >= 2 && now - log[0] < 4_000) {
-      setBlockedUntil(now + 45_000);
+      const blockUntil = now + 120_000; // 2-minute block
+      setBlockedUntil(blockUntil);
+      try { if (uid) localStorage.setItem(`sh_ac_${uid}`, String(blockUntil)); } catch {}
       completionLogRef.current = [];
       return;
     }
@@ -569,16 +556,9 @@ export function useDailyMissions() {
 
   // Returns 0–100 progress for a given mission.
   // Returns 0 until the student explicitly starts the mission from its card.
-  // pomodoro_cycle uses sessions; other pomodoro missions use minutes.
+  // All pomodoro missions use minutes tracked by the timer.
   function missionProgress(m: Mission): number {
     if (m.completed) return 100;
-
-    if (m.id === "pomodoro_cycle" && m.targetSessions) {
-      if (m.sessionsAtStart === undefined) return 0;
-      const sessionsDone = Math.max(0, naturalSessionsCompleted - m.sessionsAtStart);
-      return Math.min(100, (sessionsDone / m.targetSessions) * 100);
-    }
-
     if (!m.targetMinutes) return 0;
     if (m.startedAt === undefined) return 0;
     const minutesDone = Math.max(0, savedMinutesToday - m.startedAt);
@@ -601,10 +581,6 @@ function _doComplete(
   setMissions: React.Dispatch<React.SetStateAction<Mission[]>>,
   setAllCompleted: React.Dispatch<React.SetStateAction<boolean>>,
 ) {
-  // Clear the mission banner from Pomodoro page when the cycle mission completes
-  if (missionId === "pomodoro_cycle") {
-    try { localStorage.removeItem(POMODORO_MISSION_KEY); } catch {}
-  }
   setMissions(prev => {
     const updated = prev.map(m =>
       m.id === missionId ? { ...m, completed: true, completedAt: new Date().toISOString() } : m,
@@ -612,11 +588,22 @@ function _doComplete(
     const count  = updated.filter(m => m.completed).length;
     const isDone = count === updated.length && updated.length > 0;
     if (isDone) setAllCompleted(true);
+
+    // Always write cache — even if no prior cache exists — so completions
+    // survive a page refresh even if the Firestore write hasn't landed yet.
     const c = readCache(uid, date);
-    if (c) writeCache(uid, date, { ...c, missions: updated, allCompleted: isDone });
-    updateDoc(doc(db, "daily_missions", `${uid}_${date}`), {
+    writeCache(uid, date, {
+      missions: updated,
+      allCompleted: isDone,
+      studyMinsAtStart: c?.studyMinsAtStart ?? 0,
+      level: c?.level ?? "beginner",
+      version: MISSION_VERSION,
+    });
+
+    // Use setDoc+merge so this works whether the Firestore doc exists or not.
+    setDoc(doc(db, "daily_missions", `${uid}_${date}`), {
       missions: updated, completedCount: count, allCompleted: isDone,
-    }).catch(() => {});
+    }, { merge: true }).catch(() => {});
     if (isDone) {
       updateDoc(doc(db, "users", uid), { lastMissionsCompletedDate: date }).catch(() => {});
     }

@@ -8,11 +8,8 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   Play, Pause, RotateCcw, Timer, CheckSquare,
-  SkipForward, Settings, X, Eye, Maximize2, Minimize2, Zap,
+  SkipForward, Settings, X, Eye, Maximize2, Minimize2,
 } from "lucide-react";
-import { POMODORO_MISSION_KEY } from "@/hooks/useDailyMissions";
-import type { PomodoroMissionPreset } from "@/hooks/useDailyMissions";
-import { getNepaliDate } from "@/lib/nepaliDate";
 import type { Phase } from "@/context/TimerContext";
 import { focusTracker } from "@/components/StudyGuardian";
 
@@ -168,7 +165,6 @@ function PomodoroContent() {
   const [pendingTasks, setPendingTasks] = useState<Array<{ id: string; text: string }>>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [focusScore, setFocusScore] = useState<{ score: number; mins: number } | null>(null);
-  const [missionPreset, setMissionPreset] = useState<PomodoroMissionPreset | null>(null);
 
   // Poll focus tracker every 10 s — only show after 90 s of active session
   useEffect(() => {
@@ -184,23 +180,6 @@ function PomodoroContent() {
     return () => clearInterval(id);
   }, [running]);
 
-  // Read mission preset from localStorage (set when user clicked "Go to Pomodoro" from missions page).
-  // restartForMission() already forced settings to 25/5/15 + autoSwitch:true before navigation,
-  // so we only need to read the preset here for the banner — no settings changes needed.
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(POMODORO_MISSION_KEY);
-      if (!raw) { setMissionPreset(null); return; }
-      const preset = JSON.parse(raw) as PomodoroMissionPreset;
-      if (preset.date !== getNepaliDate()) {
-        localStorage.removeItem(POMODORO_MISSION_KEY);
-        setMissionPreset(null);
-        return;
-      }
-      setMissionPreset(preset);
-    } catch {}
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -389,95 +368,6 @@ function PomodoroContent() {
 
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
 
-      {/* Mission active banner — shown when timer is stopped (any phase) */}
-      {missionPreset && !running && (
-        <div className="mb-4 rounded-2xl overflow-hidden border border-yellow-200 shadow-sm">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-yellow-400 to-amber-400 px-4 py-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-white" />
-              <span className="text-xs font-bold text-white tracking-wide uppercase">Mission Mode — Auto-switch ON</span>
-            </div>
-            <button
-              onClick={() => { setMissionPreset(null); localStorage.removeItem(POMODORO_MISSION_KEY); }}
-              className="text-white/70 hover:text-white transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          {/* Cycle plan */}
-          <div className="bg-amber-50 px-4 py-3">
-            <p className="text-xs text-amber-800 font-medium mb-2 leading-snug line-clamp-2">
-              {missionPreset.missionText}
-            </p>
-            {/* Target summary — makes minutes goal crystal-clear */}
-            <div className="flex items-center gap-2 mb-2.5">
-              <span className="inline-flex items-center gap-1 bg-amber-200 text-amber-900 text-xs font-bold px-2.5 py-1 rounded-full">
-                🎯 Goal: study {missionPreset.targetMinutes} min total
-              </span>
-              <span className="text-[10px] text-amber-600">
-                ({Math.ceil(missionPreset.targetMinutes / 25)} × 25-min session{Math.ceil(missionPreset.targetMinutes / 25) !== 1 ? "s" : ""})
-              </span>
-            </div>
-            {/* Visual cycle flow — one block per work+break pair */}
-            {(() => {
-              const totalSessions = Math.ceil(missionPreset.targetMinutes / 25);
-              const steps: { label: string; color: string; icon: string }[] = [];
-              for (let c = 0; c < totalSessions; c++) {
-                steps.push({ label: "25 min\nFocus", color: "bg-blue-500", icon: "📚" });
-                if (c < totalSessions - 1) {
-                  steps.push({ label: "5 min\nBreak", color: "bg-green-500", icon: "☕" });
-                }
-              }
-              return (
-                <div className="flex items-center gap-1 flex-wrap">
-                  {steps.map((step, i) => (
-                    <div key={i} className="flex items-center gap-1">
-                      <div className={`flex flex-col items-center px-2.5 py-1.5 rounded-xl ${step.color} text-white`}>
-                        <span className="text-[10px]">{step.icon}</span>
-                        <span className="text-[9px] font-bold leading-tight text-center whitespace-pre">{step.label}</span>
-                      </div>
-                      {i < steps.length - 1 && (
-                        <span className="text-amber-400 text-xs font-bold">→</span>
-                      )}
-                    </div>
-                  ))}
-                  <div className="flex items-center gap-1 ml-1">
-                    <span className="text-amber-400 text-xs font-bold">→</span>
-                    <div className="flex flex-col items-center px-2.5 py-1.5 rounded-xl bg-yellow-500 text-white">
-                      <span className="text-[10px]">🏆</span>
-                      <span className="text-[9px] font-bold leading-tight">Done!</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-            <p className="text-[10px] text-amber-600 mt-2">
-              Press <strong>Start</strong> below — the timer auto-switches phases. Each 25-min focus block counts toward your goal! ✓
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Compact mission banner while timer is running */}
-      {missionPreset && running && (
-        <div className="mb-4 bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-2xl px-4 py-2.5 flex items-center gap-3">
-          <Zap className="w-4 h-4 text-yellow-500 flex-shrink-0 animate-pulse" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold text-yellow-800">
-              Mission running · {phase === "work" ? "Focus time! 📚" : "Break time ☕"}
-            </p>
-            <p className="text-[10px] text-yellow-600">Timer switches automatically — stay at your desk</p>
-          </div>
-          <button
-            onClick={() => { setMissionPreset(null); localStorage.removeItem(POMODORO_MISSION_KEY); }}
-            className="text-yellow-400 hover:text-yellow-600 flex-shrink-0"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
       {savedMinutesToday > 0 && (
         <div className="flex gap-3 mb-4 px-4 py-2.5 bg-blue-50 border border-blue-100 rounded-2xl">
           <span className="text-sm text-blue-700 font-medium">
@@ -542,9 +432,7 @@ function PomodoroContent() {
             className={`px-10 py-3.5 rounded-xl font-semibold transition-all flex items-center gap-2 ${
               running
                 ? "bg-gray-800 text-white hover:bg-gray-700"
-                : missionPreset
-                  ? `${colors.bg} text-white shadow-lg shadow-blue-200 scale-105 hover:opacity-90 animate-pulse`
-                  : `${colors.bg} text-white hover:opacity-90`
+                : `${colors.bg} text-white hover:opacity-90`
             }`}
           >
             {running ? <><Pause className="w-5 h-5" /> Pause</> : <><Play className="w-5 h-5" /> Start</>}

@@ -5,7 +5,6 @@ import { useAuth } from "@/context/AuthContext";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getNepaliDate } from "@/lib/nepaliDate";
-import { POMODORO_MISSION_KEY } from "@/hooks/useDailyMissions";
 
 // ─── Focus tracker — module-level so Pomodoro can read it ────────────────────
 // Tracks focused vs distracted time for the current session.
@@ -291,13 +290,13 @@ function WellnessPopup({
 
 // ─── Persistent mission auto-complete (runs from app root, not DailyMissions) ─
 // useDailyMissions auto-complete only fires when the DailyMissions page is mounted.
-// This hook watches naturalSessionsCompleted / savedMinutesToday from TimerContext
-// (which persists across navigation) and completes missions directly in localStorage
-// + Firestore so the update is visible even while the user is on the Pomodoro page.
+// This hook watches savedMinutesToday from TimerContext (which persists across
+// navigation) and completes missions directly in localStorage + Firestore so the
+// update is visible even while the user is on the Pomodoro page.
 // It dispatches "sh:missionCompleted" so the DailyMissions hook refreshes from cache.
 function useMissionAutoComplete() {
   const { user } = useAuth();
-  const { naturalSessionsCompleted, savedMinutesToday } = useTimer();
+  const { savedMinutesToday } = useTimer();
 
   useEffect(() => {
     const uid = user?.uid;
@@ -314,10 +313,7 @@ function useMissionAutoComplete() {
       const updated = missions.map(m => {
         if (m.type !== "pomodoro" || m.completed) return m;
         let shouldComplete = false;
-        if (m.id === "pomodoro_cycle" && m.targetSessions !== undefined && m.sessionsAtStart !== undefined) {
-          const done = Math.max(0, naturalSessionsCompleted - m.sessionsAtStart);
-          shouldComplete = done >= m.targetSessions;
-        } else if (m.targetMinutes && m.startedAt !== undefined) {
+        if (m.targetMinutes && m.startedAt !== undefined) {
           const done = Math.max(0, savedMinutesToday - m.startedAt);
           shouldComplete = done >= m.targetMinutes;
         }
@@ -335,12 +331,6 @@ function useMissionAutoComplete() {
 
       // Persist completion to localStorage immediately
       localStorage.setItem(cacheKey, JSON.stringify({ ...cache, missions: updated, allCompleted }));
-      // Clear mission preset if pomodoro_cycle just completed
-      const cycleWasJustCompleted = updated.some((m: any) => m.id === "pomodoro_cycle" && m.completed) &&
-        missions.some((m: any) => m.id === "pomodoro_cycle" && !m.completed);
-      if (cycleWasJustCompleted) {
-        try { localStorage.removeItem(POMODORO_MISSION_KEY); } catch {}
-      }
       // Notify the DailyMissions hook to refresh from cache
       window.dispatchEvent(new CustomEvent("sh:missionCompleted"));
       // Sync to Firestore in background
@@ -351,7 +341,7 @@ function useMissionAutoComplete() {
         updateDoc(doc(db, "users", uid), { lastMissionsCompletedDate: date }).catch(() => {});
       }
     } catch { /* ignore parse errors */ }
-  }, [naturalSessionsCompleted, savedMinutesToday, user?.uid]);
+  }, [savedMinutesToday, user?.uid]);
 }
 
 // ─── Main StudyGuardian ───────────────────────────────────────────────────────
