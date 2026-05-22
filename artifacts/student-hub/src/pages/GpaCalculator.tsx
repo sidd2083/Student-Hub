@@ -437,6 +437,9 @@ const FAQ_SCHEMA = {
     { "@type": "Question", name: "Is the practical/internal grade important for NEB GPA?", acceptedAnswer: { "@type": "Answer", text: "Yes, critically. Practical/Internal marks are 25% of total (25 out of 100 marks). A student with theory B+ (3.2) and practical A+ (4.0) gets subject GPA = (3.2×75 + 4.0×25)/100 = 3.4. Scoring well in practicals is often easier and can lift your overall GPA significantly. Never neglect practicals and internals." } },
     { "@type": "Question", name: "What is the NEB Grade Improvement Exam?", acceptedAnswer: { "@type": "Answer", text: "NEB offers a Grade Improvement Exam for Class 12 students who want to improve their grades in specific subjects. Students can appear in up to all subjects to improve their GPA. The improved grades replace the previous ones on the marksheet. It is available within a year of the original result. This is useful for students who missed MBBS, Engineering, or scholarship cutoffs by a small margin." } },
     { "@type": "Question", name: "How do I convert NEB percentage to GPA?", acceptedAnswer: { "@type": "Answer", text: "NEB uses a direct grade-band system, not a percentage-to-GPA conversion. Your percentage in each subject determines the grade band: 90%+ → A+ (4.0), 80–89% → A (3.6), 70–79% → B+ (3.2), 60–69% → B (2.8), 50–59% → C+ (2.4), 40–49% → C (2.0), 35–39% → D (1.6), below 35% → NG (0). Final GPA = average of all subject GPAs." } },
+    { "@type": "Question", name: "Which is the best free GPA calculator for Nepal students?", acceptedAnswer: { "@type": "Answer", text: "Student Hub's GPA Calculator Nepal is the most accurate free NEB GPA calculator available. It uses the official NEB formula (75% Theory + 25% Practical), supports both Grade 11 and Grade 12, and covers all subjects for Science and Management streams. It calculates your GPA instantly — no sign-up, no ads, completely free. It is specifically built for Nepal's NEB grading system (2082/2083 BS)." } },
+    { "@type": "Question", name: "How do I use the NEB Class 12 GPA Calculator?", acceptedAnswer: { "@type": "Answer", text: "Using the NEB Class 12 GPA Calculator is simple: (1) Select Grade 12 and your stream (Science or Management). (2) For each subject, choose the grade you received in the Theory exam (75 marks) from the dropdown. (3) Choose your Practical/Internal grade (25 marks). (4) Your Class 12 GPA appears instantly below each subject and as a total. No button needed — results update live as you select grades." } },
+    { "@type": "Question", name: "Is this NEB GPA Calculator accurate for 2082 and 2083?", acceptedAnswer: { "@type": "Answer", text: "Yes. This GPA Calculator Nepal uses the official NEB grading formula which has not changed for 2082 or 2083. The formula: Subject GPA = (Theory GPA × 75 + Practical GPA × 25) ÷ 100. Final GPA = sum of all subject GPAs ÷ 6. The grade point scale (A+ = 4.0, A = 3.6, B+ = 3.2, etc.) is unchanged. This calculator is fully accurate for NEB Grade 11 and Grade 12 results in 2082 BS and 2083 BS." } },
   ],
 };
 
@@ -456,17 +459,18 @@ const HOWTO_SCHEMA = {
 const WEBAPP_SCHEMA = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "NEB GPA Calculator Nepal 2082/2083 — Grade 11 & 12, Science & Management",
+  name: "GPA Calculator Nepal — NEB Class 11 & 12 GPA Calculator Free (2082/2083)",
   applicationCategory: "EducationApplication",
   operatingSystem: "Web Browser",
   url: "https://studenthubnp.com/tools/gpa-calculator",
-  description: "Free NEB GPA Calculator for Grade 11 and Grade 12 students in Nepal 2082/2083. Calculate your GPA using the official NEB grading formula — weighted 75% Theory + 25% Practical — for Science and Management streams instantly.",
+  description: "Free GPA Calculator for Nepal students. Calculate NEB Class 11 or Class 12 GPA instantly using the official NEB formula — 75% Theory + 25% Practical — for Science and Management streams. NEB GPA Calculator 2082/2083.",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
   featureList: [
+    "GPA Calculator Nepal — instant NEB GPA for Class 11 & Class 12",
     "NEB Grade 11 & 12 Science GPA calculator (Physics, Chemistry, Maths, Biology/Computer)",
     "NEB Grade 11 & 12 Management GPA calculator (Accountancy, Economics, Business Studies)",
     "Official NEB formula: 75% Theory + 25% Practical per subject",
-    "Grade 11 and Grade 12 selector for both NEB years",
+    "Grade 11 and Grade 12 selector for both NEB years (2082/2083)",
     "Subject-wise GPA breakdown with grade labels",
     "Free, instant, no sign-up required",
   ],
@@ -490,26 +494,26 @@ export default function GpaCalculator() {
   return (
     <>
       <Helmet>
-        <title>NEB Grade 12 GPA Calculator 2082/2083 — Class 11 &amp; 12 Free Nepal</title>
-        <meta name="description" content="Calculate your NEB Grade 12 GPA instantly — official 75% Theory + 25% Practical formula for Class 12 &amp; Class 11, Science &amp; Management. Trusted by Nepal students. 100% free." />
-        <meta name="keywords" content="NEB grade 12 GPA calculator, class 12 GPA calculator Nepal, NEB GPA calculator, grade 12 GPA Nepal, NEB class 12 GPA, NEB GPA calculator Nepal, NEB grade 11 GPA calculator, grade 11 GPA calculator Nepal, class 11 GPA calculator Nepal, class 12 result calculator nepal, grade 12 result calculator nepal, NEB grading system 2082, NEB GPA calculator 2082, NEB GPA 2083, NEB GPA 2082 2083, NEB grade 12 result calculator, NEB grade 11 result calculator, NEB grading system Nepal, grade 12 nepal GPA, grade 11 nepal GPA, NEB GPA calculation formula, NEB science GPA calculator, NEB management GPA calculator, class 12 science GPA calculator nepal, class 12 management GPA calculator nepal, कक्षा १२ GPA calculator, कक्षा ११ GPA calculator, NEB result calculator 2082, NEB grade point scale, NEB GPA calculator online free Nepal, NEB 2082 result calculator, NEB grade calculator Nepal 2082 2083, plus two GPA calculator Nepal, +2 GPA calculator Nepal, NEB 4 point scale, NEB grading scale nepal, how to calculate NEB GPA, NEB GPA formula nepal, grade 12 GPA calculation nepal, class 12 GPA nepal, NEB class 12 Science GPA, NEB class 12 Management GPA, grade 12 board exam GPA nepal, NEB +2 grade 12 GPA" />
+        <title>GPA Calculator Nepal — NEB GPA Calculator Class 11 &amp; 12 Free (2082/2083)</title>
+        <meta name="description" content="Free GPA Calculator Nepal — calculate your NEB Class 12 or Class 11 GPA instantly. Official NEB formula: 75% Theory + 25% Practical. NEB GPA calculator for Science &amp; Management. Trusted by Nepal students. No sign-up." />
+        <meta name="keywords" content="gpa calculator nepal, neb gpa calculator, grade 12 gpa calculator, class 12 gpa calculator, neb class 12 gpa calculator, neb class 11 gpa calculator, class 11 gpa calculator nepal, neb grade 12 gpa calculator, grade 11 gpa calculator nepal, NEB GPA calculator 2082, NEB GPA 2083, neb gpa calculator nepal free, neb class 12 gpa, grade 12 gpa nepal, class 12 gpa nepal, neb grading system 2082, class 12 result calculator nepal, grade 12 result calculator nepal, NEB GPA calculation formula, NEB science GPA calculator, NEB management GPA calculator, class 12 science GPA calculator nepal, class 12 management GPA calculator nepal, neb gpa 2082 2083, neb result calculator 2082, neb grade point scale, plus two GPA calculator Nepal, +2 GPA calculator Nepal, NEB 4 point scale, how to calculate NEB GPA, NEB GPA formula nepal, grade 12 GPA calculation nepal, NEB grade 12 result calculator, grade 12 board exam GPA nepal, neb +2 grade 12 GPA" />
         <meta name="author" content="Student Hub Nepal" />
         <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
         <meta name="geo.region" content="NP" />
         <meta name="geo.placename" content="Nepal" />
 
-        <meta property="og:title" content="NEB Grade 12 GPA Calculator 2082/2083 — Class 11 &amp; 12 Free Nepal" />
-        <meta property="og:description" content="Calculate your NEB Grade 12 GPA instantly! Official 75% Theory + 25% Practical formula for Class 12 &amp; Class 11, Science &amp; Management. Trusted by Nepal students. Free." />
+        <meta property="og:title" content="GPA Calculator Nepal — NEB GPA Calculator Class 11 &amp; 12 Free (2082/2083)" />
+        <meta property="og:description" content="Free GPA Calculator for Nepal students. Calculate NEB Class 12 or Class 11 GPA instantly — official 75% Theory + 25% Practical formula for Science &amp; Management. Trusted by Nepal students. 100% free." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://studenthubnp.com/tools/gpa-calculator" />
         <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
-        <meta property="og:image:alt" content="NEB Grade 12 GPA Calculator Nepal 2082/2083 — Class 11 &amp; 12 Science and Management" />
+        <meta property="og:image:alt" content="GPA Calculator Nepal — NEB Class 11 &amp; 12 GPA Calculator Free (2082/2083)" />
         <meta property="og:site_name" content="Student Hub Nepal" />
         <meta property="og:locale" content="en_NP" />
 
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="NEB Grade 12 GPA Calculator 2082/2083 — Class 11 &amp; 12 Free Nepal" />
-        <meta name="twitter:description" content="Calculate your NEB Grade 12 GPA instantly! Official 75% Theory + 25% Practical formula for Class 12 &amp; Class 11, Science &amp; Management. 100% free." />
+        <meta name="twitter:title" content="GPA Calculator Nepal — NEB GPA Calculator Class 11 &amp; 12 Free (2082/2083)" />
+        <meta name="twitter:description" content="Free NEB GPA Calculator Nepal. Calculate Class 11 &amp; Class 12 GPA instantly — official 75% Theory + 25% Practical formula. Science &amp; Management. 100% free, no login." />
         <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
 
         <link rel="canonical" href="https://studenthubnp.com/tools/gpa-calculator" />
@@ -535,9 +539,9 @@ export default function GpaCalculator() {
             </div>
             <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full">Nepal · NEB Class {grade} · 2082</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">NEB GPA Calculator Nepal — Grade {grade} (2082/2083)</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">GPA Calculator Nepal — NEB Grade {grade} GPA Calculator (2082/2083)</h1>
           <p className="text-gray-500 mt-1.5 text-sm leading-relaxed">
-            Select your grade and stream, then enter Theory and Practical grades for each subject. GPA is calculated instantly using the official NEB formula — weighted 75% Theory + 25% Practical per subject.
+            Free NEB GPA Calculator for Nepal students. Select your grade and stream, enter Theory and Practical grades — GPA calculates instantly using the official NEB formula (75% Theory + 25% Practical per subject). No sign-up needed.
           </p>
         </div>
 
@@ -622,9 +626,9 @@ export default function GpaCalculator() {
 
         {/* SEO content */}
         <article className="mt-8 space-y-5 text-gray-600 text-sm leading-relaxed">
-          <h2 className="text-xl font-bold text-gray-900">NEB GPA Calculator Nepal 2082/2083 — Grade 11 &amp; 12 Complete Guide</h2>
+          <h2 className="text-xl font-bold text-gray-900">GPA Calculator Nepal — NEB Grade 11 &amp; 12 Complete Guide (2082/2083)</h2>
           <p>
-            This free <strong>NEB GPA Calculator</strong> is built for <strong>Grade 11 and Grade 12 students in Nepal</strong> following the <strong>National Examinations Board (NEB)</strong> curriculum for 2082 and 2083 BS. It calculates your GPA using the <strong>official NEB weighted formula</strong> — 75% Theory + 25% Practical per subject — for both <strong>Science</strong> and <strong>Management</strong> streams. No manual calculation, no spreadsheet — instant, accurate results for both years of NEB (Plus Two).
+            This free <strong>GPA Calculator Nepal</strong> is built specifically for <strong>NEB Grade 11 and Grade 12 students</strong> in Nepal. Whether you need an <strong>NEB GPA Calculator</strong>, a <strong>Class 12 GPA Calculator</strong>, or a <strong>Grade 12 GPA Calculator</strong>, this tool uses the <strong>official NEB weighted formula</strong> — 75% Theory + 25% Practical per subject — for both <strong>Science</strong> and <strong>Management</strong> streams. No manual calculation needed — get instant, accurate GPA results for NEB 2082 and 2083 BS.
           </p>
 
           <h3 className="text-lg font-bold text-gray-900">NEB Science Stream — Subjects and GPA Calculation (Grade 11 &amp; 12, 2082/2083)</h3>
