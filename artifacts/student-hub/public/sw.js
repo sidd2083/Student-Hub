@@ -1,10 +1,18 @@
-const CACHE_NAME = "student-hub-v8";
+const CACHE_NAME = "student-hub-v10";
 const SHELL_ASSETS = [
   "/",
   "/manifest.json",
   "/icon-192.png",
   "/icon-512.png",
   "/favicon.svg",
+];
+
+// These are proxied to the backend — never intercept them in the SW
+const BYPASS_PATHS = [
+  "/sitemap.xml",
+  "/sitemap-index.xml",
+  "/robots.txt",
+  "/api/",
 ];
 
 self.addEventListener("install", (event) => {
@@ -29,13 +37,21 @@ function isHashedAsset(url) {
   );
 }
 
+function shouldBypass(url) {
+  if (request => request.method !== "GET") return false;
+  return BYPASS_PATHS.some((p) => url.pathname.startsWith(p)) ||
+    url.pathname.startsWith("/@") ||
+    url.pathname.includes("__vite") ||
+    url.pathname.includes("hot-update");
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
   if (request.method !== "GET") return;
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith("/api/")) return;
+  if (BYPASS_PATHS.some((p) => url.pathname.startsWith(p))) return;
   if (url.pathname.startsWith("/@") || url.pathname.includes("__vite") || url.pathname.includes("hot-update")) return;
 
   // ── Hashed assets — cache-first forever (content hash guarantees freshness)
@@ -55,17 +71,16 @@ self.addEventListener("fetch", (event) => {
   }
 
   // ── Navigation requests — stale-while-revalidate:
-  //    Serve from cache INSTANTLY, then update cache in background.
-  //    This makes repeat visits feel instant even on slow connections.
+  //    Serve the cached app shell INSTANTLY, then refresh it in the background.
+  //    Cache stored as "/" since all SPA routes serve the same HTML shell.
   if (request.mode === "navigate") {
     event.respondWith(
       caches.open(CACHE_NAME).then((cache) =>
         cache.match("/").then((cached) => {
-          const fetchPromise = fetch(request).then((res) => {
+          const fetchPromise = fetch("/").then((res) => {
             if (res.ok) cache.put("/", res.clone());
             return res;
-          });
-          // Return cached immediately if available, otherwise wait for network
+          }).catch(() => cached);
           return cached || fetchPromise;
         })
       )
@@ -79,8 +94,7 @@ self.addEventListener("fetch", (event) => {
     url.pathname === "/favicon.svg" ||
     url.pathname === "/icon-192.png" ||
     url.pathname === "/icon-512.png" ||
-    url.pathname === "/opengraph.jpg" ||
-    url.pathname === "/robots.txt"
+    url.pathname === "/opengraph.jpg"
   ) {
     event.respondWith(
       caches.match(request).then((cached) => {
@@ -94,7 +108,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // ── Everything else — network with cache fallback
+  // ── Everything else — network-first with cache fallback
   event.respondWith(
     fetch(request)
       .then((res) => {

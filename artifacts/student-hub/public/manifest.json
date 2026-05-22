@@ -1,25 +1,74 @@
 {
-  "name": "Student Hub",
-  "short_name": "StudentHub",
-  "description": "Free study platform for Grade 9–12 students in Nepal",
+  "id": "/",
+  "name": "Student Hub Nepal",
+  "short_name": "Student Hub",
+  "description": "Free study platform for Grade 9–12 students in Nepal. Notes, PYQs, MCQ practice, GPA calculator, AI tutor.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait-primary",
   "background_color": "#ffffff",
   "theme_color": "#3B82F6",
   "categories": ["education"],
+  "lang": "en-NP",
+  "dir": "ltr",
   "icons": [
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Study Notes",
+      "short_name": "Notes",
+      "description": "Browse free notes for Grade 9–12",
+      "url": "/notes",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Past Papers",
+      "short_name": "PYQs",
+      "description": "SEE and NEB previous year question papers",
+      "url": "/pyqs",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "GPA Calculator",
+      "short_name": "GPA Calc",
+      "description": "Calculate your NEB Grade 11/12 GPA",
+      "url": "/tools/gpa-calculator",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/opengraph.jpg",
+      "sizes": "1200x630",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "Student Hub Nepal — Free Study Platform"
     }
   ]
 }

@@ -156,6 +156,10 @@
 
     <!-- ── Critical CSS: boot splash + shimmer animation ────────────────── -->
     <style>
+      /* Eliminate 300ms tap delay across the entire PWA — biggest mobile speed fix */
+      html { touch-action: manipulation; }
+      * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+
       @media (min-width: 768px) { #boot-splash { display: none !important; } }
       @keyframes shimmer {
         0%   { background-position: -200% center; }
@@ -166,6 +170,12 @@
         to   { opacity: 1; }
       }
       .page-fade { animation: page-fade 0.07s ease-out both; }
+
+      /* Prevent invisible tap areas — buttons and links should always be responsive */
+      button, a, [role="button"] { cursor: pointer; touch-action: manipulation; }
+
+      /* Prevent content layout shift on font load */
+      body { font-display: swap; }
     </style>
 
     <!-- ── Font: non-render-blocking, display=swap ───────────────────────── -->
@@ -186,6 +196,39 @@
       React replaces this content when it mounts (createRoot overwrites #root).
     -->
     <div id="root"><div id="boot-splash" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#ffffff;z-index:9999;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"><div style="width:72px;height:72px;background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);border-radius:20px;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 40px rgba(59,130,246,.4);margin-bottom:16px"><svg width="42" height="42" viewBox="0 0 180 180" fill="none"><path d="M90 44 C90 44 56 39 36 48 L36 136 C56 127 90 132 90 132 L90 44Z" fill="white" fill-opacity=".95"/><path d="M90 44 C90 44 124 39 144 48 L144 136 C124 127 90 132 90 132 L90 44Z" fill="white" fill-opacity=".7"/><line x1="90" y1="44" x2="90" y2="132" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/></svg></div><p style="font-size:17px;font-weight:600;color:#111827;margin:0 0 4px;letter-spacing:-.01em">Student Hub</p><p style="font-size:13px;color:#6b7280;margin:0">Study smarter. Rank higher.</p></div></div>
+
+    <!-- ── Visible to Googlebot before JS executes — prevents "Crawled but not indexed" ── -->
+    <noscript>
+      <div style="max-width:800px;margin:40px auto;padding:0 24px;font-family:system-ui,sans-serif;color:#111827">
+        <h1 style="font-size:28px;font-weight:700;margin-bottom:8px">Student Hub Nepal — Free Study Platform for Grade 9–12</h1>
+        <p style="font-size:16px;color:#4b5563;margin-bottom:24px">Free notes, past papers (PYQs), MCQ practice, GPA calculator, attendance calculator, AI tutor and study tracker for Grade 9, 10, 11 and 12 students in Nepal. Built for SEE and NEB exam preparation. 100% free, no login required for most features.</p>
+        <nav style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:32px">
+          <a href="/notes" style="color:#2563eb;text-decoration:none;font-weight:600">📚 Study Notes</a>
+          <a href="/pyqs" style="color:#2563eb;text-decoration:none;font-weight:600">📄 Past Papers (PYQs)</a>
+          <a href="/mcq" style="color:#2563eb;text-decoration:none;font-weight:600">✅ MCQ Practice</a>
+          <a href="/tools/gpa-calculator" style="color:#2563eb;text-decoration:none;font-weight:600">🎓 NEB GPA Calculator</a>
+          <a href="/tools/attendance-calculator" style="color:#2563eb;text-decoration:none;font-weight:600">📅 Attendance Calculator</a>
+          <a href="/about" style="color:#2563eb;text-decoration:none;font-weight:600">About Us</a>
+        </nav>
+        <section style="margin-bottom:24px">
+          <h2 style="font-size:20px;font-weight:600;margin-bottom:8px">Free Notes for Grade 9–12</h2>
+          <p>Download or view free study notes for Mathematics, Science, English, Social Studies, Nepali and optional subjects. Covers Grade 9, Grade 10 (SEE), Grade 11 and Grade 12 (NEB) syllabuses.</p>
+        </section>
+        <section style="margin-bottom:24px">
+          <h2 style="font-size:20px;font-weight:600;margin-bottom:8px">NEB & SEE Past Papers</h2>
+          <p>Access previous year question papers (PYQs) for SEE 2080, 2081 and NEB Grade 11 and Grade 12 exams. Province-wise papers for Koshi, Madhesh, Bagmati, Gandaki, Lumbini, Karnali and Sudurpashchim Pradesh.</p>
+        </section>
+        <section style="margin-bottom:24px">
+          <h2 style="font-size:20px;font-weight:600;margin-bottom:8px">NEB Grade 12 GPA Calculator</h2>
+          <p>Calculate your NEB GPA instantly using the official 75% theory + 25% practical formula for Grade 11 and Grade 12 Science and Management streams. Free, no login needed.</p>
+        </section>
+        <section>
+          <h2 style="font-size:20px;font-weight:600;margin-bottom:8px">Attendance Calculator</h2>
+          <p>Find out exactly how many classes you can miss and still meet the 75% attendance requirement. Works for Indian colleges (UGC 75% rule, CBSE, DU, Mumbai University) and students worldwide.</p>
+        </section>
+      </div>
+    </noscript>
+
     <script type="module" src="/src/main.tsx"></script>
 
     <!-- ── Anti-Inspection Protection ───────────────────────────────────── -->

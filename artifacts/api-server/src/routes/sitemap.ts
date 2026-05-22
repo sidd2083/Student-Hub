@@ -125,7 +125,6 @@ router.get("/sitemap.xml", async (_req: Request, res: Response) => {
 
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
-  res.setHeader("X-Robots-Tag", "noindex");
   res.send(xml);
 });
 
@@ -179,11 +178,13 @@ router.get("/robots.txt", (_req: Request, res: Response) => {
     "Disallow: /missions",
     "Disallow: /badges",
     "Disallow: /api/",
-    "Disallow: /assets/",
+    "",
+    "# Do NOT disallow /assets/ — Googlebot needs JS/CSS to render this SPA",
     "",
     "Crawl-delay: 1",
     "",
     `Sitemap: ${SITE_URL}/sitemap.xml`,
+    `Sitemap: ${SITE_URL}/sitemap-index.xml`,
   ].join("\n");
 
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
