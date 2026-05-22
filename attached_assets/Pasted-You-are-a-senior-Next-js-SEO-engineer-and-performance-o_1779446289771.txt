@@ -1,0 +1,195 @@
+You are a senior Next.js SEO engineer and performance optimization expert.
+
+Audit and FIX my entire website for modern SEO compatibility, React rendering issues, indexing issues, and Core Web Vitals problems.
+
+My website is built with React/Next.js and deployed on Vercel.
+
+MAIN GOAL:
+Make the website fully SEO-friendly, indexable by Google, fast, scalable, and production-ready while keeping the current UI and functionality intact.
+
+========================================
+🔴 FIX ALL REACT SEO PROBLEMS
+========================================
+
+Detect and fix ALL issues caused by:
+- Client-side rendering (CSR)
+- Hydration delays
+- Empty HTML before JavaScript loads
+- Dynamic-only rendering
+- Slow first paint
+- Excessive JavaScript bundles
+
+IMPORTANT:
+Google must be able to read meaningful HTML content immediately without waiting for heavy client-side hydration.
+
+========================================
+🟢 NEXT.JS RENDERING STRATEGY
+========================================
+
+Use the BEST rendering strategy for each page.
+
+SEO pages MUST use:
+- Static Site Generation (SSG)
+OR
+- Server Side Rendering (SSR)
+
+DO NOT use full client-side rendering for SEO pages.
+
+SEO pages include:
+- Notes pages
+- PYQ pages
+- Blog pages
+- Tool pages
+- GPA calculator
+- Attendance calculator
+- Landing/home page
+
+Client-side rendering can remain ONLY for:
+- Dashboard
+- User profile
+- Leaderboard
+- Study timer
+- Groups
+- Real-time features
+
+========================================
+🔵 METADATA & INDEXING FIX
+========================================
+
+Implement modern Next.js metadata properly for ALL SEO pages.
+
+Every page must include:
+- title
+- meta description
+- canonical URL
+- OpenGraph tags
+- Twitter cards
+- robots meta
+- keywords (natural, not spam)
+- viewport tags
+
+Generate dynamic metadata where needed.
+
+========================================
+🟣 STRUCTURED DATA / SCHEMA
+========================================
+
+Add proper JSON-LD schema.
+
+Use:
+- Article schema for blogs
+- FAQ schema
+- HowTo schema for tools
+- Breadcrumb schema
+- Organization schema
+
+Ensure schema is valid and Google-friendly.
+
+========================================
+🟡 PERFORMANCE OPTIMIZATION
+========================================
+
+Improve Core Web Vitals aggressively.
+
+TARGET:
+- LCP under 2.5s
+- CLS near 0
+- minimal JS bundle
+- fast mobile performance
+
+Fix:
+- unnecessary rerenders
+- oversized bundles
+- unoptimized images
+- blocking scripts
+- hydration bottlenecks
+
+========================================
+🟠 IMAGE OPTIMIZATION
+========================================
+
+Use:
+- next/image
+- WebP/AVIF
+- lazy loading
+- responsive sizing
+
+Prevent layout shifts.
+
+========================================
+🔵 JAVASCRIPT OPTIMIZATION
+========================================
+
+Reduce JavaScript execution time.
+
+Use:
+- dynamic imports
+- code splitting
+- memoization where needed
+- server components when possible
+
+Move unnecessary client components to server components.
+
+========================================
+🟢 REMOVE BAD UX ELEMENTS
+========================================
+
+Remove:
+- splash screen from website
+- unnecessary loading screens
+- blocking animations
+
+Keep ONLY lightweight transitions.
+
+========================================
+🟣 GOOGLE INDEXING FIX
+========================================
+
+Generate:
+- sitemap.xml
+- robots.txt
+- canonical URLs
+- proper internal linking
+
+Ensure all important pages are crawlable.
+
+========================================
+🟡 MOBILE SEO
+========================================
+
+Fully optimize for mobile-first indexing.
+
+Ensure:
+- responsive layout
+- touch-friendly UI
+- no mobile overflow
+- excellent mobile Lighthouse score
+
+========================================
+🔴 SECURITY & TECHNICAL SEO
+========================================
+
+Add:
+- security headers
+- proper caching
+- compression
+- clean URL structure
+
+Ensure no console SEO warnings or hydration errors.
+
+========================================
+🟢 FINAL REQUIREMENTS
+========================================
+
+- Keep current design aesthetic
+- Do NOT break existing functionality
+- Fix all React SEO problems properly
+- Ensure Google can index content immediately
+- Make website production-grade
+- Improve Lighthouse SEO and performance scores significantly
+
+At the end:
+1. Explain every issue found
+2. Explain every optimization made
+3. Show before vs after improvements
+4. Explain which pages use SSR/SSG/CSR and why
