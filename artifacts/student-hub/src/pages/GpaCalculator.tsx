@@ -630,6 +630,66 @@ export default function GpaCalculator() {
           <p>
             This free <strong>GPA Calculator Nepal</strong> is built specifically for <strong>NEB Grade 11 and Grade 12 students</strong> in Nepal. Whether you need an <strong>NEB GPA Calculator</strong>, a <strong>Class 12 GPA Calculator</strong>, or a <strong>Grade 12 GPA Calculator</strong>, this tool uses the <strong>official NEB weighted formula</strong> — 75% Theory + 25% Practical per subject — for both <strong>Science</strong> and <strong>Management</strong> streams. No manual calculation needed — get instant, accurate GPA results for NEB 2082 and 2083 BS.
           </p>
+          <p>
+            Thousands of NEB students across Nepal use this tool every year after their results to understand exactly where they stand — which scholarships they qualify for, whether they meet MBBS or IOE entrance GPA cutoffs, and how much they would need to improve in specific subjects to hit their target GPA. The calculator handles all 6 subjects, both streams, and both Grade 11 and Grade 12 simultaneously. There are no sign-ups, no ads interrupting you, and no delays — just enter your grades and see your GPA instantly.
+          </p>
+          <p>
+            If you are preparing for NEB 2082 or 2083 exams, use this tool alongside our <Link href="/pyqs" className="text-blue-600 hover:underline font-medium">NEB past year question papers</Link> and <Link href="/notes" className="text-blue-600 hover:underline font-medium">subject notes</Link> to plan your study strategy. Knowing your target GPA before the exam is the best way to stay focused.
+          </p>
+
+          <h3 className="text-lg font-bold text-gray-900">How to Use the NEB GPA Calculator — Step-by-Step</h3>
+          <ol className="list-decimal list-inside space-y-2 text-sm">
+            <li><strong>Select your grade</strong> — Click "Grade 11" or "Grade 12" depending on which year you are calculating for.</li>
+            <li><strong>Select your stream</strong> — Choose "Science" (Physics, Chemistry, Maths, Biology/Computer) or "Management" (Accountancy, Economics, Business Studies, etc.).</li>
+            <li><strong>Enter Theory grades</strong> — For each subject, select the grade you received in your Theory exam (out of 75 marks) from the dropdown: A+, A, B+, B, C+, C, or D.</li>
+            <li><strong>Enter Practical/Internal grades</strong> — Select the grade you received in your Practical or Internal Assessment (out of 25 marks) for the same subject.</li>
+            <li><strong>Read your instant GPA</strong> — Your subject GPA and overall final GPA appear automatically as you select each grade. No submit button needed.</li>
+            <li><strong>Experiment with targets</strong> — Change grades in specific subjects to see how improving one subject would affect your total GPA — useful for planning your Grade Improvement Exam subjects.</li>
+          </ol>
+
+          <h3 className="text-lg font-bold text-gray-900">Real Examples — NEB GPA Calculations (Grade 12, 2082)</h3>
+
+          <p className="font-semibold text-gray-800">Example 1: Science Student (High Performer)</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border border-gray-100 rounded-xl overflow-hidden">
+              <thead className="bg-blue-50"><tr className="text-gray-600"><th className="px-3 py-2 text-left">Subject</th><th className="px-3 py-2">Theory Grade</th><th className="px-3 py-2">Practical Grade</th><th className="px-3 py-2">Subject GPA</th></tr></thead>
+              <tbody className="divide-y divide-gray-50">
+                {[["English","A (3.6)","A+ (4.0)","3.70"],["Nepali","A (3.6)","A+ (4.0)","3.70"],["Physics","A (3.6)","A+ (4.0)","3.70"],["Chemistry","B+ (3.2)","A+ (4.0)","3.40"],["Mathematics","A+ (4.0)","A+ (4.0)","4.00"],["Biology","A (3.6)","A+ (4.0)","3.70"]].map(([s,t,p,g])=>(
+                  <tr key={s} className="text-xs"><td className="px-3 py-2 text-gray-700 font-medium">{s}</td><td className="px-3 py-2 text-center">{t}</td><td className="px-3 py-2 text-center">{p}</td><td className="px-3 py-2 text-center font-bold text-blue-600">{g}</td></tr>
+                ))}
+                <tr className="bg-blue-50 font-bold text-xs"><td colSpan={3} className="px-3 py-2">Final GPA (sum ÷ 6)</td><td className="px-3 py-2 text-center text-blue-700">3.70 — A (Outstanding)</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-gray-500">→ Qualifies for: MBBS government colleges, IOE engineering, NEB Merit Scholarship</p>
+
+          <p className="font-semibold text-gray-800">Example 2: Management Student (Average Performer)</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border border-gray-100 rounded-xl overflow-hidden">
+              <thead className="bg-green-50"><tr className="text-gray-600"><th className="px-3 py-2 text-left">Subject</th><th className="px-3 py-2">Theory Grade</th><th className="px-3 py-2">Internal Grade</th><th className="px-3 py-2">Subject GPA</th></tr></thead>
+              <tbody className="divide-y divide-gray-50">
+                {[["English","B+ (3.2)","A (3.6)","3.30"],["Nepali","B+ (3.2)","A (3.6)","3.30"],["Accountancy","B (2.8)","A+ (4.0)","3.10"],["Economics","B+ (3.2)","A (3.6)","3.30"],["Business Studies","B (2.8)","A (3.6)","2.97"],["Business Maths","C+ (2.4)","A (3.6)","2.70"]].map(([s,t,p,g])=>(
+                  <tr key={s} className="text-xs"><td className="px-3 py-2 text-gray-700 font-medium">{s}</td><td className="px-3 py-2 text-center">{t}</td><td className="px-3 py-2 text-center">{p}</td><td className="px-3 py-2 text-center font-bold text-green-600">{g}</td></tr>
+                ))}
+                <tr className="bg-green-50 font-bold text-xs"><td colSpan={3} className="px-3 py-2">Final GPA (sum ÷ 6)</td><td className="px-3 py-2 text-center text-green-700">3.11 — B+ (Very Good)</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-gray-500">→ Qualifies for: BBS, BBA, BCA programs. Note how strong Internals (A/A+) rescued a weak Business Maths Theory score.</p>
+
+          <p className="font-semibold text-gray-800">Example 3: Grade 11 Science Student Targeting Improvement</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border border-gray-100 rounded-xl overflow-hidden">
+              <thead className="bg-yellow-50"><tr className="text-gray-600"><th className="px-3 py-2 text-left">Subject</th><th className="px-3 py-2">Theory Grade</th><th className="px-3 py-2">Practical Grade</th><th className="px-3 py-2">Subject GPA</th></tr></thead>
+              <tbody className="divide-y divide-gray-50">
+                {[["English","B+ (3.2)","A (3.6)","3.30"],["Nepali","A (3.6)","A (3.6)","3.60"],["Physics","C+ (2.4)","B+ (3.2)","2.60"],["Chemistry","B (2.8)","A (3.6)","3.00"],["Mathematics","C+ (2.4)","A (3.6)","2.70"],["Computer","B+ (3.2)","A+ (4.0)","3.40"]].map(([s,t,p,g])=>(
+                  <tr key={s} className="text-xs"><td className="px-3 py-2 text-gray-700 font-medium">{s}</td><td className="px-3 py-2 text-center">{t}</td><td className="px-3 py-2 text-center">{p}</td><td className="px-3 py-2 text-center font-bold text-yellow-600">{g}</td></tr>
+                ))}
+                <tr className="bg-yellow-50 font-bold text-xs"><td colSpan={3} className="px-3 py-2">Final GPA (sum ÷ 6)</td><td className="px-3 py-2 text-center text-yellow-700">3.10 — B+ (Very Good)</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-gray-500">→ To reach 3.2 (A/Excellent) for Grade 12: needs to improve Physics from C+ to B and Maths from C+ to B+. Use our calculator to model the exact target grades.</p>
 
           <h3 className="text-lg font-bold text-gray-900">NEB Science Stream — Subjects and GPA Calculation (Grade 11 &amp; 12, 2082/2083)</h3>
           <p>

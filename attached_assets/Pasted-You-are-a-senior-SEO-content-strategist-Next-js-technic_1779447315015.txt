@@ -1,0 +1,116 @@
+You are a senior SEO content strategist + Next.js technical SEO engineer.
+
+Your task is to generate TWO fully optimized, Google-ranking-ready tool pages for my website:
+
+1) NEB Class 12 GPA Calculator (Nepal-focused)
+2) Attendance Calculator (Global audience)
+
+These pages must be designed to rank on Google, follow modern SEO rules, and be ready for production use in a React/Next.js website.
+
+========================================
+🎯 MAIN GOAL
+========================================
+
+Create SEO-optimized pages that:
+- Rank on Google
+- Are fully indexable
+- Have strong keyword targeting
+- Provide high user value
+- Are fast, structured, and mobile-friendly
+
+========================================
+🟢 PAGE REQUIREMENTS (FOR BOTH TOOLS)
+========================================
+
+For EACH tool page, generate:
+
+1. SEO URL slug
+2. SEO title (50–60 characters)
+3. Meta description (140–160 characters)
+4. H1 heading
+5. Full introduction (150–250 words, natural human tone)
+6. Tool explanation section
+7. Step-by-step usage guide
+8. Real examples (at least 3)
+9. Formula / logic explanation (if applicable)
+10. FAQ section (5–8 questions with answers)
+11. Internal linking suggestions
+12. Keyword list (primary + secondary + long-tail)
+13. Schema markup (JSON-LD)
+14. Image alt text suggestions
+
+========================================
+🟡 SEO RULES (VERY IMPORTANT)
+========================================
+
+- Use natural keyword placement (NO keyword stuffing)
+- Focus on search intent, not just keywords
+- Make content human-readable, not robotic
+- Each page must be 800–1500+ words minimum
+- Include long-tail keywords for ranking
+- Optimize for Google Featured Snippets
+- Use clear H1, H2, H3 structure
+
+========================================
+🔵 KEYWORD TARGETING
+========================================
+
+For GPA Calculator page:
+- NEB GPA calculator Nepal
+- Class 12 GPA calculator
+- NEB grading system Nepal
+- GPA calculator science management Nepal
+
+For Attendance Calculator page:
+- attendance calculator
+- how many classes can I miss
+- attendance percentage calculator
+- school attendance calculator
+
+========================================
+🟣 TECHNICAL SEO REQUIREMENTS
+========================================
+
+Add:
+- JSON-LD schema (HowTo or SoftwareApplication)
+- OpenGraph tags
+- Twitter card data
+- Canonical URL structure
+- Internal linking strategy
+
+========================================
+🟠 USER EXPERIENCE REQUIREMENTS
+========================================
+
+- Mobile-first design
+- Fast loading content structure
+- Clear UI explanation for tool usage
+- No unnecessary complexity
+- Simple and clean UI explanation
+
+========================================
+🔴 IMPORTANT RESTRICTIONS
+========================================
+
+- Do NOT overuse AI-sounding language
+- Do NOT spam keywords
+- Do NOT create duplicate content between both pages
+- GPA page = Nepal-focused ONLY
+- Attendance page = GLOBAL-focused ONLY
+
+========================================
+🟢 OUTPUT FORMAT
+========================================
+
+Return output in this structure:
+
+PAGE 1: GPA CALCULATOR (NEPAL)
+- Full SEO page content
+
+PAGE 2: ATTENDANCE CALCULATOR (GLOBAL)
+- Full SEO page content
+
+END WITH:
+- Keyword strategy summary
+- Ranking difficulty analysis
+- Suggested improvements for faster indexing

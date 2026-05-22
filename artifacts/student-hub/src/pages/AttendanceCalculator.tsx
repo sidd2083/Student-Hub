@@ -309,6 +309,50 @@ export default function AttendanceCalculator() {
           <p>
             Whether you are a college student looking for a <strong>bunk calculator</strong> to plan ahead, worried about the <strong>75% attendance rule</strong>, or need to know how many classes you must attend to recover — this free <strong>attendance calculator</strong> and <strong>bunk calculator</strong> gives you instant, accurate answers. No formula to memorise. Works for students in India, USA, Australia, Canada, the UK, Nepal, and every institution worldwide.
           </p>
+          <p>
+            This tool is used by thousands of students globally every semester to stay on top of their attendance. Whether you're at a Delhi University college, an IIT, a Mumbai University affiliate, an Australian university on a student visa, or anywhere else — the calculation is the same: enter your total classes held, the classes you attended, and your required percentage. The result shows your current attendance, how many more classes you can safely skip, and (if you're below the limit) exactly how many consecutive classes you need to attend to recover. No guessing, no spreadsheets.
+          </p>
+          <p>
+            Students searching for <strong>"how many classes can I bunk"</strong> or <strong>"attendance calculator for 75 percent"</strong> often don't realise that the calculation changes every week as more classes are held. That's why it's important to check your running total regularly — not just once at the start of the semester.
+          </p>
+
+          <h3 className="text-lg font-bold text-gray-900">How to Use This Bunk Calculator — Step-by-Step</h3>
+          <ol className="list-decimal list-inside space-y-2 text-sm">
+            <li><strong>Enter Total Classes Held</strong> — Type the total number of classes your college has conducted so far this semester across all lectures and practicals. Your college's attendance portal or timetable will have this number.</li>
+            <li><strong>Enter Classes Attended</strong> — Enter how many of those classes you actually attended. Only count sessions where you were marked present.</li>
+            <li><strong>Set Your Required %</strong> — The default is 75% (India UGC standard). Change this to 80% for medical colleges, 85% for UK/Australian visa students, or any value your institution requires.</li>
+            <li><strong>Read Instant Results</strong> — You will immediately see: (a) your current attendance %, (b) how many more classes you can safely miss, OR (c) how many consecutive classes you need to attend to reach the required minimum.</li>
+            <li><strong>Check regularly</strong> — Re-enter updated numbers each week to keep your attendance plan current as more classes are held.</li>
+          </ol>
+
+          <h3 className="text-lg font-bold text-gray-900">Real Examples — Bunk Calculator (3 Student Scenarios)</h3>
+
+          <p className="font-semibold text-gray-800">Example 1: Student Safely Above 75% — How Many Can I Bunk?</p>
+          <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs space-y-1">
+            <p><strong>Total classes held:</strong> 80 &nbsp;|&nbsp; <strong>Attended:</strong> 68 &nbsp;|&nbsp; <strong>Required:</strong> 75%</p>
+            <p><strong>Current attendance:</strong> (68 ÷ 80) × 100 = <span className="text-green-600 font-bold">85.0%</span> ✓ Safe</p>
+            <p><strong>Maximum misses allowed:</strong> 80 × (1 − 0.75) = 20 total allowed; 80 − 68 = 12 already missed</p>
+            <p><strong>Classes still bunkable:</strong> 20 − 12 = <span className="text-green-700 font-bold">8 more classes</span></p>
+            <p className="text-gray-500 pt-1">→ This student can skip 8 more classes and still clear 75%. A long weekend trip is safe — but barely.</p>
+          </div>
+
+          <p className="font-semibold text-gray-800">Example 2: Student Right at the Edge — One More Bunk Is Risky</p>
+          <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs space-y-1">
+            <p><strong>Total classes held:</strong> 120 &nbsp;|&nbsp; <strong>Attended:</strong> 91 &nbsp;|&nbsp; <strong>Required:</strong> 75%</p>
+            <p><strong>Current attendance:</strong> (91 ÷ 120) × 100 = <span className="text-yellow-600 font-bold">75.8%</span> ⚠ Borderline</p>
+            <p><strong>Maximum misses allowed:</strong> 120 × 0.25 = 30 total; 120 − 91 = 29 already missed</p>
+            <p><strong>Classes still bunkable:</strong> 30 − 29 = <span className="text-yellow-700 font-bold">1 more class only</span></p>
+            <p className="text-gray-500 pt-1">→ This student has practically no margin left. One sick day pushes them to 74.2% — below the limit. Zero planned bunks from here.</p>
+          </div>
+
+          <p className="font-semibold text-gray-800">Example 3: Student Below 75% — How Many Must I Attend to Recover?</p>
+          <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs space-y-1">
+            <p><strong>Total classes held:</strong> 100 &nbsp;|&nbsp; <strong>Attended:</strong> 65 &nbsp;|&nbsp; <strong>Required:</strong> 75%</p>
+            <p><strong>Current attendance:</strong> (65 ÷ 100) × 100 = <span className="text-red-600 font-bold">65.0%</span> ✗ Below limit</p>
+            <p><strong>Recovery formula:</strong> (75 × 100 − 100 × 65) ÷ (100 − 75) = (7500 − 6500) ÷ 25 = 1000 ÷ 25</p>
+            <p><strong>Must attend:</strong> <span className="text-red-700 font-bold">40 consecutive classes</span> without missing a single one</p>
+            <p className="text-gray-500 pt-1">→ This student needs to attend the next 40 classes without a single absence to crawl back to exactly 75%. The longer they wait, the harder recovery becomes as more classes are held.</p>
+          </div>
 
           <h3 className="text-lg font-bold text-gray-900">What Is the 75% Attendance Rule?</h3>
           <p>
