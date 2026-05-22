@@ -1,6 +1,7 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
+import compression from "compression";
 import { rateLimit } from "express-rate-limit";
 import pino from "pino";
 import pinoHttp from "pino-http";
@@ -11,8 +12,28 @@ const app: Express = express();
 
 app.set("trust proxy", 1);
 
+// Gzip/deflate all responses — reduces payload 40-60%, speeds crawling + LCP
+app.use(compression({
+  level: 6,
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.headers["x-no-compression"]) return false;
+    return compression.filter(req, res);
+  },
+}));
+
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "same-site" },
+  // Improve security headers for SEO and trust signals
+  contentSecurityPolicy: false, // Managed by Vite/Vercel
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+  xContentTypeOptions: true,
+  xFrameOptions: { action: "deny" },
 }));
 
 const serverLogger = pino({ level: process.env.LOG_LEVEL ?? "info" });

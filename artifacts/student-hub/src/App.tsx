@@ -60,17 +60,24 @@ const queryClient = new QueryClient({
 // Preloads the JS chunks for the most-visited pages while the browser is idle,
 // so navigation feels instant rather than waiting for a chunk download.
 if (typeof requestIdleCallback !== "undefined") {
+  // Priority 1: SEO-critical tool pages + most-visited logged-out pages
   requestIdleCallback(() => {
-    // These are the most common navigation targets after login
-    void import("@/pages/Dashboard");
+    void import("@/pages/GpaCalculator");
+    void import("@/pages/AttendanceCalculator");
     void import("@/pages/Notes");
+  }, { timeout: 2000 });
+  // Priority 2: Common navigation targets after login
+  requestIdleCallback(() => {
+    void import("@/pages/Dashboard");
     void import("@/pages/DailyMissions");
-  }, { timeout: 3000 });
+    void import("@/pages/Pyqs");
+  }, { timeout: 4000 });
+  // Priority 3: Secondary pages
   requestIdleCallback(() => {
     void import("@/pages/Pomodoro");
     void import("@/pages/NepAi");
-    void import("@/pages/Pyqs");
-  }, { timeout: 6000 });
+    void import("@/pages/Tools");
+  }, { timeout: 7000 });
 }
 
 function scrollToTop() {
