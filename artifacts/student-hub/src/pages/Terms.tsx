@@ -6,8 +6,9 @@ export default function Terms() {
   return (
     <>
       <Helmet>
-        <title>Terms &amp; Conditions — Student Hub</title>
-        <meta name="description" content="Terms and Conditions for using Student Hub — the free study platform for Nepal students." />
+        <title>Terms &amp; Conditions — Student Hub Nepal</title>
+        <meta name="description" content="Terms and Conditions for using Student Hub Nepal — the free study platform for Nepal students in grades 9–12." />
+        <link rel="canonical" href="https://studenthubnp.com/terms" />
       </Helmet>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 mb-6 transition-colors">

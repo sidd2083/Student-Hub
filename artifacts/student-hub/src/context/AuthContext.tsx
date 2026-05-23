@@ -39,7 +39,7 @@ interface AuthContextType {
   setProfile: (p: UserProfile | null) => void;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+export const AuthContext = createContext<AuthContextType | null>(null);
 
 // ─── Profile Cache + Auth Hint ────────────────────────────────────────────────
 // The profile cache stores full user data; the auth hint is a lightweight flag

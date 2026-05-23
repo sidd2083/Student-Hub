@@ -296,8 +296,9 @@ export default function McqPractice() {
   return (
     <>
       <Helmet>
-        <title>MCQ Practice — Student Hub</title>
-        <meta name="description" content="Practice multiple-choice questions by grade and subject. Improve your SEE and NEB exam scores." />
+        <title>MCQ Practice Nepal — SEE &amp; NEB Multiple Choice Questions | Student Hub</title>
+        <meta name="description" content="Free MCQ practice for SEE and NEB exams. Grade 9–12 multiple-choice questions for Maths, Science, English and Social Studies — Student Hub Nepal." />
+        <link rel="canonical" href="https://studenthubnp.com/mcq" />
       </Helmet>
       <SoftGate feature="MCQ Practice">
         <McqContent />
