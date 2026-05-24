@@ -36,7 +36,7 @@ interface CachedMissionState {
 }
 
 // Bump this whenever mission structure changes to force a regeneration for all users
-const MISSION_VERSION = 3;
+const MISSION_VERSION = 4;
 const CACHE_KEY  = (uid: string, date: string) => `sh_dm_${uid}_${date}`;
 export const POMODORO_MISSION_KEY = "sh_mission_timer";
 
@@ -285,6 +285,7 @@ export function buildMissions(
   level: MissionLevel,
   grade: number,
   isSaturday: boolean,
+  studyMinsNow: number = 0,
 ): Mission[] {
   const rand = seededRand(uid + date);
 
@@ -296,15 +297,16 @@ export function buildMissions(
         difficulty: "easy", type: "manual", completed: false, emoji: "📚",
         actionLink: "/notes", actionLabel: "Open Notes",
       },
-      getSubjectStudyMission(level, grade),
+      { ...getSubjectStudyMission(level, grade), startedAt: studyMinsNow },
     ];
   }
 
   const wellnessItem = pick(WELLNESS_MISSIONS, rand);
 
   return [
+    { ...getPomodoroMission(level, grade), startedAt: studyMinsNow },
     getSchoolTaskMission(grade),
-    getSubjectStudyMission(level, grade),
+    { ...getSubjectStudyMission(level, grade), startedAt: studyMinsNow },
     {
       id: "wellness",
       text: wellnessItem.text,
@@ -404,7 +406,7 @@ export function useDailyMissions() {
           if ((data.version ?? 1) < MISSION_VERSION) {
             await deleteDoc(docRef).catch(() => {});
             const grade       = profile?.grade ?? 10;
-            const newMissions = buildMissions(uid, date, level, grade, isSaturday);
+            const newMissions = buildMissions(uid, date, level, grade, isSaturday, savedMinutesToday);
             const cacheData: CachedMissionState = {
               missions: newMissions, allCompleted: false,
               studyMinsAtStart: savedMinutesToday, level, version: MISSION_VERSION,
@@ -448,7 +450,7 @@ export function useDailyMissions() {
           }
         } else {
           const grade       = profile?.grade ?? 10;
-          const newMissions = buildMissions(uid, date, level, grade, isSaturday);
+          const newMissions = buildMissions(uid, date, level, grade, isSaturday, savedMinutesToday);
           const cacheData: CachedMissionState = {
             missions: newMissions, allCompleted: false,
             studyMinsAtStart: savedMinutesToday, level, version: MISSION_VERSION,
@@ -464,10 +466,18 @@ export function useDailyMissions() {
         }
       } catch (e) {
         console.error("[DailyMissions] Firestore sync:", e);
+        // On error, prefer local cache over regenerating — prevents overwriting
+        // completions that were saved locally but not yet confirmed by Firestore.
         if (uid) {
-          const newMissions = buildMissions(uid, date, level, profile?.grade ?? 10, isSaturday);
-          setMissions(newMissions);
-          writeCache(uid, date, { missions: newMissions, allCompleted: false, studyMinsAtStart: savedMinutesToday, level, version: MISSION_VERSION });
+          const localFallback = readCache(uid, date);
+          if (localFallback && localFallback.missions.length > 0) {
+            setMissions(localFallback.missions);
+            setAllCompleted(localFallback.allCompleted);
+          } else {
+            const newMissions = buildMissions(uid, date, level, profile?.grade ?? 10, isSaturday, savedMinutesToday);
+            setMissions(newMissions);
+            writeCache(uid, date, { missions: newMissions, allCompleted: false, studyMinsAtStart: savedMinutesToday, level, version: MISSION_VERSION });
+          }
         }
       } finally {
         if (mounted) setLoading(false);
@@ -524,7 +534,8 @@ export function useDailyMissions() {
     if (!uid) return;
     const updated = missions.map(m => m.id === missionId ? {
       ...m,
-      startedAt: savedMinutesToday,
+      // Only set startedAt if not already set — preserves auto-tracking from mission creation
+      startedAt: m.startedAt ?? savedMinutesToday,
     } : m);
 
     // Write cache SYNCHRONOUSLY before setMissions (async) so that if the user

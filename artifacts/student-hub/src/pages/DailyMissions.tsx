@@ -72,7 +72,7 @@ function PomodoroMissionCard({
             <div className="mb-3">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-[10px] text-gray-400">
-                  {mission.startedAt === undefined ? "Click below to start tracking" : "Auto-tracked from Pomodoro timer"}
+                  Auto-tracked from Pomodoro timer
                 </span>
                 <span className="text-[10px] font-semibold text-blue-600">{Math.round(progress)}%</span>
               </div>

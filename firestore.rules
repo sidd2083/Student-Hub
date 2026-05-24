@@ -143,6 +143,20 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── Daily Missions ────────────────────────────────────────────────────────
+    // Doc ID is "{uid}_{date}". Owners may read/write their own mission docs.
+    // resource == null check allows getDoc on a non-existent doc to succeed.
+    match /daily_missions/{docId} {
+      allow read: if isSignedIn()
+        && (resource == null || resource.data.uid == request.auth.uid);
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid;
+      allow update: if isSignedIn()
+        && resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn()
+        && resource.data.uid == request.auth.uid;
+    }
+
     // ── Saved Items ──────────────────────────────────────────────────────────
     match /saved_items/{itemId} {
       allow read:   if isSignedIn() && resource.data.uid == request.auth.uid;
