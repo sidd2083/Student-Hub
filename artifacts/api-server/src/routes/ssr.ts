@@ -35,7 +35,7 @@ const API_KEY     = process.env.VITE_FIREBASE_API_KEY    ?? "";
 // built frontend directory. Falls back to the monorepo-relative path.
 const FRONTEND_DIST = process.env.FRONTEND_DIST
   ? resolve(process.cwd(), process.env.FRONTEND_DIST)
-  : resolve(process.cwd(), "../../student-hub/dist/public");
+  : resolve(process.cwd(), "../student-hub/dist/public");
 
 const BUILD_EXISTS = existsSync(resolve(FRONTEND_DIST, "index.html"));
 
@@ -115,11 +115,33 @@ function injectMeta(html: string, m: MetaInput): string {
 
   let result = html;
 
+  // Replace inline title and description
   result = result.replace(/<title>[^<]*<\/title>/i, `<title>${t}</title>`);
   result = result.replace(
     /<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i,
     `<meta name="description" content="${d}" />`,
   );
+
+  // ── CRITICAL: strip homepage-level tags that conflict with page-specific ones ──
+  // index.html embeds a canonical pointing at the homepage root plus matching OG/
+  // Twitter tags.  Leaving them in produces duplicate, contradictory tags.
+  // Google reads the FIRST canonical it encounters — which is the homepage one —
+  // and classifies every note/PYQ as "Alternate page with proper canonical tag",
+  // preventing indexing.  Strip them ALL before injecting the correct page values.
+  result = result.replace(/<link\s[^>]*rel=["']canonical["'][^>]*\/?>/gi, "");
+  result = result.replace(/<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/gi, "");
+  result = result.replace(/<meta\s+property="og:type"\s+content="[^"]*"\s*\/?>/gi, "");
+  result = result.replace(/<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/gi, "");
+  result = result.replace(/<meta\s+property="og:description"\s+content="[^"]*"\s*\/?>/gi, "");
+  result = result.replace(/<meta\s+property="og:image:width"\s+content="[^"]*"\s*\/?>/gi, "");
+  result = result.replace(/<meta\s+property="og:image:height"\s+content="[^"]*"\s*\/?>/gi, "");
+  result = result.replace(/<meta\s+property="og:image:alt"\s+content="[^"]*"\s*\/?>/gi, "");
+  result = result.replace(/<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/?>/gi, "");
+  result = result.replace(/<meta\s+name="twitter:description"\s+content="[^"]*"\s*\/?>/gi, "");
+  result = result.replace(/<meta\s+name="twitter:card"\s+content="[^"]*"\s*\/?>/gi, "");
+  result = result.replace(/<meta\s+name="twitter:image"\s+content="[^"]*"\s*\/?>/gi, "");
+  result = result.replace(/<meta\s+name="twitter:image:alt"\s+content="[^"]*"\s*\/?>/gi, "");
+  result = result.replace(/<meta\s+name="robots"\s+content="[^"]*"\s*\/?>/gi, "");
 
   const tags = [
     kw ? `<meta name="keywords" content="${kw}" />` : "",
@@ -131,6 +153,7 @@ function injectMeta(html: string, m: MetaInput): string {
     `<meta property="og:image" content="${img}" />`,
     `<meta property="og:image:width" content="1200" />`,
     `<meta property="og:image:height" content="630" />`,
+    `<meta property="og:image:alt" content="${t}" />`,
     `<meta property="og:type" content="${ot}" />`,
     `<meta property="og:site_name" content="Student Hub Nepal" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
