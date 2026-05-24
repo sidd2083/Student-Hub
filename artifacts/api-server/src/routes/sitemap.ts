@@ -1,4 +1,6 @@
 import { Router, type Request, type Response } from "express";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+import { resolve } from "path";
 import pino from "pino";
 
 const router = Router();
@@ -7,6 +9,10 @@ const log = pino({ level: "info" });
 const SITE_URL   = "https://studenthubnp.com";
 const PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID ?? "studenthub-6bcc5";
 const API_KEY    = process.env.VITE_FIREBASE_API_KEY    ?? "";
+
+// Disk cache path — survives server restarts so Google never gets stale/missing URLs
+const DISK_CACHE_PATH = resolve(process.cwd(), "sitemap_cache.json");
+const CACHE_TTL_MS    = 6 * 60 * 60 * 1000; // 6 hours
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -20,23 +26,17 @@ function toSlug(str: string): string {
     .replace(/^-|-$/g, "");
 }
 
-type FirestoreFields = Record<string, { stringValue?: string; integerValue?: string; doubleValue?: number }>;
-interface FirestoreDoc { name: string; fields: FirestoreFields; }
+type FSFields = Record<string, { stringValue?: string; integerValue?: string; doubleValue?: number }>;
+interface FSDoc { name: string; fields: FSFields; }
 
-function docId(docName: string): string { return docName.split("/").pop() ?? docName; }
-function fStr(fields: FirestoreFields, key: string): string {
-  return fields[key]?.stringValue ?? fields[key]?.integerValue ?? "";
-}
-function fInt(fields: FirestoreFields, key: string): number {
-  return Number(fields[key]?.integerValue ?? fields[key]?.doubleValue ?? 0);
-}
+const docId = (n: string) => n.split("/").pop() ?? n;
+const fStr  = (f: FSFields, k: string) => f[k]?.stringValue ?? f[k]?.integerValue ?? "";
+const fInt  = (f: FSFields, k: string) => Number(f[k]?.integerValue ?? f[k]?.doubleValue ?? 0);
 
-async function fetchAll(collection: string): Promise<FirestoreDoc[]> {
-  const docs: FirestoreDoc[] = [];
+async function fetchAll(collection: string): Promise<FSDoc[]> {
+  const docs: FSDoc[] = [];
   let pageToken = "";
-  let attempts  = 0;
-  while (attempts < 20) {
-    attempts++;
+  for (let attempt = 0; attempt < 20; attempt++) {
     const url =
       `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collection}` +
       `?pageSize=300` +
@@ -45,8 +45,7 @@ async function fetchAll(collection: string): Promise<FirestoreDoc[]> {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) { log.error({ collection, status: res.status }, "Firestore error"); break; }
-      const data = await res.json() as { documents?: FirestoreDoc[]; nextPageToken?: string };
-      log.info({ collection, page: attempts, count: data.documents?.length ?? 0 }, "Firestore page fetched");
+      const data = await res.json() as { documents?: FSDoc[]; nextPageToken?: string };
       docs.push(...(data.documents ?? []));
       if (!data.nextPageToken) break;
       pageToken = data.nextPageToken;
@@ -85,46 +84,71 @@ function buildXml(urls: UrlEntry[], today: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries}\n</urlset>`;
 }
 
+// ── Disk cache ─────────────────────────────────────────────────────────────────
+// Persists the last successful full sitemap to disk so server restarts never
+// cause a gap where Google sees only the static-only fallback.
+
+interface DiskCache {
+  xml:         string;
+  generatedAt: number; // epoch ms
+  noteCount:   number;
+  pyqCount:    number;
+}
+
+function loadFromDisk(): DiskCache | null {
+  try {
+    if (!existsSync(DISK_CACHE_PATH)) return null;
+    const raw = readFileSync(DISK_CACHE_PATH, "utf-8");
+    const c = JSON.parse(raw) as DiskCache;
+    const ageMs = Date.now() - c.generatedAt;
+    if (ageMs > CACHE_TTL_MS * 2) { // discard if > 12 hours old
+      log.info("Sitemap: disk cache too old, ignoring");
+      return null;
+    }
+    log.info({ noteCount: c.noteCount, pyqCount: c.pyqCount, ageMin: Math.round(ageMs / 60_000) }, "Sitemap: loaded from disk cache");
+    return c;
+  } catch {
+    return null;
+  }
+}
+
+function saveToDisk(c: DiskCache): void {
+  try {
+    writeFileSync(DISK_CACHE_PATH, JSON.stringify(c), "utf-8");
+    log.info({ noteCount: c.noteCount, pyqCount: c.pyqCount }, "Sitemap: saved to disk cache");
+  } catch (err) {
+    log.warn({ err }, "Sitemap: disk save failed (non-fatal)");
+  }
+}
+
+// ── In-memory cache (loaded from disk on startup) ─────────────────────────────
+
+interface SitemapCache extends DiskCache { isFullData: boolean; }
+
+let sitemapCache: SitemapCache;
+let isGenerating = false;
+
 // ── Search-engine ping ─────────────────────────────────────────────────────────
-// Notifies Google and Bing that the sitemap has been updated so they re-crawl
-// your notes and PYQ pages faster. Fires silently in the background — never
-// blocks a request. Results are logged but errors are swallowed.
 
-async function pingSitemapToSearchEngines(): Promise<void> {
+async function pingSearchEngines(): Promise<void> {
   const sitemapUrl = encodeURIComponent(`${SITE_URL}/sitemap.xml`);
-
   const engines = [
     { name: "Google", url: `https://www.google.com/ping?sitemap=${sitemapUrl}` },
     { name: "Bing",   url: `https://www.bing.com/ping?sitemap=${sitemapUrl}`   },
   ];
-
-  await Promise.allSettled(
-    engines.map(async ({ name, url }) => {
-      try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
-        log.info({ engine: name, status: res.status }, "Sitemap ping sent");
-      } catch (err) {
-        log.warn({ engine: name, err }, "Sitemap ping failed (non-fatal)");
-      }
-    }),
-  );
+  await Promise.allSettled(engines.map(async ({ name, url }) => {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+      log.info({ engine: name, status: res.status }, "Sitemap ping sent");
+    } catch (err) {
+      log.warn({ engine: name, err }, "Sitemap ping failed (non-fatal)");
+    }
+  }));
 }
 
-// ── In-memory cache ────────────────────────────────────────────────────────────
+// ── Generation ─────────────────────────────────────────────────────────────────
 
-interface SitemapCache {
-  xml:         string;
-  generatedAt: number;
-  noteCount:   number;
-  pyqCount:    number;
-  isFullData:  boolean; // false = static-only fallback
-}
-
-let sitemapCache: SitemapCache | null = null;
-let isGenerating = false;
-const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
-
-async function generateAndCache(pingSearchEngines = false): Promise<void> {
+async function generateAndCache(pingAfter = false): Promise<void> {
   if (isGenerating) return;
   isGenerating = true;
   try {
@@ -145,24 +169,22 @@ async function generateAndCache(pingSearchEngines = false): Promise<void> {
       changefreq: "monthly",
     }));
 
-    const totalUrls = STATIC_URLS.length + noteUrls.length + pyqUrls.length;
-    sitemapCache = {
+    const disk: DiskCache = {
       xml:         buildXml([...STATIC_URLS, ...noteUrls, ...pyqUrls], today),
       generatedAt: Date.now(),
       noteCount:   noteUrls.length,
       pyqCount:    pyqUrls.length,
-      isFullData:  true,
     };
 
+    sitemapCache = { ...disk, isFullData: true };
+    saveToDisk(disk);
+
     log.info(
-      { notes: noteUrls.length, pyqs: pyqUrls.length, statics: STATIC_URLS.length, totalUrls },
-      "Sitemap: generated successfully",
+      { notes: noteUrls.length, pyqs: pyqUrls.length, total: STATIC_URLS.length + noteUrls.length + pyqUrls.length },
+      "Sitemap: generated",
     );
 
-    if (pingSearchEngines) {
-      // Fire-and-forget: don't await so we never block a request
-      pingSitemapToSearchEngines().catch(() => {});
-    }
+    if (pingAfter) pingSearchEngines().catch(() => {});
   } catch (err) {
     log.error({ err }, "Sitemap: generation failed");
   } finally {
@@ -170,23 +192,33 @@ async function generateAndCache(pingSearchEngines = false): Promise<void> {
   }
 }
 
-// On startup: set a static-only placeholder immediately so the VERY FIRST
-// request responds instantly (no Firestore calls needed). Then kick off full
-// generation in the background. Any request after ~8 s gets the complete sitemap.
+// ── Startup ────────────────────────────────────────────────────────────────────
+// 1. Try to load the last full sitemap from disk → serves ALL URLs instantly.
+// 2. If disk is empty/stale, set static-only placeholder so the first request
+//    never hangs (Google gets at least the static URLs immediately).
+// 3. Either way, kick off a fresh background generation.
+
 (function initCache() {
-  const today = new Date().toISOString().split("T")[0];
-  sitemapCache = {
-    xml:         buildXml([...STATIC_URLS], today),
-    generatedAt: Date.now(),
-    noteCount:   0,
-    pyqCount:    0,
-    isFullData:  false,
-  };
-  log.info("Sitemap: static placeholder ready — fetching dynamic URLs in background");
+  const disk = loadFromDisk();
+  if (disk) {
+    sitemapCache = { ...disk, isFullData: true };
+    log.info("Sitemap: disk cache ready — no cold-start delay");
+  } else {
+    const today = new Date().toISOString().split("T")[0];
+    sitemapCache = {
+      xml:         buildXml([...STATIC_URLS], today),
+      generatedAt: Date.now(),
+      noteCount:   0,
+      pyqCount:    0,
+      isFullData:  false,
+    };
+    log.info("Sitemap: no disk cache — static placeholder active, generating full sitemap in background");
+  }
+  // Always refresh in background to keep URLs up to date
   generateAndCache(false).catch(() => {});
 })();
 
-// Refresh every 6 hours and ping search engines so new notes get indexed faster
+// Refresh every 6 hours and ping search engines
 setInterval(() => {
   log.info("Sitemap: scheduled 6-hour refresh");
   generateAndCache(true).catch(() => {});
@@ -195,20 +227,15 @@ setInterval(() => {
 // ── Routes ─────────────────────────────────────────────────────────────────────
 
 router.get("/sitemap.xml", (_req: Request, res: Response) => {
-  const cache = sitemapCache!;
-  const ageMin = Math.round((Date.now() - cache.generatedAt) / 60_000);
-
+  const { noteCount, pyqCount, generatedAt, isFullData, xml } = sitemapCache;
   log.info(
-    { notes: cache.noteCount, pyqs: cache.pyqCount, ageMin, full: cache.isFullData },
+    { notes: noteCount, pyqs: pyqCount, ageMin: Math.round((Date.now() - generatedAt) / 60_000), full: isFullData },
     "Sitemap: served",
   );
-
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
-  // no-store prevents browser / CDN from caching a stale or partial version
   res.setHeader("Cache-Control", "no-store");
-  res.setHeader("X-Sitemap-Cache", cache.isFullData ? "FULL" : "STATIC-ONLY");
-  res.setHeader("X-Sitemap-Age-Min", String(ageMin));
-  res.send(cache.xml);
+  res.setHeader("X-Sitemap-Cache", isFullData ? "FULL" : "STATIC-ONLY");
+  res.send(xml);
 });
 
 router.get("/sitemap-index.xml", (_req: Request, res: Response) => {
@@ -220,51 +247,22 @@ router.get("/sitemap-index.xml", (_req: Request, res: Response) => {
   );
 });
 
-/**
- * POST /api/sitemap/refresh
- *
- * Manually triggers a sitemap regeneration and pings Google + Bing.
- * Use this from Google Search Console or after adding new notes/PYQs.
- *
- * How to use:
- *   curl -X POST https://studenthubnp.com/api/sitemap/refresh
- *
- * Returns: { ok: true, notes, pyqs, totalUrls, pinged: ["Google","Bing"] }
- */
 router.post("/api/sitemap/refresh", async (_req: Request, res: Response) => {
-  log.info("Sitemap: manual refresh triggered via API");
-
-  // Respond immediately so the caller isn't waiting 8 s
-  res.json({
-    ok:      true,
-    message: "Sitemap refresh started in background. Google and Bing will be pinged once done.",
-  });
-
-  // Run after responding
+  res.json({ ok: true, message: "Sitemap refresh started. Google and Bing will be pinged once done." });
   await generateAndCache(true);
-  log.info(
-    { notes: sitemapCache?.noteCount, pyqs: sitemapCache?.pyqCount },
-    "Sitemap: manual refresh complete",
-  );
+  log.info({ notes: sitemapCache.noteCount, pyqs: sitemapCache.pyqCount }, "Sitemap: manual refresh complete");
 });
 
-/**
- * GET /api/sitemap/status
- *
- * Returns the current sitemap cache status — useful for checking if
- * the full sitemap has been generated yet.
- */
 router.get("/api/sitemap/status", (_req: Request, res: Response) => {
-  const cache = sitemapCache;
-  if (!cache) return res.json({ ready: false });
+  const { noteCount, pyqCount, generatedAt, isFullData } = sitemapCache;
   res.json({
     ready:       true,
-    isFullData:  cache.isFullData,
-    noteCount:   cache.noteCount,
-    pyqCount:    cache.pyqCount,
-    totalUrls:   STATIC_URLS.length + cache.noteCount + cache.pyqCount,
-    ageMin:      Math.round((Date.now() - cache.generatedAt) / 60_000),
-    generatedAt: new Date(cache.generatedAt).toISOString(),
+    isFullData,
+    noteCount,
+    pyqCount,
+    totalUrls:   STATIC_URLS.length + noteCount + pyqCount,
+    ageMin:      Math.round((Date.now() - generatedAt) / 60_000),
+    generatedAt: new Date(generatedAt).toISOString(),
   });
 });
 
@@ -308,7 +306,6 @@ router.get("/robots.txt", (_req: Request, res: Response) => {
     `Sitemap: ${SITE_URL}/sitemap.xml`,
     `Sitemap: ${SITE_URL}/sitemap-index.xml`,
   ].join("\n");
-
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=86400");
   res.send(txt);
