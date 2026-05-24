@@ -123,6 +123,74 @@ async function fetchCollection(col) {
   }
 }
 
+// ── Content HTML builders ──────────────────────────────────────────────────────
+// React uses createRoot (NOT hydrateRoot), so it REPLACES #root content on load.
+// The HTML we inject here is crawled by Google but replaced for real users.
+// Strip <script> tags from Firestore content for safety.
+function safeContent(raw) {
+  if (!raw) return "";
+  return raw.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
+}
+
+function noteBodyHtml(title, grade, subject, chapter, content, contentType) {
+  const subjectLine = [
+    subject ? `<strong>Subject:</strong> ${esc(subject)}` : "",
+    grade   ? `<strong>Grade:</strong> ${grade}` : "",
+    chapter ? `<strong>Chapter:</strong> ${esc(chapter)}` : "",
+  ].filter(Boolean).join(" &nbsp;|&nbsp; ");
+
+  let contentBlock = "";
+  if (content && (contentType === "html" || !contentType)) {
+    contentBlock = `<div class="note-body">${safeContent(content)}</div>`;
+  } else if (content && contentType === "text") {
+    contentBlock = `<div class="note-body">${content.split("\n").map(l => `<p>${esc(l)}</p>`).join("")}</div>`;
+  }
+
+  return `<main style="max-width:860px;margin:0 auto;padding:24px 16px;font-family:system-ui,sans-serif">
+  <nav style="font-size:13px;color:#6b7280;margin-bottom:16px">
+    <a href="/" style="color:#3b82f6">Student Hub Nepal</a> &rsaquo;
+    <a href="/notes" style="color:#3b82f6">Notes</a> &rsaquo;
+    <span>${esc(title)}</span>
+  </nav>
+  <h1 style="font-size:1.6rem;font-weight:700;color:#111827;margin:0 0 8px">${esc(title)}</h1>
+  <p style="font-size:14px;color:#6b7280;margin:0 0 20px">${subjectLine}</p>
+  ${contentBlock}
+  <p style="margin-top:32px;font-size:14px;color:#6b7280">
+    Free study notes for Grade ${grade} students in Nepal. Available on
+    <a href="${SITE_URL}" style="color:#3b82f6">Student Hub Nepal</a>.
+  </p>
+</main>`;
+}
+
+function pyqBodyHtml(title, grade, subject, year) {
+  return `<main style="max-width:860px;margin:0 auto;padding:24px 16px;font-family:system-ui,sans-serif">
+  <nav style="font-size:13px;color:#6b7280;margin-bottom:16px">
+    <a href="/" style="color:#3b82f6">Student Hub Nepal</a> &rsaquo;
+    <a href="/pyqs" style="color:#3b82f6">PYQ Papers</a> &rsaquo;
+    <span>${esc(title)}</span>
+  </nav>
+  <h1 style="font-size:1.6rem;font-weight:700;color:#111827;margin:0 0 8px">${esc(subject)} Grade ${grade} Past Year Question — ${year}</h1>
+  <p style="font-size:14px;color:#6b7280;margin:0 0 16px">
+    <strong>Subject:</strong> ${esc(subject)} &nbsp;|&nbsp;
+    <strong>Grade:</strong> ${grade} &nbsp;|&nbsp;
+    <strong>Year:</strong> ${year}
+  </p>
+  <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 16px">
+    ${esc(title)}. This is the ${year} ${esc(subject)} past year question paper (PYQ) for Grade ${grade}
+    students in Nepal. Practice real NEB/SEE exam questions to prepare for your upcoming examination.
+  </p>
+  <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 16px">
+    The ${year} Grade ${grade} ${esc(subject)} question paper covers key topics from the NEB curriculum.
+    Solving past year questions is one of the most effective ways to prepare for the SEE and NEB examinations.
+    Access this and hundreds more past year papers free on Student Hub Nepal.
+  </p>
+  <p style="font-size:14px;color:#6b7280">
+    Free past year question papers for Grade 9–12 students in Nepal. Available on
+    <a href="${SITE_URL}" style="color:#3b82f6">Student Hub Nepal</a>.
+  </p>
+</main>`;
+}
+
 // ── Pre-render individual note pages ──────────────────────────────────────────
 async function prerenderNotes(template) {
   console.log("\n  📄 Pre-rendering individual note pages...");
@@ -132,12 +200,14 @@ async function prerenderNotes(template) {
   let ok = 0;
   for (const document of docs) {
     try {
-      const id      = document.name.split("/").pop();
-      const f       = document.fields ?? {};
-      const grade   = fInt(f, "grade");
-      const subject = fStr(f, "subject");
-      const title   = fStr(f, "title");
-      const chapter = fStr(f, "chapter");
+      const id          = document.name.split("/").pop();
+      const f           = document.fields ?? {};
+      const grade       = fInt(f, "grade");
+      const subject     = fStr(f, "subject");
+      const title       = fStr(f, "title");
+      const chapter     = fStr(f, "chapter");
+      const content     = fStr(f, "content");
+      const contentType = fStr(f, "contentType");
 
       if (!grade || !subject || !title) continue;
 
@@ -172,7 +242,12 @@ async function prerenderNotes(template) {
         isAccessibleForFree: true,
       });
 
-      const html    = injectMeta(template, { title: pageTitle, description: desc, canonical, keywords: kw, ogType: "article", structuredData: ld });
+      // Replace <!--APP_HTML--> with actual readable content so Google can crawl it.
+      // React (createRoot) will replace this content when JavaScript loads.
+      const bodyHtml = noteBodyHtml(title, grade, subject, chapter, content, contentType);
+      let html = template.replace("<!--APP_HTML-->", bodyHtml);
+      html = injectMeta(html, { title: pageTitle, description: desc, canonical, keywords: kw, ogType: "article", structuredData: ld });
+
       const outPath = resolve(ROOT, "dist/public/notes", slug);
       mkdirSync(outPath, { recursive: true });
       writeFileSync(resolve(outPath, "index.html"), html, "utf-8");
@@ -231,7 +306,12 @@ async function prerenderPyqs(template) {
         isAccessibleForFree: true,
       });
 
-      const html    = injectMeta(template, { title: pageTitle, description: desc, canonical, keywords: kw, ogType: "article", structuredData: ld });
+      // Replace <!--APP_HTML--> with readable content so Google can crawl it.
+      // React (createRoot) will replace this content when JavaScript loads.
+      const bodyHtml = pyqBodyHtml(title, grade, subject, year);
+      let html = template.replace("<!--APP_HTML-->", bodyHtml);
+      html = injectMeta(html, { title: pageTitle, description: desc, canonical, keywords: kw, ogType: "article", structuredData: ld });
+
       const outPath = resolve(ROOT, "dist/public/pyq", slug);
       mkdirSync(outPath, { recursive: true });
       writeFileSync(resolve(outPath, "index.html"), html, "utf-8");
