@@ -263,7 +263,7 @@ if (BUILD_EXISTS) {
   );
 
   // SPA catch-all — anything not matched above gets index.html
-  router.get("*", (_req: Request, res: Response, next: NextFunction) => {
+  router.get("/*path", (_req: Request, res: Response, next: NextFunction) => {
     const tpl = getTemplate();
     if (!tpl) return next();
     res.setHeader("Content-Type", "text/html; charset=utf-8");
