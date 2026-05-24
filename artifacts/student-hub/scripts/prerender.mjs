@@ -112,18 +112,25 @@ function injectMeta(html, { title, description, canonical, keywords, ogType, str
   return result.replace("</head>", `    ${tags}\n  </head>`);
 }
 
-// ── Firestore REST fetch ────────────────────────────────────────────────────────
+// ── Firestore REST fetch (handles pagination) ──────────────────────────────────
 async function fetchCollection(col) {
+  const all = [];
+  let pageToken = "";
   try {
-    const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${col}?pageSize=500`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-    if (!res.ok) { console.warn(`  ⚠  Firestore fetch failed for ${col}: ${res.status}`); return []; }
-    const data = await res.json();
-    return data.documents ?? [];
+    do {
+      const url =
+        `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${col}?pageSize=300` +
+        (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "");
+      const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) { console.warn(`  ⚠  Firestore fetch failed for ${col}: ${res.status}`); break; }
+      const data = await res.json();
+      all.push(...(data.documents ?? []));
+      pageToken = data.nextPageToken ?? "";
+    } while (pageToken);
   } catch (err) {
     console.warn(`  ⚠  Firestore fetch error for ${col}: ${err.message}`);
-    return [];
   }
+  return all;
 }
 
 // ── Content HTML builders ──────────────────────────────────────────────────────
