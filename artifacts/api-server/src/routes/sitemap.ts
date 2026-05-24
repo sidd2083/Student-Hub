@@ -283,6 +283,30 @@ export function triggerSitemapRefresh(): void {
   );
 }
 
+/**
+ * Fire a Vercel deploy hook so the static sitemap is rebuilt with latest
+ * Firestore data.  The hook URL is kept server-side so it never reaches
+ * the browser.  Errors are non-fatal — the hourly refresh is the fallback.
+ */
+async function triggerVercelDeploy(reason: string): Promise<void> {
+  const hookUrl = process.env.VERCEL_DEPLOY_HOOK_URL;
+  if (!hookUrl) {
+    log.info("[Sitemap] VERCEL_DEPLOY_HOOK_URL not set — skipping redeploy trigger");
+    return;
+  }
+  try {
+    const res = await fetch(hookUrl, { method: "POST", signal: AbortSignal.timeout(10_000) });
+    log.info({ status: res.status, reason }, "[Sitemap] Vercel deploy hook triggered");
+  } catch (err) {
+    log.warn({ err, reason }, "[Sitemap] Vercel deploy hook failed (non-fatal)");
+  }
+}
+
+router.post("/api/sitemap/redeploy", async (_req: Request, res: Response) => {
+  res.json({ ok: true, message: "Redeploy triggered — sitemap will update in ~1-2 minutes." });
+  await triggerVercelDeploy("admin-content-change");
+});
+
 router.get("/api/sitemap/status", (_req: Request, res: Response) => {
   const { noteCount, pyqCount, generatedAt, isFullData } = sitemapCache;
   res.json({

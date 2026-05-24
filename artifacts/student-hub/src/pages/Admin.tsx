@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { noteUrl, pyqUrl, SITE_URL, toSlug } from "@/lib/slugs";
+import { triggerSitemapUpdate } from "@/lib/sitemapUpdate";
 import {
   collection, getDocs, doc, query, where, orderBy,
   setDoc, getDoc, addDoc, deleteDoc, updateDoc,
@@ -333,6 +334,7 @@ function ManageNotes() {
         await addDoc(collection(db, "notes"), { ...form, createdAt: new Date().toISOString() });
         setSaveStatus("success"); setSaveMsg(`Note "${form.title}" saved successfully!`);
       }
+      triggerSitemapUpdate("note-saved");
       loadNotes();
       setTimeout(() => reset(), 1800);
     } catch (err: any) {
@@ -345,6 +347,7 @@ function ManageNotes() {
     try {
       await deleteDoc(doc(db, "notes", id));
       setNotes(prev => prev.filter(n => n.id !== id));
+      triggerSitemapUpdate("note-deleted");
     } catch (e) { console.error("[Admin] Delete note failed:", e); }
   };
 
@@ -638,6 +641,7 @@ function ManagePyqs() {
         await addDoc(collection(db, "pyqs"), { ...payload, createdAt: new Date().toISOString() });
         setSaveStatus("success"); setSaveMsg(`PYQ "${form.title.trim()}" saved successfully!`);
       }
+      triggerSitemapUpdate("pyq-saved");
       loadPyqs();
       setTimeout(() => reset(), 1800);
     } catch (e: any) {
@@ -650,6 +654,7 @@ function ManagePyqs() {
     try {
       await deleteDoc(doc(db, "pyqs", id));
       setPyqs(prev => prev.filter(p => p.id !== id));
+      triggerSitemapUpdate("pyq-deleted");
     } catch (e) { console.error("[Admin] Delete PYQ failed:", e); }
   };
 
