@@ -7,6 +7,7 @@ import pino from "pino";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import sitemapRouter from "./routes/sitemap";
+import ssrRouter, { BUILD_EXISTS } from "./routes/ssr";
 
 const app: Express = express();
 
@@ -74,9 +75,18 @@ app.use("/api", limiter, router);
 // Sitemap, robots.txt — served at root, no auth, no rate-limit
 app.use(sitemapRouter);
 
-app.use((_req: Request, res: Response, _next: NextFunction) => {
-  res.status(404).json({ error: "Not found" });
-});
+// SSR meta-injection for /notes/* and /pyq/* + static frontend serving.
+// When the frontend is built (production), this also catches all unmatched
+// routes and serves index.html so the React SPA handles them.
+app.use(ssrRouter);
+
+// API 404 — only reached in dev mode (no frontend build) for unmatched paths.
+// In production the ssrRouter catch-all above handles everything.
+if (!BUILD_EXISTS) {
+  app.use((_req: Request, res: Response, _next: NextFunction) => {
+    res.status(404).json({ error: "Not found" });
+  });
+}
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   serverLogger.error(err);

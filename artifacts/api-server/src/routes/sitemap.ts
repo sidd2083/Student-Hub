@@ -1,6 +1,8 @@
 import { Router, type Request, type Response } from "express";
+import pino from "pino";
 
 const router = Router();
+const log = pino({ level: "info" });
 
 const SITE_URL   = "https://studenthubnp.com";
 const PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID ?? "studenthub-6bcc5";
@@ -19,7 +21,7 @@ function toSlug(str: string): string {
 type FirestoreFields = Record<string, { stringValue?: string; integerValue?: string; doubleValue?: number }>;
 
 interface FirestoreDoc {
-  name: string;
+  name:   string;
   fields: FirestoreFields;
 }
 
@@ -40,21 +42,38 @@ async function fetchAll(collection: string): Promise<FirestoreDoc[]> {
   let pageToken = "";
   let attempts  = 0;
 
+  if (!API_KEY) {
+    log.warn({ collection }, "VITE_FIREBASE_API_KEY is not set — Firestore fetch will fail");
+  }
+
   while (attempts < 10) {
     attempts++;
-    const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collection}?pageSize=300${pageToken ? `&pageToken=${pageToken}` : ""}${API_KEY ? `&key=${API_KEY}` : ""}`;
+    const url =
+      `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collection}` +
+      `?pageSize=300` +
+      (pageToken ? `&pageToken=${pageToken}` : "") +
+      (API_KEY   ? `&key=${API_KEY}`         : "");
+
     try {
-      const res  = await fetch(url, { signal: AbortSignal.timeout(8_000) });
-      if (!res.ok) break;
+      const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "(unreadable)");
+        log.error({ collection, status: res.status, body }, "Firestore REST API error");
+        break;
+      }
       const data = await res.json() as { documents?: FirestoreDoc[]; nextPageToken?: string };
+      const count = data.documents?.length ?? 0;
+      log.info({ collection, page: attempts, count }, "Firestore page fetched");
       docs.push(...(data.documents ?? []));
       if (!data.nextPageToken) break;
       pageToken = data.nextPageToken;
-    } catch {
+    } catch (err) {
+      log.error({ collection, err }, "Firestore fetch threw");
       break;
     }
   }
 
+  log.info({ collection, total: docs.length }, "Firestore fetch complete");
   return docs;
 }
 
@@ -73,17 +92,27 @@ const STATIC_URLS = [
 ] as const;
 
 function escape(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g,  "&lt;")
+    .replace(/>/g,  "&gt;")
+    .replace(/"/g,  "&quot;")
+    .replace(/'/g,  "&apos;");
 }
 
-function buildSitemapXml(urls: Array<{ loc: string; priority: string; changefreq: string }>, today: string): string {
+function buildSitemapXml(
+  urls: Array<{ loc: string; priority: string; changefreq: string }>,
+  today: string,
+): string {
   const entries = urls
-    .map(u => `  <url>
+    .map(
+      u => `  <url>
     <loc>${escape(u.loc)}</loc>
     <lastmod>${today}</lastmod>
     <changefreq>${u.changefreq}</changefreq>
     <priority>${u.priority}</priority>
-  </url>`)
+  </url>`,
+    )
     .join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -94,6 +123,8 @@ ${entries}
 
 router.get("/sitemap.xml", async (_req: Request, res: Response) => {
   const today = new Date().toISOString().split("T")[0];
+  log.info("Sitemap requested — fetching Firestore collections");
+
   const [noteDocs, pyqDocs] = await Promise.all([
     fetchAll("notes"),
     fetchAll("pyqs"),
@@ -106,7 +137,11 @@ router.get("/sitemap.xml", async (_req: Request, res: Response) => {
       const grade   = fInt(d.fields, "grade");
       const subject = toSlug(fStr(d.fields, "subject"));
       const title   = toSlug(fStr(d.fields, "title"));
-      return { loc: `${SITE_URL}/notes/${id}-grade-${grade}-${subject}-${title}`, priority: "0.75", changefreq: "monthly" };
+      return {
+        loc: `${SITE_URL}/notes/${id}-grade-${grade}-${subject}-${title}`,
+        priority:   "0.75",
+        changefreq: "monthly",
+      };
     });
 
   const pyqUrls = pyqDocs
@@ -117,8 +152,14 @@ router.get("/sitemap.xml", async (_req: Request, res: Response) => {
       const subject = toSlug(fStr(d.fields, "subject"));
       const year    = fInt(d.fields, "year");
       const title   = toSlug(fStr(d.fields, "title"));
-      return { loc: `${SITE_URL}/pyq/${id}-grade-${grade}-${subject}-${year}-${title}`, priority: "0.75", changefreq: "monthly" };
+      return {
+        loc: `${SITE_URL}/pyq/${id}-grade-${grade}-${subject}-${year}-${title}`,
+        priority:   "0.75",
+        changefreq: "monthly",
+      };
     });
+
+  log.info({ notes: noteUrls.length, pyqs: pyqUrls.length, statics: STATIC_URLS.length }, "Sitemap built");
 
   const xml = buildSitemapXml([...STATIC_URLS, ...noteUrls, ...pyqUrls], today);
 
@@ -146,7 +187,7 @@ router.get("/robots.txt", (_req: Request, res: Response) => {
   const txt = [
     "User-agent: *",
     "",
-    "# Public pages",
+    "# Public pages — allow crawling",
     "Allow: /$",
     "Allow: /notes",
     "Allow: /notes/",

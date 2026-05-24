@@ -47,6 +47,10 @@ export interface PomodoroMissionPreset {
   date: string;
 }
 
+// Captured once when the module is first imported — used by the anti-cheat guard
+// to ensure the page has been open for a minimum time before completions are allowed.
+const _PAGE_LOAD_TIME = Date.now();
+
 function readCache(uid: string, date: string): CachedMissionState | null {
   try {
     const raw = localStorage.getItem(CACHE_KEY(uid, date));
@@ -545,19 +549,35 @@ export function useDailyMissions() {
   }, [uid]);
 
   // ── Manual complete (with anti-cheat) ─────────────────────────────────────
+  // pageLoadTime is captured once at module scope so it persists across re-renders
   const completeMission = useCallback((missionId: string) => {
     if (!uid || completingRef.current.has(missionId)) return;
+
+    // Guard 1: Pomodoro missions MUST auto-complete via timer tracking.
+    // A manual tap on a pomodoro mission is either a bug or cheating — reject it.
+    const mission = missions.find(m => m.id === missionId);
+    if (!mission || mission.type === "pomodoro") return;
+
     const now = Date.now();
+
+    // Guard 2: Respect the block period (set by rapid-tap detection below).
     if (now < blockedUntil) return;
+
+    // Guard 3: Page must have been open for at least 8 seconds.
+    // This stops bots or DevTools scripts that call completeMission immediately.
+    if (now - _PAGE_LOAD_TIME < 8_000) return;
+
+    // Guard 4: Rapid-tap detection — 2 completions within 4 s triggers a 2-min block.
     const log = [...completionLogRef.current, now].filter(t => now - t < 10_000);
     completionLogRef.current = log;
     if (log.length >= 2 && now - log[0] < 4_000) {
-      const blockUntil = now + 120_000; // 2-minute block
+      const blockUntil = now + 120_000;
       setBlockedUntil(blockUntil);
       try { if (uid) localStorage.setItem(`sh_ac_${uid}`, String(blockUntil)); } catch {}
       completionLogRef.current = [];
       return;
     }
+
     completingRef.current.add(missionId);
     _doComplete(uid, date, missions, missionId, setMissions, setAllCompleted);
   }, [uid, date, missions, blockedUntil]);
