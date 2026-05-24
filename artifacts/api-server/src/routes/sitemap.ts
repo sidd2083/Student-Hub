@@ -226,14 +226,34 @@ setInterval(() => {
 
 // ── Routes ─────────────────────────────────────────────────────────────────────
 
-router.get("/sitemap.xml", (_req: Request, res: Response) => {
+router.get("/sitemap.xml", async (_req: Request, res: Response) => {
+  // On serverless (Vercel) cold starts, the background generation may not
+  // have completed yet. Wait for it so we always return full data.
+  if (!sitemapCache.isFullData) {
+    if (isGenerating) {
+      // Poll until the in-progress generation finishes (max 15s)
+      await new Promise<void>((resolve) => {
+        const deadline = Date.now() + 15_000;
+        const poll = setInterval(() => {
+          if (!isGenerating || Date.now() > deadline) {
+            clearInterval(poll);
+            resolve();
+          }
+        }, 100);
+      });
+    } else {
+      // Nothing running — generate synchronously now
+      await generateAndCache(false);
+    }
+  }
+
   const { noteCount, pyqCount, generatedAt, isFullData, xml } = sitemapCache;
   log.info(
     { notes: noteCount, pyqs: pyqCount, ageMin: Math.round((Date.now() - generatedAt) / 60_000), full: isFullData },
     "Sitemap: served",
   );
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
-  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=3600");
   res.setHeader("X-Sitemap-Cache", isFullData ? "FULL" : "STATIC-ONLY");
   res.send(xml);
 });
