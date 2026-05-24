@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/student-hub run build",
+  "buildCommand": "pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/student-hub run build && node scripts/generate-sitemap.mjs",
   "outputDirectory": "artifacts/student-hub/dist/public",
   "installCommand": "pnpm install",
   "framework": null,
@@ -18,10 +18,7 @@
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)",          "destination": "/api/index" },
-    { "source": "/sitemap.xml",       "destination": "/api/index" },
-    { "source": "/sitemap-index.xml", "destination": "/api/index" },
-    { "source": "/robots.txt",        "destination": "/api/index" },
-    { "source": "/(.*)",              "destination": "/index.html" }
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/(.*)",     "destination": "/index.html" }
   ]
 }
