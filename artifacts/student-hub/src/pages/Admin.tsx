@@ -12,11 +12,12 @@ import { db, auth, googleProvider } from "@/lib/firebase";
 import {
   LayoutDashboard, BookOpen, FileText, Users,
   Shield, Plus, Trash2, LogOut, Megaphone, Upload, X, Image,
-  CheckCircle, AlertCircle, Award, Search, Type, Pencil,
+  CheckCircle, AlertCircle, Award, Search, Type, Pencil, Globe,
+  RefreshCw, Clock, Link2,
 } from "lucide-react";
 
 const ADMIN_SESSION = "admin_session_v1";
-type Section = "dashboard" | "notes" | "pyqs" | "announcements" | "users" | "reports" | "seo";
+type Section = "dashboard" | "notes" | "pyqs" | "announcements" | "users" | "reports" | "seo" | "sitemap";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -273,6 +274,155 @@ function AdminOverview() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 text-center text-gray-400 text-sm">
           No users yet — they appear here after signing up.
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Sitemap Panel ───────────────────────────────────────────────────────────
+
+interface SitemapStatus {
+  ready: boolean;
+  isFullData: boolean;
+  noteCount: number;
+  pyqCount: number;
+  totalUrls: number;
+  ageMin: number;
+  generatedAt: string;
+}
+
+function SitemapPanel() {
+  const [status, setStatus] = useState<SitemapStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [deploying, setDeploying] = useState(false);
+  const [deployMsg, setDeployMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const fetchStatus = () => {
+    setLoading(true);
+    fetch("/api/sitemap/status")
+      .then(r => r.json())
+      .then(d => setStatus(d))
+      .catch(() => setStatus(null))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchStatus(); }, []);
+
+  const handleForceUpdate = async () => {
+    setDeploying(true);
+    setDeployMsg(null);
+    try {
+      const r = await fetch("/api/sitemap/redeploy", { method: "POST" });
+      const d = await r.json();
+      if (r.ok) {
+        setDeployMsg({ type: "success", text: "Vercel rebuild triggered! Sitemap will update in ~1–2 minutes." });
+      } else {
+        setDeployMsg({ type: "error", text: d.message ?? "Redeploy failed." });
+      }
+    } catch {
+      setDeployMsg({ type: "error", text: "Could not reach the server. Check your connection." });
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  const StatBox = ({ label, value, sub }: { label: string; value: string | number; sub?: string }) => (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <p className="text-xs text-gray-400 font-medium mb-1">{label}</p>
+      <p className="text-3xl font-bold text-gray-900">{value}</p>
+      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    </div>
+  );
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Sitemap</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Live status of your <code className="bg-gray-100 px-1 rounded text-xs">sitemap.xml</code> — updates automatically when you add or remove content.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={fetchStatus} disabled={loading}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50">
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </button>
+          <button onClick={handleForceUpdate} disabled={deploying}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all disabled:opacity-60 font-medium">
+            <Globe className={`w-4 h-4 ${deploying ? "animate-spin" : ""}`} />
+            {deploying ? "Triggering…" : "Force Update Now"}
+          </button>
+        </div>
+      </div>
+
+      {deployMsg && (
+        <div className={`flex items-start gap-3 p-4 rounded-2xl mb-6 text-sm ${
+          deployMsg.type === "success"
+            ? "bg-green-50 border border-green-100 text-green-800"
+            : "bg-red-50 border border-red-100 text-red-800"
+        }`}>
+          {deployMsg.type === "success"
+            ? <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            : <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />}
+          {deployMsg.text}
+        </div>
+      )}
+
+      {loading && !status && (
+        <div className="text-center py-16 text-gray-400 text-sm">Loading sitemap status…</div>
+      )}
+
+      {status && (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <StatBox label="Total URLs Indexed" value={status.totalUrls} />
+            <StatBox label="Notes in Sitemap"   value={status.noteCount} />
+            <StatBox label="PYQs in Sitemap"    value={status.pyqCount} />
+            <StatBox label="Cache Age"          value={`${status.ageMin}m`} sub="refreshes every hour" />
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+            <h3 className="font-semibold text-gray-800">Details</h3>
+
+            <div className="flex items-center justify-between py-3 border-b border-gray-50">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Clock className="w-4 h-4 text-gray-400" />
+                Last generated
+              </div>
+              <span className="text-sm font-medium text-gray-800">
+                {new Date(status.generatedAt).toLocaleString()}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between py-3 border-b border-gray-50">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Globe className="w-4 h-4 text-gray-400" />
+                Data completeness
+              </div>
+              <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                status.isFullData
+                  ? "bg-green-100 text-green-700"
+                  : "bg-yellow-100 text-yellow-700"
+              }`}>
+                {status.isFullData ? "Full — all notes & PYQs included" : "Partial — still loading"}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between py-3">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Link2 className="w-4 h-4 text-gray-400" />
+                Live sitemap URL
+              </div>
+              <a href="https://studenthubnp.com/sitemap.xml" target="_blank" rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:underline font-medium">
+                studenthubnp.com/sitemap.xml ↗
+              </a>
+            </div>
+          </div>
+
+          <div className="mt-4 bg-blue-50 border border-blue-100 rounded-2xl p-4 text-sm text-blue-700">
+            <strong>How it works:</strong> Every time you add, edit, or delete a note or PYQ, Vercel automatically rebuilds the sitemap. Google will pick up the changes on its next crawl. Use <strong>Force Update Now</strong> to trigger an immediate rebuild without changing any content.
+          </div>
+        </>
       )}
     </div>
   );
@@ -1784,6 +1934,7 @@ export default function Admin() {
     { key: "users",         icon: Users,           label: "Manage Users"  },
     { key: "reports",       icon: Award,           label: "Badges"        },
     { key: "seo",           icon: Shield,          label: "SEO Panel"     },
+    { key: "sitemap",       icon: Globe,           label: "Sitemap"       },
   ];
 
   return (
@@ -1829,6 +1980,7 @@ export default function Admin() {
         {section === "users"         && <ManageUsers />}
         {section === "reports"       && <BadgeManager />}
         {section === "seo"           && <SeoPanel />}
+        {section === "sitemap"       && <SitemapPanel />}
       </main>
     </div>
   );
