@@ -12,7 +12,7 @@ const API_KEY    = process.env.VITE_FIREBASE_API_KEY    ?? "";
 
 // Disk cache path — survives server restarts so Google never gets stale/missing URLs
 const DISK_CACHE_PATH = resolve(process.cwd(), "sitemap_cache.json");
-const CACHE_TTL_MS    = 6 * 60 * 60 * 1000; // 6 hours
+const CACHE_TTL_MS    = 60 * 60 * 1000; // 1 hour
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -252,6 +252,16 @@ router.post("/api/sitemap/refresh", async (_req: Request, res: Response) => {
   await generateAndCache(true);
   log.info({ notes: sitemapCache.noteCount, pyqs: sitemapCache.pyqCount }, "Sitemap: manual refresh complete");
 });
+
+/**
+ * Exported so other routes (e.g. upload) can trigger a background refresh
+ * when new content is added without waiting for the next scheduled cycle.
+ */
+export function triggerSitemapRefresh(): void {
+  generateAndCache(true).catch((err) =>
+    log.warn({ err }, "Sitemap: background refresh after upload failed (non-fatal)")
+  );
+}
 
 router.get("/api/sitemap/status", (_req: Request, res: Response) => {
   const { noteCount, pyqCount, generatedAt, isFullData } = sitemapCache;

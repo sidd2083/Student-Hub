@@ -4,6 +4,7 @@ import multer from "multer";
 import { logger } from "../lib/logger";
 import { getAdminStorage, getAdminDb } from "../lib/firebase-admin";
 import { requireAuth } from "../lib/auth-middleware";
+import { triggerSitemapRefresh } from "./sitemap";
 import crypto from "crypto";
 
 const router = Router();
@@ -91,6 +92,12 @@ router.post(
           `/o/${encodeURIComponent(path)}?alt=media&token=${token}`;
 
         logger.info({ uid: req.uid, folder, size: file.size }, "[Upload] File saved via Admin SDK");
+
+        // Kick off a background sitemap rebuild whenever content folders are updated
+        if (folder === "notes" || folder === "pyqs") {
+          triggerSitemapRefresh();
+        }
+
         return res.json({ url: downloadUrl });
       }
 
