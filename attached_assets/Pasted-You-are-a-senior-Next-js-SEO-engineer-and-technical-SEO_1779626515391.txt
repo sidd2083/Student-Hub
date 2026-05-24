@@ -1,0 +1,192 @@
+You are a senior Next.js SEO engineer and technical SEO auditor.
+
+My website has a major canonical and metadata issue affecting indexing and rankings.
+
+IMPORTANT:
+The sitemap.xml is NOT missing notes or PYQs.
+The sitemap already contains all note and PYQ URLs correctly.
+
+The REAL issue is:
+When inspecting note pages or PYQ pages in Google Search Console, Google reports:
+
+"Page is not indexed: Alternate page with proper canonical tag"
+
+This means Google thinks these pages are duplicates because canonical handling is broken.
+
+I am sure this issue affects:
+- all 26 notes pages
+- all 18 PYQ pages
+- possibly other dynamic pages too
+
+==================================================
+MAIN SEO PROBLEMS
+==================================================
+
+1. Notes and PYQ pages are being treated as alternate pages.
+2. Canonical URLs are likely incorrectly pointing to homepage or wrong pages.
+3. Many pages share duplicate meta descriptions and titles.
+4. About page, notes page, tools page, contact page etc. currently reuse homepage metadata.
+5. Dynamic metadata generation is broken.
+6. Google is not indexing many important pages properly because of canonical confusion.
+7. Attendance calculator ranking is weak.
+8. GPA calculator ranking is weak.
+9. Website SEO architecture needs cleanup.
+
+==================================================
+CRITICAL FIX REQUIRED
+==================================================
+
+Fix ALL canonical URL problems across the website.
+
+Every SEO page MUST use SELF-REFERENCING canonical URLs.
+
+Examples:
+
+Correct:
+https://studenthubnp.com/notes/class-10-science
+canonical:
+https://studenthubnp.com/notes/class-10-science
+
+Correct:
+https://studenthubnp.com/pyqs/class-10-math
+canonical:
+https://studenthubnp.com/pyqs/class-10-math
+
+WRONG:
+Pages canonicalized to homepage or another unrelated page.
+
+==================================================
+REQUIREMENTS
+==================================================
+
+1. Audit ALL metadata generation logic in Next.js App Router.
+
+2. Fix canonical URL generation dynamically for:
+- notes
+- PYQs
+- blogs
+- tools
+- homepage
+- about page
+- contact page
+- dynamic routes
+
+3. Ensure EVERY page generates UNIQUE:
+- title
+- meta description
+- canonical URL
+- OpenGraph metadata
+- Twitter metadata
+
+4. Prevent homepage metadata from leaking into other pages.
+
+5. Notes pages must generate metadata using:
+- note title
+- subject
+- class
+- keywords
+- content summary
+
+6. PYQ pages must generate metadata using:
+- subject
+- class
+- year
+- exam type
+
+7. Ensure metadata is server-rendered properly for SEO.
+
+8. SEO pages must use:
+- SSR or SSG
+NOT pure client-side rendering.
+
+9. Verify every page source contains:
+- correct canonical
+- correct title
+- correct meta description
+
+10. Ensure NO duplicate metadata exists sitewide.
+
+==================================================
+GOOGLE INDEXING FIX
+==================================================
+
+After canonical fixes:
+
+1. Ensure all note and PYQ pages become independently indexable.
+2. Ensure Google no longer sees them as alternate pages.
+3. Ensure canonical matches the actual page URL exactly.
+4. Ensure sitemap only contains canonical URLs.
+
+==================================================
+ATTENDANCE CALCULATOR SEO IMPROVEMENT
+==================================================
+
+Improve ranking for:
+Attendance Calculator
+
+Optimize:
+- title
+- content structure
+- keyword targeting
+- FAQ
+- schema
+- internal links
+- metadata
+- page speed
+
+Target keywords:
+- attendance calculator
+- attendance percentage calculator
+- how many classes can I miss
+
+==================================================
+GPA CALCULATOR SEO IMPROVEMENT
+==================================================
+
+Improve ranking for:
+NEB GPA Calculator
+
+Target:
+- NEB GPA calculator
+- GPA calculator Nepal
+- Class 12 GPA calculator Nepal
+
+Generate Nepal-focused metadata and SEO structure.
+
+==================================================
+TECHNICAL SEO FIXES
+==================================================
+
+Fix:
+- metadata inheritance bugs
+- dynamic route SEO issues
+- duplicate titles
+- duplicate descriptions
+- canonical conflicts
+- hydration SEO issues
+- client-side SEO issues
+
+==================================================
+FINAL VERIFICATION
+==================================================
+
+After fixes:
+1. verify every page has unique metadata
+2. verify canonical tags are self-referencing
+3. verify notes pages are independently indexable
+4. verify PYQ pages are independently indexable
+5. verify homepage metadata is NOT reused elsewhere
+6. verify no duplicate canonical conflicts exist
+7. verify Google can crawl and index all important pages
+
+==================================================
+OUTPUT REQUIRED
+==================================================
+
+At the end explain:
+- what caused the canonical issue
+- what metadata problems existed
+- what was fixed
+- which pages were affected
+- before vs after SEO architecture
+- how indexing will improve after fixes
