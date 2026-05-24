@@ -36,7 +36,7 @@ interface CachedMissionState {
 }
 
 // Bump this whenever mission structure changes to force a regeneration for all users
-const MISSION_VERSION = 4;
+const MISSION_VERSION = 5;
 const CACHE_KEY  = (uid: string, date: string) => `sh_dm_${uid}_${date}`;
 export const POMODORO_MISSION_KEY = "sh_mission_timer";
 
@@ -304,9 +304,12 @@ export function buildMissions(
   const wellnessItem = pick(WELLNESS_MISSIONS, rand);
 
   return [
+    // Mission 1: auto-starts immediately — tracks total daily study time in background.
     { ...getPomodoroMission(level, grade), startedAt: studyMinsNow },
     getSchoolTaskMission(grade),
-    { ...getSubjectStudyMission(level, grade), startedAt: studyMinsNow },
+    // Mission 3: does NOT auto-start. The user must tap "Go to Pomodoro" on this
+    // card to begin tracking, keeping it fully independent of Mission 1.
+    getSubjectStudyMission(level, grade),
     {
       id: "wellness",
       text: wellnessItem.text,

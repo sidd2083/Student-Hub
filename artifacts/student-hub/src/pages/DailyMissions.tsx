@@ -71,15 +71,27 @@ function PomodoroMissionCard({
           {!mission.completed && (
             <div className="mb-3">
               <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] text-gray-400">
-                  Auto-tracked from Pomodoro timer
+                {mission.startedAt !== undefined ? (
+                  <span className="text-[10px] text-gray-400">
+                    Tracking from Pomodoro timer
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-amber-500 font-medium flex items-center gap-1">
+                    ⚡ Tap below to start tracking this mission
+                  </span>
+                )}
+                <span className={`text-[10px] font-semibold ${mission.startedAt !== undefined ? "text-blue-600" : "text-gray-400"}`}>
+                  {mission.startedAt !== undefined ? `${Math.round(progress)}%` : "Not started"}
                 </span>
-                <span className="text-[10px] font-semibold text-blue-600">{Math.round(progress)}%</span>
               </div>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-700"
-                  style={{ width: `${progress}%` }}
+                  className={`h-full rounded-full transition-all duration-700 ${
+                    mission.startedAt !== undefined
+                      ? "bg-gradient-to-r from-blue-400 to-blue-600"
+                      : "bg-gray-200"
+                  }`}
+                  style={{ width: mission.startedAt !== undefined ? `${progress}%` : "0%" }}
                 />
               </div>
             </div>
@@ -88,10 +100,14 @@ function PomodoroMissionCard({
           {!mission.completed && (
             <button
               onClick={handleGo}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 active:scale-95 text-white text-xs font-semibold rounded-xl transition-all"
+              className={`flex items-center gap-2 px-4 py-2 active:scale-95 text-white text-xs font-semibold rounded-xl transition-all ${
+                mission.startedAt !== undefined
+                  ? "bg-blue-500 hover:bg-blue-600"
+                  : "bg-amber-500 hover:bg-amber-600"
+              }`}
             >
               <Timer className="w-3.5 h-3.5" />
-              {mission.startedAt !== undefined ? "Continue in Pomodoro" : "Go to Pomodoro"}
+              {mission.startedAt !== undefined ? "Continue in Pomodoro" : "Start This Mission"}
               <ArrowRight className="w-3 h-3" />
             </button>
           )}
