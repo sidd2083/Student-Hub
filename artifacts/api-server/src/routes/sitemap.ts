@@ -46,16 +46,16 @@ async function fetchAll(collection: string): Promise<FirestoreDoc[]> {
     log.warn({ collection }, "VITE_FIREBASE_API_KEY is not set — Firestore fetch will fail");
   }
 
-  while (attempts < 10) {
+  while (attempts < 20) {
     attempts++;
     const url =
       `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collection}` +
       `?pageSize=300` +
-      (pageToken ? `&pageToken=${pageToken}` : "") +
+      (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "") +
       (API_KEY   ? `&key=${API_KEY}`         : "");
 
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) {
         const body = await res.text().catch(() => "(unreadable)");
         log.error({ collection, status: res.status, body }, "Firestore REST API error");
@@ -121,9 +121,23 @@ ${entries}
 </urlset>`;
 }
 
-router.get("/sitemap.xml", async (_req: Request, res: Response) => {
+// ── In-memory sitemap cache ────────────────────────────────────────────────────
+// Generated once on startup (and every 6 hours thereafter).
+// Requests are served instantly from this cache — no Firestore call on each hit.
+interface SitemapCache {
+  xml:         string;
+  generatedAt: number; // Date.now()
+  noteCount:   number;
+  pyqCount:    number;
+}
+
+let sitemapCache: SitemapCache | null = null;
+let generating = false;
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+async function generateSitemap(): Promise<SitemapCache> {
   const today = new Date().toISOString().split("T")[0];
-  log.info("Sitemap requested — fetching Firestore collections");
+  log.info("Sitemap: generating (fetching Firestore collections)");
 
   const [noteDocs, pyqDocs] = await Promise.all([
     fetchAll("notes"),
@@ -159,13 +173,79 @@ router.get("/sitemap.xml", async (_req: Request, res: Response) => {
       };
     });
 
-  log.info({ notes: noteUrls.length, pyqs: pyqUrls.length, statics: STATIC_URLS.length }, "Sitemap built");
-
   const xml = buildSitemapXml([...STATIC_URLS, ...noteUrls, ...pyqUrls], today);
+  const cache: SitemapCache = {
+    xml,
+    generatedAt: Date.now(),
+    noteCount:   noteUrls.length,
+    pyqCount:    pyqUrls.length,
+  };
 
-  res.setHeader("Content-Type", "application/xml; charset=utf-8");
-  res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
-  res.send(xml);
+  log.info(
+    { notes: cache.noteCount, pyqs: cache.pyqCount, statics: STATIC_URLS.length, totalUrls: STATIC_URLS.length + noteUrls.length + pyqUrls.length },
+    "Sitemap: generated successfully",
+  );
+  return cache;
+}
+
+// Kick off generation in the background on startup so the first real request
+// is served from cache instead of waiting 8+ seconds.
+async function warmCache() {
+  if (generating) return;
+  generating = true;
+  try {
+    sitemapCache = await generateSitemap();
+  } catch (err) {
+    log.error({ err }, "Sitemap: background warm-up failed");
+  } finally {
+    generating = false;
+  }
+}
+
+// Warm up immediately when this module is loaded
+warmCache();
+
+// Refresh every 6 hours
+setInterval(() => {
+  warmCache();
+}, CACHE_TTL_MS);
+
+router.get("/sitemap.xml", async (_req: Request, res: Response) => {
+  // If cache is warm, serve immediately
+  if (sitemapCache) {
+    const ageMs  = Date.now() - sitemapCache.generatedAt;
+    const ageMin = Math.round(ageMs / 60_000);
+    log.info(
+      { notes: sitemapCache.noteCount, pyqs: sitemapCache.pyqCount, ageMin },
+      "Sitemap: served from cache",
+    );
+
+    // no-store prevents the Replit proxy / browser from caching a stale version
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Sitemap-Cache", "HIT");
+    res.setHeader("X-Sitemap-Age-Min", String(ageMin));
+    return res.send(sitemapCache.xml);
+  }
+
+  // Cache is cold — generate now (only happens on very first request after startup)
+  log.info("Sitemap: cache cold, generating now");
+  try {
+    sitemapCache = await generateSitemap();
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Sitemap-Cache", "MISS");
+    return res.send(sitemapCache.xml);
+  } catch (err) {
+    log.error({ err }, "Sitemap: generation failed on request");
+    // Serve static-only sitemap as fallback so the request doesn't fail
+    const today = new Date().toISOString().split("T")[0];
+    const fallbackXml = buildSitemapXml([...STATIC_URLS], today);
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Sitemap-Cache", "FALLBACK");
+    return res.send(fallbackXml);
+  }
 });
 
 router.get("/sitemap-index.xml", (_req: Request, res: Response) => {
@@ -179,7 +259,7 @@ router.get("/sitemap-index.xml", (_req: Request, res: Response) => {
 </sitemapindex>`;
 
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
-  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.setHeader("Cache-Control", "no-store");
   res.send(xml);
 });
 
