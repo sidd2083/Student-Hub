@@ -6,7 +6,8 @@
   "functions": {
     "api/index.mjs": {
       "memory": 512,
-      "maxDuration": 30
+      "maxDuration": 30,
+      "includeFiles": "artifacts/student-hub/dist/public/index.html"
     },
     "api/ai/chat.mjs": {
       "memory": 512,
@@ -18,7 +19,9 @@
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/(.*)",     "destination": "/index.html" }
+    { "source": "/api/(.*)",    "destination": "/api/index" },
+    { "source": "/notes/:path*","destination": "/api/index" },
+    { "source": "/pyq/:path*",  "destination": "/api/index" },
+    { "source": "/(.*)",        "destination": "/index.html" }
   ]
 }

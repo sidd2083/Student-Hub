@@ -23,7 +23,10 @@ import express, {
   type NextFunction,
 } from "express";
 import { readFileSync, existsSync } from "fs";
-import { resolve } from "path";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __ssrDir = dirname(fileURLToPath(import.meta.url));
 
 const router = Router();
 
@@ -33,9 +36,12 @@ const API_KEY     = process.env.VITE_FIREBASE_API_KEY    ?? "";
 
 // When Express serves everything (production mode), set FRONTEND_DIST to the
 // built frontend directory. Falls back to the monorepo-relative path.
+// __ssrDir is the compiled file's directory (e.g. artifacts/api-server/dist/).
+// ../../student-hub/dist/public reliably resolves to the frontend build on both
+// Replit (process.cwd = artifacts/api-server) and Vercel (function bundle root).
 const FRONTEND_DIST = process.env.FRONTEND_DIST
   ? resolve(process.cwd(), process.env.FRONTEND_DIST)
-  : resolve(process.cwd(), "../student-hub/dist/public");
+  : resolve(__ssrDir, "../../student-hub/dist/public");
 
 const BUILD_EXISTS = existsSync(resolve(FRONTEND_DIST, "index.html"));
 
