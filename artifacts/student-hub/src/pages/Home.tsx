@@ -4,7 +4,7 @@ import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { BookOpen, FileText, BarChart2, MessageCircle, Timer, CheckSquare, Trophy, ArrowRight, LogIn, Sparkles, Calculator, CalendarCheck } from "lucide-react";
+import { BookOpen, FileText, BarChart2, MessageCircle, Timer, CheckSquare, Trophy, ArrowRight, LogIn, Calculator, CalendarCheck } from "lucide-react";
 import { noteUrl, pyqUrl } from "@/lib/slugs";
 
 const features = [
@@ -131,9 +131,6 @@ export default function Home() {
           <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-indigo-100 rounded-full blur-3xl opacity-30" />
         </div>
         <div className="relative max-w-3xl mx-auto text-center">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full mb-5">
-            <Sparkles className="w-3 h-3" aria-hidden="true" /> Free for every Nepali student
-          </span>
           <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 leading-tight mb-4">
             Study smarter.<br />
             <span className="text-blue-500">Rank higher.</span>
@@ -269,8 +266,8 @@ export default function Home() {
                         }`} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-gray-900 text-sm truncate">{note.title}</p>
-                        <p className="text-xs text-gray-500">{note.subject} · Grade {note.grade}</p>
+                        <p className="font-medium text-gray-900 text-sm line-clamp-2 leading-snug">{note.title}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{note.subject} · Grade {note.grade}</p>
                       </div>
                       <ArrowRight className="w-4 h-4 text-gray-300 flex-shrink-0" aria-hidden="true" />
                     </div>
@@ -300,8 +297,8 @@ export default function Home() {
                         <FileText className="w-4 h-4 text-orange-500" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-gray-900 text-sm truncate">{pyq.title}</p>
-                        <p className="text-xs text-gray-500">{pyq.subject} · {pyq.year} · Grade {pyq.grade}</p>
+                        <p className="font-medium text-gray-900 text-sm line-clamp-2 leading-snug">{pyq.title}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{pyq.subject} · {pyq.year} · Grade {pyq.grade}</p>
                       </div>
                       <ArrowRight className="w-4 h-4 text-gray-300 flex-shrink-0" aria-hidden="true" />
                     </div>

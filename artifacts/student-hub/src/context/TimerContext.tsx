@@ -44,10 +44,11 @@ interface TimerContextType {
    * Resets the timer to the work phase and enables auto-switch — without
    * clearing session counts or today's saved minutes. Call this when the
    * student navigates to Pomodoro from a mission so they always see a clean
-   * 25:00 ready to start, regardless of previous timer state.
+   * timer ready to start, regardless of previous timer state.
+   * Accepts an optional workMins to set a custom focus duration (e.g. 50 min).
    * No-ops if the timer is already running.
    */
-  restartForMission: () => void;
+  restartForMission: (workMins?: number) => void;
 }
 
 const TimerContext = createContext<TimerContextType | null>(null);
@@ -550,16 +551,13 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const restartForMission = useCallback(() => {
+  const restartForMission = useCallback((workMins?: number) => {
     if (runningRef.current) return;
-    // Force standard Pomodoro settings: 25 min focus / 5 min short break /
-    // 15 min long break / 4 sessions before long break / auto-switch ON.
-    // This overrides any custom settings the student may have set, so they
-    // always land on a clean 25:00 cycle ready to start from missions.
+    const focusMins = workMins && workMins > 0 ? workMins : 25;
     const missionSettings: TimerSettings = {
-      workMins: 25,
-      shortBreakMins: 5,
-      longBreakMins: 10,
+      workMins: focusMins,
+      shortBreakMins: focusMins >= 90 ? 20 : focusMins >= 50 ? 10 : 5,
+      longBreakMins:  focusMins >= 90 ? 30 : focusMins >= 50 ? 15 : 10,
       sessionsBeforeLongBreak: 2,
       sessionsBeforeShortBreak: 2,
       autoSwitch: true,
@@ -567,7 +565,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     settingsRef.current = missionSettings;
     setSettings(missionSettings);
 
-    // Reset cycle so it starts fresh: Focus → Break → Focus → Break → … → Long Break
     workWallStartRef.current    = null;
     displayWallStartRef.current = null;
     totalWorkSecondsRef.current = 0;
@@ -575,10 +572,10 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     sessionsRef.current         = 0;
     naturalSessionsRef.current  = 0;
     phaseRef.current            = "work";
-    secondsRef.current          = 25 * 60;
+    secondsRef.current          = focusMins * 60;
 
     setPhase("work");
-    setSeconds(25 * 60);
+    setSeconds(focusMins * 60);
     setSessionsCompleted(0);
     setNaturalSessionsCompleted(0);
   }, []);

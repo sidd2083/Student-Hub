@@ -40,7 +40,7 @@ function PomodoroMissionCard({
     if (mission.startedAt === undefined) {
       onStart(mission.id, mission.text, mins);
     }
-    navigate("/pomodoro");
+    navigate(`/pomodoro?mins=${mins}`);
   };
 
   return (

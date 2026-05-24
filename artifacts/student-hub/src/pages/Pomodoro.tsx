@@ -158,10 +158,21 @@ function PomodoroContent() {
   const {
     phase, seconds, running, sessionsCompleted,
     settings, savedMinutesToday,
-    start, pause, reset, skipPhase,
+    start, pause, reset, skipPhase, restartForMission,
   } = useTimer();
   const [activeTask, setActiveTask] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+
+  // If the user arrived from a mission card (/pomodoro?mins=N), reset the
+  // timer to that exact duration so they can start their mission right away.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mins = parseInt(params.get("mins") ?? "0", 10);
+    if (mins > 0 && !running) {
+      restartForMission(mins);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [pendingTasks, setPendingTasks] = useState<Array<{ id: string; text: string }>>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [focusScore, setFocusScore] = useState<{ score: number; mins: number } | null>(null);

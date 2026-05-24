@@ -292,19 +292,13 @@ export function buildMissions(
         difficulty: "easy", type: "manual", completed: false, emoji: "📚",
         actionLink: "/notes", actionLabel: "Open Notes",
       },
-      {
-        id: "pomodoro_cycle",
-        text: `Study for 50 minutes using the Pomodoro timer today. Even on Saturday, a little focused study keeps your momentum going.`,
-        difficulty: "easy", type: "pomodoro",
-        targetMinutes: 50, completed: false, emoji: "⏱️",
-      },
+      getSubjectStudyMission(level, grade),
     ];
   }
 
   const wellnessItem = pick(WELLNESS_MISSIONS, rand);
 
   return [
-    getPomodoroMission(level, grade),
     getSchoolTaskMission(grade),
     getSubjectStudyMission(level, grade),
     {
@@ -344,12 +338,32 @@ export function useDailyMissions() {
     );
   }, [profile]);
 
-  const cached = uid ? readCache(uid, date) : null;
-
-  const [missions,         setMissions]         = useState<Mission[]>(cached?.missions ?? []);
-  const [loading,          setLoading]          = useState<boolean>(!cached);
-  const [allCompleted,     setAllCompleted]     = useState(cached?.allCompleted ?? false);
-  const [studyMinsAtStart, setStudyMinsAtStart] = useState(cached?.studyMinsAtStart ?? 0);
+  // Try to read cached state even before Firebase Auth resolves (uid is null
+  // on the first render). Scan localStorage for any sh_dm_*_<date> key so the
+  // user sees their missions instantly without waiting for Firestore.
+  const [missions, setMissions] = useState<Mission[]>(() => {
+    if (uid) {
+      const c = readCache(uid, date);
+      if (c && c.missions.length > 0) return c.missions;
+    }
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith("sh_dm_") && key.endsWith(`_${date}`)) {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const p = JSON.parse(raw) as CachedMissionState;
+            if (p?.version === MISSION_VERSION && Array.isArray(p.missions) && p.missions.length > 0) return p.missions;
+          }
+        }
+      }
+    } catch {}
+    return [];
+  });
+  const _initCache = uid ? readCache(uid, date) : null;
+  const [loading,          setLoading]          = useState<boolean>(!_initCache);
+  const [allCompleted,     setAllCompleted]     = useState(_initCache?.allCompleted ?? false);
+  const [studyMinsAtStart, setStudyMinsAtStart] = useState(_initCache?.studyMinsAtStart ?? 0);
   const [fetchTrigger,     setFetchTrigger]     = useState(0);
 
   const [blockedUntil, setBlockedUntil] = useState(0);
@@ -362,7 +376,17 @@ export function useDailyMissions() {
     if (!uid || syncedRef.current) return;
     syncedRef.current = true;
     let mounted = true;
-    setLoading(true);
+
+    // Immediately apply local cache so the user sees their missions right away
+    // while Firestore is being fetched in the background.
+    const localImmediate = readCache(uid, date);
+    if (localImmediate && localImmediate.missions.length > 0) {
+      setMissions(localImmediate.missions);
+      setAllCompleted(localImmediate.allCompleted);
+      setStudyMinsAtStart(localImmediate.studyMinsAtStart);
+    } else {
+      setLoading(true);
+    }
     (async () => {
       try {
         const docId  = `${uid}_${date}`;

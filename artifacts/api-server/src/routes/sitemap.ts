@@ -58,8 +58,6 @@ async function fetchAll(collection: string): Promise<FirestoreDoc[]> {
   return docs;
 }
 
-const TODAY = new Date().toISOString().split("T")[0];
-
 const STATIC_URLS = [
   { loc: `${SITE_URL}/`,                            priority: "1.0",  changefreq: "weekly"  },
   { loc: `${SITE_URL}/notes`,                       priority: "0.95", changefreq: "daily"   },
@@ -78,11 +76,11 @@ function escape(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
 
-function buildSitemapXml(urls: Array<{ loc: string; priority: string; changefreq: string }>): string {
+function buildSitemapXml(urls: Array<{ loc: string; priority: string; changefreq: string }>, today: string): string {
   const entries = urls
     .map(u => `  <url>
     <loc>${escape(u.loc)}</loc>
-    <lastmod>${TODAY}</lastmod>
+    <lastmod>${today}</lastmod>
     <changefreq>${u.changefreq}</changefreq>
     <priority>${u.priority}</priority>
   </url>`)
@@ -95,6 +93,7 @@ ${entries}
 }
 
 router.get("/sitemap.xml", async (_req: Request, res: Response) => {
+  const today = new Date().toISOString().split("T")[0];
   const [noteDocs, pyqDocs] = await Promise.all([
     fetchAll("notes"),
     fetchAll("pyqs"),
@@ -121,7 +120,7 @@ router.get("/sitemap.xml", async (_req: Request, res: Response) => {
       return { loc: `${SITE_URL}/pyq/${id}-grade-${grade}-${subject}-${year}-${title}`, priority: "0.75", changefreq: "monthly" };
     });
 
-  const xml = buildSitemapXml([...STATIC_URLS, ...noteUrls, ...pyqUrls]);
+  const xml = buildSitemapXml([...STATIC_URLS, ...noteUrls, ...pyqUrls], today);
 
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
@@ -129,11 +128,12 @@ router.get("/sitemap.xml", async (_req: Request, res: Response) => {
 });
 
 router.get("/sitemap-index.xml", (_req: Request, res: Response) => {
+  const today = new Date().toISOString().split("T")[0];
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <sitemap>
     <loc>${SITE_URL}/sitemap.xml</loc>
-    <lastmod>${TODAY}</lastmod>
+    <lastmod>${today}</lastmod>
   </sitemap>
 </sitemapindex>`;
 
