@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en-NP"><head>
+    <!-- Performance: early DNS/connection hints -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" />
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
+    <link rel="preconnect" href="https://www.googleapis.com" />
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-L4E04GRGLP"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-L4E04GRGLP');
+    </script>
+
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5, viewport-fit=cover" />
+
+    <!-- ── Primary SEO ───────────────────────────────────────────────────── -->
+    <title>O.Math Grade 10 PYQ 2026 — Multiple and Sub-Multiple Angles Important question : Grade 10 (see 2083) | Student Hub Nepal</title>
+    <meta name="description" content="2026 past year question paper for Grade 10 O.Math: Multiple and Sub-Multiple Angles Important question : Grade  10 (see 2083). Practice real NEB/SEE exam questions. Free download on Student Hub Nepal." />
+    <meta name="keywords" content="student hub, student hub nepal, grade 10 notes, SEE preparation, NEB notes, PYQ nepal, free notes nepal, MCQ practice nepal, study tracker nepal, SEE 2082, NEB 2082, grade 9 notes nepal, grade 11 notes nepal, grade 12 notes nepal, NEB exam preparation, free study platform nepal, NEB grade 12 notes" />
+    <meta name="author" content="Student Hub Nepal" />
+    
+    <meta name="language" content="English" />
+    <meta name="revisit-after" content="3 days" />
+    <meta name="rating" content="general" />
+
+    <!-- ── Geo / Region ───────────────────────────────────────────────────── -->
+    <meta name="geo.region" content="NP" />
+    <meta name="geo.placename" content="Nepal" />
+    <meta name="geo.position" content="27.7172;85.3240" />
+    <meta name="ICBM" content="27.7172, 85.3240" />
+
+    <!-- ── Open Graph (Facebook / WhatsApp / LinkedIn) ───────────────────── -->
+    
+    
+    <meta property="og:site_name" content="Student Hub Nepal" />
+    
+    
+    <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+    
+    
+    
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:locale" content="en_NP" />
+
+    <!-- ── Twitter / X Card ──────────────────────────────────────────────── -->
+    
+    
+    
+    
+    
+
+    <!-- ── Canonical ─────────────────────────────────────────────────────── -->
+    
+
+    <!-- ── PWA / Icons ───────────────────────────────────────────────────── -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#3B82F6" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Student Hub" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+
+    <!-- ── Performance: preconnect critical origins FIRST ───────────────── -->
+    <link rel="preconnect" href="https://www.googletagmanager.com" />
+    <link rel="preconnect" href="https://www.google-analytics.com" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://firebase.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin />
+    <!-- Secondary Google APIs — dns-prefetch is sufficient -->
+    <link rel="dns-prefetch" href="https://generativelanguage.googleapis.com" />
+    <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com" />
+    <link rel="dns-prefetch" href="https://www.googleapis.com" />
+
+    <!-- OG image: not preloaded — it's only used by crawlers, not render-critical -->
+
+    <!-- ── JSON-LD Structured Data — Website + Organization + WebPage ────── -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://studenthubnp.com/#website",
+          "name": "Student Hub Nepal",
+          "url": "https://studenthubnp.com",
+          "description": "Free study platform for Grade 9–12 students in Nepal. Notes, PYQs, MCQ practice, AI tutor, Pomodoro timer, and progress tracking for SEE and NEB exams.",
+          "inLanguage": "en-NP",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://studenthubnp.com/notes?q={search_term_string}"
+            },
+            "query-input": "required name=search_term_string"
+          },
+          "publisher": {
+            "@id": "https://studenthubnp.com/#organization"
+          }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://studenthubnp.com/#organization",
+          "name": "Student Hub Nepal",
+          "url": "https://studenthubnp.com",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://studenthubnp.com/icon-512.png",
+            "width": 512,
+            "height": 512
+          },
+          "description": "Free educational platform built for Grade 9–12 students across Nepal.",
+          "foundingDate": "2024",
+          "areaServed": {
+            "@type": "Country",
+            "name": "Nepal"
+          },
+          "sameAs": []
+        },
+        {
+          "@type": "WebPage",
+          "@id": "https://studenthubnp.com/#webpage",
+          "url": "https://studenthubnp.com/",
+          "name": "Student Hub — Free Study Platform for Grade 9–12 Students in Nepal",
+          "isPartOf": { "@id": "https://studenthubnp.com/#website" },
+          "about": { "@id": "https://studenthubnp.com/#organization" },
+          "description": "Free notes, past papers (PYQs), MCQ practice, AI study assistant and progress tracking for Grade 9–12 students in Nepal.",
+          "inLanguage": "en-NP",
+          "image": {
+            "@type": "ImageObject",
+            "url": "https://studenthubnp.com/opengraph.jpg",
+            "width": 1200,
+            "height": 630
+          }
+        },
+        {
+          "@type": "EducationalOrganization",
+          "name": "Student Hub Nepal",
+          "url": "https://studenthubnp.com",
+          "description": "Free online study platform for Nepali high school students preparing for SEE and NEB examinations.",
+          "educationalCredentialAwarded": "Study support for Grade 9–12 NEB/SEE examinations",
+          "areaServed": {
+            "@type": "Country",
+            "name": "Nepal"
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- ── Critical CSS: boot splash + shimmer animation ────────────────── -->
+    <style>
+      /* Eliminate 300ms tap delay across the entire PWA — biggest mobile speed fix */
+      html { touch-action: manipulation; }
+      * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+
+      @media (min-width: 768px) { #boot-splash { display: none !important; } }
+      @keyframes shimmer {
+        0%   { background-position: -200% center; }
+        100% { background-position:  200% center; }
+      }
+      @keyframes page-fade {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+      .page-fade { animation: page-fade 0.07s ease-out both; }
+
+      /* Prevent invisible tap areas — buttons and links should always be responsive */
+      button, a, [role="button"] { cursor: pointer; touch-action: manipulation; }
+
+      /* Prevent content layout shift on font load */
+      body { font-display: swap; }
+    </style>
+
+    <!-- ── Font: non-render-blocking, display=swap ───────────────────────── -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet" media="all" onload="this.media=&#39;all&#39;" />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    </noscript>
+    <script type="module" crossorigin src="/assets/index-CtJRFZbG.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-react-DP1M2pbw.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-router-CKX0uRh_.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-firebase-core-CFjT51jY.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-firebase-firestore-BJg5kyIE.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-firebase-auth-0rakPz2L.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-firebase-storage-DqkPfOCd.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-radix-BkrJsv1T.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-icons-DTC4ib-e.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-C9ZXQFpf.css">
+      <meta name="keywords" content="o.math pyq 2026, grade 10 o.math past paper, 2026 o.math question nepal, neb past year question 2026, see past paper 2026, grade 10 pyq nepal" />
+    <meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large" />
+    <link rel="canonical" href="https://studenthubnp.com/pyq/1Kae5JMxvlqCDaMmo4Uo-grade-10-omath-2026-multiple-and-sub-multiple-angles-important-question-grade-10-see-2083" />
+    <meta property="og:title" content="O.Math Grade 10 PYQ 2026 — Multiple and Sub-Multiple Angles Important question : Grade  10 (see 2083) | Student Hub Nepal" />
+    <meta property="og:description" content="2026 past year question paper for Grade 10 O.Math: Multiple and Sub-Multiple Angles Important question : Grade  10 (see 2083). Practice real NEB/SEE exam questions. Free download on Student Hub Nepal." />
+    <meta property="og:url" content="https://studenthubnp.com/pyq/1Kae5JMxvlqCDaMmo4Uo-grade-10-omath-2026-multiple-and-sub-multiple-angles-important-question-grade-10-see-2083" />
+    <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="O.Math Grade 10 PYQ 2026 — Multiple and Sub-Multiple Angles Important question : Grade  10 (see 2083) | Student Hub Nepal" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Student Hub Nepal" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="O.Math Grade 10 PYQ 2026 — Multiple and Sub-Multiple Angles Important question : Grade  10 (see 2083) | Student Hub Nepal" />
+    <meta name="twitter:description" content="2026 past year question paper for Grade 10 O.Math: Multiple and Sub-Multiple Angles Important question : Grade  10 (see 2083). Practice real NEB/SEE exam questions. Free download on Student Hub Nepal." />
+    <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"O.Math Grade 10 PYQ 2026 — Multiple and Sub-Multiple Angles Important question : Grade  10 (see 2083) | Student Hub Nepal","description":"2026 past year question paper for Grade 10 O.Math: Multiple and Sub-Multiple Angles Important question : Grade  10 (see 2083). Practice real NEB/SEE exam questions. Free download on Student Hub Nepal.","url":"https://studenthubnp.com/pyq/1Kae5JMxvlqCDaMmo4Uo-grade-10-omath-2026-multiple-and-sub-multiple-angles-important-question-grade-10-see-2083","mainEntityOfPage":{"@type":"WebPage","@id":"https://studenthubnp.com/pyq/1Kae5JMxvlqCDaMmo4Uo-grade-10-omath-2026-multiple-and-sub-multiple-angles-important-question-grade-10-see-2083"},"author":{"@type":"Organization","name":"Student Hub Nepal","url":"https://studenthubnp.com"},"publisher":{"@type":"Organization","name":"Student Hub Nepal","url":"https://studenthubnp.com"},"educationalLevel":"Grade 10","about":{"@type":"Thing","name":"O.Math Past Year Questions 2026"},"inLanguage":"en-NP","isAccessibleForFree":true}</script>
+  </head>
+  <body>
+    <!--
+      Boot splash — rendered by the browser from HTML BEFORE any JavaScript runs.
+      Shows the logo instantly on PWA open and browser cold-start.
+      React replaces this content when it mounts (createRoot overwrites #root).
+    -->
+    <div id="root"><!--APP_HTML--><div id="boot-splash" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#ffffff;z-index:9999;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"><div style="width:72px;height:72px;background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);border-radius:20px;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 40px rgba(59,130,246,.4);margin-bottom:16px"><svg width="42" height="42" viewBox="0 0 180 180" fill="none"><path d="M90 44 C90 44 56 39 36 48 L36 136 C56 127 90 132 90 132 L90 44Z" fill="white" fill-opacity=".95"/></path><path d="M90 44 C90 44 124 39 144 48 L144 136 C124 127 90 132 90 132 L90 44Z" fill="white" fill-opacity=".7"/></path><line x1="90" y1="44" x2="90" y2="132" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/></line></svg></div><p style="font-size:17px;font-weight:600;color:#111827;margin:0 0 4px;letter-spacing:-.01em">Student Hub</p><p style="font-size:13px;color:#6b7280;margin:0">Study smarter. Rank higher.</p></div></div>
+
+    <!-- ── Visible to Googlebot before JS executes — prevents "Crawled but not indexed" ── -->
+    <noscript>
+      <div style="max-width:860px;margin:40px auto;padding:0 24px;font-family:system-ui,sans-serif;color:#111827">
+        <h1 style="font-size:28px;font-weight:700;margin-bottom:8px">Student Hub Nepal — Free Study Platform for Grade 9–12</h1>
+        <p style="font-size:16px;color:#4b5563;margin-bottom:24px">Free notes, past papers (PYQs), MCQ practice, GPA calculator Nepal, bunk calculator, attendance calculator, AI tutor and study tracker for Grade 9, 10, 11 and 12 students in Nepal and worldwide. Built for SEE and NEB exam preparation. 100% free, no login required for most features.</p>
+        <nav style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:32px">
+          <a href="/notes" style="color:#2563eb;text-decoration:none;font-weight:600">Study Notes</a>
+          <a href="/pyqs" style="color:#2563eb;text-decoration:none;font-weight:600">Past Papers (PYQs)</a>
+          <a href="/mcq" style="color:#2563eb;text-decoration:none;font-weight:600">MCQ Practice</a>
+          <a href="/tools/gpa-calculator" style="color:#2563eb;text-decoration:none;font-weight:600">GPA Calculator Nepal — NEB Class 11 &amp; 12</a>
+          <a href="/tools/attendance-calculator" style="color:#2563eb;text-decoration:none;font-weight:600">Bunk Calculator &amp; Attendance Calculator</a>
+          <a href="/about" style="color:#2563eb;text-decoration:none;font-weight:600">About Us</a>
+          <a href="/contact" style="color:#2563eb;text-decoration:none;font-weight:600">Contact</a>
+        </nav>
+        <section style="margin-bottom:28px">
+          <h2 style="font-size:22px;font-weight:700;margin-bottom:8px">GPA Calculator Nepal — NEB Class 11 &amp; 12 GPA Calculator (2082/2083)</h2>
+          <p style="margin-bottom:8px">Free GPA Calculator for Nepal students. Calculate your NEB Class 12 or Class 11 GPA instantly using the official NEB formula — 75% Theory + 25% Practical per subject. Works for Science and Management streams. No sign-up required.</p>
+          <p>Our <strong>NEB GPA Calculator</strong> is the most accurate <strong>grade 12 GPA calculator</strong> available for Nepal students. Enter your theory and practical grades and get your <strong>class 12 GPA</strong> or <strong>class 11 GPA</strong> in seconds. Trusted by thousands of NEB students every year.</p>
+          <p style="margin-top:8px"><a href="/tools/gpa-calculator" style="color:#2563eb;font-weight:600">Use the NEB GPA Calculator →</a></p>
+        </section>
+        <section style="margin-bottom:28px">
+          <h2 style="font-size:22px;font-weight:700;margin-bottom:8px">Bunk Calculator &amp; Attendance Calculator — How Many Classes Can I Miss?</h2>
+          <p style="margin-bottom:8px">Free bunk calculator and attendance calculator. Instantly find how many classes you can miss (bunk) while staying above your college's 75%, 80%, or 85% minimum. Works for India (UGC 75% rule, CBSE, DU, Mumbai University, IIT, NIT), Nepal, USA, UK, Australia, Canada and worldwide.</p>
+          <p>Use our <strong>bunk calculator</strong> to plan your absences without risking your semester. Just enter your total classes, attended classes, and required percentage — get your attendance % and exactly how many more classes you can safely miss.</p>
+          <p style="margin-top:8px"><a href="/tools/attendance-calculator" style="color:#2563eb;font-weight:600">Use the Bunk Calculator →</a></p>
+        </section>
+        <section style="margin-bottom:28px">
+          <h2 style="font-size:20px;font-weight:600;margin-bottom:8px">Free Notes for Grade 9–12</h2>
+          <p>Download or view free study notes for Mathematics, Science, English, Social Studies, Nepali and optional subjects. Covers Grade 9, Grade 10 (SEE), Grade 11 and Grade 12 (NEB) syllabuses.</p>
+          <p style="margin-top:8px"><a href="/notes" style="color:#2563eb;font-weight:600">Browse Study Notes →</a></p>
+        </section>
+        <section style="margin-bottom:28px">
+          <h2 style="font-size:20px;font-weight:600;margin-bottom:8px">NEB &amp; SEE Past Papers (PYQs)</h2>
+          <p>Access previous year question papers (PYQs) for SEE 2080, 2081 and NEB Grade 11 and Grade 12 exams. Province-wise papers for Koshi, Madhesh, Bagmati, Gandaki, Lumbini, Karnali and Sudurpashchim Pradesh.</p>
+          <p style="margin-top:8px"><a href="/pyqs" style="color:#2563eb;font-weight:600">Browse Past Papers →</a></p>
+        </section>
+        <section>
+          <h2 style="font-size:20px;font-weight:600;margin-bottom:8px">MCQ Practice — Grade 9–12 Nepal</h2>
+          <p>Practice multiple-choice questions (MCQs) for SEE and NEB exams. Chapter-wise MCQ sets for all major subjects. Instant feedback on each answer.</p>
+          <p style="margin-top:8px"><a href="/mcq" style="color:#2563eb;font-weight:600">Start MCQ Practice →</a></p>
+        </section>
+      </div>
+    </noscript>
+
+
+    <!-- ── Anti-Inspection Protection (deferred — does NOT block page render) ── -->
+    <script defer>
+    (function(){
+      'use strict';
+
+      /* ── 1. Disable right-click ───────────────────────────────────────── */
+      document.addEventListener('contextmenu', function(e){ e.preventDefault(); return false; });
+
+      /* ── 2. Block DevTools keyboard shortcuts ─────────────────────────── */
+      document.addEventListener('keydown', function(e){
+        var k = e.key, ctrl = e.ctrlKey || e.metaKey, shift = e.shiftKey;
+        if (k === 'F12'){ e.preventDefault(); e.stopPropagation(); return false; }
+        if (ctrl && shift && 'IJCijc'.indexOf(k) !== -1){ e.preventDefault(); e.stopPropagation(); return false; }
+        if (ctrl && (k === 'u' || k === 'U') && !shift){ e.preventDefault(); e.stopPropagation(); return false; }
+        if (ctrl && (k === 's' || k === 'S') && !shift){ e.preventDefault(); e.stopPropagation(); return false; }
+      }, true);
+
+      /* ── 3. DevTools open-detection (prod only) ───────────────────────── */
+      var h = location.hostname;
+      var isProd = h !== 'localhost' && h !== '127.0.0.1' && h.indexOf('.replit.dev') === -1 && h.indexOf('.repl.co') === -1;
+
+      if (isProd) {
+        var _dt = { open: false };
+
+        function _showBlock(){
+          if (document.getElementById('__sh_block')) return;
+          var d = document.createElement('div');
+          d.id = '__sh_block';
+          d.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.97);z-index:2147483647;display:flex;align-items:center;justify-content:center;flex-direction:column;font-family:system-ui,sans-serif';
+          d.innerHTML = '<div style="background:#fff;border-radius:20px;padding:36px 44px;text-align:center;max-width:380px;box-shadow:0 24px 80px rgba(0,0,0,.4)"><div style="width:56px;height:56px;background:#fee2e2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><h2 style="font-size:19px;font-weight:700;color:#0f172a;margin:0 0 8px">Access Restricted</h2><p style="color:#64748b;font-size:13.5px;line-height:1.65;margin:0 0 22px">Developer tools are not permitted on Student Hub.<br>Please close DevTools to continue studying.</p><button onclick="location.reload()" style="background:#3b82f6;color:#fff;border:none;border-radius:10px;padding:11px 28px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(59,130,246,.4)">Close &amp; Continue</button></div>';
+          document.body.appendChild(d);
+        }
+
+        function _hideBlock(){
+          var d = document.getElementById('__sh_block');
+          if (d && d.parentNode) d.parentNode.removeChild(d);
+        }
+
+        function _check(){
+          var open = (window.outerWidth - window.innerWidth) > 160 || (window.outerHeight - window.innerHeight) > 160;
+          if (open && !_dt.open){ _dt.open = true; _showBlock(); }
+          else if (!open && _dt.open){ _dt.open = false; _hideBlock(); }
+        }
+
+        window.addEventListener('resize', _check, { passive: true });
+        setTimeout(_check, 1500);
+        setInterval(_check, 4000);
+      }
+    })();
+    </script>
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"4b383aa03bae47e48ce03a5ce0aed6ab","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+
+
+</body></html>

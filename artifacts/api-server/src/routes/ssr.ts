@@ -135,19 +135,22 @@ function injectMeta(html: string, m: MetaInput): string {
   // and classifies every note/PYQ as "Alternate page with proper canonical tag",
   // preventing indexing.  Strip them ALL before injecting the correct page values.
   result = result.replace(/<link\s[^>]*rel=["']canonical["'][^>]*\/?>/gi, "");
+  result = result.replace(/<meta\s+name="keywords"\s+content="[^"]*"\s*\/?>/gi, "");
+  result = result.replace(/<meta\s+name="robots"\s+content="[^"]*"\s*\/?>/gi, "");
   result = result.replace(/<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/gi, "");
   result = result.replace(/<meta\s+property="og:type"\s+content="[^"]*"\s*\/?>/gi, "");
   result = result.replace(/<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/gi, "");
   result = result.replace(/<meta\s+property="og:description"\s+content="[^"]*"\s*\/?>/gi, "");
+  result = result.replace(/<meta\s+property="og:image"\s+content="[^"]*"\s*\/?>/gi, "");
   result = result.replace(/<meta\s+property="og:image:width"\s+content="[^"]*"\s*\/?>/gi, "");
   result = result.replace(/<meta\s+property="og:image:height"\s+content="[^"]*"\s*\/?>/gi, "");
   result = result.replace(/<meta\s+property="og:image:alt"\s+content="[^"]*"\s*\/?>/gi, "");
+  result = result.replace(/<meta\s+property="og:site_name"\s+content="[^"]*"\s*\/?>/gi, "");
   result = result.replace(/<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/?>/gi, "");
   result = result.replace(/<meta\s+name="twitter:description"\s+content="[^"]*"\s*\/?>/gi, "");
   result = result.replace(/<meta\s+name="twitter:card"\s+content="[^"]*"\s*\/?>/gi, "");
   result = result.replace(/<meta\s+name="twitter:image"\s+content="[^"]*"\s*\/?>/gi, "");
   result = result.replace(/<meta\s+name="twitter:image:alt"\s+content="[^"]*"\s*\/?>/gi, "");
-  result = result.replace(/<meta\s+name="robots"\s+content="[^"]*"\s*\/?>/gi, "");
 
   const tags = [
     kw ? `<meta name="keywords" content="${kw}" />` : "",
