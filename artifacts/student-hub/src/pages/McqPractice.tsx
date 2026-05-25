@@ -298,7 +298,7 @@ export default function McqPractice() {
       <Helmet>
         <title>MCQ Practice Nepal — SEE &amp; NEB Multiple Choice Questions | Student Hub</title>
         <meta name="description" content="Free MCQ practice for SEE and NEB exams. Grade 9–12 multiple-choice questions for Maths, Science, English and Social Studies — Student Hub Nepal." />
-        <link rel="canonical" href="https://studenthubnp.com/mcq" />
+        <link rel="canonical" href="https://www.studenthubnp.com/mcq" />
       </Helmet>
       <SoftGate feature="MCQ Practice">
         <McqContent />

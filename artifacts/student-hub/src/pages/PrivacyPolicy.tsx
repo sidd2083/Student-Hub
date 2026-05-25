@@ -8,7 +8,7 @@ export default function PrivacyPolicy() {
       <Helmet>
         <title>Privacy Policy — Student Hub Nepal</title>
         <meta name="description" content="Privacy Policy for Student Hub Nepal — how we collect, use and protect your data as a free study platform for Nepal students." />
-        <link rel="canonical" href="https://studenthubnp.com/privacy-policy" />
+        <link rel="canonical" href="https://www.studenthubnp.com/privacy-policy" />
       </Helmet>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 mb-6 transition-colors">

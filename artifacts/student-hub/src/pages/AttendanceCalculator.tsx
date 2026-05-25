@@ -42,7 +42,7 @@ const WEBAPP_SCHEMA = {
   name: "Bunk Calculator & Attendance Calculator — How Many Classes Can I Miss? Free",
   applicationCategory: "EducationApplication",
   operatingSystem: "Web Browser",
-  url: "https://studenthubnp.com/tools/attendance-calculator",
+  url: "https://www.studenthubnp.com/tools/attendance-calculator",
   description: "Free Bunk Calculator and Attendance Calculator. Instantly find how many classes you can miss (bunk) while staying above 75%, 80%, 85%, or any required percentage. Works for India (UGC 75% rule, CBSE, DU), Nepal, USA, UK, Australia. No login required.",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
   featureList: [
@@ -60,9 +60,9 @@ const BREADCRUMB_SCHEMA = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   itemListElement: [
-    { "@type": "ListItem", position: 1, name: "Home", item: "https://studenthubnp.com" },
-    { "@type": "ListItem", position: 2, name: "Tools", item: "https://studenthubnp.com/tools" },
-    { "@type": "ListItem", position: 3, name: "Attendance Calculator", item: "https://studenthubnp.com/tools/attendance-calculator" },
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.studenthubnp.com" },
+    { "@type": "ListItem", position: 2, name: "Tools", item: "https://www.studenthubnp.com/tools" },
+    { "@type": "ListItem", position: 3, name: "Attendance Calculator", item: "https://www.studenthubnp.com/tools/attendance-calculator" },
   ],
 };
 
@@ -107,17 +107,17 @@ export default function AttendanceCalculator() {
         <meta property="og:title" content="Bunk Calculator — Attendance Calculator | How Many Classes Can I Miss? Free" />
         <meta property="og:description" content="Free Bunk Calculator &amp; Attendance Calculator. Instantly find how many classes you can miss while staying above 75%, 80%, 85% or any required %. India (UGC/CBSE/DU), Nepal, USA, UK, Australia. No login." />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://studenthubnp.com/tools/attendance-calculator" />
-        <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta property="og:url" content="https://www.studenthubnp.com/tools/attendance-calculator" />
+        <meta property="og:image" content="https://www.studenthubnp.com/opengraph.jpg" />
         <meta property="og:image:alt" content="Free Bunk Calculator &amp; Attendance Calculator — How Many Classes Can I Miss? India &amp; Worldwide" />
         <meta property="og:site_name" content="Student Hub" />
 
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Bunk Calculator — Attendance Calculator | How Many Classes Can I Miss? Free" />
         <meta name="twitter:description" content="Free Bunk Calculator &amp; Attendance Calculator. Find how many classes you can miss while staying above 75%, 80%, 85% or any %. India, Nepal, USA, UK, Australia. Free." />
-        <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta name="twitter:image" content="https://www.studenthubnp.com/opengraph.jpg" />
 
-        <link rel="canonical" href="https://studenthubnp.com/tools/attendance-calculator" />
+        <link rel="canonical" href="https://www.studenthubnp.com/tools/attendance-calculator" />
         <script type="application/ld+json">{JSON.stringify(FAQ_SCHEMA)}</script>
         <script type="application/ld+json">{JSON.stringify(HOWTO_SCHEMA)}</script>
         <script type="application/ld+json">{JSON.stringify(WEBAPP_SCHEMA)}</script>

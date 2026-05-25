@@ -422,35 +422,35 @@ export default function Notes() {
         <meta name="geo.region" content="NP" />
         <meta name="geo.placename" content="Nepal" />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://studenthubnp.com/notes" />
+        <meta property="og:url" content="https://www.studenthubnp.com/notes" />
         <meta property="og:title" content="Free Class 9–12 Study Notes Nepal — SEE &amp; NEB | Student Hub" />
         <meta property="og:description" content="Free Maths, Science, English &amp; Social Studies notes for Class 9–12 Nepal students. PDF &amp; text, organised by subject &amp; chapter. No login needed." />
-        <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta property="og:image" content="https://www.studenthubnp.com/opengraph.jpg" />
         <meta property="og:image:alt" content="Student Hub Nepal — Free Study Notes for Grade 9 to 12" />
         <meta property="og:site_name" content="Student Hub Nepal" />
         <meta property="og:locale" content="en_NP" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Free Class 9–12 Study Notes Nepal — SEE &amp; NEB | Student Hub" />
         <meta name="twitter:description" content="Free Maths, Science, English &amp; Social Studies notes for Class 9–12 Nepal. PDF &amp; text by subject &amp; chapter. No login. Ace SEE &amp; NEB!" />
-        <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
-        <link rel="canonical" href="https://studenthubnp.com/notes" />
+        <meta name="twitter:image" content="https://www.studenthubnp.com/opengraph.jpg" />
+        <link rel="canonical" href="https://www.studenthubnp.com/notes" />
         <script type="application/ld+json">{JSON.stringify({
           "@context": "https://schema.org",
           "@type": "WebPage",
           "name": "Free Class 9–12 Study Notes Nepal — SEE & NEB",
           "description": "Free study notes for Class 9, 10, 11 and 12 students in Nepal. Subjects include Maths, Science, English, and Social Studies. Available in PDF and text formats.",
-          "url": "https://studenthubnp.com/notes",
+          "url": "https://www.studenthubnp.com/notes",
           "inLanguage": "en",
           "publisher": {
             "@type": "Organization",
             "name": "Student Hub Nepal",
-            "url": "https://studenthubnp.com"
+            "url": "https://www.studenthubnp.com"
           },
           "breadcrumb": {
             "@type": "BreadcrumbList",
             "itemListElement": [
-              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://studenthubnp.com" },
-              { "@type": "ListItem", "position": 2, "name": "Study Notes", "item": "https://studenthubnp.com/notes" }
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.studenthubnp.com" },
+              { "@type": "ListItem", "position": 2, "name": "Study Notes", "item": "https://www.studenthubnp.com/notes" }
             ]
           }
         })}</script>

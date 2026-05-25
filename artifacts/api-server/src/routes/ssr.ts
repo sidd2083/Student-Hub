@@ -30,7 +30,7 @@ const __ssrDir = dirname(fileURLToPath(import.meta.url));
 
 const router = Router();
 
-const SITE_URL    = "https://studenthubnp.com";
+const SITE_URL    = "https://www.studenthubnp.com";
 const PROJECT_ID  = process.env.VITE_FIREBASE_PROJECT_ID ?? "studenthub-6bcc5";
 const API_KEY     = process.env.VITE_FIREBASE_API_KEY    ?? "";
 

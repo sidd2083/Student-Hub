@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 
-const SITE_URL    = "https://studenthubnp.com";
+const SITE_URL    = "https://www.studenthubnp.com";
 const PROJECT_ID  = "studenthub-6bcc5";
 
 // Every URL here gets its own static index.html in the build output.

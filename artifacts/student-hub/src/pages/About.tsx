@@ -13,24 +13,24 @@ export default function About() {
         <meta name="geo.region" content="NP" />
         <meta name="geo.placename" content="Nepal" />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://studenthubnp.com/about" />
+        <meta property="og:url" content="https://www.studenthubnp.com/about" />
         <meta property="og:title" content="About Student Hub Nepal — Nepal's #1 Free Study Platform" />
         <meta property="og:description" content="Student Hub Nepal is 100% free — notes, past papers, AI tutor &amp; Pomodoro for Grade 9–12 SEE &amp; NEB students. Built for Nepali students." />
-        <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta property="og:image" content="https://www.studenthubnp.com/opengraph.jpg" />
         <meta property="og:image:alt" content="Student Hub Nepal — Free Study Platform for Grade 9 to 12" />
         <meta property="og:site_name" content="Student Hub Nepal" />
         <meta property="og:locale" content="en_NP" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="About Student Hub Nepal — Nepal's #1 Free Study Platform" />
         <meta name="twitter:description" content="Student Hub Nepal is 100% free — notes, past papers, AI tutor &amp; Pomodoro for Grade 9–12 SEE &amp; NEB students. No fees, ever." />
-        <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
-        <link rel="canonical" href="https://studenthubnp.com/about" />
+        <meta name="twitter:image" content="https://www.studenthubnp.com/opengraph.jpg" />
+        <link rel="canonical" href="https://www.studenthubnp.com/about" />
         <script type="application/ld+json">{JSON.stringify({
           "@context": "https://schema.org",
           "@type": "Organization",
           "name": "Student Hub Nepal",
-          "url": "https://studenthubnp.com",
-          "logo": "https://studenthubnp.com/opengraph.jpg",
+          "url": "https://www.studenthubnp.com",
+          "logo": "https://www.studenthubnp.com/opengraph.jpg",
           "description": "Student Hub Nepal is a free study platform for Grade 9–12 students preparing for SEE and NEB exams in Nepal. Offers notes, past papers, AI tutor (Nep AI), Pomodoro timer, and progress tracking.",
           "areaServed": "NP",
           "foundingDate": "2024",
@@ -46,8 +46,8 @@ export default function About() {
           "@context": "https://schema.org",
           "@type": "BreadcrumbList",
           "itemListElement": [
-            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://studenthubnp.com" },
-            { "@type": "ListItem", "position": 2, "name": "About", "item": "https://studenthubnp.com/about" }
+            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.studenthubnp.com" },
+            { "@type": "ListItem", "position": 2, "name": "About", "item": "https://www.studenthubnp.com/about" }
           ]
         })}</script>
       </Helmet>

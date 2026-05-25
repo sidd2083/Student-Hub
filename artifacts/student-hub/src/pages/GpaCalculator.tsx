@@ -462,7 +462,7 @@ const WEBAPP_SCHEMA = {
   name: "GPA Calculator Nepal — NEB Class 11 & 12 GPA Calculator Free (2082/2083)",
   applicationCategory: "EducationApplication",
   operatingSystem: "Web Browser",
-  url: "https://studenthubnp.com/tools/gpa-calculator",
+  url: "https://www.studenthubnp.com/tools/gpa-calculator",
   description: "Free GPA Calculator for Nepal students. Calculate NEB Class 11 or Class 12 GPA instantly using the official NEB formula — 75% Theory + 25% Practical — for Science and Management streams. NEB GPA Calculator 2082/2083.",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
   featureList: [
@@ -480,9 +480,9 @@ const BREADCRUMB_SCHEMA = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   itemListElement: [
-    { "@type": "ListItem", position: 1, name: "Home", item: "https://studenthubnp.com" },
-    { "@type": "ListItem", position: 2, name: "Tools", item: "https://studenthubnp.com/tools" },
-    { "@type": "ListItem", position: 3, name: "NEB GPA Calculator", item: "https://studenthubnp.com/tools/gpa-calculator" },
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.studenthubnp.com" },
+    { "@type": "ListItem", position: 2, name: "Tools", item: "https://www.studenthubnp.com/tools" },
+    { "@type": "ListItem", position: 3, name: "NEB GPA Calculator", item: "https://www.studenthubnp.com/tools/gpa-calculator" },
   ],
 };
 
@@ -505,8 +505,8 @@ export default function GpaCalculator() {
         <meta property="og:title" content="GPA Calculator Nepal — NEB GPA Calculator Class 11 &amp; 12 Free (2082/2083)" />
         <meta property="og:description" content="Free GPA Calculator for Nepal students. Calculate NEB Class 12 or Class 11 GPA instantly — official 75% Theory + 25% Practical formula for Science &amp; Management. Trusted by Nepal students. 100% free." />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://studenthubnp.com/tools/gpa-calculator" />
-        <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta property="og:url" content="https://www.studenthubnp.com/tools/gpa-calculator" />
+        <meta property="og:image" content="https://www.studenthubnp.com/opengraph.jpg" />
         <meta property="og:image:alt" content="GPA Calculator Nepal — NEB Class 11 &amp; 12 GPA Calculator Free (2082/2083)" />
         <meta property="og:site_name" content="Student Hub Nepal" />
         <meta property="og:locale" content="en_NP" />
@@ -514,9 +514,9 @@ export default function GpaCalculator() {
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="GPA Calculator Nepal — NEB GPA Calculator Class 11 &amp; 12 Free (2082/2083)" />
         <meta name="twitter:description" content="Free NEB GPA Calculator Nepal. Calculate Class 11 &amp; Class 12 GPA instantly — official 75% Theory + 25% Practical formula. Science &amp; Management. 100% free, no login." />
-        <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta name="twitter:image" content="https://www.studenthubnp.com/opengraph.jpg" />
 
-        <link rel="canonical" href="https://studenthubnp.com/tools/gpa-calculator" />
+        <link rel="canonical" href="https://www.studenthubnp.com/tools/gpa-calculator" />
         <script type="application/ld+json">{JSON.stringify(FAQ_SCHEMA)}</script>
         <script type="application/ld+json">{JSON.stringify(HOWTO_SCHEMA)}</script>
         <script type="application/ld+json">{JSON.stringify(WEBAPP_SCHEMA)}</script>

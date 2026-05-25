@@ -51,7 +51,7 @@ export function extractFirestoreId(param: string): string {
   return param.slice(0, idx);
 }
 
-export const SITE_URL = "https://studenthubnp.com";
+export const SITE_URL = "https://www.studenthubnp.com";
 
 export function noteCanonical(note: {
   id: string;

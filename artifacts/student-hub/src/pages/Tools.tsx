@@ -7,19 +7,19 @@ const TOOLS_ITEMLIST_SCHEMA = {
   "@type": "ItemList",
   name: "Free Student Tools — NEB GPA Calculator & Attendance Calculator",
   description: "Free online calculators for students: NEB GPA Calculator for Nepal Class 12 (2082/2083) and Attendance Calculator for any college requirement worldwide.",
-  url: "https://studenthubnp.com/tools",
+  url: "https://www.studenthubnp.com/tools",
   numberOfItems: 2,
   itemListElement: [
     {
       "@type": "ListItem", position: 1,
       name: "NEB GPA Calculator Nepal 2082 2083",
-      url: "https://studenthubnp.com/tools/gpa-calculator",
+      url: "https://www.studenthubnp.com/tools/gpa-calculator",
       description: "Free NEB Class 12 GPA calculator using official formula — 75% Theory + 25% Practical. Science and Management streams.",
     },
     {
       "@type": "ListItem", position: 2,
       name: "Attendance Calculator — How Many Classes Can I Miss?",
-      url: "https://studenthubnp.com/tools/attendance-calculator",
+      url: "https://www.studenthubnp.com/tools/attendance-calculator",
       description: "Free attendance percentage calculator. Find how many classes you can miss or bunk, or how many you need to reach 75%, 80%, or any required percentage.",
     },
   ],
@@ -29,8 +29,8 @@ const BREADCRUMB_SCHEMA = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   itemListElement: [
-    { "@type": "ListItem", position: 1, name: "Home", item: "https://studenthubnp.com" },
-    { "@type": "ListItem", position: 2, name: "Tools", item: "https://studenthubnp.com/tools" },
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.studenthubnp.com" },
+    { "@type": "ListItem", position: 2, name: "Tools", item: "https://www.studenthubnp.com/tools" },
   ],
 };
 
@@ -67,12 +67,12 @@ export default function Tools() {
         <meta property="og:title" content="Free Student Tools — NEB GPA Calculator &amp; Attendance Calculator | Student Hub" />
         <meta property="og:description" content="Free NEB GPA Calculator for Nepal Class 12 (2082/2083) and Attendance Calculator. Instant results, no sign-up required." />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://studenthubnp.com/tools" />
-        <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta property="og:url" content="https://www.studenthubnp.com/tools" />
+        <meta property="og:image" content="https://www.studenthubnp.com/opengraph.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Free Student Tools — NEB GPA &amp; Attendance Calculator" />
         <meta name="twitter:description" content="Free NEB GPA Calculator for Nepal Class 12 and Attendance Calculator. Instant, accurate, no sign-up." />
-        <link rel="canonical" href="https://studenthubnp.com/tools" />
+        <link rel="canonical" href="https://www.studenthubnp.com/tools" />
         <script type="application/ld+json">{JSON.stringify(TOOLS_ITEMLIST_SCHEMA)}</script>
         <script type="application/ld+json">{JSON.stringify(BREADCRUMB_SCHEMA)}</script>
       </Helmet>

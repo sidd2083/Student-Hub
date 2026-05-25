@@ -19,7 +19,7 @@ const features = [
   { icon: Trophy,        label: "Leaderboard",           desc: "Top students by study time & streak",  href: "/leaderboard",                color: "bg-amber-50 text-amber-600",   public: false },
 ];
 
-const SITE_URL = "https://studenthubnp.com";
+const SITE_URL = "https://www.studenthubnp.com";
 const OG_IMAGE = `${SITE_URL}/opengraph.jpg`;
 
 const jsonLd = {

@@ -473,35 +473,35 @@ export default function Pyqs() {
         <meta name="geo.region" content="NP" />
         <meta name="geo.placename" content="Nepal" />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://studenthubnp.com/pyqs" />
+        <meta property="og:url" content="https://www.studenthubnp.com/pyqs" />
         <meta property="og:title" content="Free SEE &amp; NEB Past Papers Nepal — PYQ Grade 9–12 | Student Hub" />
         <meta property="og:description" content="Free SEE &amp; NEB past year question papers for Class 9–12 Nepal students. Browse by subject &amp; year — Maths, Science, English. PDF &amp; images. No login." />
-        <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta property="og:image" content="https://www.studenthubnp.com/opengraph.jpg" />
         <meta property="og:image:alt" content="Free SEE and NEB Past Papers Nepal — Grade 9 to 12" />
         <meta property="og:site_name" content="Student Hub Nepal" />
         <meta property="og:locale" content="en_NP" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Free SEE &amp; NEB Past Papers Nepal — PYQ Grade 9–12 | Student Hub" />
         <meta name="twitter:description" content="Free SEE &amp; NEB past question papers for Class 9–12 Nepal. Browse by subject &amp; year. PDF &amp; images. No login needed." />
-        <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
-        <link rel="canonical" href="https://studenthubnp.com/pyqs" />
+        <meta name="twitter:image" content="https://www.studenthubnp.com/opengraph.jpg" />
+        <link rel="canonical" href="https://www.studenthubnp.com/pyqs" />
         <script type="application/ld+json">{JSON.stringify({
           "@context": "https://schema.org",
           "@type": "WebPage",
           "name": "Free SEE & NEB Past Papers Nepal — PYQ Grade 9–12",
           "description": "Free previous year question papers for SEE and NEB exams. Covers Grade 9, 10, 11, and 12 — all subjects, sorted by year.",
-          "url": "https://studenthubnp.com/pyqs",
+          "url": "https://www.studenthubnp.com/pyqs",
           "inLanguage": "en",
           "publisher": {
             "@type": "Organization",
             "name": "Student Hub Nepal",
-            "url": "https://studenthubnp.com"
+            "url": "https://www.studenthubnp.com"
           },
           "breadcrumb": {
             "@type": "BreadcrumbList",
             "itemListElement": [
-              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://studenthubnp.com" },
-              { "@type": "ListItem", "position": 2, "name": "Past Papers (PYQ)", "item": "https://studenthubnp.com/pyqs" }
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.studenthubnp.com" },
+              { "@type": "ListItem", "position": 2, "name": "Past Papers (PYQ)", "item": "https://www.studenthubnp.com/pyqs" }
             ]
           }
         })}</script>

@@ -22,28 +22,28 @@ export default function Contact() {
         <meta name="geo.region" content="NP" />
         <meta name="geo.placename" content="Nepal" />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://studenthubnp.com/contact" />
+        <meta property="og:url" content="https://www.studenthubnp.com/contact" />
         <meta property="og:title" content="Contact Student Hub Nepal — We Reply Within 24 Hours" />
         <meta property="og:description" content="Questions, bugs or suggestions for Student Hub Nepal? Our team replies within 24 hours. Help us improve Nepal's best free study platform." />
-        <meta property="og:image" content="https://studenthubnp.com/opengraph.jpg" />
+        <meta property="og:image" content="https://www.studenthubnp.com/opengraph.jpg" />
         <meta property="og:image:alt" content="Contact Student Hub Nepal — Free Study Platform Support" />
         <meta property="og:site_name" content="Student Hub Nepal" />
         <meta property="og:locale" content="en_NP" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Contact Student Hub Nepal — We Reply Within 24 Hours" />
         <meta name="twitter:description" content="Questions, bugs or suggestions? Student Hub Nepal team replies within 24 hours. Help us build Nepal's best free study platform." />
-        <meta name="twitter:image" content="https://studenthubnp.com/opengraph.jpg" />
-        <link rel="canonical" href="https://studenthubnp.com/contact" />
+        <meta name="twitter:image" content="https://www.studenthubnp.com/opengraph.jpg" />
+        <link rel="canonical" href="https://www.studenthubnp.com/contact" />
         <script type="application/ld+json">{JSON.stringify({
           "@context": "https://schema.org",
           "@type": "ContactPage",
           "name": "Contact Student Hub Nepal",
           "description": "Get in touch with the Student Hub Nepal team for questions, feedback, or support.",
-          "url": "https://studenthubnp.com/contact",
+          "url": "https://www.studenthubnp.com/contact",
           "publisher": {
             "@type": "Organization",
             "name": "Student Hub Nepal",
-            "url": "https://studenthubnp.com",
+            "url": "https://www.studenthubnp.com",
             "contactPoint": {
               "@type": "ContactPoint",
               "contactType": "customer support",
@@ -54,8 +54,8 @@ export default function Contact() {
           "breadcrumb": {
             "@type": "BreadcrumbList",
             "itemListElement": [
-              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://studenthubnp.com" },
-              { "@type": "ListItem", "position": 2, "name": "Contact", "item": "https://studenthubnp.com/contact" }
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.studenthubnp.com" },
+              { "@type": "ListItem", "position": 2, "name": "Contact", "item": "https://www.studenthubnp.com/contact" }
             ]
           }
         })}</script>
