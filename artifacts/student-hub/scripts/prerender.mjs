@@ -49,6 +49,15 @@ function fInt(fields, k) {
   return Number(v?.integerValue ?? v?.doubleValue ?? 0);
 }
 
+// Strip HTML tags and decode entities → plain readable text for auto-descriptions
+function htmlToText(html) {
+  return (html || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ").trim();
+}
+
 // ── Meta injection ─────────────────────────────────────────────────────────────
 // Mirrors the same logic in artifacts/api-server/src/routes/ssr.ts
 // CRITICAL: strips the homepage-level canonical/OG/Twitter tags that are
@@ -239,26 +248,35 @@ async function prerenderNotes(template, seoMetaMap) {
       const slug      = `${id}-grade-${grade}-${toSlug(subject)}-${toSlug(title)}`;
       const canonical = `${SITE_URL}/notes/${slug}`;
 
-      // ── SEO: Admin Panel overrides take priority over auto-generated values ──
-      const seo      = seoMetaMap.get(`note_${id}`) ?? {};
-      const noIndex  = seo.noIndex?.booleanValue ?? false;
+      // ── SEO: auto-generate from content; Admin Panel overrides only if complete ──
+      const seo     = seoMetaMap.get(`note_${id}`) ?? {};
+      const noIndex = seo.noIndex?.booleanValue ?? false;
 
       const autoTitle = chapter
         ? `${title} (${chapter}) | Grade ${grade} ${subject} Notes — Student Hub Nepal`
         : `${title} | Grade ${grade} ${subject} Notes — Student Hub Nepal`;
-      const autoDesc =
-        `Free Grade ${grade} ${subject} notes — ${title}` +
-        (chapter ? ` from ${chapter}` : "") +
-        ". Complete chapter material for NEB & SEE exam preparation. Study on Student Hub Nepal.";
+
+      // Use real note content for description so Google ranks on actual text
+      const contentText = htmlToText(content);
+      const autoDesc = contentText.length > 80
+        ? contentText.slice(0, 155).replace(/\s+\S*$/, "") + "…"
+        : `Free Grade ${grade} ${subject} notes on ${title}` +
+          (chapter ? ` (${chapter})` : "") +
+          ". Complete NEB & SEE exam preparation material. Study free on Student Hub Nepal.";
+
       const autoKw =
         `${title.toLowerCase()}, grade ${grade} ${subject.toLowerCase()} notes, ` +
         `${subject.toLowerCase()} notes nepal` +
         (chapter ? `, ${chapter.toLowerCase()}` : "") +
         `, neb notes, see notes, nepal grade ${grade} notes`;
 
-      const pageTitle = fStr(seo, "seoTitle") || autoTitle;
-      const desc      = fStr(seo, "description") || autoDesc;
-      const kw        = fStr(seo, "keywords") || autoKw;
+      // Only use Admin SEO override if it's meaningfully long (not a draft/stub)
+      const customTitle = fStr(seo, "seoTitle");
+      const customDesc  = fStr(seo, "description");
+      const customKw    = fStr(seo, "keywords");
+      const pageTitle = customTitle.length >= 30 ? customTitle : autoTitle;
+      const desc      = customDesc.length  >= 50 ? customDesc  : autoDesc;
+      const kw        = customKw.length    >= 10 ? customKw    : autoKw;
       const customLd  = fStr(seo, "structuredData");
 
       const autoLd = JSON.stringify({
@@ -323,22 +341,27 @@ async function prerenderPyqs(template, seoMetaMap) {
       const slug      = `${id}-grade-${grade}-${toSlug(subject)}-${year}-${toSlug(title)}`;
       const canonical = `${SITE_URL}/pyq/${slug}`;
 
-      // ── SEO: Admin Panel overrides take priority over auto-generated values ──
+      // ── SEO: auto-generate from content; Admin Panel overrides only if complete ──
       const seo     = seoMetaMap.get(`pyq_${id}`) ?? {};
       const noIndex = seo.noIndex?.booleanValue ?? false;
 
       const autoTitle = `${subject} Grade ${grade} PYQ ${year} — ${title} | Student Hub Nepal`;
       const autoDesc  =
-        `${year} past year question paper for Grade ${grade} ${subject}: ${title}. ` +
-        "Practice real NEB/SEE exam questions. Free download on Student Hub Nepal.";
+        `${year} Grade ${grade} ${subject} past year question paper: ${title}. ` +
+        `Practice real NEB/SEE exam questions for Nepal students. ` +
+        `Free download on Student Hub Nepal.`;
       const autoKw =
         `${subject.toLowerCase()} pyq ${year}, grade ${grade} ${subject.toLowerCase()} past paper, ` +
         `${year} ${subject.toLowerCase()} question nepal, neb past year question ${year}, ` +
         `see past paper ${year}, grade ${grade} pyq nepal`;
 
-      const pageTitle = fStr(seo, "seoTitle") || autoTitle;
-      const desc      = fStr(seo, "description") || autoDesc;
-      const kw        = fStr(seo, "keywords") || autoKw;
+      // Only use Admin SEO override if it's meaningfully long (not a draft/stub)
+      const customTitle = fStr(seo, "seoTitle");
+      const customDesc  = fStr(seo, "description");
+      const customKw    = fStr(seo, "keywords");
+      const pageTitle = customTitle.length >= 30 ? customTitle : autoTitle;
+      const desc      = customDesc.length  >= 50 ? customDesc  : autoDesc;
+      const kw        = customKw.length    >= 10 ? customKw    : autoKw;
       const customLd  = fStr(seo, "structuredData");
 
       const autoLd = JSON.stringify({
