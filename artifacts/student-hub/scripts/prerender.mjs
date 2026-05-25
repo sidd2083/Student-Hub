@@ -55,7 +55,7 @@ function fInt(fields, k) {
 // hardcoded in index.html before injecting page-specific ones.
 // Without the strip step Google reads the FIRST canonical (homepage) and marks
 // every note/PYQ as "Alternate page with proper canonical tag".
-function injectMeta(html, { title, description, canonical, keywords, ogType, structuredData }) {
+function injectMeta(html, { title, description, canonical, keywords, ogType, structuredData, noIndex = false }) {
   const t  = esc(title);
   const d  = esc(description);
   const c  = esc(canonical);
@@ -91,7 +91,9 @@ function injectMeta(html, { title, description, canonical, keywords, ogType, str
 
   const tags = [
     kw ? `<meta name="keywords" content="${kw}" />` : "",
-    `<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large" />`,
+    noIndex
+      ? `<meta name="robots" content="noindex,nofollow" />`
+      : `<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large" />`,
     `<link rel="canonical" href="${c}" />`,
     `<meta property="og:title" content="${t}" />`,
     `<meta property="og:description" content="${d}" />`,
@@ -201,8 +203,21 @@ function pyqBodyHtml(title, grade, subject, year) {
 </main>`;
 }
 
+// ── Fetch all custom SEO meta saved via the Admin SEO Panel ───────────────────
+// Keys are like "note_{id}" and "pyq_{id}" — same as the Firestore doc IDs.
+async function fetchSeoMetaMap() {
+  const docs = await fetchCollection("seo_meta");
+  const map  = new Map();
+  for (const d of docs) {
+    const key = d.name.split("/").pop();
+    map.set(key, d.fields ?? {});
+  }
+  console.log(`  ✓  ${map.size} custom SEO overrides loaded from Admin SEO Panel`);
+  return map;
+}
+
 // ── Pre-render individual note pages ──────────────────────────────────────────
-async function prerenderNotes(template) {
+async function prerenderNotes(template, seoMetaMap) {
   console.log("\n  📄 Pre-rendering individual note pages...");
   const docs = await fetchCollection("notes");
   if (!docs.length) { console.warn("  ⚠  No notes fetched from Firestore — skipping individual note pages"); return 0; }
@@ -224,20 +239,29 @@ async function prerenderNotes(template) {
       const slug      = `${id}-grade-${grade}-${toSlug(subject)}-${toSlug(title)}`;
       const canonical = `${SITE_URL}/notes/${slug}`;
 
-      const pageTitle = chapter
+      // ── SEO: Admin Panel overrides take priority over auto-generated values ──
+      const seo      = seoMetaMap.get(`note_${id}`) ?? {};
+      const noIndex  = seo.noIndex?.booleanValue ?? false;
+
+      const autoTitle = chapter
         ? `${title} (${chapter}) | Grade ${grade} ${subject} Notes — Student Hub Nepal`
         : `${title} | Grade ${grade} ${subject} Notes — Student Hub Nepal`;
-      const desc =
+      const autoDesc =
         `Free Grade ${grade} ${subject} notes — ${title}` +
         (chapter ? ` from ${chapter}` : "") +
         ". Complete chapter material for NEB & SEE exam preparation. Study on Student Hub Nepal.";
-      const kw =
+      const autoKw =
         `${title.toLowerCase()}, grade ${grade} ${subject.toLowerCase()} notes, ` +
         `${subject.toLowerCase()} notes nepal` +
         (chapter ? `, ${chapter.toLowerCase()}` : "") +
         `, neb notes, see notes, nepal grade ${grade} notes`;
 
-      const ld = JSON.stringify({
+      const pageTitle = fStr(seo, "seoTitle") || autoTitle;
+      const desc      = fStr(seo, "description") || autoDesc;
+      const kw        = fStr(seo, "keywords") || autoKw;
+      const customLd  = fStr(seo, "structuredData");
+
+      const autoLd = JSON.stringify({
         "@context": "https://schema.org",
         "@type": "Article",
         headline: pageTitle,
@@ -252,16 +276,23 @@ async function prerenderNotes(template) {
         isAccessibleForFree: true,
       });
 
-      // Replace <!--APP_HTML--> with actual readable content so Google can crawl it.
-      // React (createRoot) will replace this content when JavaScript loads.
       const bodyHtml = noteBodyHtml(title, grade, subject, chapter, content, contentType);
       let html = template.replace("<!--APP_HTML-->", bodyHtml);
-      html = injectMeta(html, { title: pageTitle, description: desc, canonical, keywords: kw, ogType: "article", structuredData: ld });
+      html = injectMeta(html, {
+        title: pageTitle,
+        description: desc,
+        canonical: fStr(seo, "canonicalUrl") || canonical,
+        keywords: kw,
+        ogType: fStr(seo, "ogType") || "article",
+        structuredData: customLd || autoLd,
+        noIndex,
+      });
 
       const outPath = resolve(ROOT, "dist/public/notes", slug);
       mkdirSync(outPath, { recursive: true });
       writeFileSync(resolve(outPath, "index.html"), html, "utf-8");
-      console.log(`  ✓  /notes/${slug}`);
+      const flag = seoMetaMap.has(`note_${id}`) ? " [custom SEO]" : "";
+      console.log(`  ✓  /notes/${slug}${flag}`);
       ok++;
     } catch (err) {
       console.warn(`  ⚠  Note skipped: ${err.message?.slice(0, 80)}`);
@@ -272,7 +303,7 @@ async function prerenderNotes(template) {
 }
 
 // ── Pre-render individual PYQ pages ───────────────────────────────────────────
-async function prerenderPyqs(template) {
+async function prerenderPyqs(template, seoMetaMap) {
   console.log("\n  📄 Pre-rendering individual PYQ pages...");
   const docs = await fetchCollection("pyqs");
   if (!docs.length) { console.warn("  ⚠  No PYQs fetched from Firestore — skipping individual PYQ pages"); return 0; }
@@ -292,16 +323,25 @@ async function prerenderPyqs(template) {
       const slug      = `${id}-grade-${grade}-${toSlug(subject)}-${year}-${toSlug(title)}`;
       const canonical = `${SITE_URL}/pyq/${slug}`;
 
-      const pageTitle = `${subject} Grade ${grade} PYQ ${year} — ${title} | Student Hub Nepal`;
-      const desc =
+      // ── SEO: Admin Panel overrides take priority over auto-generated values ──
+      const seo     = seoMetaMap.get(`pyq_${id}`) ?? {};
+      const noIndex = seo.noIndex?.booleanValue ?? false;
+
+      const autoTitle = `${subject} Grade ${grade} PYQ ${year} — ${title} | Student Hub Nepal`;
+      const autoDesc  =
         `${year} past year question paper for Grade ${grade} ${subject}: ${title}. ` +
         "Practice real NEB/SEE exam questions. Free download on Student Hub Nepal.";
-      const kw =
+      const autoKw =
         `${subject.toLowerCase()} pyq ${year}, grade ${grade} ${subject.toLowerCase()} past paper, ` +
         `${year} ${subject.toLowerCase()} question nepal, neb past year question ${year}, ` +
         `see past paper ${year}, grade ${grade} pyq nepal`;
 
-      const ld = JSON.stringify({
+      const pageTitle = fStr(seo, "seoTitle") || autoTitle;
+      const desc      = fStr(seo, "description") || autoDesc;
+      const kw        = fStr(seo, "keywords") || autoKw;
+      const customLd  = fStr(seo, "structuredData");
+
+      const autoLd = JSON.stringify({
         "@context": "https://schema.org",
         "@type": "Article",
         headline: pageTitle,
@@ -316,16 +356,23 @@ async function prerenderPyqs(template) {
         isAccessibleForFree: true,
       });
 
-      // Replace <!--APP_HTML--> with readable content so Google can crawl it.
-      // React (createRoot) will replace this content when JavaScript loads.
       const bodyHtml = pyqBodyHtml(title, grade, subject, year);
       let html = template.replace("<!--APP_HTML-->", bodyHtml);
-      html = injectMeta(html, { title: pageTitle, description: desc, canonical, keywords: kw, ogType: "article", structuredData: ld });
+      html = injectMeta(html, {
+        title: pageTitle,
+        description: desc,
+        canonical: fStr(seo, "canonicalUrl") || canonical,
+        keywords: kw,
+        ogType: fStr(seo, "ogType") || "article",
+        structuredData: customLd || autoLd,
+        noIndex,
+      });
 
       const outPath = resolve(ROOT, "dist/public/pyq", slug);
       mkdirSync(outPath, { recursive: true });
       writeFileSync(resolve(outPath, "index.html"), html, "utf-8");
-      console.log(`  ✓  /pyq/${slug}`);
+      const flag = seoMetaMap.has(`pyq_${id}`) ? " [custom SEO]" : "";
+      console.log(`  ✓  /pyq/${slug}${flag}`);
       ok++;
     } catch (err) {
       console.warn(`  ⚠  PYQ skipped: ${err.message?.slice(0, 80)}`);
@@ -436,8 +483,9 @@ async function prerender() {
   // Pre-render every individual note and PYQ page so Vercel serves them with
   // the correct canonical URL instead of the homepage index.html.
   // This fixes "Alternate page with proper canonical tag" in Google Search Console.
-  const noteCount = await prerenderNotes(template);
-  const pyqCount  = await prerenderPyqs(template);
+  const seoMetaMap = await fetchSeoMetaMap();
+  const noteCount = await prerenderNotes(template, seoMetaMap);
+  const pyqCount  = await prerenderPyqs(template, seoMetaMap);
 
   console.log(`\n  ✅ Total: ${ok} static + ${noteCount} notes + ${pyqCount} PYQs pre-rendered`);
 }
