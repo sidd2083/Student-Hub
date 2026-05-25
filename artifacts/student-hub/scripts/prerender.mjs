@@ -405,29 +405,49 @@ async function prerenderPyqs(template, seoMetaMap) {
   return ok;
 }
 
-// ── Static page pre-rendering (existing) ──────────────────────────────────────
-function extractHeadAndCleanBody(appHtml) {
-  const titleMatch     = appHtml.match(/<title(?:[^>]*)>([\s\S]*?)<\/title>/i);
-  const title          = titleMatch ? titleMatch[1].trim() : null;
+// ── Static page pre-rendering ──────────────────────────────────────────────────
+// react-helmet-async v3 + React 19 renderToString renders <title> and
+// <meta name=*> tags directly into appHtml (inside the React tree), but
+// <meta property="og:*">, <meta name="twitter:*">, and <script ld+json>
+// are only captured in helmetContext — which is not populated in this env.
+// Strategy: extract what IS in appHtml (title, description, canonical,
+// keywords), then call injectMeta() which adds correct OG/Twitter/canonical.
+function extractFromAppHtml(appHtml) {
+  const attr = (tag, attr) => {
+    const m = tag.match(new RegExp(`${attr}=["']([^"']+)["']`, "i"));
+    return m ? m[1] : "";
+  };
 
+  // <title> appears as a real element in the appHtml SSR output
+  const titleMatch = appHtml.match(/<title(?:[^>]*)>([\s\S]*?)<\/title>/i);
+  const title = titleMatch ? titleMatch[1].replace(/&amp;/g, "&").trim() : null;
+
+  // <link rel="canonical"> appears as a real element too
   const canonicalMatch =
     appHtml.match(/<link[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["'][^>]*\/?>/i) ||
     appHtml.match(/<link[^>]*href=["']([^"']+)["'][^>]*rel=["']canonical["'][^>]*\/?>/i);
-  const canonical      = canonicalMatch ? canonicalMatch[1] : null;
+  const canonical = canonicalMatch ? canonicalMatch[1] : null;
 
+  // <meta name="description"> also appears in appHtml
   const descMatch =
     appHtml.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["'][^>]*\/?>/i) ||
     appHtml.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["'][^>]*\/?>/i);
-  const description    = descMatch ? descMatch[1] : null;
+  const description = descMatch ? descMatch[1] : null;
 
+  // <meta name="keywords">
+  const kwMatch = appHtml.match(/<meta[^>]*name=["']keywords["'][^>]*content=["']([^"']+)["'][^>]*\/?>/i);
+  const keywords = kwMatch ? kwMatch[1] : null;
+
+  // Body: strip all head-related inline tags so they don't double up in <div id="root">
   const bodyHtml = appHtml
     .replace(/<title[^>]*>[\s\S]*?<\/title>/gi, "")
     .replace(/<link[^>]*rel=["']canonical["'][^>]*\/?>/gi, "")
     .replace(/<link[^>]*rel=["']alternate["'][^>]*\/?>/gi, "")
     .replace(/<meta(?=[^>]*(?:name=|property=|http-equiv=))[^>]*\/?>/gi, "")
+    .replace(/<script[^>]*type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi, "")
     .trim();
 
-  return { title, canonical, description, bodyHtml };
+  return { title, canonical, description, keywords, bodyHtml };
 }
 
 async function prerenderStaticRoutes(template) {
@@ -448,25 +468,21 @@ async function prerenderStaticRoutes(template) {
         const result = await render(url);
         if (!result) { skipped++; continue; }
 
-        const { title, canonical, description, bodyHtml } = extractHeadAndCleanBody(result.appHtml);
+        const { title, canonical, description, keywords, bodyHtml } =
+          extractFromAppHtml(result.appHtml);
 
-        let html = template.replace("<!--APP_HTML-->", bodyHtml);
+        // injectMeta() strips all homepage-level OG/Twitter/canonical from the
+        // template and injects page-specific ones derived from title/description.
+        let html = injectMeta(template, {
+          title:       title       || "Student Hub Nepal — Free Study Platform",
+          description: description || "Free study platform for Nepal students.",
+          canonical:   canonical   || `${SITE_URL}${url}`,
+          keywords,
+          ogType: "website",
+        });
 
-        if (title) {
-          html = html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
-        }
-        if (canonical) {
-          html = html.replace(
-            /<link rel="canonical" href="[^"]*"\s*\/>/,
-            `<link rel="canonical" href="${canonical}" />`
-          );
-        }
-        if (description) {
-          html = html.replace(
-            /<meta name="description" content="[^"]*"\s*\/>/,
-            `<meta name="description" content="${description}" />`
-          );
-        }
+        // Inject the SSR body (clean — head-related inline tags stripped above)
+        html = html.replace("<!--APP_HTML-->", bodyHtml);
 
         const outPath = resolve(ROOT, "dist/public", outDir);
         mkdirSync(outPath, { recursive: true });
