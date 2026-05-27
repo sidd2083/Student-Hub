@@ -1,0 +1,640 @@
+FINAL FINISHING + SOUND SYSTEM + REALTIME FIX PASS
+
+The Virtual Study Room system is now MOSTLY COMPLETE.
+
+UI exists.
+Core systems exist.
+
+BUT several CRITICAL realtime, performance, synchronization, and sound system issues are still making the app feel unfinished and unprofessional.
+
+DO NOT redesign UI.
+DO NOT rebuild frontend.
+
+ONLY:
+
+- fix broken systems
+- fix realtime synchronization
+- fix performance
+- fix study tracking
+- fix sound system
+- fix cleanup logic
+- optimize entire experience
+
+The final experience must feel:
+
+- premium
+- smooth
+- instant
+- realtime
+- polished
+- addictive
+- production-quality
+
+==================================================
+
+1. EMPTY ROOM CLEANUP SYSTEM IS STILL BROKEN
+   ==================================================
+
+Current issue:
+
+- users leave room
+- room still exists
+- room still shows participants
+- timer still runs
+- ghost room remains active
+
+THIS MUST BE FIXED COMPLETELY.
+
+==================================================
+FIX ROOM CLEANUP
+
+When ALL participants leave room:
+
+- room enters pending deletion state
+- after 1 minute
+  → automatically delete room
+
+During cleanup:
+
+- stop timer
+- remove participants
+- clear listeners
+- cleanup room state
+- remove room from room list instantly
+
+==================================================
+2. GHOST USERS / FAKE ACTIVE USERS
+
+Current issue:
+
+- rooms show fake users
+- dashboard shows fake active students
+- inactive users remain online forever
+
+Implement REAL presence system:
+
+- detect disconnect
+- detect tab close
+- detect app close
+- detect internet loss
+- cleanup stale presence instantly
+
+NO ghost users allowed.
+
+==================================================
+3. FULLSCREEN EXIT BUG
+
+Current issue:
+
+- user enters fullscreen
+- clicking leave room sometimes fails
+
+Fix flow:
+
+1. exit fullscreen
+2. cleanup room listeners
+3. leave room
+4. navigate away
+
+Must work on:
+
+- mobile
+- desktop
+
+==================================================
+4. CHAT DUPLICATE MESSAGE BUG
+
+Current issue:
+Sending ONE message
+causes SAME message to appear MULTIPLE times.
+
+Fix:
+
+- duplicate Firestore listeners
+- duplicate optimistic updates
+- duplicate append rendering
+
+Requirements:
+
+- one listener only
+- unique message IDs
+- deduplicate messages before rendering
+
+==================================================
+5. MASSIVE CRITICAL BUG:
+ONLY HOST RECEIVES STUDY TIME
+
+Currently:
+
+- host study time increases
+- host leaderboard updates
+- host report card updates
+
+BUT:
+
+- members receive NOTHING
+- member leaderboard never increases
+- member analytics stay unchanged
+
+THIS MUST BE FIXED AT ALL COSTS.
+
+==================================================
+FIX MULTI-USER STUDY TRACKING SYSTEM
+
+The room timer is SHARED.
+BUT study tracking must be INDIVIDUAL PER USER.
+
+When:
+
+- timer is running
+- current phase = study
+- user is active in room
+
+THEN:
+EVERY ACTIVE PARTICIPANT must receive:
+
+- study time updates
+- leaderboard updates
+- streak updates
+- report card updates
+- analytics updates
+
+NOT just the host.
+
+==================================================
+IMPORTANT:
+
+Tracking must STOP if:
+
+- user leaves room
+- disconnects
+- becomes inactive
+- room enters break mode
+
+==================================================
+6. MOBILE PERFORMANCE OPTIMIZATION
+
+Mobile performance is still not smooth enough.
+
+Optimize EVERYTHING for:
+
+- low-end Android phones
+- weak internet
+- many simultaneous users
+
+The app must feel:
+
+- instant
+- lightweight
+- responsive
+
+==================================================
+OPTIMIZATION REQUIREMENTS
+
+Optimize:
+
+- Firestore reads/writes
+- listeners
+- React rerenders
+- timer updates
+- avatar popup loading
+- chat rendering
+- vote propagation
+
+Prevent:
+
+- duplicate listeners
+- full room rerenders
+- unnecessary state updates
+- Firestore spam writes
+
+Use:
+
+- React.memo
+- useMemo
+- useCallback
+- efficient subscriptions
+- batched writes
+
+==================================================
+7. ROOM SOUND SYSTEM IS BROKEN
+
+Current issue:
+
+- host selects sound during room creation
+- sounds do NOT play
+- ambient sound system does not work
+
+THIS SYSTEM MUST BE FULLY IMPLEMENTED.
+
+==================================================
+FIX ROOM AMBIENT SOUND SYSTEM
+
+Host can select room ambience:
+
+- Rain
+- Cafe
+- Library
+- Keyboard typing
+- Lo-fi
+- None
+
+Room stores:
+roomAmbientSound
+
+When user joins room:
+
+- automatically load selected sound
+- loop ambience continuously
+- smooth low-volume playback
+- lightweight loading
+
+==================================================
+8. SOUND PREVIEW SYSTEM REQUIRED
+
+During room creation:
+When host selects a sound,
+the sound must PREVIEW instantly.
+
+Example:
+
+- user clicks "Rain"
+  → rain sound starts playing immediately
+
+If another sound selected:
+
+- stop previous preview
+- start new preview
+
+This allows host to understand room atmosphere before creating room.
+
+==================================================
+9. SOUND CONTROL SYSTEM REQUIRED
+
+ALL USERS must have audio controls inside room.
+
+Users must be able to:
+
+- mute sound
+- unmute sound
+- pause ambience
+- resume ambience
+- adjust volume
+
+Controls must work instantly.
+
+==================================================
+10. SOUND PERFORMANCE REQUIREMENTS
+
+Sounds must:
+
+- preload efficiently
+- use lightweight mp3/ogg files
+- not block room loading
+- not lag mobile devices
+- loop seamlessly
+
+DO NOT:
+
+- autoplay loudly
+- reload sounds repeatedly
+- cause memory leaks
+
+==================================================
+11. SOUND UX ENHANCEMENTS
+
+Add subtle UX sounds:
+
+- study session start bell
+- break start bell
+- vote success sound
+
+Keep all sounds:
+
+- subtle
+- clean
+- non-annoying
+
+==================================================
+12. FINAL EXPERIENCE REQUIREMENT
+
+The app must feel:
+
+- smooth like Discord
+- responsive like WhatsApp
+- polished like production apps
+- addictive for students
+- realtime with zero fake states
+
+NO:
+
+- lag
+- stale rooms
+- ghost users
+- duplicate messages
+- broken sound system
+- fake active counts
+- delayed updates
+- inconsistent leaderboard tracking
+
+EVERYTHING MUST WORK PERFECTLY.
+==================================================
+13. HOST TRANSFER SYSTEM IS BROKEN
+
+Current issue:
+When host leaves room,
+host ownership does NOT transfer properly.
+
+This causes:
+
+- broken room state
+- dead timers
+- no active controller
+- rooms becoming unstable
+
+==================================================
+FIX HOST TRANSFER SYSTEM
+
+When current host leaves:
+
+- automatically transfer host ownership
+  to another ACTIVE participant.
+
+Selection logic:
+
+- oldest active participant becomes new host
+  OR
+- first joined participant becomes new host
+
+Requirements:
+
+- transfer instantly
+- sync in realtime
+- update Firestore immediately
+- update UI instantly
+
+New host must receive:
+
+- timer controls
+- room controls
+- vote management permissions
+
+==================================================
+IMPORTANT:
+
+If NO participants remain:
+→ room enters pending deletion
+→ delete after 1 minute
+
+==================================================
+14. DEMOCRATIC ROOM SYSTEM (ANTI-DICTATORSHIP)
+
+The room should NOT be controlled like dictatorship.
+
+Currently:
+
+- host has too much uncontested power
+
+This creates bad user experience.
+
+The room system should become:
+
+- democratic
+- community-driven
+- vote-controlled
+
+==================================================
+IMPLEMENT ADVANCED DEMOCRATIC VOTING SYSTEM
+
+Users must be able to create votes for:
+
+- pause timer
+- unpause timer
+- extend timer
+- skip phase
+- start break
+- end break
+- remove host
+- kick user
+
+ALL important room actions should support democratic voting.
+
+==================================================
+15. PAUSE / UNPAUSE TIMER VOTING
+
+Add voting options for:
+
+- Pause Timer
+- Resume Timer (Unpause)
+
+==================================================
+PAUSE TIMER BEHAVIOR
+
+When vote passes:
+
+- timer pauses for ALL users
+- study tracking pauses
+- timer UI shows paused state
+
+While paused:
+
+- no study time increases
+- no phase progression
+
+==================================================
+UNPAUSE TIMER BEHAVIOR
+
+When unpause vote passes:
+
+- timer resumes from exact remaining time
+- study tracking resumes
+- all users sync instantly
+
+==================================================
+16. REMOVE HOST VOTING SYSTEM
+
+Add democratic vote option:
+"Remove Host"
+
+When vote passes:
+
+- current host loses host permissions
+- host automatically transfers
+  to another participant
+
+Requirements:
+
+- realtime sync
+- no room breakage
+- seamless transfer
+
+==================================================
+17. KICK USER VOTING SYSTEM
+
+Add vote option:
+"Kick User"
+
+When selected:
+
+- show participant list
+- selectable usernames
+- users choose target participant
+
+If vote passes:
+
+- target user removed from room
+- listeners cleaned up
+- presence removed
+- timer/study tracking stopped for kicked user
+
+==================================================
+IMPORTANT:
+
+Prevent abuse:
+
+- host cannot kick instantly without vote
+- users cannot spam votes
+- cooldown between votes
+- one active vote at a time
+
+==================================================
+18. VOTING SYSTEM REQUIREMENTS
+
+Voting must:
+
+- sync instantly
+- update in realtime
+- prevent duplicate votes
+- support majority logic
+- support countdown timer
+- show live vote counts
+
+==================================================
+19. REALTIME ROOM GOVERNANCE SYSTEM
+
+The room should feel:
+
+- collaborative
+- democratic
+- fair
+
+NOT:
+
+- dictator-controlled
+
+Users should feel:
+
+- involved
+- empowered
+- socially connected
+
+==================================================
+20. FINAL SYSTEM QUALITY REQUIREMENT
+
+After all fixes:
+
+- host transfer works perfectly
+- pause/unpause voting works
+- kick voting works
+- remove host voting works
+- no room deadlocks
+- no broken timers
+- no unstable ownership states
+- all room actions sync instantly
+- entire room system feels smooth and professional
+
+
+========================================================
+➕ FEATURE UPDATE: PROFILE AVATAR SYSTEM (ONLY AVATAR)
+========================================================
+
+Implement a PROFILE AVATAR system.
+
+IMPORTANT:
+- DO NOT use profile pictures anywhere except avatar display.
+- DO NOT show avatar in chat messages or any other UI.
+- Avatar is ONLY for:
+  → classroom view
+  → profile popup
+
+========================================================
+AVATAR UPLOAD SYSTEM
+========================================================
+
+1. Users can upload avatar from Settings page.
+
+2. Storage:
+- Use Firebase Storage ONLY
+- Save only image URL in Firestore:
+  users/{userId}.photoURL
+
+3. Image requirements (VERY IMPORTANT FOR PERFORMANCE):
+
+- Must be HIGH QUALITY but optimized
+- Must NOT slow down website
+- Must be compressed intelligently (not low quality)
+
+Rules:
+- max size ~150KB to 300KB
+- resize to 256x256 or 512x512
+- convert to WebP or optimized JPEG
+- lazy load images
+- cache images automatically
+
+4. Performance requirement:
+- Avatar must load instantly
+- Must not block UI rendering
+- Must not re-download repeatedly
+
+========================================================
+CLASSROOM UI IMPROVEMENT (IMPORTANT)
+========================================================
+
+Improve ONLY the classroom section UI.
+
+DO NOT redesign entire app.
+
+Make classroom feel like a REAL STUDY CLASSROOM:
+
+GOAL:
+Students should feel like they are studying together in a real classroom environment.
+
+========================================================
+CLASSROOM LAYOUT FIX
+========================================================
+
+1. Use structured seating layout:
+- rows and benches system
+- each bench = 2 students
+- dynamic arrangement based on participants
+
+2. Improve visual structure:
+- better spacing between students
+- aligned seating rows
+- clean and organized layout
+- realistic classroom feel
+
+3. Add classroom feeling:
+- subtle background ambiance feeling (NOT heavy UI changes)
+- make it feel like a study environment, not a chat grid
+
+4. User display:
+- avatar clearly visible
+- username above avatar
+- class/grade shown under name
+
+========================================================
+PERFORMANCE RULE
+========================================================
+
+Classroom must remain:
+- extremely fast
+- smooth on mobile
+- scalable to many users
+- no lag or rerender issues
+
+DO NOT:
+- load heavy images repeatedly
+- re-render full classroom on small updates
+- block UI for avatar loading
+

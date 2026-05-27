@@ -1,36 +1,56 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
-import { ArrowLeft, Lock, Unlock, Users, Music, ChevronRight } from "lucide-react";
+import { ArrowLeft, Lock, Unlock, Users, Music, ChevronRight, Volume2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { StudyFlowBuilder } from "@/components/study-room/StudyFlowBuilder";
 import { createRoom, joinRoom, StudyPhase, SUBJECTS, AMBIENT_SOUNDS } from "@/lib/studyRooms";
+import { useAmbientSound } from "@/hooks/useAmbientSound";
 
 const DEFAULT_FLOW: StudyPhase[] = [
-  { type: "study", label: "Focus", durationMins: 25 },
-  { type: "break", label: "Short Break", durationMins: 5 },
-  { type: "study", label: "Focus", durationMins: 25 },
-  { type: "break", label: "Short Break", durationMins: 5 },
-  { type: "study", label: "Focus", durationMins: 25 },
-  { type: "break", label: "Long Break", durationMins: 15 },
+  { type: "study", label: "Focus",       durationMins: 25 },
+  { type: "break", label: "Short Break", durationMins: 5  },
+  { type: "study", label: "Focus",       durationMins: 25 },
+  { type: "break", label: "Short Break", durationMins: 5  },
+  { type: "study", label: "Focus",       durationMins: 25 },
+  { type: "break", label: "Long Break",  durationMins: 15 },
 ];
 
 export default function StudyRoomCreate() {
   const { user, profile } = useAuth();
   const [, setLocation] = useLocation();
+  const { preview, stopPreview } = useAmbientSound("none", false);
 
-  const [title, setTitle] = useState("");
-  const [subject, setSubject] = useState("Science");
-  const [description, setDescription] = useState("");
-  const [isPrivate, setIsPrivate] = useState(false);
-  const [password, setPassword] = useState("");
+  const [title,           setTitle]           = useState("");
+  const [subject,         setSubject]         = useState("Science");
+  const [description,     setDescription]     = useState("");
+  const [isPrivate,       setIsPrivate]       = useState(false);
+  const [password,        setPassword]        = useState("");
   const [maxParticipants, setMaxParticipants] = useState(20);
-  const [ambientSound, setAmbientSound] = useState("none");
-  const [studyFlow, setStudyFlow] = useState<StudyPhase[]>(DEFAULT_FLOW);
-  const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<"details" | "flow">("details");
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [ambientSound,    setAmbientSound]    = useState("none");
+  const [studyFlow,       setStudyFlow]       = useState<StudyPhase[]>(DEFAULT_FLOW);
+  const [loading,         setLoading]         = useState(false);
+  const [step,            setStep]            = useState<"details" | "flow">("details");
+  const [errors,          setErrors]          = useState<Record<string, string>>({});
+  const [previewing,      setPreviewing]      = useState<string | null>(null);
+
+  // Stop preview on unmount
+  useEffect(() => () => stopPreview(), [stopPreview]);
+
+  function handleSoundSelect(id: string) {
+    setAmbientSound(id);
+    // Preview the sound for 5 seconds when selected
+    if (id !== "none") {
+      stopPreview();
+      setPreviewing(id);
+      preview(id);
+      setTimeout(() => setPreviewing(null), 5000);
+    } else {
+      stopPreview();
+      setPreviewing(null);
+    }
+  }
 
   function validateStep1() {
     const e: Record<string, string> = {};
@@ -53,7 +73,7 @@ export default function StudyRoomCreate() {
   async function handleCreate() {
     if (!user || !profile) return;
     if (!validateStep2()) return;
-
+    stopPreview();
     setLoading(true);
     try {
       const roomId = await createRoom({
@@ -246,28 +266,44 @@ export default function StudyRoomCreate() {
                 )}
               </div>
 
-              {/* Ambient sound */}
+              {/* Ambient sound — with live preview */}
               <div>
-                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5 mb-2">
+                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5 mb-1.5">
                   <Music className="w-4 h-4" /> Ambient Sound
                 </label>
+                {previewing && previewing !== "none" && (
+                  <motion.p
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 mb-2"
+                  >
+                    <Volume2 className="w-3 h-3 animate-pulse" />
+                    Previewing {AMBIENT_SOUNDS.find(s => s.id === previewing)?.label}…
+                  </motion.p>
+                )}
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {AMBIENT_SOUNDS.map((s) => (
                     <button
                       key={s.id}
                       type="button"
-                      onClick={() => setAmbientSound(s.id)}
-                      className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-xs font-medium transition-all ${
+                      onClick={() => handleSoundSelect(s.id)}
+                      className={`relative flex flex-col items-center gap-1 p-2.5 rounded-xl border text-xs font-medium transition-all ${
                         ambientSound === s.id
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 shadow-sm"
                           : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600"
                       }`}
                     >
                       <span className="text-xl">{s.emoji}</span>
                       <span className="leading-tight text-center">{s.label}</span>
+                      {previewing === s.id && (
+                        <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping" />
+                      )}
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">
+                  Click a sound to preview it (5s). This plays for all room members automatically.
+                </p>
               </div>
 
               <button

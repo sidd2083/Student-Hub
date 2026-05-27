@@ -52,8 +52,10 @@ export interface RoomParticipant {
 export interface Vote {
   id: string;
   description: string;
-  type: "extend" | "break" | "skip_break" | "end" | "custom";
+  type: "extend" | "break" | "skip_break" | "end" | "custom" | "pause" | "unpause" | "kick" | "remove_host";
   addMinutes?: number;
+  targetUid?: string;
+  targetName?: string;
   createdByUid: string;
   createdByName: string;
   createdAt: Timestamp | null;
@@ -350,6 +352,8 @@ export async function createVote(roomId: string, vote: {
   description: string;
   type: Vote["type"];
   addMinutes?: number;
+  targetUid?: string;
+  targetName?: string;
   createdByUid: string;
   createdByName: string;
   totalParticipants: number;
@@ -361,6 +365,8 @@ export async function createVote(roomId: string, vote: {
     description: vote.description,
     type: vote.type,
     addMinutes: vote.addMinutes ?? null,
+    targetUid: vote.targetUid ?? null,
+    targetName: vote.targetName ?? null,
     createdByUid: vote.createdByUid,
     createdByName: vote.createdByName,
     totalParticipants: vote.totalParticipants,
@@ -401,6 +407,12 @@ export async function resolveVote(roomId: string, voteId: string, room: Room): P
   const roomRef = doc(db, "studyRooms", roomId);
   if (vote.type === "end") {
     await updateDoc(roomRef, { status: "finished", timerStartedAt: null });
+  } else if (vote.type === "pause") {
+    const remaining = getRemainingSeconds(room);
+    await updateDoc(roomRef, { status: "paused", timerStartedAt: null, pausedRemaining: remaining });
+  } else if (vote.type === "unpause") {
+    const remaining = room.pausedRemaining ?? getRemainingSeconds(room);
+    await updateDoc(roomRef, { status: "active", timerStartedAt: serverTimestamp(), pausedRemaining: remaining });
   } else if (vote.type === "extend" && vote.addMinutes) {
     const remaining = getRemainingSeconds(room);
     await updateDoc(roomRef, {
@@ -416,6 +428,37 @@ export async function resolveVote(roomId: string, voteId: string, room: Room): P
     await skipPhase(roomId, { ...room, studyFlow: newFlow });
   } else if (vote.type === "skip_break") {
     await skipPhase(roomId, room);
+  } else if (vote.type === "kick" && vote.targetUid) {
+    await kickParticipant(roomId, vote.targetUid, room);
+  } else if (vote.type === "remove_host") {
+    const snap = await getDocs(collection(db, "studyRooms", roomId, "participants"));
+    const others = snap.docs
+      .filter(d => d.id !== room.hostUid)
+      .map(d => ({ uid: d.id, ...d.data() } as RoomParticipant))
+      .filter(isParticipantActive)
+      .sort((a, b) => (a.joinedAt?.toMillis() ?? 0) - (b.joinedAt?.toMillis() ?? 0));
+    if (others.length > 0) {
+      await transferHost(roomId, room.hostUid, others[0].uid, others[0].name);
+    }
+  }
+}
+
+export async function kickParticipant(roomId: string, targetUid: string, room: Room): Promise<void> {
+  try {
+    await deleteDoc(doc(db, "studyRooms", roomId, "participants", targetUid));
+    try {
+      await updateDoc(doc(db, "studyRooms", roomId), { participantCount: increment(-1) });
+    } catch {}
+    // Send a system message
+    try {
+      await setDoc(doc(collection(db, "studyRooms", roomId, "messages")), {
+        uid: "system", name: "System",
+        text: `A participant was removed by democratic vote.`,
+        type: "system", createdAt: serverTimestamp(),
+      });
+    } catch {}
+  } catch (err) {
+    console.warn("[Room] kickParticipant error:", err);
   }
 }
 
@@ -573,11 +616,22 @@ export async function syncStudyTimeToLeaderboard(uid: string, additionalMins: nu
 
 // ── Transfer Host ─────────────────────────────────────────────────────────────
 
-export async function transferHost(roomId: string, newHostUid: string, newHostName: string): Promise<void> {
+export async function transferHost(roomId: string, oldHostUid: string, newHostUid: string, newHostName: string): Promise<void> {
   const batch = writeBatch(db);
   batch.update(doc(db, "studyRooms", roomId), { hostUid: newHostUid, hostName: newHostName });
   batch.update(doc(db, "studyRooms", roomId, "participants", newHostUid), { isHost: true });
+  try {
+    batch.update(doc(db, "studyRooms", roomId, "participants", oldHostUid), { isHost: false });
+  } catch {}
   await batch.commit();
+  // System message
+  try {
+    await setDoc(doc(collection(db, "studyRooms", roomId, "messages")), {
+      uid: "system", name: "System",
+      text: `${newHostName} is now the host.`,
+      type: "system", createdAt: serverTimestamp(),
+    });
+  } catch {}
 }
 
 // ── Admin: cascade delete a room and all its subcollections ───────────────────

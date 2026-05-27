@@ -6,8 +6,9 @@ import {
   Play, Pause, SkipForward, Square, Users, Copy,
   Send, BookOpen, Coffee, Crown, CheckCircle, BarChart2,
   ChevronRight, ChevronDown, Maximize, Minimize, LogOut, X,
-  MessageCircle, ListChecks, School,
+  MessageCircle, ListChecks, School, Volume2, VolumeX,
 } from "lucide-react";
+import { useRoomSound } from "@/hooks/useAmbientSound";
 import {
   Room, RoomParticipant, Vote, RoomMessage,
   subscribeRoom, subscribeParticipants, subscribeActiveVotes, subscribeMessages,
@@ -85,6 +86,12 @@ export default function StudyRoomLive() {
   // Derive active room + participants: context when joined, local when browsing
   const room         = alreadyIn ? ctxRoom         : localRoom;
   const participants = alreadyIn ? ctxParticipants : localParticipants;
+
+  // ── Sound system — driven by the room's ambientSound setting ─────────────────
+  const roomSoundId = room?.ambientSound ?? "none";
+  const { isMuted, volume, setMuted, setVolume } = useRoomSound(
+    joined && room?.status === "active" ? roomSoundId : "none"
+  );
 
   // ── PRE-JOIN: subscribe to room and participants ONLY while not yet joined ────
   // After join, the context already subscribes — subscribing again would create
@@ -190,6 +197,11 @@ export default function StudyRoomLive() {
 
   // ── Actions ───────────────────────────────────────────────────────────────────
   async function confirmLeave() {
+    setShowLeave(false);
+    // Exit fullscreen first so the leave doesn't break the layout
+    if (document.fullscreenElement) {
+      try { await document.exitFullscreen(); } catch {}
+    }
     await leaveActiveRoom();
     setLocation("/study-rooms");
   }
@@ -538,6 +550,27 @@ export default function StudyRoomLive() {
             {showCopied ? <><CheckCircle className="w-3.5 h-3.5 text-green-500" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Invite</>}
           </button>
 
+          {/* Sound controls — only shown when room has ambient sound */}
+          {roomSoundId !== "none" && joined && (
+            <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => setMuted(!isMuted)}
+                title={isMuted ? "Unmute ambient sound" : "Mute ambient sound"}
+                className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              >
+                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              </button>
+              {!isMuted && (
+                <input
+                  type="range" min={0} max={1} step={0.05} value={volume}
+                  onChange={(e) => setVolume(parseFloat(e.target.value))}
+                  className="w-16 accent-blue-500 cursor-pointer"
+                  title="Ambient volume"
+                />
+              )}
+            </div>
+          )}
+
           <button onClick={toggleFullscreen}
             className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 transition-colors shrink-0">
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
@@ -667,7 +700,7 @@ export default function StudyRoomLive() {
             {mobileTab === "vote" && (
               <motion.div key="vote" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
                 className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
-                <VotingPanel room={room} votes={votes} participantCount={participants.length} />
+                <VotingPanel room={room} votes={votes} participantCount={participants.length} participants={participants} />
               </motion.div>
             )}
             {mobileTab === "chat" && (
@@ -734,7 +767,7 @@ export default function StudyRoomLive() {
                 </span>
               </div>
               <div className="p-3">
-                <VotingPanel room={room} votes={votes} participantCount={participants.length} />
+                <VotingPanel room={room} votes={votes} participantCount={participants.length} participants={participants} />
               </div>
             </div>
 
