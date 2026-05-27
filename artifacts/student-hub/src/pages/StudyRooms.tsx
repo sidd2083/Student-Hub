@@ -75,7 +75,8 @@ export default function StudyRooms() {
 
   function handlePasswordSubmit() {
     if (!pendingRoom) return;
-    if (pwInput.trim() === pendingRoom.password) {
+    // Trim both sides to avoid whitespace mismatches
+    if (pwInput.trim() === (pendingRoom.password ?? "").trim()) {
       setLocation(`/study-rooms/${pendingRoom.id}`);
       setPendingRoom(null);
     } else {

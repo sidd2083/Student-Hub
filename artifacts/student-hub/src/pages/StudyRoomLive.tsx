@@ -11,7 +11,7 @@ import {
 import {
   Room, RoomParticipant, Vote, RoomMessage,
   subscribeRoom, subscribeParticipants, subscribeActiveVotes, subscribeMessages,
-  joinRoom, sendMessage, getRemainingSeconds, formatTime, createVote,
+  joinRoom, isParticipant, sendMessage, getRemainingSeconds, formatTime, createVote,
 } from "@/lib/studyRooms";
 import { useActiveRoom } from "@/context/ActiveRoomContext";
 import { useAuth } from "@/context/AuthContext";
@@ -97,13 +97,14 @@ export default function StudyRoomLive() {
   // auto-scroll chat
   useEffect(() => { chatRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  // auto-join
+  // auto-join — check Firestore directly to avoid double-counting participant
   useEffect(() => {
     if (!roomId || !user || !profile || joined || !room || room.status === "finished") return;
-    const already = participants.some(p => p.uid === user.uid);
     async function doJoin() {
       try {
-        if (!already) {
+        // Use server check — local `participants` state may be empty on first render
+        const alreadyInRoom = await isParticipant(roomId!, user!.uid);
+        if (!alreadyInRoom) {
           await joinRoom(roomId!, { uid: user!.uid, name: profile!.name, grade: profile!.grade, isHost: room!.hostUid === user!.uid });
         }
         joinActiveRoom(roomId!);

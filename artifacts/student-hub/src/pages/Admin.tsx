@@ -13,11 +13,11 @@ import {
   LayoutDashboard, BookOpen, FileText, Users,
   Shield, Plus, Trash2, LogOut, Megaphone, Upload, X, Image,
   CheckCircle, AlertCircle, Award, Search, Type, Pencil, Globe,
-  RefreshCw, Clock, Link2,
+  RefreshCw, Clock, Link2, School, Square, Lock, Unlock,
 } from "lucide-react";
 
 const ADMIN_SESSION = "admin_session_v1";
-type Section = "dashboard" | "notes" | "pyqs" | "announcements" | "users" | "reports" | "seo" | "sitemap";
+type Section = "dashboard" | "notes" | "pyqs" | "announcements" | "users" | "reports" | "seo" | "sitemap" | "rooms";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -1913,6 +1913,208 @@ function SeoPanel() {
   );
 }
 
+// ─── Manage Study Rooms ───────────────────────────────────────────────────────
+
+interface AdminRoom {
+  id: string;
+  title: string;
+  subject: string;
+  hostName: string;
+  hostGrade: number;
+  status: string;
+  isPrivate: boolean;
+  participantCount: number;
+  maxParticipants: number;
+  createdAt: string | null;
+  expiresAt: string | null;
+  description: string;
+}
+
+function ManageRooms() {
+  const [rooms, setRooms]           = useState<AdminRoom[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [actionId, setActionId]     = useState<string | null>(null);
+  const [statusFilter, setStatusF]  = useState<string>("all");
+  const [search, setSearch]         = useState("");
+  const [msg, setMsg]               = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const loadRooms = useCallback(async () => {
+    setLoading(true);
+    try {
+      const snap = await getDocs(query(collection(db, "studyRooms"), orderBy("createdAt", "desc")));
+      setRooms(snap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          title: data.title ?? "Untitled",
+          subject: data.subject ?? "—",
+          hostName: data.hostName ?? "—",
+          hostGrade: data.hostGrade ?? 0,
+          status: data.status ?? "waiting",
+          isPrivate: data.isPrivate ?? false,
+          participantCount: data.participantCount ?? 0,
+          maxParticipants: data.maxParticipants ?? 20,
+          createdAt: data.createdAt?.toDate?.()?.toLocaleString?.() ?? null,
+          expiresAt: data.expiresAt?.toDate?.()?.toLocaleString?.() ?? null,
+          description: data.description ?? "",
+        } as AdminRoom;
+      }));
+    } catch (e) {
+      console.error("[Admin] loadRooms:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadRooms(); }, [loadRooms]);
+
+  async function handleEndRoom(id: string, title: string) {
+    if (!confirm(`End session for "${title}"? This will mark it as finished.`)) return;
+    setActionId(id);
+    try {
+      await updateDoc(doc(db, "studyRooms", id), { status: "finished", timerStartedAt: null });
+      setMsg({ type: "success", text: `Room "${title}" ended.` });
+      loadRooms();
+    } catch {
+      setMsg({ type: "error", text: "Failed to end room." });
+    } finally { setActionId(null); }
+  }
+
+  async function handleDeleteRoom(id: string, title: string) {
+    if (!confirm(`PERMANENTLY DELETE "${title}"? This cannot be undone.`)) return;
+    setActionId(id);
+    try {
+      // Delete participants subcollection
+      const pSnap = await getDocs(collection(db, "studyRooms", id, "participants"));
+      for (const p of pSnap.docs) await deleteDoc(p.ref);
+      // Delete votes subcollection
+      const vSnap = await getDocs(collection(db, "studyRooms", id, "votes"));
+      for (const v of vSnap.docs) await deleteDoc(v.ref);
+      // Delete messages subcollection
+      const mSnap = await getDocs(collection(db, "studyRooms", id, "messages"));
+      for (const m of mSnap.docs) await deleteDoc(m.ref);
+      // Delete the room itself
+      await deleteDoc(doc(db, "studyRooms", id));
+      setRooms(prev => prev.filter(r => r.id !== id));
+      setMsg({ type: "success", text: `Room "${title}" deleted.` });
+    } catch {
+      setMsg({ type: "error", text: "Failed to delete room." });
+    } finally { setActionId(null); }
+  }
+
+  const STATUS_COLORS: Record<string, string> = {
+    waiting:  "bg-yellow-100 text-yellow-700",
+    active:   "bg-green-100 text-green-700",
+    paused:   "bg-orange-100 text-orange-700",
+    finished: "bg-gray-100 text-gray-500",
+  };
+
+  const filtered = rooms.filter(r => {
+    if (statusFilter !== "all" && r.status !== statusFilter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!r.title.toLowerCase().includes(q) && !r.hostName.toLowerCase().includes(q) && !r.subject.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  const counts = {
+    all: rooms.length,
+    waiting:  rooms.filter(r => r.status === "waiting").length,
+    active:   rooms.filter(r => r.status === "active").length,
+    paused:   rooms.filter(r => r.status === "paused").length,
+    finished: rooms.filter(r => r.status === "finished").length,
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Study Rooms Control</h2>
+          <p className="text-sm text-gray-500 mt-0.5">View, end, or delete any study room</p>
+        </div>
+        <button onClick={loadRooms} disabled={loading}
+          className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 disabled:opacity-50 transition-all">
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+        </button>
+      </div>
+
+      {msg && (
+        <div className={`flex items-center gap-2 p-3 rounded-xl mb-4 text-sm ${msg.type === "success" ? "bg-green-50 border border-green-100 text-green-700" : "bg-red-50 border border-red-100 text-red-700"}`}>
+          {msg.type === "success" ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+          {msg.text}
+          <button onClick={() => setMsg(null)} className="ml-auto text-gray-400 hover:text-gray-600"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
+        {(["all","active","waiting","paused","finished"] as const).map(s => (
+          <button key={s} onClick={() => setStatusF(s)}
+            className={`p-3 rounded-2xl border text-left transition-all ${statusFilter === s ? "border-purple-300 bg-purple-50" : "border-gray-100 bg-white hover:bg-gray-50"}`}>
+            <p className="text-2xl font-bold text-gray-900">{counts[s]}</p>
+            <p className="text-xs text-gray-500 capitalize mt-0.5">{s}</p>
+          </button>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input type="text" placeholder="Search rooms, hosts, subjects…" value={search} onChange={e => setSearch(e.target.value)}
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-purple-300 bg-white" />
+      </div>
+
+      {loading ? (
+        <div className="space-y-3">
+          {[...Array(4)].map((_, i) => <div key={i} className="h-20 bg-white rounded-2xl border border-gray-100 animate-pulse" />)}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16 text-gray-400 text-sm">No rooms match this filter.</div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(room => (
+            <div key={room.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[room.status] ?? "bg-gray-100 text-gray-500"}`}>
+                      {room.status}
+                    </span>
+                    <span className="flex items-center gap-1 text-xs text-gray-400">
+                      {room.isPrivate ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                      {room.isPrivate ? "Private" : "Public"}
+                    </span>
+                    <span className="text-xs text-gray-400">{room.subject}</span>
+                  </div>
+                  <p className="font-semibold text-gray-900 truncate">{room.title}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Host: {room.hostName} (Grade {room.hostGrade}) · {room.participantCount}/{room.maxParticipants} participants
+                    {room.createdAt && <> · Created {room.createdAt}</>}
+                  </p>
+                  {room.description && <p className="text-xs text-gray-400 mt-1 line-clamp-1">{room.description}</p>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {room.status !== "finished" && (
+                    <button onClick={() => handleEndRoom(room.id, room.title)} disabled={actionId === room.id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-600 text-xs font-semibold border border-orange-200 transition-colors disabled:opacity-50">
+                      <Square className="w-3.5 h-3.5" /> End
+                    </button>
+                  )}
+                  <button onClick={() => handleDeleteRoom(room.id, room.title)} disabled={actionId === room.id}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold border border-red-200 transition-colors disabled:opacity-50">
+                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Admin Shell ─────────────────────────────────────────────────────────────
 
 export default function Admin() {
@@ -1928,6 +2130,7 @@ export default function Admin() {
 
   const navItems: { key: Section; icon: typeof LayoutDashboard; label: string }[] = [
     { key: "dashboard",     icon: LayoutDashboard, label: "Dashboard"     },
+    { key: "rooms",         icon: School,          label: "Study Rooms"   },
     { key: "notes",         icon: BookOpen,        label: "Manage Notes"  },
     { key: "pyqs",          icon: FileText,        label: "Manage PYQs"   },
     { key: "announcements", icon: Megaphone,       label: "Announcements" },
@@ -1974,6 +2177,7 @@ export default function Admin() {
       </aside>
       <main className="flex-1 overflow-y-auto p-8">
         {section === "dashboard"     && <AdminOverview />}
+        {section === "rooms"         && <ManageRooms />}
         {section === "notes"         && <ManageNotes />}
         {section === "pyqs"          && <ManagePyqs />}
         {section === "announcements" && <ManageAnnouncements />}
