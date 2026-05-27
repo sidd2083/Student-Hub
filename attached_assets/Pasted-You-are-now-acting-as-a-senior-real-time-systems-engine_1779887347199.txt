@@ -1,0 +1,401 @@
+You are now acting as a senior real-time systems engineer, Firebase performance engineer, scalable backend architect, and UX optimization expert.
+
+IMPORTANT:
+The Virtual Study Room system is MOSTLY BUILT already.
+UI exists.
+Features exist.
+BUT THE ENTIRE EXPERIENCE FEELS BROKEN, SLOW, INCONSISTENT, AND UNPROFESSIONAL.
+
+DO NOT redesign UI.
+DO NOT rebuild pages.
+
+ONLY:
+
+* FIX backend logic
+* FIX realtime synchronization
+* FIX presence system
+* FIX performance
+* FIX speed
+* FIX stale room data
+* FIX lag
+* MAKE EVERYTHING FEEL INSTANT, SMOOTH, AND ADDICTIVE
+
+The final experience should feel:
+
+* instant
+* responsive
+* realtime
+* smooth
+* premium
+* addictive
+* professional
+* stable like Discord/WhatsApp realtime feeling
+
+==================================================
+CRITICAL CURRENT PROBLEMS
+=========================
+
+==================================================
+
+1. EMPTY ROOMS ARE NOT REMOVED
+   ==================================================
+
+Current issue:
+I created rooms before.
+Then left the rooms.
+
+Now:
+
+* rooms still exist
+* rooms still appear active
+* rooms falsely show users inside
+* ghost rooms remain forever
+
+THIS IS BROKEN.
+
+==================================================
+FIX ROOM CLEANUP SYSTEM
+=======================
+
+Implement proper room lifecycle management.
+
+RULES:
+
+* if room has 0 active participants
+  → room must automatically close/delete
+
+When:
+
+* last participant leaves
+* browser closes
+* disconnect happens
+* user becomes inactive
+
+Then:
+
+* remove participant properly
+* update participant count instantly
+* if count becomes 0
+  → delete room automatically
+
+==================================================
+2. GHOST USERS / FAKE ACTIVE USERS
+==================================
+
+Current issue:
+Dashboard shows:
+
+* 1 active user
+* 5 active students
+
+Even when literally nobody is online.
+
+Rooms also falsely show:
+
+* 1 participant
+  when nobody exists.
+
+THIS IS A PRESENCE SYSTEM FAILURE.
+
+==================================================
+FIX REAL PRESENCE SYSTEM
+========================
+
+Implement REAL online presence tracking.
+
+Use:
+
+* Firestore presence
+  OR
+* Firebase Realtime Database presence system
+
+Requirements:
+
+* detect disconnects instantly
+* detect tab close
+* detect app close
+* detect internet disconnect
+
+When user disconnects:
+
+* remove from active room
+* remove from participant list
+* decrement counters instantly
+
+NO ghost users allowed.
+
+==================================================
+3. PRIVATE ROOM JOIN IS BROKEN
+==============================
+
+Current issue:
+Private rooms exist.
+Correct password entered.
+Still cannot join room.
+
+Fix:
+
+* password verification logic
+* room join authentication
+* private room access flow
+
+Ensure:
+
+* valid password joins instantly
+* invalid password shows proper error
+
+==================================================
+4. EVERYTHING FEELS EXTREMELY SLOW
+==================================
+
+Current experience:
+
+* clicking takes 10–30 seconds
+* messages send slowly
+* voting updates slowly
+* room actions delayed
+* avatar popup delayed
+* leaving fullscreen delayed
+* everything feels frustrating
+
+THIS IS THE BIGGEST ISSUE.
+
+The app MUST feel:
+
+* instant
+* realtime
+* responsive
+
+==================================================
+FIX PERFORMANCE COMPLETELY
+==========================
+
+You MUST optimize EVERYTHING.
+
+==================================================
+A. FIRESTORE OPTIMIZATION
+=========================
+
+Reduce:
+
+* unnecessary reads
+* unnecessary writes
+* duplicate listeners
+* expensive queries
+
+Use:
+
+* indexed queries
+* batched writes
+* efficient subscriptions
+
+==================================================
+B. REACT PERFORMANCE
+====================
+
+Prevent:
+
+* unnecessary rerenders
+* rerendering entire classroom
+* state explosion
+
+Use:
+
+* React.memo
+* useMemo
+* useCallback
+* selective state updates
+* virtualization if needed
+
+==================================================
+C. REALTIME OPTIMIZATION
+========================
+
+Listeners must:
+
+* clean up correctly
+* not duplicate
+* update minimal UI only
+
+==================================================
+D. MOBILE PERFORMANCE
+=====================
+
+Optimize especially for:
+
+* low-end Android devices
+* weak internet
+* mobile browsers
+
+The system MUST feel smooth on mobile.
+
+==================================================
+5. CHAT SYSTEM IS SLOW
+======================
+
+Current issue:
+Messages appear late.
+
+Fix:
+
+* realtime message delivery
+* optimistic UI updates
+* instant rendering
+* Firestore message indexing
+
+Messages must feel:
+
+* instant like WhatsApp/Discord
+
+==================================================
+6. PROFILE POPUP LOADS SLOW
+===========================
+
+Current issue:
+Clicking avatar takes long time to open popup.
+
+Fix:
+
+* preload lightweight user data
+* cache profile data
+* optimize Firestore reads
+
+Popup must open INSTANTLY.
+
+==================================================
+7. ADMIN PANEL DELETE ROOM FAILS
+================================
+
+Current issue:
+Admin clicks delete room.
+Error:
+"Failed to delete room"
+
+Fix:
+
+* Firestore permissions
+* cascading delete logic
+* related subcollections cleanup
+
+Admin must be able to:
+
+* instantly delete room
+* instantly force close room
+
+==================================================
+8. FULLSCREEN EXIT IS BROKEN
+============================
+
+Current issue:
+Entering fullscreen works.
+Leaving fullscreen fails sometimes.
+
+Fix:
+
+* Fullscreen API handling
+* escape handling
+* mobile support
+
+==================================================
+9. VOTING SYSTEM FEELS SLOW
+===========================
+
+Votes:
+
+* appear delayed
+* results delayed
+* timer changes delayed
+
+Fix:
+
+* realtime vote propagation
+* optimistic vote updates
+* efficient timer sync
+
+==================================================
+10. STUDY TIMER + LEADERBOARD SYNC
+==================================
+
+Ensure:
+
+* study time updates instantly
+* leaderboard updates realtime
+* analytics update correctly
+
+NO delayed updates.
+
+==================================================
+11. OVERALL UX FEEL
+===================
+
+The system MUST feel:
+
+* polished
+* addictive
+* modern
+* responsive
+
+Current feeling:
+
+* frustrating
+* laggy
+* broken
+
+Fix ALL friction.
+
+==================================================
+12. IMPLEMENT REALTIME ROOM ENGINE PROPERLY
+===========================================
+
+Build proper room engine architecture.
+
+Requirements:
+
+* authoritative room state
+* proper participant synchronization
+* instant join/leave updates
+* reliable room cleanup
+* scalable realtime architecture
+
+==================================================
+13. ADD DEBUGGING + MONITORING
+==============================
+
+Add logs for:
+
+* active users
+* room joins/leaves
+* disconnects
+* cleanup events
+* listener counts
+* Firestore latency
+* message delivery time
+* vote execution time
+
+==================================================
+14. FINAL REQUIREMENT
+=====================
+
+The final product should feel:
+
+* smooth like Discord
+* responsive like WhatsApp
+* stable like production apps
+* realtime with no fake states
+* fast on mobile
+* fully synchronized
+* professional quality
+
+NO:
+
+* ghost users
+* stale rooms
+* delayed messages
+* laggy popups
+* broken room states
+* delayed voting
+* incorrect counters
+* fake active users
+* slow fullscreen exit
+
+EVERYTHING MUST WORK PERFECTLY.
