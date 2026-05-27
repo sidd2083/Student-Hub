@@ -17,6 +17,9 @@ interface Props {
   onClose: () => void;
 }
 
+// Module-level cache so repeated avatar clicks are instant
+const statsCache = new Map<string, UserStats>();
+
 function avatarColor(name: string): string {
   const colors = [
     "from-blue-500 to-blue-600", "from-purple-500 to-purple-600",
@@ -35,17 +38,29 @@ export function StudentProfileModal({ participant, onClose }: Props) {
 
   useEffect(() => {
     if (!participant) return;
+
+    // Serve from cache immediately — no loading state needed
+    const cached = statsCache.get(participant.uid);
+    if (cached) {
+      setStats(cached);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setStats(null);
+
     getDoc(doc(db, "users", participant.uid)).then((snap) => {
       if (snap.exists()) {
         const d = snap.data();
-        setStats({
+        const s: UserStats = {
           totalStudyTime: d.totalStudyTime ?? 0,
           streak: d.streak ?? 0,
           createdAt: d.createdAt ?? "",
           todayStudyTime: d.todayStudyTime ?? 0,
-        });
+        };
+        statsCache.set(participant.uid, s);
+        setStats(s);
       }
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -66,7 +81,6 @@ export function StudentProfileModal({ participant, onClose }: Props) {
     <AnimatePresence>
       {participant && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -74,7 +88,6 @@ export function StudentProfileModal({ participant, onClose }: Props) {
             onClick={onClose}
             className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
           />
-          {/* Modal */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -83,7 +96,6 @@ export function StudentProfileModal({ participant, onClose }: Props) {
             className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
           >
             <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm pointer-events-auto overflow-hidden">
-              {/* Header gradient */}
               <div className={`bg-gradient-to-r ${gradient} p-6 relative`}>
                 <button
                   onClick={onClose}
@@ -102,7 +114,6 @@ export function StudentProfileModal({ participant, onClose }: Props) {
                 </div>
               </div>
 
-              {/* Stats */}
               <div className="p-5 space-y-4">
                 {loading ? (
                   <div className="space-y-3">
@@ -112,7 +123,6 @@ export function StudentProfileModal({ participant, onClose }: Props) {
                   </div>
                 ) : (
                   <>
-                    {/* Study stats grid */}
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-orange-50 dark:bg-orange-900/20 rounded-2xl p-3.5 text-center">
                         <Flame className="w-5 h-5 text-orange-500 mx-auto mb-1" />
@@ -136,7 +146,6 @@ export function StudentProfileModal({ participant, onClose }: Props) {
                       </div>
                     </div>
 
-                    {/* Joined date */}
                     <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 justify-center">
                       <Calendar className="w-4 h-4" />
                       <span>Joined StudentHub {joinedDate}</span>

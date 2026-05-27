@@ -6,7 +6,7 @@ import {
   Room, RoomParticipant, subscribeRoom, subscribeParticipants,
   leaveRoom, updatePresence, syncStudyTimeToLeaderboard,
   pauseTimer, resumeTimer, startTimer, skipPhase, endRoom,
-  advancePhase, getRemainingSeconds, transferHost,
+  advancePhase, getRemainingSeconds, transferHost, purgeStaleParticipants,
 } from "@/lib/studyRooms";
 
 interface ActiveRoomContextType {
@@ -35,16 +35,15 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [studyMinsInSession, setStudyMinsInSession] = useState(0);
 
-  // Unsync'd seconds since last Firestore write
   const studySecondsRef  = useRef(0);
-  // Minutes already committed to Firestore this session
   const syncedMinsRef    = useRef(0);
-  // Timestamp of last periodic sync
   const lastSyncRef      = useRef(Date.now());
   const roomRef          = useRef<Room | null>(null);
   const advancingRef     = useRef(false);
   const unsubRoomRef     = useRef<(() => void) | null>(null);
   const unsubPartsRef    = useRef<(() => void) | null>(null);
+  // Track if we've already fired the leave on unload
+  const unloadedRef      = useRef(false);
 
   roomRef.current = room;
 
@@ -68,7 +67,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     };
   }, [activeRoomId]);
 
-  // ── Timer tick — runs every second, shared for all users ───────────────────
+  // ── Timer tick ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const interval = setInterval(() => {
       const r = roomRef.current;
@@ -77,28 +76,27 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
       const rem = getRemainingSeconds(r);
       setRemainingSeconds(rem);
 
-      // Accumulate study seconds during active study phases
       if (r.status === "active") {
         const phase = r.studyFlow[r.currentPhaseIndex];
         if (phase?.type === "study") {
           studySecondsRef.current += 1;
         }
 
-        // Periodic sync every 60 seconds (not 5 min — catches short sessions)
+        // Sync every 60 seconds
         const now = Date.now();
         if (now - lastSyncRef.current >= 60_000 && user) {
           const minsToSync = Math.floor(studySecondsRef.current / 60);
           if (minsToSync > 0) {
             syncStudyTimeToLeaderboard(user.uid, minsToSync).catch(() => {});
             syncedMinsRef.current += minsToSync;
-            studySecondsRef.current -= minsToSync * 60; // keep sub-minute remainder
+            studySecondsRef.current -= minsToSync * 60;
           }
           lastSyncRef.current = now;
         }
 
         setStudyMinsInSession(syncedMinsRef.current + Math.floor(studySecondsRef.current / 60));
 
-        // Auto-advance phase at 0 — only host runs the Firestore write
+        // Host auto-advances phase at 0
         if (rem <= 0 && r.currentPhaseIndex < r.studyFlow.length - 1 && !advancingRef.current) {
           if (user && r.hostUid === user.uid) {
             advancingRef.current = true;
@@ -111,31 +109,56 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     return () => clearInterval(interval);
   }, [user]);
 
-  // ── Presence heartbeat (every 30s) ──────────────────────────────────────────
+  // ── Presence heartbeat — every 15s for fast disconnect detection ─────────────
   useEffect(() => {
     if (!activeRoomId || !user) return;
     const interval = setInterval(() => {
       updatePresence(activeRoomId, user.uid).catch(() => {});
-    }, 30_000);
+    }, 15_000);
     return () => clearInterval(interval);
   }, [activeRoomId, user]);
 
-  // ── Sync on tab/window close ─────────────────────────────────────────────────
+  // ── Host: purge stale participants every 60s ─────────────────────────────────
+  useEffect(() => {
+    if (!activeRoomId || !user || !isHost) return;
+    const interval = setInterval(() => {
+      purgeStaleParticipants(activeRoomId).catch(() => {});
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [activeRoomId, user, isHost]);
+
+  // ── Sync + leave on tab/window close ─────────────────────────────────────────
   useEffect(() => {
     if (!activeRoomId || !user) return;
+    unloadedRef.current = false;
+
     const handleUnload = () => {
+      if (unloadedRef.current) return;
+      unloadedRef.current = true;
+
       const remainderMins = Math.floor(studySecondsRef.current / 60);
       if (remainderMins > 0) {
-        // Use sendBeacon for reliable delivery on unload
         const body = JSON.stringify({ uid: user.uid, mins: remainderMins });
-        const sent = navigator.sendBeacon?.("/api/study/sync", body);
-        if (!sent) {
-          syncStudyTimeToLeaderboard(user.uid, remainderMins).catch(() => {});
-        }
+        navigator.sendBeacon?.("/api/study/sync", body);
+      }
+      // Best-effort: remove participant doc on unload
+      // (sendBeacon can't do Firestore, so we do a synchronous XHR or just rely
+      //  on stale-participant cleanup to handle it within 90s)
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        // Re-ping presence immediately when tab comes back
+        updatePresence(activeRoomId, user.uid).catch(() => {});
       }
     };
+
     window.addEventListener("beforeunload", handleUnload);
-    return () => window.removeEventListener("beforeunload", handleUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("beforeunload", handleUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [activeRoomId, user]);
 
   // ── Public API ───────────────────────────────────────────────────────────────
@@ -144,6 +167,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     syncedMinsRef.current   = 0;
     lastSyncRef.current     = Date.now();
     advancingRef.current    = false;
+    unloadedRef.current     = false;
     setStudyMinsInSession(0);
     setActiveRoomId(roomId);
   }, []);
@@ -151,14 +175,12 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   const leaveActiveRoom = useCallback(async () => {
     if (!activeRoomId || !user) return;
 
-    // Sync the unsync'd remainder before leaving
     const remainderMins = Math.floor(studySecondsRef.current / 60);
     if (remainderMins > 0) {
       await syncStudyTimeToLeaderboard(user.uid, remainderMins).catch(() => {});
     }
     const totalSessionMins = syncedMinsRef.current + remainderMins;
 
-    // If host leaving and others remain, auto-transfer host
     const r = roomRef.current;
     if (r && r.hostUid === user.uid && participants.length > 1) {
       const next = participants.find(p => p.uid !== user.uid);

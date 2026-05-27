@@ -1,0 +1,178 @@
+==================================================
+15. MEMBER STUDY TIME / LEADERBOARD SYNC IS BROKEN
+==================================================
+
+CRITICAL ISSUE:
+
+Currently:
+
+* when room timer runs
+* ONLY the host's study time increases
+* ONLY the host's leaderboard updates
+* ONLY the host's analytics update
+
+BUT:
+
+* other members inside the room get NO study time
+* their leaderboard does NOT update
+* their report card does NOT update
+* their total study hours remain unchanged
+
+THIS IS A MAJOR MULTI-USER TRACKING FAILURE.
+
+==================================================
+FIX MULTI-USER STUDY TRACKING SYSTEM
+====================================
+
+Study tracking must work for EVERY active participant inside the room.
+
+NOT just the host.
+
+==================================================
+CORRECT BEHAVIOR
+================
+
+When:
+
+* room timer is running
+* current phase = study phase
+* participant is active inside room
+
+THEN:
+ALL ACTIVE PARTICIPANTS must receive:
+
+* study time increase
+* leaderboard updates
+* streak updates
+* analytics updates
+* report card updates
+
+==================================================
+TRACKING REQUIREMENTS
+=====================
+
+Each participant must have independent tracking:
+
+* sessionStartTime
+* accumulatedStudyTime
+* breakTime
+* activePresenceState
+* lastActivityTimestamp
+
+Tracking must:
+
+* pause during break phases
+* stop after leaving room
+* stop after disconnect
+* stop after inactivity timeout
+
+==================================================
+IMPORTANT:
+DO NOT tie study tracking ONLY to room host.
+============================================
+
+Current architecture incorrectly gives:
+
+* host = tracked
+* members = ignored
+
+This must be fully rewritten.
+
+==================================================
+CORRECT ARCHITECTURE
+====================
+
+The room timer is SHARED.
+BUT study tracking is INDIVIDUAL PER USER.
+
+Meaning:
+One shared timer controls:
+
+* study phase
+* break phase
+
+But EACH USER gets their OWN:
+
+* tracked study minutes
+* leaderboard progress
+* analytics updates
+
+==================================================
+WHEN USERS SHOULD RECEIVE STUDY TIME
+====================================
+
+ONLY if:
+
+* user is actively present in room
+* user has not disconnected
+* room timer is in study mode
+* user is not inactive/AFK
+
+==================================================
+LEADERBOARD UPDATE FIX
+======================
+
+When study tracking updates:
+Immediately update:
+
+* users/{userId}/totalStudyTime
+* todayStudyTime
+* weeklyStudyTime
+* streaks
+* rankings
+
+FOR ALL PARTICIPANTS.
+
+NOT just host.
+
+==================================================
+REPORT CARD FIX
+===============
+
+All participants must receive:
+
+* study hour updates
+* room participation stats
+* completed sessions
+* analytics updates
+
+==================================================
+REALTIME SYNCHRONIZATION
+========================
+
+Study tracking must:
+
+* sync in realtime
+* survive refresh
+* survive reconnect
+* use Firestore server timestamps
+
+==================================================
+ANTI-GHOST REQUIREMENT
+======================
+
+If user:
+
+* disconnects
+* closes browser
+* leaves room
+* loses internet
+
+Then:
+
+* stop tracking immediately
+* remove active presence
+* stop leaderboard updates
+
+==================================================
+FINAL REQUIREMENT
+=================
+
+After fix:
+✔ Host study time updates
+✔ Member study time updates
+✔ Leaderboard updates for ALL participants
+✔ Analytics update for ALL participants
+✔ Study tracking is accurate and individual
+✔ No participant gets ignored
+✔ Shared timer works correctly for all users
