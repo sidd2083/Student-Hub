@@ -613,16 +613,52 @@ export function subscribePublicRooms(cb: RoomsCb): () => void {
 
 // ── Study Time Sync ───────────────────────────────────────────────────────────
 
+/**
+ * Sync study minutes earned in a study room back to the user's profile
+ * AND to the daily study_log entry (so the report card + leaderboard update).
+ * Mirrors the same write pattern as TimerContext.
+ */
 export async function syncStudyTimeToLeaderboard(uid: string, additionalMins: number): Promise<void> {
-  if (additionalMins <= 0) return;
+  if (additionalMins <= 0 || !uid) return;
+
+  // ── 1. Update users/{uid} — leaderboard & streak ──────────────────────────
   try {
+    // Get today's Nepali date (offset NPT = UTC+5:45)
+    const NPT_OFFSET_MS = 5 * 60 * 60 * 1000 + 45 * 60 * 1000;
+    const today = new Date(Date.now() + NPT_OFFSET_MS)
+      .toISOString().slice(0, 10); // "YYYY-MM-DD"
+
     await updateDoc(doc(db, "users", uid), {
-      totalStudyTime: increment(additionalMins),
-      todayStudyTime: increment(additionalMins),
+      totalStudyTime:  increment(additionalMins),
+      todayStudyTime:  increment(additionalMins),
       weeklyStudyTime: increment(additionalMins),
+      lastActiveDate:  today,
     });
   } catch (err) {
-    console.warn("[StudyRoom] Failed to sync study time:", err);
+    console.warn("[StudyRoom] users write failed:", err);
+  }
+
+  // ── 2. Update study_logs/{uid_date} — report card ─────────────────────────
+  try {
+    const NPT_OFFSET_MS = 5 * 60 * 60 * 1000 + 45 * 60 * 1000;
+    const today = new Date(Date.now() + NPT_OFFSET_MS).toISOString().slice(0, 10);
+    const logRef = doc(db, "study_logs", `${uid}_${today}`);
+    const logSnap = await getDoc(logRef);
+    if (logSnap.exists()) {
+      await updateDoc(logRef, {
+        studyMinutes: increment(additionalMins),
+      });
+    } else {
+      await setDoc(logRef, {
+        uid,
+        date: today,
+        studyMinutes: additionalMins,
+        tasksCompleted: 0,
+        notesViewed: 0,
+      });
+    }
+  } catch (err) {
+    console.warn("[StudyRoom] study_logs write failed:", err);
   }
 }
 

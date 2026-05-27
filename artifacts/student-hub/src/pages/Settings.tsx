@@ -4,34 +4,29 @@ import { useAuth } from "@/context/AuthContext";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { uploadProfilePhoto, removeProfilePhoto } from "@/lib/photoUpload";
-import { User, Sun, Moon, Shield, Check, LogOut, Camera, Trash2, Loader2 } from "lucide-react";
+import { Sun, Moon, Shield, Check, LogOut, Camera, Trash2, Loader2 } from "lucide-react";
 
 export default function Settings() {
   const { profile, setProfile, user, signOut } = useAuth();
-  const [name,        setName]        = useState(profile?.name || "");
-  const [grade,       setGrade]       = useState<number>(profile?.grade || 10);
+  const [name,        setName]        = useState(profile?.name ?? "");
+  const [grade,       setGrade]       = useState<number>(profile?.grade ?? 10);
   const [saving,      setSaving]      = useState(false);
   const [gradeSaving, setGradeSaving] = useState(false);
   const [success,     setSuccess]     = useState(false);
   const [error,       setError]       = useState("");
 
-  // Photo upload state
-  const [photoUploadPct, setPhotoUploadPct] = useState<number | null>(null);
-  const [photoPreview,   setPhotoPreview]   = useState<string | null>(null);
-  const [photoError,     setPhotoError]     = useState("");
-  const [removingPhoto,  setRemovingPhoto]  = useState(false);
+  const [uploadPct,   setUploadPct]   = useState<number | null>(null);
+  const [photoPreview,setPhotoPreview]= useState<string | null>(null);
+  const [photoError,  setPhotoError]  = useState("");
+  const [removing,    setRemoving]    = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return document.documentElement.classList.contains("dark");
-  });
+  const [darkMode, setDarkMode] = useState(
+    () => typeof window !== "undefined" && document.documentElement.classList.contains("dark")
+  );
 
   useEffect(() => {
-    if (profile) {
-      setName(profile.name || "");
-      setGrade(profile.grade || 10);
-    }
+    if (profile) { setName(profile.name ?? ""); setGrade(profile.grade ?? 10); }
   }, [profile]);
 
   const toggleTheme = async () => {
@@ -39,9 +34,7 @@ export default function Settings() {
     setDarkMode(next);
     localStorage.setItem("theme", next ? "dark" : "light");
     document.documentElement.classList.toggle("dark", next);
-    if (user) {
-      try { await updateDoc(doc(db, "users", user.uid), { darkMode: next }); } catch {}
-    }
+    if (user) try { await updateDoc(doc(db, "users", user.uid), { darkMode: next }); } catch {}
   };
 
   const handleGradeSwitch = async (g: number) => {
@@ -49,117 +42,103 @@ export default function Settings() {
     setGrade(g);
     setProfile({ ...profile!, grade: g });
     setGradeSaving(true);
-    try {
-      await updateDoc(doc(db, "users", user.uid), { grade: g });
-    } catch (err) {
-      console.error("Grade update failed:", err);
-    } finally {
-      setGradeSaving(false);
-    }
+    try { await updateDoc(doc(db, "users", user.uid), { grade: g }); }
+    catch (e) { console.error("Grade update failed:", e); }
+    finally { setGradeSaving(false); }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return setError("Name cannot be empty.");
     if (!user) return;
-    setSaving(true);
-    setError("");
-    setSuccess(false);
+    setSaving(true); setError(""); setSuccess(false);
     try {
       await updateDoc(doc(db, "users", user.uid), { name: name.trim() });
       setProfile({ ...profile!, name: name.trim() });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
-    } catch (err) {
-      console.error("Profile update failed:", err);
-      setError("Failed to save. Please try again.");
-    } finally {
-      setSaving(false);
-    }
+    } catch { setError("Failed to save. Please try again."); }
+    finally { setSaving(false); }
   };
 
-  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     setPhotoError("");
 
     if (!file.type.startsWith("image/")) {
-      setPhotoError("Please select an image file (JPG, PNG, WebP).");
+      setPhotoError("Please pick an image file (JPG, PNG, etc.)");
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      setPhotoError("Image is too large. Maximum 10 MB.");
+    if (file.size > 15 * 1024 * 1024) {
+      setPhotoError("File too large — max 15 MB.");
       return;
     }
 
-    // Show local preview immediately while uploading
-    const localUrl = URL.createObjectURL(file);
-    setPhotoPreview(localUrl);
-    setPhotoUploadPct(0);
+    // Show local preview immediately
+    const local = URL.createObjectURL(file);
+    setPhotoPreview(local);
+    setUploadPct(0);
 
     try {
-      const url = await uploadProfilePhoto(user.uid, file, (pct) => {
-        setPhotoUploadPct(pct);
-      });
-      URL.revokeObjectURL(localUrl);
+      const url = await uploadProfilePhoto(user.uid, file, (pct) => setUploadPct(pct));
+      URL.revokeObjectURL(local);
       setPhotoPreview(url);
       setProfile({ ...profile!, photoURL: url });
-      setPhotoUploadPct(null);
     } catch (err) {
-      URL.revokeObjectURL(localUrl);
+      URL.revokeObjectURL(local);
       setPhotoPreview(null);
-      setPhotoUploadPct(null);
       setPhotoError("Upload failed — please try again.");
-      console.error("[Settings] Photo upload failed:", err);
+      console.error("[Settings] Upload error:", err);
+    } finally {
+      setUploadPct(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
-
-    // Reset input so the same file can be re-selected
-    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleRemovePhoto = async () => {
+  const handleRemove = async () => {
     if (!user) return;
-    setRemovingPhoto(true);
+    setRemoving(true);
     try {
       await removeProfilePhoto(user.uid);
       setPhotoPreview(null);
       setProfile({ ...profile!, photoURL: undefined });
-    } catch (err) {
-      console.error("[Settings] Remove photo failed:", err);
-    } finally {
-      setRemovingPhoto(false);
-    }
+    } catch { /* silent */ }
+    finally { setRemoving(false); }
   };
 
-  const currentPhoto  = photoPreview ?? profile?.photoURL ?? null;
-  const displayInitial = (profile?.name ?? user?.displayName ?? "?").charAt(0).toUpperCase();
-  const isUploading   = photoUploadPct !== null;
+  const currentPhoto   = photoPreview ?? profile?.photoURL ?? null;
+  const initial        = (profile?.name ?? user?.displayName ?? "?").charAt(0).toUpperCase();
+  const isUploading    = uploadPct !== null;
 
   return (
     <>
       <Helmet>
         <title>Settings — Student Hub</title>
-        <meta name="description" content="Manage your Student Hub profile, grade, and appearance settings." />
+        <meta name="description" content="Manage your Student Hub profile and preferences." />
       </Helmet>
+
       <div className="px-4 pt-4 pb-36 sm:p-8 max-w-2xl mx-auto space-y-4">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Settings</h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm">Manage your account and preferences</p>
         </div>
 
-        {/* ── Profile ───────────────────────────────────────────────────────── */}
+        {/* ── Profile ─────────────────────────────────────────────────────── */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-              <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            </div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Profile</h2>
-          </div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Profile</h2>
 
-          {/* ── Photo upload ────────────────────────────────────────────────── */}
-          <div className="flex items-center gap-5 mb-6 pb-6 border-b border-gray-100 dark:border-gray-800">
-            <div className="relative shrink-0">
-              <div className="w-20 h-20 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
+          {/* ── Avatar tap-to-change ─────────────────────────────────────── */}
+          <div className="flex flex-col items-center gap-3 mb-6 pb-6 border-b border-gray-100 dark:border-gray-800">
+            {/* Entire avatar is the tap/click target */}
+            <button
+              type="button"
+              disabled={isUploading || removing}
+              onClick={() => fileInputRef.current?.click()}
+              className="relative group focus:outline-none"
+              aria-label="Change profile photo"
+            >
+              <div className="w-24 h-24 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg ring-4 ring-white dark:ring-gray-900 transition-transform active:scale-95">
                 {currentPhoto ? (
                   <img
                     src={currentPhoto}
@@ -168,69 +147,69 @@ export default function Settings() {
                     onError={() => setPhotoPreview(null)}
                   />
                 ) : (
-                  <span className="text-white text-2xl font-bold">{displayInitial}</span>
+                  <span className="text-white text-3xl font-bold select-none">{initial}</span>
                 )}
               </div>
 
-              {/* Upload progress ring */}
+              {/* Upload spinner overlay */}
               {isUploading && (
-                <div className="absolute inset-0 rounded-full flex items-center justify-center bg-black/40">
+                <div className="absolute inset-0 rounded-full flex flex-col items-center justify-center bg-black/50">
                   <Loader2 className="w-6 h-6 text-white animate-spin" />
-                  <span className="sr-only">{photoUploadPct}%</span>
+                  <span className="text-white text-xs font-bold mt-1">{uploadPct}%</span>
                 </div>
               )}
 
-              {/* Camera button */}
+              {/* Camera overlay on hover/non-uploading */}
               {!isUploading && (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="absolute bottom-0 right-0 w-7 h-7 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg transition-colors"
-                  title="Change photo"
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                </button>
+                <div className="absolute inset-0 rounded-full flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors">
+                  <Camera className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
               )}
+
+              {/* Small camera badge for mobile (always visible) */}
+              {!isUploading && (
+                <span className="absolute bottom-1 right-1 w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center shadow-md border-2 border-white dark:border-gray-900 sm:hidden">
+                  <Camera className="w-3.5 h-3.5 text-white" />
+                </span>
+              )}
+            </button>
+
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                {isUploading ? `Uploading… ${uploadPct}%` : currentPhoto ? "Tap photo to change" : "Tap to add a photo"}
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                Auto-resized · Only visible in classroom & here
+              </p>
             </div>
 
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Profile Photo</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                Used in classroom & profile. Auto-resized to 512×512 px.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={isUploading}
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1.5 text-xs font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl border border-blue-200 dark:border-blue-800 transition-colors disabled:opacity-50"
-                >
-                  {isUploading ? `Uploading ${photoUploadPct}%…` : currentPhoto ? "Change Photo" : "Upload Photo"}
-                </button>
-                {currentPhoto && !isUploading && (
-                  <button
-                    type="button"
-                    disabled={removingPhoto}
-                    onClick={handleRemovePhoto}
-                    className="px-3 py-1.5 text-xs font-semibold bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50 flex items-center gap-1"
-                  >
-                    {removingPhoto ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                    Remove
-                  </button>
-                )}
-              </div>
-              {photoError && <p className="text-xs text-red-500 mt-2">{photoError}</p>}
-            </div>
+            {currentPhoto && !isUploading && (
+              <button
+                type="button"
+                disabled={removing}
+                onClick={handleRemove}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800/50 transition-colors disabled:opacity-50"
+              >
+                {removing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                Remove photo
+              </button>
+            )}
+
+            {photoError && (
+              <p className="text-xs text-red-500 dark:text-red-400 text-center max-w-xs">{photoError}</p>
+            )}
 
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              capture="environment"
               className="hidden"
-              onChange={handlePhotoSelect}
+              onChange={handleFileSelect}
             />
           </div>
 
+          {/* ── Name + Grade form ──────────────────────────────────────────── */}
           <form onSubmit={handleSave} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
@@ -240,7 +219,7 @@ export default function Settings() {
                 onChange={(e) => setName(e.target.value)}
                 disabled={saving}
                 placeholder="Your full name"
-                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition-all disabled:opacity-60 placeholder-gray-400"
+                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:opacity-60 placeholder-gray-400"
               />
             </div>
 
@@ -251,19 +230,13 @@ export default function Settings() {
               </div>
               <div className="grid grid-cols-4 gap-2">
                 {[9, 10, 11, 12].map((g) => (
-                  <button
-                    key={g}
-                    type="button"
-                    disabled={saving}
-                    onClick={() => handleGradeSwitch(g)}
+                  <button key={g} type="button" disabled={saving} onClick={() => handleGradeSwitch(g)}
                     className={`py-3 rounded-xl border-2 text-sm font-semibold transition-all disabled:opacity-60 ${
                       grade === g
                         ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                        : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-blue-300 hover:bg-blue-50/40"
+                        : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-blue-300"
                     }`}
-                  >
-                    Grade {g}
-                  </button>
+                  >Grade {g}</button>
                 ))}
               </div>
               <p className="text-xs text-gray-400 mt-2">Grade updates instantly — no save needed.</p>
@@ -272,11 +245,8 @@ export default function Settings() {
             {error   && <div className="px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm">{error}</div>}
             {success && <div className="px-4 py-3 bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 rounded-xl text-green-700 dark:text-green-400 text-sm font-medium flex items-center gap-2"><Check className="w-4 h-4" /> Name saved!</div>}
 
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-xl transition-all disabled:opacity-50 text-sm"
-            >
+            <button type="submit" disabled={saving}
+              className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-xl transition-all disabled:opacity-50 text-sm">
               {saving ? "Saving…" : "Save Name"}
             </button>
           </form>
@@ -295,11 +265,8 @@ export default function Settings() {
               <p className="text-sm font-medium text-gray-900 dark:text-white">Dark Mode</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Switch between light and dark theme</p>
             </div>
-            <button
-              onClick={toggleTheme}
-              className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${darkMode ? "bg-blue-500" : "bg-gray-200"}`}
-              aria-label="Toggle dark mode"
-            >
+            <button onClick={toggleTheme}
+              className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${darkMode ? "bg-blue-500" : "bg-gray-200"}`}>
               <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${darkMode ? "left-7" : "left-1"}`} />
             </button>
           </div>
@@ -314,23 +281,19 @@ export default function Settings() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Account</h2>
           </div>
           <div className="space-y-3 text-sm">
-            <div className="flex justify-between py-2 border-b border-gray-50 dark:border-gray-800">
-              <span className="text-gray-500 dark:text-gray-400">Email</span>
-              <span className="text-gray-900 dark:text-white font-medium">{profile?.email || user?.email || "—"}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-gray-50 dark:border-gray-800">
-              <span className="text-gray-500 dark:text-gray-400">Grade</span>
-              <span className="text-gray-900 dark:text-white font-medium">{profile?.grade ? `Grade ${profile.grade}` : "—"}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-gray-50 dark:border-gray-800">
-              <span className="text-gray-500 dark:text-gray-400">Role</span>
-              <span className="text-gray-900 dark:text-white font-medium capitalize">{profile?.role || "user"}</span>
-            </div>
+            {[
+              { label: "Email", value: profile?.email ?? user?.email ?? "—" },
+              { label: "Grade", value: profile?.grade ? `Grade ${profile.grade}` : "—" },
+              { label: "Role",  value: profile?.role ?? "user" },
+            ].map(({ label, value }) => (
+              <div key={label} className="flex justify-between py-2 border-b border-gray-50 dark:border-gray-800">
+                <span className="text-gray-500 dark:text-gray-400">{label}</span>
+                <span className="text-gray-900 dark:text-white font-medium capitalize">{value}</span>
+              </div>
+            ))}
           </div>
-          <button
-            onClick={signOut}
-            className="mt-5 flex items-center gap-2 w-full px-4 py-3 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all border border-red-100 dark:border-red-900"
-          >
+          <button onClick={signOut}
+            className="mt-5 flex items-center gap-2 w-full px-4 py-3 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all border border-red-100 dark:border-red-900">
             <LogOut className="w-4 h-4" />
             Sign out
           </button>
