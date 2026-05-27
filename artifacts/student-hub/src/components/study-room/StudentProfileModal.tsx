@@ -10,6 +10,7 @@ interface UserStats {
   streak: number;
   createdAt: string;
   todayStudyTime: number;
+  photoURL?: string;
 }
 
 interface Props {
@@ -17,29 +18,30 @@ interface Props {
   onClose: () => void;
 }
 
-// Module-level cache so repeated avatar clicks are instant
 const statsCache = new Map<string, UserStats>();
 
-function avatarColor(name: string): string {
-  const colors = [
-    "from-blue-500 to-blue-600", "from-purple-500 to-purple-600",
-    "from-emerald-500 to-emerald-600", "from-orange-500 to-orange-600",
-    "from-pink-500 to-pink-600", "from-cyan-500 to-cyan-600",
-    "from-indigo-500 to-indigo-600", "from-teal-500 to-teal-600",
-  ];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return colors[Math.abs(hash) % colors.length];
+const AVATAR_COLORS = [
+  "from-blue-500 to-blue-600", "from-purple-500 to-purple-600",
+  "from-emerald-500 to-emerald-600", "from-orange-500 to-orange-600",
+  "from-pink-500 to-pink-600", "from-cyan-500 to-cyan-600",
+  "from-indigo-500 to-indigo-600", "from-teal-500 to-teal-600",
+];
+
+function avatarGradient(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
 }
 
 export function StudentProfileModal({ participant, onClose }: Props) {
-  const [stats, setStats] = useState<UserStats | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [stats,       setStats]       = useState<UserStats | null>(null);
+  const [loading,     setLoading]     = useState(false);
+  const [photoBroken, setPhotoBroken] = useState(false);
 
   useEffect(() => {
     if (!participant) return;
+    setPhotoBroken(false);
 
-    // Serve from cache immediately — no loading state needed
     const cached = statsCache.get(participant.uid);
     if (cached) {
       setStats(cached);
@@ -55,9 +57,10 @@ export function StudentProfileModal({ participant, onClose }: Props) {
         const d = snap.data();
         const s: UserStats = {
           totalStudyTime: d.totalStudyTime ?? 0,
-          streak: d.streak ?? 0,
-          createdAt: d.createdAt ?? "",
+          streak:         d.streak ?? 0,
+          createdAt:      d.createdAt ?? "",
           todayStudyTime: d.todayStudyTime ?? 0,
+          photoURL:       d.photoURL ?? undefined,
         };
         statsCache.set(participant.uid, s);
         setStats(s);
@@ -68,10 +71,12 @@ export function StudentProfileModal({ participant, onClose }: Props) {
 
   if (!participant) return null;
 
-  const initial = participant.name.charAt(0).toUpperCase();
-  const gradient = avatarColor(participant.name);
+  // Photo resolution order: Firestore user doc → participant doc (Google photo)
+  const photoURL   = (!photoBroken && (stats?.photoURL || participant.photoURL)) || null;
+  const initial    = participant.name.charAt(0).toUpperCase();
+  const gradient   = avatarGradient(participant.name);
   const totalHours = stats ? (stats.totalStudyTime / 60).toFixed(1) : "—";
-  const todayMins = stats ? stats.todayStudyTime : 0;
+  const todayMins  = stats ? stats.todayStudyTime : 0;
   const joinedDate = stats?.createdAt
     ? new Date(stats.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })
     : "—";
@@ -81,21 +86,25 @@ export function StudentProfileModal({ participant, onClose }: Props) {
     <AnimatePresence>
       {participant && (
         <>
+          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm"
           />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
-          >
-            <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm pointer-events-auto overflow-hidden">
+
+          {/* Modal — z-index above fullscreen container's z-50 */}
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.88, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.88, y: 24 }}
+              transition={{ type: "spring", damping: 24, stiffness: 300 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm pointer-events-auto overflow-hidden"
+            >
+              {/* Header with gradient + avatar */}
               <div className={`bg-gradient-to-r ${gradient} p-6 relative`}>
                 <button
                   onClick={onClose}
@@ -103,10 +112,23 @@ export function StudentProfileModal({ participant, onClose }: Props) {
                 >
                   <X className="w-4 h-4" />
                 </button>
+
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-white font-bold text-3xl shadow-xl border-4 border-white/30">
-                    {initial}
+                  {/* Avatar: photo or initial */}
+                  <div className="w-20 h-20 rounded-full overflow-hidden bg-white/20 backdrop-blur border-4 border-white/30 shadow-xl flex items-center justify-center">
+                    {photoURL ? (
+                      <img
+                        src={photoURL}
+                        alt={participant.name}
+                        loading="lazy"
+                        className="w-full h-full object-cover"
+                        onError={() => setPhotoBroken(true)}
+                      />
+                    ) : (
+                      <span className="text-white text-3xl font-bold">{initial}</span>
+                    )}
                   </div>
+
                   <div className="text-center">
                     <h2 className="text-xl font-bold text-white">{participant.name}</h2>
                     <p className="text-white/70 text-sm mt-0.5">Grade {participant.grade}</p>
@@ -114,6 +136,7 @@ export function StudentProfileModal({ participant, onClose }: Props) {
                 </div>
               </div>
 
+              {/* Stats */}
               <div className="p-5 space-y-4">
                 {loading ? (
                   <div className="space-y-3">
@@ -153,8 +176,8 @@ export function StudentProfileModal({ participant, onClose }: Props) {
                   </>
                 )}
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>

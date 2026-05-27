@@ -1,0 +1,228 @@
+You are a senior Firebase + realtime systems engineer.
+
+I already have a fully built Virtual Study Room application (Next.js + Firebase).
+
+DO NOT change UI.
+
+ONLY FIX ALL BROKEN BACKEND LOGIC, REALTIME SYNC, AND STATE ISSUES.
+
+========================================================
+🔥 CRITICAL SYSTEM FAILURE SUMMARY
+========================================================
+
+Right now the system is partially working but fundamentally broken in realtime logic.
+
+Multiple core systems are NOT working:
+
+- study time not updating for ALL members
+- leaderboard/report card not updating
+- host transfer not working
+- rooms not deleting properly
+- ghost users still exist
+- sound system is broken
+- avatar popup breaks in fullscreen
+- profile picture system not integrated
+
+THIS IS NOT A UI ISSUE.
+THIS IS A REALTIME + FIREBASE ARCHITECTURE ISSUE.
+
+========================================================
+🔥 1. STUDY TIME NOT WORKING FOR MEMBERS (CRITICAL BUG)
+========================================================
+
+Problem:
+- Only host study time increases
+- Members inside room do NOT get study time updates
+- Leaderboard and report card do not update for members
+
+FIX:
+
+Study tracking MUST be PER USER, NOT ONLY HOST.
+
+When room timer runs in STUDY phase:
+→ EVERY ACTIVE PARTICIPANT must receive study time update
+
+Rules:
+- update study time for all users in room
+- sync to Firestore per user
+- update leaderboard + report card per user
+- use server timestamp (NOT frontend timer only)
+
+If user is in room AND active:
+→ they MUST receive study time updates
+
+========================================================
+🔥 2. HOST TRANSFER IS BROKEN
+========================================================
+
+Problem:
+When host leaves room:
+- host is NOT transferred
+- room becomes unstable
+
+FIX:
+
+When host leaves:
+- select NEW host automatically
+- new host = longest/oldest active participant
+- transfer must be instant
+- update Firestore immediately
+
+If no users remain:
+→ start 1 minute countdown
+→ then delete room
+
+========================================================
+🔥 3. ROOM IS NOT DELETING AFTER EMPTY
+========================================================
+
+Problem:
+- room still exists after everyone leaves
+- shows fake 1 user
+- timer still running
+
+FIX:
+
+If participants = 0:
+→ start 60 second deletion timer
+→ if still empty after 60s → DELETE ROOM COMPLETELY
+
+Must:
+- stop timer
+- remove listeners
+- clear Firestore room state
+
+NO ghost rooms allowed.
+
+========================================================
+🔥 4. SOUND SYSTEM IS BAD / INCOMPLETE
+========================================================
+
+Problem:
+- sounds are annoying or low quality
+- no proper mute control on mobile
+- no sound toggle in fullscreen or top bar
+
+FIX:
+
+Improve sound system:
+
+Add better ambient sounds:
+- soft rain
+- calm library
+- lo-fi study
+- ocean waves
+- cafe ambience
+- keyboard soft typing
+
+Add UI controls:
+- mute sound button (TOP BAR)
+- unmute button
+- volume control slider
+
+Rules:
+- sound must be optional
+- must not affect performance
+- must not auto-lag mobile
+
+========================================================
+🔥 5. AVATAR POPUP BREAKS IN FULLSCREEN
+========================================================
+
+Problem:
+- avatar popup works normally
+- but NOT inside fullscreen mode
+
+FIX:
+
+Ensure:
+- modal system works in fullscreen
+- z-index fixed properly
+- pointer events not blocked
+- popup always visible above fullscreen layer
+
+========================================================
+🔥 6. PROFILE PICTURE SYSTEM NOT WORKING
+========================================================
+
+Problem:
+- cannot upload profile picture
+- system not integrated
+
+FIX:
+
+Use Firebase Storage:
+
+- upload image to Firebase Storage
+- store only URL in Firestore
+- use that URL as avatar
+
+Rules:
+- compress image (max 150–300KB)
+- resize 256x256 or 512x512
+- lazy load image
+- cache image
+
+Avatar used ONLY in:
+- classroom UI
+- profile popup
+- room display
+
+NOT in chat.
+
+========================================================
+🔥 7. ROOM STILL SHOWING ACTIVE USERS AFTER LEAVING
+========================================================
+
+Problem:
+- users leave room
+- still shown as active
+- room shows fake users
+
+FIX:
+
+Implement REAL presence system:
+- detect disconnect
+- detect tab close
+- detect internet loss
+- instantly remove user from room
+
+Update Firestore immediately.
+
+========================================================
+🔥 8. PERFORMANCE ISSUE (MOBILE LAG)
+========================================================
+
+Problem:
+- everything slow on mobile
+- delay in messages, votes, popup, timer
+
+FIX:
+
+Optimize:
+- Firestore listeners (avoid duplicates)
+- React rerenders (use memoization)
+- chat updates
+- timer sync
+- avatar loading
+
+Goal:
+App must feel instant like WhatsApp/Discord.
+
+========================================================
+🔥 FINAL GOAL
+========================================================
+
+After fixing:
+
+✔ study time works for ALL users
+✔ leaderboard/report card updates correctly
+✔ host transfer works perfectly
+✔ rooms delete properly
+✔ no ghost users
+✔ sound system improved + controllable
+✔ avatar works in fullscreen
+✔ profile picture system works
+✔ mobile is smooth
+✔ everything is realtime and synced
+✔ no lag, no delay, no broken state

@@ -20,6 +20,7 @@ export interface UserProfile {
   grade: number;
   role: "user" | "admin";
   createdAt: string;
+  photoURL?: string;
 }
 
 type ProfileResult =
@@ -108,6 +109,7 @@ async function fetchProfile(uid: string): Promise<ProfileResult> {
       grade: d.grade ?? 0,
       role: d.role === "admin" ? "admin" : "user",
       createdAt: d.createdAt ?? new Date().toISOString(),
+      photoURL: d.photoURL ?? undefined,
     };
     return { status: "found", profile };
   } catch (err) {
@@ -146,10 +148,17 @@ async function patchProfileFromFirebase(uid: string, firebaseUser: FirebaseUser,
   const updates: Record<string, unknown> = {};
   if (!profile.name && firebaseUser.displayName) updates.name = firebaseUser.displayName;
   if (!profile.email && firebaseUser.email) updates.email = firebaseUser.email;
+  // Sync Google photoURL if user has no custom photo yet
+  if (!profile.photoURL && firebaseUser.photoURL) updates.photoURL = firebaseUser.photoURL;
   if (Object.keys(updates).length === 0) return profile;
   try {
     await updateDoc(doc(db, "users", uid), updates);
-    return { ...profile, name: (updates.name as string) ?? profile.name, email: (updates.email as string) ?? profile.email };
+    return {
+      ...profile,
+      name: (updates.name as string) ?? profile.name,
+      email: (updates.email as string) ?? profile.email,
+      photoURL: (updates.photoURL as string | undefined) ?? profile.photoURL,
+    };
   } catch {
     return profile;
   }

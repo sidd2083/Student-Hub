@@ -166,12 +166,16 @@ export async function joinRoom(roomId: string, participant: {
   name: string;
   grade: number;
   isHost: boolean;
+  photoURL?: string | null;
 }): Promise<void> {
   // Step 1: Write the participant document (always permitted: own uid)
   const pRef = doc(db, "studyRooms", roomId, "participants", participant.uid);
   await setDoc(pRef, {
-    ...participant,
-    photoURL: null,
+    uid: participant.uid,
+    name: participant.name,
+    grade: participant.grade,
+    isHost: participant.isHost,
+    photoURL: participant.photoURL ?? null,
     joinedAt: serverTimestamp(),
     lastSeen: serverTimestamp(),
     studyMinsInRoom: 0,
@@ -188,33 +192,38 @@ export async function joinRoom(roomId: string, participant: {
 }
 
 /**
- * Leave a room. If this is the last participant, marks the room as "finished"
- * so it disappears from the room list immediately (no ghost rooms).
+ * Leave a room. If this is the last participant:
+ *   1. Marks status → "finished" immediately (hides from lobby).
+ *   2. Sets pendingDeleteAt 60 s in the future.
+ *   3. Schedules a client-side timer to call deleteRoomCascade after 60 s.
  */
 export async function leaveRoom(roomId: string, uid: string, studyMinsInRoom: number): Promise<void> {
   try {
-    const roomRef = doc(db, "studyRooms", roomId);
-    const roomSnap = await getDoc(roomRef);
+    const roomRef    = doc(db, "studyRooms", roomId);
+    const roomSnap   = await getDoc(roomRef);
     const currentCount = roomSnap.exists() ? (roomSnap.data().participantCount ?? 1) : 1;
     const isLastPerson = currentCount <= 1;
 
     // Delete own participant doc (always allowed by rules: own uid)
     await deleteDoc(doc(db, "studyRooms", roomId, "participants", uid));
 
-    // Update room: if last person, mark finished; otherwise decrement count
     try {
       if (isLastPerson) {
+        const deleteAt = Timestamp.fromMillis(Date.now() + 60_000);
         await updateDoc(roomRef, {
           participantCount: 0,
-          status: "finished",
-          timerStartedAt: null,
+          status:           "finished",
+          timerStartedAt:   null,
+          pendingDeleteAt:  deleteAt,
         });
+        // Best-effort client-side cascade: fires if the user keeps the tab open for 60 s.
+        // Rooms are also deleted by sweepZombieRooms when other users browse the lobby.
+        setTimeout(() => deleteRoomCascade(roomId), 62_000);
       } else {
         await updateDoc(roomRef, { participantCount: increment(-1) });
       }
     } catch {
-      // If rules block this (e.g. non-host leaving), the room will still
-      // disappear via the zombie filter in subscribePublicRooms
+      // Non-fatal — zombie filter hides the room from the lobby
     }
   } catch (err) {
     console.warn("[Room] leaveRoom error (non-fatal):", err);
@@ -281,9 +290,12 @@ export async function purgeStaleParticipants(roomId: string): Promise<void> {
     // Correct participantCount to match actual active participants
     try {
       if (activeCount === 0) {
+        const deleteAt = Timestamp.fromMillis(Date.now() + 60_000);
         await updateDoc(doc(db, "studyRooms", roomId), {
           participantCount: 0, status: "finished", timerStartedAt: null,
+          pendingDeleteAt: deleteAt,
         });
+        setTimeout(() => deleteRoomCascade(roomId), 62_000);
       } else {
         await updateDoc(doc(db, "studyRooms", roomId), {
           participantCount: activeCount,
@@ -669,11 +681,30 @@ export async function deleteRoomCascade(roomId: string): Promise<void> {
  * Returns number of rooms cleaned up.
  */
 export async function sweepZombieRooms(): Promise<number> {
+  const now = Date.now();
+  let count = 0;
+
+  // ── Phase 1: hard-delete finished rooms past pendingDeleteAt ───────────────
+  try {
+    const finishedSnap = await getDocs(
+      query(collection(db, "studyRooms"), where("status", "==", "finished"))
+    );
+    for (const d of finishedSnap.docs) {
+      const data = d.data();
+      const deleteAt: Timestamp | undefined = data.pendingDeleteAt;
+      if (deleteAt && deleteAt.toMillis() <= now) {
+        await deleteRoomCascade(d.id);
+        count++;
+      }
+    }
+  } catch (err) {
+    console.warn("[Room] sweepZombieRooms phase-1 error:", err);
+  }
+
+  // ── Phase 2: mark stale active/waiting/paused rooms as finished ────────────
   const snap = await getDocs(
     query(collection(db, "studyRooms"), where("status", "in", ["waiting", "active", "paused"]))
   );
-  const now = Date.now();
-  let count = 0;
 
   for (const d of snap.docs) {
     const data = d.data();
@@ -681,7 +712,8 @@ export async function sweepZombieRooms(): Promise<number> {
     // Immediately mark expired rooms finished
     if (data.expiresAt && data.expiresAt.toMillis() <= now) {
       try {
-        await updateDoc(d.ref, { status: "finished", participantCount: 0, timerStartedAt: null });
+        const deleteAt = Timestamp.fromMillis(now + 60_000);
+        await updateDoc(d.ref, { status: "finished", participantCount: 0, timerStartedAt: null, pendingDeleteAt: deleteAt });
         count++;
       } catch {}
       continue;

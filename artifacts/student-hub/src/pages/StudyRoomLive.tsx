@@ -154,10 +154,11 @@ export default function StudyRoomLive() {
         const alreadyInRoom = await isParticipant(roomId!, user!.uid);
         if (!alreadyInRoom) {
           await joinRoom(roomId!, {
-            uid: user!.uid,
-            name: profile!.name,
-            grade: profile!.grade,
-            isHost: room!.hostUid === user!.uid,
+            uid:      user!.uid,
+            name:     profile!.name,
+            grade:    profile!.grade,
+            isHost:   room!.hostUid === user!.uid,
+            photoURL: profile!.photoURL ?? user!.photoURL ?? null,
           });
         }
         if (cancelled) return;
@@ -796,16 +797,15 @@ export default function StudyRoomLive() {
         <div className="fixed bottom-0 left-0 right-0 z-30 lg:hidden shadow-lg">
           {MobileTabs()}
         </div>
-      </div>
 
-      {/* ── LEAVE CONFIRMATION MODAL ───────────────────────────────────────── */}
+        {/* ── LEAVE CONFIRMATION MODAL — inside container so it shows in fullscreen */}
       <AnimatePresence>
         {showLeave && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setShowLeave(false)}
-              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+              className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm" />
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
               <motion.div
                 initial={{ opacity: 0, scale: 0.9, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -859,8 +859,8 @@ export default function StudyRoomLive() {
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setShowEndVote(false)}
-              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+              className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm" />
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
               <motion.div
                 initial={{ opacity: 0, scale: 0.9, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -909,6 +909,7 @@ export default function StudyRoomLive() {
       </AnimatePresence>
 
       <StudentProfileModal participant={selectedStudent} onClose={() => setSel(null)} />
+      </div>  {/* ← closes containerRef — ALL modals above must be inside for fullscreen */}
     </>
   );
 }
