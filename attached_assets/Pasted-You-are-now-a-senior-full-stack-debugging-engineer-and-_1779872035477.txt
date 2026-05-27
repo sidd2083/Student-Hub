@@ -1,0 +1,169 @@
+You are now a senior full-stack debugging engineer and Firebase production deployment expert.
+
+IMPORTANT:
+I already have a fully generated Virtual Study Room system UI + skeleton pages in Next.js + TypeScript.
+But NOTHING is working properly.
+
+Current issues:
+- "Something went wrong" on Create Room
+- Firebase errors or missing configuration
+- Firestore writes not working
+- Authentication not properly connected
+- Real-time updates not working
+- Some pages load but backend logic is broken
+- Replit AI previously said "you need to configure Firebase rules / setup"
+
+YOUR TASK:
+DO NOT rebuild UI.
+DO NOT recreate pages.
+ONLY FIX AND CONNECT EVERYTHING.
+
+==================================================
+GOAL
+==================================================
+
+Make the existing project FULLY FUNCTIONAL in production state.
+
+Everything must work:
+- Create room works
+- Join room works
+- Timer sync works
+- Voting works
+- Leaderboard updates
+- Firebase reads/writes work
+- Auth works
+- No runtime errors
+
+==================================================
+STEP 1: FIREBASE FIX (CRITICAL)
+==================================================
+
+Check and fix:
+
+1. Firebase initialization
+- Ensure correct firebaseConfig
+- Ensure environment variables are correctly loaded
+- Fix missing .env variables in Next.js (NEXT_PUBLIC_*)
+
+2. Firestore connection
+- Ensure db is initialized properly
+- Fix import issues (modular SDK v9+)
+
+3. Authentication
+- Ensure Firebase Auth is properly connected
+- Ensure user session is accessible globally
+
+4. Fix ALL "permission denied" issues
+- Update Firestore rules for development mode first
+- Then secure them later
+
+==================================================
+STEP 2: CREATE ROOM FIX
+==================================================
+
+Fix createRoom function:
+
+- Ensure it writes to Firestore correctly
+- Ensure schema matches frontend expectations
+- Ensure no undefined fields
+- Ensure timestamps use serverTimestamp()
+- Ensure host userId is stored properly
+
+Return proper error handling:
+- show real error message instead of "something went wrong"
+
+==================================================
+STEP 3: REALTIME FIX
+==================================================
+
+Fix Firestore listeners:
+
+- rooms listener
+- participants listener
+- timer listener
+- votes listener
+
+Ensure:
+- no memory leaks
+- no duplicate listeners
+- unsubscribe properly in useEffect cleanup
+
+==================================================
+STEP 4: TIMER SYNC FIX
+==================================================
+
+Fix shared timer system:
+
+- Use Firestore server timestamps as source of truth
+- Do NOT use local setInterval as main system
+- Sync timer based on:
+  startTime + duration - current server time
+
+Ensure:
+- refresh does NOT reset timer
+- late joiners sync correctly
+- host control updates propagate instantly
+
+==================================================
+STEP 5: VOTING SYSTEM FIX
+==================================================
+
+Fix voting:
+
+- ensure vote writes go to Firestore
+- ensure one user = one vote
+- ensure majority calculation works
+- ensure vote updates UI in real time
+
+Voting actions must support:
+- extend time (with custom duration input)
+- take break (custom break duration)
+- skip phase
+- end session
+
+Votes should dynamically modify timer flow.
+
+==================================================
+STEP 6: SECURITY RULES (TEMP FIX)
+==================================================
+
+Set FIRESTORE RULES FOR DEV MODE:
+
+ALLOW authenticated users full read/write ONLY for now,
+but keep structure ready for production tightening later.
+
+Reason:
+Current issue is blocking development.
+
+==================================================
+STEP 7: DEBUGGING OUTPUT
+
+Add console logs for:
+- Firebase connection status
+- Auth state
+- Room creation payload
+- Firestore write success/failure
+- Timer sync values
+
+==================================================
+STEP 8: CRITICAL REQUIREMENT
+
+DO NOT:
+- break existing UI
+- rewrite frontend design
+- delete pages
+- recreate project
+
+ONLY FIX BACKEND + INTEGRATION + ERRORS
+
+==================================================
+FINAL OUTPUT
+
+After fixing, confirm:
+
+- Firebase connected ✔
+- Room creation working ✔
+- Join room working ✔
+- Timer sync working ✔
+- Voting working ✔
+- No runtime errors ✔
