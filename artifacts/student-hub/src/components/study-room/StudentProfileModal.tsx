@@ -71,8 +71,8 @@ export function StudentProfileModal({ participant, onClose }: Props) {
 
   if (!participant) return null;
 
-  // Photo resolution order: Firestore user doc → participant doc (Google photo)
-  const photoURL   = (!photoBroken && (stats?.photoURL || participant.photoURL)) || null;
+  // Only use the custom-uploaded photo from Firestore users doc. Never Google photo.
+  const photoURL = (!photoBroken && stats?.photoURL) || null;
   const initial    = participant.name.charAt(0).toUpperCase();
   const gradient   = avatarGradient(participant.name);
   const totalHours = stats ? (stats.totalStudyTime / 60).toFixed(1) : "—";

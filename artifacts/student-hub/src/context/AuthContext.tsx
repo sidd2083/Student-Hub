@@ -148,8 +148,7 @@ async function patchProfileFromFirebase(uid: string, firebaseUser: FirebaseUser,
   const updates: Record<string, unknown> = {};
   if (!profile.name && firebaseUser.displayName) updates.name = firebaseUser.displayName;
   if (!profile.email && firebaseUser.email) updates.email = firebaseUser.email;
-  // Sync Google photoURL if user has no custom photo yet
-  if (!profile.photoURL && firebaseUser.photoURL) updates.photoURL = firebaseUser.photoURL;
+  // NOTE: We never auto-sync Google's photoURL. Avatar = custom uploaded photo or letter initial.
   if (Object.keys(updates).length === 0) return profile;
   try {
     await updateDoc(doc(db, "users", uid), updates);
@@ -157,7 +156,6 @@ async function patchProfileFromFirebase(uid: string, firebaseUser: FirebaseUser,
       ...profile,
       name: (updates.name as string) ?? profile.name,
       email: (updates.email as string) ?? profile.email,
-      photoURL: (updates.photoURL as string | undefined) ?? profile.photoURL,
     };
   } catch {
     return profile;

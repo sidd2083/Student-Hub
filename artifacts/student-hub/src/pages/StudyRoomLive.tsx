@@ -158,7 +158,7 @@ export default function StudyRoomLive() {
             name:     profile!.name,
             grade:    profile!.grade,
             isHost:   room!.hostUid === user!.uid,
-            photoURL: profile!.photoURL ?? user!.photoURL ?? null,
+            photoURL: profile!.photoURL ?? null,
           });
         }
         if (cancelled) return;

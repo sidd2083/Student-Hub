@@ -87,13 +87,9 @@ export default function Onboarding() {
         <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-8 anim anim-2">
           {user && (
             <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-100 rounded-2xl mb-6">
-              {user.photoURL ? (
-                <img src={user.photoURL} className="w-9 h-9 rounded-full ring-2 ring-green-200" alt="" />
-              ) : (
-                <div className="w-9 h-9 rounded-full bg-green-200 flex items-center justify-center text-green-700 font-bold text-sm">
-                  {user.displayName?.charAt(0)?.toUpperCase() ?? "?"}
-                </div>
-              )}
+              <div className="w-9 h-9 rounded-full bg-green-200 flex items-center justify-center text-green-700 font-bold text-sm flex-shrink-0">
+                {user.displayName?.charAt(0)?.toUpperCase() ?? user.email?.charAt(0)?.toUpperCase() ?? "?"}
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-green-800">✓ Google account connected</p>
                 <p className="text-xs text-green-600 truncate">{user.email}</p>
