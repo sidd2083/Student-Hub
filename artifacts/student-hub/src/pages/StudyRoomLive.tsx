@@ -1,16 +1,17 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, Play, Pause, SkipForward, Square, Users, Copy,
-  Send, BookOpen, Coffee, Crown, CheckCircle,
-  BarChart2, ChevronRight, ChevronDown, Maximize, Minimize,
+  Play, Pause, SkipForward, Square, Users, Copy,
+  Send, BookOpen, Coffee, Crown, CheckCircle, BarChart2,
+  ChevronRight, ChevronDown, Maximize, Minimize, LogOut, X,
+  MessageCircle, ListChecks, School,
 } from "lucide-react";
 import {
   Room, RoomParticipant, Vote, RoomMessage,
   subscribeRoom, subscribeParticipants, subscribeActiveVotes, subscribeMessages,
-  joinRoom, sendMessage, getRemainingSeconds, formatTime,
+  joinRoom, sendMessage, getRemainingSeconds, formatTime, createVote,
 } from "@/lib/studyRooms";
 import { useActiveRoom } from "@/context/ActiveRoomContext";
 import { useAuth } from "@/context/AuthContext";
@@ -20,81 +21,71 @@ import { StudentProfileModal } from "@/components/study-room/StudentProfileModal
 
 const EMOJI_REACTIONS = ["👍", "🔥", "💪", "🎯", "⚡", "🙏", "😎", "🥳"];
 
-interface FloatingEmoji {
-  id: string;
-  emoji: string;
-  x: number;
-}
+interface FloatingEmoji { id: string; emoji: string; x: number }
 
+type MobileTab = "class" | "vote" | "chat";
+
+// ── tiny helpers ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: Room["status"] }) {
   const map = {
-    waiting:  { label: "Waiting",  cls: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" },
-    active:   { label: "Studying", cls: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
-    paused:   { label: "Paused",   cls: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" },
-    finished: { label: "Finished", cls: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400" },
+    waiting:  "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+    active:   "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+    paused:   "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+    finished: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
   };
-  const { label, cls } = map[status] ?? map.waiting;
-  return <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${cls}`}>{label}</span>;
+  const labels = { waiting: "Waiting", active: "Studying", paused: "Paused", finished: "Finished" };
+  return <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${map[status] ?? map.waiting}`}>{labels[status]}</span>;
 }
 
+// ── main component ─────────────────────────────────────────────────────────────
 export default function StudyRoomLive() {
   const { id: roomId } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user, profile } = useAuth();
   const {
-    joinActiveRoom, leaveActiveRoom, isHost,
-    onHostStart, onHostPause, onHostResume, onHostSkip, onHostEnd,
+    joinActiveRoom, leaveActiveRoom, isHost, studyMinsInSession,
+    onHostStart, onHostPause, onHostResume, onHostSkip,
     remainingSeconds, activeRoomId,
   } = useActiveRoom();
 
-  const [room, setRoom]                 = useState<Room | null>(null);
-  const [participants, setParticipants] = useState<RoomParticipant[]>([]);
-  const [votes, setVotes]               = useState<Vote[]>([]);
-  const [messages, setMessages]         = useState<RoomMessage[]>([]);
-  const [loading, setLoading]           = useState(true);
-  const [joined, setJoined]             = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<RoomParticipant | null>(null);
-  const [rightTab, setRightTab]         = useState<"vote" | "chat">("vote");
-  const [chatMsg, setChatMsg]           = useState("");
-  const [showCopied, setShowCopied]     = useState(false);
-  const [showFlowExpanded, setShowFlowExpanded] = useState(false);
+  const [room, setRoom]           = useState<Room | null>(null);
+  const [participants, setPs]     = useState<RoomParticipant[]>([]);
+  const [votes, setVotes]         = useState<Vote[]>([]);
+  const [messages, setMessages]   = useState<RoomMessage[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [joined, setJoined]       = useState(false);
+  const [selectedStudent, setSel] = useState<RoomParticipant | null>(null);
+  const [mobileTab, setMobileTab] = useState<MobileTab>("class");
+  const [chatMsg, setChatMsg]     = useState("");
+  const [showCopied, setShowCopied] = useState(false);
+  const [flowOpen, setFlowOpen]   = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [floatingEmojis, setFloatingEmojis] = useState<FloatingEmoji[]>([]);
-  const chatBottomRef  = useRef<HTMLDivElement>(null);
-  const seenMsgIds     = useRef<Set<string>>(new Set());
-  const emojiIdCounter = useRef(0);
-  const containerRef   = useRef<HTMLDivElement>(null);
+  const [floatingEmojis, setFE]   = useState<FloatingEmoji[]>([]);
 
-  const alreadyInRoom = activeRoomId === roomId;
+  // Leave confirmation
+  const [showLeave, setShowLeave] = useState(false);
+  // End-room vote confirmation (host)
+  const [showEndVote, setShowEndVote] = useState(false);
+  const [endVoteLoading, setEndVoteLoading] = useState(false);
 
-  // ── Subscriptions ────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!roomId) return;
-    return subscribeRoom(roomId, (r) => { setRoom(r); setLoading(false); });
-  }, [roomId]);
+  const chatRef      = useRef<HTMLDivElement>(null);
+  const seenMsgIds   = useRef<Set<string>>(new Set());
+  const emojiCounter = useRef(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const alreadyIn    = activeRoomId === roomId;
 
-  useEffect(() => {
-    if (!roomId) return;
-    return subscribeParticipants(roomId, setParticipants);
-  }, [roomId]);
-
-  useEffect(() => {
-    if (!roomId) return;
-    return subscribeActiveVotes(roomId, setVotes);
-  }, [roomId]);
-
+  // ── subscriptions ────────────────────────────────────────────────────────────
+  useEffect(() => { if (!roomId) return; return subscribeRoom(roomId, (r) => { setRoom(r); setLoading(false); }); }, [roomId]);
+  useEffect(() => { if (!roomId) return; return subscribeParticipants(roomId, setPs); }, [roomId]);
+  useEffect(() => { if (!roomId) return; return subscribeActiveVotes(roomId, setVotes); }, [roomId]);
   useEffect(() => {
     if (!roomId) return;
     return subscribeMessages(roomId, (msgs) => {
-      // Detect new reaction messages → spawn floating emojis
       for (const msg of msgs) {
         if (msg.type === "reaction" && msg.emoji && !seenMsgIds.current.has(msg.id)) {
           seenMsgIds.current.add(msg.id);
-          // Only animate reactions that are recent (within last 5 seconds)
-          const age = msg.createdAt ? Date.now() - msg.createdAt.toMillis() : 9999;
-          if (age < 5000) {
-            spawnFloatingEmoji(msg.emoji);
-          }
+          const age = msg.createdAt ? Date.now() - msg.createdAt.toMillis() : 99999;
+          if (age < 6000) spawnEmoji(msg.emoji);
         } else {
           seenMsgIds.current.add(msg.id);
         }
@@ -103,43 +94,66 @@ export default function StudyRoomLive() {
     });
   }, [roomId]);
 
-  // Auto-scroll chat
+  // auto-scroll chat
+  useEffect(() => { chatRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+
+  // auto-join
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // ── Auto-join ─────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!roomId || !user || !profile || joined || !room) return;
-    if (room.status === "finished") return;
-
-    const alreadyParticipant = participants.some(p => p.uid === user.uid);
-
+    if (!roomId || !user || !profile || joined || !room || room.status === "finished") return;
+    const already = participants.some(p => p.uid === user.uid);
     async function doJoin() {
       try {
-        if (!alreadyParticipant) {
-          await joinRoom(roomId!, {
-            uid: user!.uid,
-            name: profile!.name,
-            grade: profile!.grade,
-            isHost: room!.hostUid === user!.uid,
-          });
+        if (!already) {
+          await joinRoom(roomId!, { uid: user!.uid, name: profile!.name, grade: profile!.grade, isHost: room!.hostUid === user!.uid });
         }
         joinActiveRoom(roomId!);
         setJoined(true);
-      } catch (err) {
-        console.error("[Room] Failed to join:", err);
-      }
+      } catch (e) { console.error("[Room] join failed", e); }
     }
     doJoin();
-  }, [roomId, user, profile, room, participants, joined, joinActiveRoom]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId, user, profile, room, joined]);
 
-  // ── Fullscreen ────────────────────────────────────────────────────────────────
+  // fullscreen listener
   useEffect(() => {
-    const handler = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", handler);
-    return () => document.removeEventListener("fullscreenchange", handler);
+    const h = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", h);
+    return () => document.removeEventListener("fullscreenchange", h);
   }, []);
+
+  // ── emoji float ──────────────────────────────────────────────────────────────
+  function spawnEmoji(emoji: string) {
+    const id = `e${emojiCounter.current++}`;
+    const x  = 5 + Math.random() * 80;
+    setFE(prev => [...prev, { id, emoji, x }]);
+    setTimeout(() => setFE(prev => prev.filter(e => e.id !== id)), 2500);
+  }
+
+  // ── actions ──────────────────────────────────────────────────────────────────
+  async function confirmLeave() {
+    await leaveActiveRoom();
+    setLocation("/study-rooms");
+  }
+
+  async function handleSend() {
+    if (!chatMsg.trim() || !user || !profile) return;
+    const txt = chatMsg.trim();
+    setChatMsg("");
+    await sendMessage(roomId!, { uid: user.uid, name: profile.name, text: txt, type: "message" });
+  }
+
+  async function handleReaction(emoji: string) {
+    if (!user || !profile) return;
+    spawnEmoji(emoji);
+    await sendMessage(roomId!, { uid: user.uid, name: profile.name, emoji, type: "reaction" });
+  }
+
+  function copyLink() {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setShowCopied(true);
+      setTimeout(() => setShowCopied(false), 2000);
+    });
+  }
 
   function toggleFullscreen() {
     if (!document.fullscreenElement) {
@@ -149,398 +163,628 @@ export default function StudyRoomLive() {
     }
   }
 
-  // ── Floating emoji reactions ──────────────────────────────────────────────────
-  function spawnFloatingEmoji(emoji: string) {
-    const id = `emoji-${emojiIdCounter.current++}`;
-    const x = 10 + Math.random() * 80; // random horizontal position 10–90%
-    setFloatingEmojis(prev => [...prev, { id, emoji, x }]);
-    // Remove after animation completes
-    setTimeout(() => {
-      setFloatingEmojis(prev => prev.filter(e => e.id !== id));
-    }, 2500);
+  // Host: "End" → creates an "end" vote instead of direct end
+  async function handleHostEndVote() {
+    if (!user || !profile || !roomId) return;
+    setEndVoteLoading(true);
+    try {
+      await createVote(roomId, {
+        description: "🏁 End the session now? Everyone vote!",
+        type: "end",
+        createdByUid: user.uid,
+        createdByName: profile.name,
+        totalParticipants: participants.length,
+        expiresInSecs: 90,
+      });
+      setShowEndVote(false);
+      setMobileTab("vote");
+    } catch (e) { console.error("[Vote] end vote failed", e); }
+    setEndVoteLoading(false);
   }
 
-  // ── Actions ───────────────────────────────────────────────────────────────────
-  async function handleLeave() {
-    await leaveActiveRoom();
-    setLocation("/study-rooms");
-  }
+  // ── render guards ─────────────────────────────────────────────────────────────
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="w-10 h-10 rounded-full border-3 border-blue-100 border-t-blue-600 animate-spin" />
+    </div>
+  );
 
-  async function handleSendMessage() {
-    if (!chatMsg.trim() || !user || !profile) return;
-    const text = chatMsg.trim();
-    setChatMsg("");
-    await sendMessage(roomId!, { uid: user.uid, name: profile.name, text, type: "message" });
-  }
+  if (!room) return (
+    <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4">
+      <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Room not found.</p>
+      <button onClick={() => setLocation("/study-rooms")} className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm">
+        Browse Rooms
+      </button>
+    </div>
+  );
 
-  async function handleReaction(emoji: string) {
-    if (!user || !profile) return;
-    // Immediately spawn local floating emoji for instant feedback
-    spawnFloatingEmoji(emoji);
-    await sendMessage(roomId!, { uid: user.uid, name: profile.name, emoji, type: "reaction" });
-  }
+  const phase      = room.studyFlow[room.currentPhaseIndex];
+  const isStudying = room.status === "active" && phase?.type === "study";
+  const isBreak    = room.status === "active" && phase?.type === "break";
+  const remaining  = alreadyIn ? remainingSeconds : getRemainingSeconds(room);
+  const pctDone    = phase ? Math.max(0, Math.min(100, 100 - (remaining / (phase.durationMins * 60)) * 100)) : 0;
+  const timerFmt   = formatTime(remaining);
+  const showTimer  = phase && room.status !== "waiting" && room.status !== "finished";
+  const activeVoteCount = votes.filter(v => v.status === "active").length;
 
-  function copyInviteLink() {
-    navigator.clipboard.writeText(window.location.href).then(() => {
-      setShowCopied(true);
-      setTimeout(() => setShowCopied(false), 2000);
-    });
-  }
-
-  if (loading) {
+  // ── SHARED: Right/Side panel content ──────────────────────────────────────────
+  function StudyFlow() {
     return (
-      <div className="flex items-center justify-center min-h-64">
-        <div className="w-8 h-8 rounded-full border-2 border-blue-200 border-t-blue-600 animate-spin" />
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+        <button
+          onClick={() => setFlowOpen(!flowOpen)}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <BarChart2 className="w-4 h-4 text-gray-400" />
+            Study Flow
+            <span className="text-xs font-normal text-gray-400">{room.currentPhaseIndex + 1}/{room.studyFlow.length}</span>
+          </span>
+          {flowOpen ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
+        </button>
+        <AnimatePresence>
+          {flowOpen && (
+            <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
+              <div className="px-3 pb-3 space-y-1">
+                {room.studyFlow.map((p, i) => (
+                  <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs ${
+                    i === room.currentPhaseIndex ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-semibold"
+                    : i < room.currentPhaseIndex ? "text-gray-400 dark:text-gray-500 line-through"
+                    : "text-gray-600 dark:text-gray-400"
+                  }`}>
+                    {p.type === "study" ? <BookOpen className="w-3.5 h-3.5 shrink-0" /> : <Coffee className="w-3.5 h-3.5 shrink-0" />}
+                    <span className="flex-1 truncate">{p.label}</span>
+                    <span className="font-mono shrink-0">{p.durationMins}m</span>
+                    {i === room.currentPhaseIndex && <span className="shrink-0 bg-blue-500 text-white text-[9px] px-1.5 py-0.5 rounded-full">NOW</span>}
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }
 
-  if (!room) {
+  function ChatPanel() {
     return (
-      <div className="max-w-lg mx-auto px-4 py-16 text-center space-y-4">
-        <p className="text-gray-600 dark:text-gray-400 text-lg">Room not found.</p>
-        <button onClick={() => setLocation("/study-rooms")} className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm">
-          Browse Rooms
+      <div className="flex flex-col h-full">
+        {/* Emoji row */}
+        <div className="flex gap-1.5 flex-wrap mb-2">
+          {EMOJI_REACTIONS.map(e => (
+            <button key={e} onClick={() => handleReaction(e)}
+              className="text-xl hover:scale-125 active:scale-95 transition-transform select-none">
+              {e}
+            </button>
+          ))}
+        </div>
+        {/* Messages */}
+        <div className="flex-1 space-y-2 overflow-y-auto pr-0.5 mb-2" style={{ maxHeight: 320 }}>
+          {messages.length === 0 && (
+            <p className="text-center text-xs text-gray-400 dark:text-gray-500 py-6">No messages yet — say something!</p>
+          )}
+          {messages.map(msg => (
+            <div key={msg.id}>
+              {msg.type === "reaction" ? (
+                <div className="text-center text-base">
+                  {msg.emoji}
+                  <span className="text-[10px] text-gray-400 ml-1">{msg.name.split(" ")[0]}</span>
+                </div>
+              ) : msg.type === "system" ? (
+                <p className="text-center text-xs italic text-gray-400">{msg.text}</p>
+              ) : (
+                <div className={`flex gap-1.5 ${msg.uid === user?.uid ? "flex-row-reverse" : ""}`}>
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5">
+                    {msg.name.charAt(0)}
+                  </div>
+                  <div className={`max-w-[78%] flex flex-col gap-0.5 ${msg.uid === user?.uid ? "items-end" : "items-start"}`}>
+                    <p className="text-[10px] text-gray-400">{msg.name.split(" ")[0]}</p>
+                    <div className={`px-3 py-1.5 rounded-2xl text-xs leading-relaxed ${
+                      msg.uid === user?.uid
+                        ? "bg-blue-500 text-white rounded-tr-sm"
+                        : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-tl-sm"
+                    }`}>
+                      {msg.text}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          <div ref={chatRef} />
+        </div>
+        {/* Input */}
+        {user && (
+          <div className="flex gap-2 mt-auto">
+            <input
+              type="text" value={chatMsg}
+              onChange={e => setChatMsg(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSend()}
+              placeholder="Say something…" maxLength={200}
+              className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-400"
+            />
+            <button onClick={handleSend} disabled={!chatMsg.trim()}
+              className="p-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 transition-colors shrink-0">
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function ParticipantsList() {
+    return (
+      <div className="space-y-2">
+        {participants.map(p => (
+          <button key={p.uid} onClick={() => setSel(p)}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors text-left">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
+              {p.name.charAt(0)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white truncate flex items-center gap-1">
+                {p.name}
+                {p.uid === room.hostUid && <Crown className="w-3 h-3 text-yellow-500 shrink-0" />}
+              </p>
+              <p className="text-xs text-gray-400">Grade {p.grade}</p>
+            </div>
+            <div className="w-2 h-2 rounded-full bg-green-400" />
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  // ── HOST CONTROLS BAR ──────────────────────────────────────────────────────────
+  function HostBar() {
+    if (!isHost) return null;
+    return (
+      <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/40 dark:to-yellow-950/30 border border-amber-200/80 dark:border-amber-800/40 rounded-2xl px-4 py-2.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-400 mr-1">
+            <Crown className="w-3.5 h-3.5" /> Host
+          </span>
+          {room.status === "waiting" && (
+            <button onClick={onHostStart}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-xs font-bold transition-colors shadow-sm">
+              <Play className="w-3.5 h-3.5" /> Start
+            </button>
+          )}
+          {room.status === "active" && (
+            <button onClick={onHostPause}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-colors shadow-sm">
+              <Pause className="w-3.5 h-3.5" /> Pause
+            </button>
+          )}
+          {room.status === "paused" && (
+            <button onClick={onHostResume}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-bold transition-colors shadow-sm">
+              <Play className="w-3.5 h-3.5" /> Resume
+            </button>
+          )}
+          {(room.status === "active" || room.status === "paused") && (
+            <button onClick={onHostSkip}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold transition-colors shadow-sm">
+              <SkipForward className="w-3.5 h-3.5" /> Skip
+            </button>
+          )}
+          {room.status !== "waiting" && room.status !== "finished" && (
+            <button onClick={() => setShowEndVote(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition-colors shadow-sm">
+              <Square className="w-3.5 h-3.5" /> End Session
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── HEADER BAR ────────────────────────────────────────────────────────────────
+  function HeaderBar() {
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          {/* Title */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h1 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base truncate">
+                {room.title}
+              </h1>
+              <StatusBadge status={room.status} />
+            </div>
+            <p className="text-[11px] text-gray-400 truncate mt-0.5">{room.subject} · {room.hostName}</p>
+          </div>
+
+          {/* Timer pill */}
+          {showTimer && (
+            <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl shrink-0 font-mono text-sm font-bold ${
+              isStudying ? "bg-blue-600 text-white" : "bg-green-600 text-white"
+            }`}>
+              {isStudying ? <BookOpen className="w-3.5 h-3.5" /> : <Coffee className="w-3.5 h-3.5" />}
+              {timerFmt}
+            </div>
+          )}
+
+          {/* Participant count */}
+          <div className="hidden sm:flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 shrink-0">
+            <Users className="w-4 h-4" /> {participants.length}
+          </div>
+
+          {/* Study time */}
+          {studyMinsInSession > 0 && (
+            <div className="hidden md:flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">
+              <BookOpen className="w-3.5 h-3.5" /> {studyMinsInSession}m
+            </div>
+          )}
+
+          {/* Copy invite */}
+          <button onClick={copyLink}
+            className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors shrink-0">
+            {showCopied ? <><CheckCircle className="w-3.5 h-3.5 text-green-500" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Invite</>}
+          </button>
+
+          {/* Fullscreen */}
+          <button onClick={toggleFullscreen}
+            className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 transition-colors shrink-0">
+            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+          </button>
+
+          {/* Leave button */}
+          <button onClick={() => setShowLeave(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-xs font-bold border border-red-200 dark:border-red-800/40 transition-colors shrink-0">
+            <LogOut className="w-3.5 h-3.5" /> Leave
+          </button>
+        </div>
+
+        {/* Progress bar */}
+        {showTimer && (
+          <div className="mt-2 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+            <motion.div
+              className={`h-full rounded-full ${isStudying ? "bg-blue-500" : "bg-green-500"}`}
+              style={{ width: `${pctDone}%` }}
+              transition={{ duration: 1, ease: "linear" }}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── MOBILE BOTTOM TABS ────────────────────────────────────────────────────────
+  function MobileTabs() {
+    const tabs: { id: MobileTab; label: string; icon: React.ReactNode; badge?: number }[] = [
+      { id: "class", label: "Classroom", icon: <School className="w-4 h-4" /> },
+      { id: "vote",  label: "Vote",      icon: <ListChecks className="w-4 h-4" />, badge: activeVoteCount || undefined },
+      { id: "chat",  label: "Chat",      icon: <MessageCircle className="w-4 h-4" /> },
+    ];
+    return (
+      <div className="flex bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 lg:hidden">
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setMobileTab(t.id)}
+            className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs font-medium relative transition-colors ${
+              mobileTab === t.id
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-gray-500 dark:text-gray-400"
+            }`}>
+            <span className={`transition-colors ${mobileTab === t.id ? "text-blue-600 dark:text-blue-400" : ""}`}>
+              {t.icon}
+            </span>
+            {t.label}
+            {t.badge ? (
+              <span className="absolute top-2 right-[calc(50%-12px)] w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                {t.badge}
+              </span>
+            ) : null}
+            {mobileTab === t.id && (
+              <motion.div layoutId="tab-underline" className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-blue-500 rounded-full" />
+            )}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  // ── FULLSCREEN SESSION COMPLETE ───────────────────────────────────────────────
+  if (room.status === "finished") {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-10 text-center space-y-5">
+        <div className="text-6xl">🎉</div>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Session Complete!</h2>
+        <p className="text-gray-500 dark:text-gray-400">
+          Great work! You studied for <strong>{studyMinsInSession} minutes</strong> in this session.
+        </p>
+        <button onClick={() => setLocation("/study-rooms")}
+          className="px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm transition-all">
+          Browse Study Rooms
         </button>
       </div>
     );
   }
 
-  const phase        = room.studyFlow[room.currentPhaseIndex];
-  const isStudying   = room.status === "active" && phase?.type === "study";
-  const isBreak      = room.status === "active" && phase?.type === "break";
-  const remaining    = alreadyInRoom ? remainingSeconds : getRemainingSeconds(room);
-  const pctComplete  = phase ? Math.max(0, Math.min(100, 100 - (remaining / (phase.durationMins * 60)) * 100)) : 0;
-
+  // ── DESKTOP LAYOUT ────────────────────────────────────────────────────────────
   return (
     <>
       <Helmet><title>{room.title} — Study Room</title></Helmet>
 
-      <div ref={containerRef} className="max-w-7xl mx-auto px-3 sm:px-4 py-4 space-y-4">
-        {/* Top bar */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 px-4 py-3">
-          <div className="flex items-center gap-3 flex-wrap">
-            <button
-              onClick={handleLeave}
-              className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors flex-shrink-0"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
+      <div ref={containerRef}
+        className={`${isFullscreen ? "fixed inset-0 z-50 bg-white dark:bg-gray-950 overflow-auto" : "max-w-screen-xl mx-auto"} px-2 sm:px-4 py-3 flex flex-col gap-3`}
+      >
+        <HeaderBar />
+        <HostBar />
 
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="font-bold text-gray-900 dark:text-white text-base sm:text-lg truncate">
-                  {room.title}
-                </h1>
-                <StatusBadge status={room.status} />
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                {room.subject} · by {room.hostName}
-              </p>
-            </div>
-
-            {/* Timer pill (top bar) */}
-            {phase && room.status !== "waiting" && room.status !== "finished" && (
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-xl flex-shrink-0 ${
-                isStudying ? "bg-blue-600 text-white" : "bg-green-600 text-white"
-              }`}>
+        {/* ── MOBILE LAYOUT ──────────────────────────────────────────────────── */}
+        <div className="lg:hidden flex flex-col gap-3 pb-16">
+          {/* Mobile timer bar (always visible) */}
+          {showTimer && (
+            <div className={`flex items-center justify-between px-4 py-3 rounded-2xl ${
+              isStudying ? "bg-blue-600 text-white" : "bg-green-600 text-white"
+            }`}>
+              <div className="flex items-center gap-2">
                 {isStudying ? <BookOpen className="w-4 h-4" /> : <Coffee className="w-4 h-4" />}
-                <span className="font-mono text-lg font-bold tabular-nums">{formatTime(remaining)}</span>
+                <span className="text-sm font-semibold">{phase?.label}</span>
               </div>
-            )}
-
-            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">
-              <Users className="w-4 h-4" />
-              <span>{participants.length}</span>
-            </div>
-
-            <button
-              onClick={copyInviteLink}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors flex-shrink-0"
-            >
-              {showCopied
-                ? <><CheckCircle className="w-3.5 h-3.5 text-green-500" /> Copied</>
-                : <><Copy className="w-3.5 h-3.5" /> Invite</>
-              }
-            </button>
-
-            {/* Fullscreen toggle */}
-            <button
-              onClick={toggleFullscreen}
-              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-              className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors flex-shrink-0"
-            >
-              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-            </button>
-          </div>
-
-          {/* Phase progress bar */}
-          {phase && room.status === "active" && (
-            <div className="mt-2 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-              <motion.div
-                className={`h-full rounded-full ${isStudying ? "bg-blue-500" : "bg-green-500"}`}
-                style={{ width: `${pctComplete}%` }}
-              />
+              <span className="font-mono text-2xl font-black tabular-nums">{timerFmt}</span>
+              <div className="flex items-center gap-1 text-sm opacity-80">
+                <Users className="w-4 h-4" /> {participants.length}
+              </div>
             </div>
           )}
+          {room.status === "waiting" && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/40 rounded-2xl px-4 py-3 text-center">
+              <p className="text-yellow-700 dark:text-yellow-400 text-sm font-semibold">⏳ Waiting for host to start…</p>
+            </div>
+          )}
+
+          {/* Mobile tab content */}
+          <AnimatePresence mode="wait">
+            {mobileTab === "class" && (
+              <motion.div key="class" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden relative">
+                <ClassroomView
+                  participants={participants} hostUid={room.hostUid}
+                  onSelectStudent={setSel} compact
+                  timerDisplay={showTimer ? timerFmt : undefined}
+                  timerLabel={phase?.label} timerPhaseType={phase?.type ?? null}
+                  roomStatus={room.status}
+                />
+                {/* Floating emojis */}
+                <AnimatePresence>
+                  {floatingEmojis.map(fe => (
+                    <motion.div key={fe.id} className="absolute bottom-8 pointer-events-none text-3xl select-none"
+                      style={{ left: `${fe.x}%` }}
+                      initial={{ y: 0, opacity: 1, scale: 0.8 }}
+                      animate={{ y: -140, opacity: 0, scale: 1.5 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 2.2, ease: "easeOut" }}>
+                      {fe.emoji}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </motion.div>
+            )}
+
+            {mobileTab === "vote" && (
+              <motion.div key="vote" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
+                <VotingPanel room={room} votes={votes} participantCount={participants.length} />
+              </motion.div>
+            )}
+
+            {mobileTab === "chat" && (
+              <motion.div key="chat" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4"
+                style={{ minHeight: 400 }}>
+                <ChatPanel />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Study flow (mobile) */}
+          <StudyFlow />
         </div>
 
-        {/* Host controls */}
-        {isHost && (
-          <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/10 dark:to-yellow-900/10 border border-amber-200 dark:border-amber-800/40 rounded-2xl px-4 py-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 flex-1">
-                <Crown className="w-3.5 h-3.5" /> Host Controls
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                {room.status === "waiting" && (
-                  <button onClick={onHostStart} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-semibold transition-colors">
-                    <Play className="w-3.5 h-3.5" /> Start
-                  </button>
-                )}
-                {room.status === "active" && (
-                  <button onClick={onHostPause} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition-colors">
-                    <Pause className="w-3.5 h-3.5" /> Pause
-                  </button>
-                )}
-                {room.status === "paused" && (
-                  <button onClick={onHostResume} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-semibold transition-colors">
-                    <Play className="w-3.5 h-3.5" /> Resume
-                  </button>
-                )}
-                {(room.status === "active" || room.status === "paused") && (
-                  <button onClick={onHostSkip} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold transition-colors">
-                    <SkipForward className="w-3.5 h-3.5" /> Skip Phase
-                  </button>
-                )}
-                {room.status !== "waiting" && room.status !== "finished" && (
-                  <button onClick={onHostEnd} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-semibold transition-colors">
-                    <Square className="w-3.5 h-3.5" /> End
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Finished banner */}
-        {room.status === "finished" && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl px-5 py-4 text-white text-center"
-          >
-            <p className="text-xl font-bold">🎉 Session Complete!</p>
-            <p className="text-white/80 text-sm mt-1">Great work everyone. Your study time has been recorded.</p>
-            <button onClick={() => setLocation("/study-rooms")} className="mt-3 px-4 py-2 rounded-xl bg-white text-blue-600 text-sm font-semibold">
-              Browse Rooms
-            </button>
-          </motion.div>
-        )}
-
-        {/* Main 3-column layout */}
-        <div className="grid lg:grid-cols-[1fr_auto_340px] gap-4">
-          {/* Left: Classroom — with floating emoji overlay */}
-          <div className="relative bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+        {/* ── DESKTOP LAYOUT ─────────────────────────────────────────────────── */}
+        <div className="hidden lg:grid lg:grid-cols-[1fr_48px_340px] gap-3">
+          {/* Classroom */}
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden relative">
             <ClassroomView
-              participants={participants}
-              hostUid={room.hostUid}
-              onSelectStudent={setSelectedStudent}
-              timerDisplay={phase && room.status !== "waiting" && room.status !== "finished" ? formatTime(remaining) : undefined}
-              timerLabel={phase?.label}
-              timerPhaseType={phase?.type ?? null}
+              participants={participants} hostUid={room.hostUid}
+              onSelectStudent={setSel}
+              timerDisplay={showTimer ? timerFmt : undefined}
+              timerLabel={phase?.label} timerPhaseType={phase?.type ?? null}
               roomStatus={room.status}
             />
-
-            {/* Floating emoji reaction overlay */}
             <AnimatePresence>
               {floatingEmojis.map(fe => (
-                <motion.div
-                  key={fe.id}
-                  className="absolute bottom-8 pointer-events-none text-3xl select-none"
+                <motion.div key={fe.id} className="absolute bottom-10 pointer-events-none text-3xl select-none"
                   style={{ left: `${fe.x}%` }}
                   initial={{ y: 0, opacity: 1, scale: 0.8 }}
-                  animate={{ y: -160, opacity: 0, scale: 1.4 }}
+                  animate={{ y: -180, opacity: 0, scale: 1.5 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 2.2, ease: "easeOut" }}
-                >
+                  transition={{ duration: 2.3, ease: "easeOut" }}>
                   {fe.emoji}
                 </motion.div>
               ))}
             </AnimatePresence>
           </div>
 
-          {/* Center: Emoji reactions column */}
-          <div className="hidden lg:flex flex-col gap-2 justify-center">
-            {EMOJI_REACTIONS.map(emoji => (
-              <button
-                key={emoji}
-                onClick={() => handleReaction(emoji)}
-                className="w-10 h-10 rounded-xl text-lg hover:scale-110 active:scale-95 transition-transform bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow"
-              >
-                {emoji}
+          {/* Emoji column */}
+          <div className="flex flex-col gap-1.5 justify-center">
+            {EMOJI_REACTIONS.map(e => (
+              <button key={e} onClick={() => handleReaction(e)}
+                className="w-11 h-11 rounded-xl text-xl hover:scale-115 active:scale-95 transition-transform bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow">
+                {e}
               </button>
             ))}
           </div>
 
           {/* Right panel */}
-          <div className="flex flex-col gap-3 min-w-0">
-            {/* Study flow summary */}
-            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-              <button
-                onClick={() => setShowFlowExpanded(!showFlowExpanded)}
-                className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <BarChart2 className="w-4 h-4 text-gray-400" />
-                  Study Flow
-                  <span className="text-xs font-normal text-gray-400">
-                    {room.currentPhaseIndex + 1}/{room.studyFlow.length}
-                  </span>
-                </div>
-                {showFlowExpanded ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
-              </button>
-              <AnimatePresence>
-                {showFlowExpanded && (
-                  <motion.div
-                    initial={{ height: 0 }}
-                    animate={{ height: "auto" }}
-                    exit={{ height: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="px-4 pb-3 space-y-1.5">
-                      {room.studyFlow.map((p, i) => (
-                        <div
-                          key={i}
-                          className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs transition-colors ${
-                            i === room.currentPhaseIndex
-                              ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-semibold"
-                              : i < room.currentPhaseIndex
-                                ? "text-gray-400 dark:text-gray-500 line-through"
-                                : "text-gray-600 dark:text-gray-400"
-                          }`}
-                        >
-                          {p.type === "study" ? <BookOpen className="w-3.5 h-3.5 flex-shrink-0" /> : <Coffee className="w-3.5 h-3.5 flex-shrink-0" />}
-                          <span className="flex-1 truncate">{p.label}</span>
-                          <span className="font-mono flex-shrink-0">{p.durationMins}m</span>
-                          {i === room.currentPhaseIndex && (
-                            <span className="flex-shrink-0 text-[10px] bg-blue-500 text-white rounded-full px-1.5 py-0.5">Now</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+          <div className="flex flex-col gap-3 min-w-0 overflow-y-auto" style={{ maxHeight: "calc(100vh - 180px)" }}>
+            {/* Study stats */}
+            {studyMinsInSession > 0 && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/30 px-4 py-3 flex items-center justify-between">
+                <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">Your study time</span>
+                <span className="text-sm font-bold text-blue-700 dark:text-blue-300">{studyMinsInSession} min</span>
+              </div>
+            )}
+
+            <StudyFlow />
+
+            {/* Vote tab */}
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800">
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                  🗳️ Votes {activeVoteCount > 0 && <span className="ml-1 text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full">{activeVoteCount}</span>}
+                </span>
+              </div>
+              <div className="p-3">
+                <VotingPanel room={room} votes={votes} participantCount={participants.length} />
+              </div>
             </div>
 
-            {/* Tabs: Vote / Chat */}
-            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 flex flex-col">
-              <div className="flex border-b border-gray-100 dark:border-gray-800 px-2 pt-1">
-                {(["vote", "chat"] as const).map(tab => (
-                  <button
-                    key={tab}
-                    onClick={() => setRightTab(tab)}
-                    className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                      rightTab === tab
-                        ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                        : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                    }`}
-                  >
-                    {tab === "vote" ? "🗳️" : "💬"} {tab === "vote" ? "Vote" : "Chat"}
-                  </button>
-                ))}
+            {/* Chat */}
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800">
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                <span className="text-sm font-bold text-gray-900 dark:text-white">💬 Chat</span>
               </div>
+              <div className="p-3">
+                <ChatPanel />
+              </div>
+            </div>
 
-              <div className="p-3 flex-1">
-                {rightTab === "vote" && (
-                  <VotingPanel room={room} votes={votes} participantCount={participants.length} />
-                )}
-
-                {rightTab === "chat" && (
-                  <div className="flex flex-col gap-2">
-                    {/* Mobile emoji row */}
-                    <div className="flex gap-2 flex-wrap lg:hidden">
-                      {EMOJI_REACTIONS.map(emoji => (
-                        <button
-                          key={emoji}
-                          onClick={() => handleReaction(emoji)}
-                          className="text-xl hover:scale-110 active:scale-95 transition-transform"
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Messages */}
-                    <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                      {messages.length === 0 && (
-                        <p className="text-center text-xs text-gray-400 dark:text-gray-500 py-4">
-                          No messages yet. Say something!
-                        </p>
-                      )}
-                      {messages.map((msg) => (
-                        <div key={msg.id}>
-                          {msg.type === "reaction" ? (
-                            <div className="text-center">
-                              <span className="text-xl">{msg.emoji}</span>
-                              <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-1">{msg.name.split(" ")[0]}</span>
-                            </div>
-                          ) : msg.type === "system" ? (
-                            <p className="text-center text-xs text-gray-400 dark:text-gray-500 italic">{msg.text}</p>
-                          ) : (
-                            <div className={`flex gap-2 ${msg.uid === user?.uid ? "flex-row-reverse" : ""}`}>
-                              <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
-                                {msg.name.charAt(0)}
-                              </div>
-                              <div className={`max-w-[80%] ${msg.uid === user?.uid ? "items-end" : "items-start"} flex flex-col gap-0.5`}>
-                                <p className="text-[10px] text-gray-400 dark:text-gray-500">{msg.name.split(" ")[0]}</p>
-                                <div className={`px-3 py-1.5 rounded-2xl text-xs ${
-                                  msg.uid === user?.uid
-                                    ? "bg-blue-500 text-white rounded-tr-sm"
-                                    : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-tl-sm"
-                                }`}>
-                                  {msg.text}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                      <div ref={chatBottomRef} />
-                    </div>
-
-                    {/* Input */}
-                    {user && (
-                      <div className="flex gap-2 mt-1">
-                        <input
-                          type="text"
-                          value={chatMsg}
-                          onChange={(e) => setChatMsg(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-                          placeholder="Say something..."
-                          maxLength={200}
-                          className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-400"
-                        />
-                        <button
-                          onClick={handleSendMessage}
-                          disabled={!chatMsg.trim()}
-                          className="p-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 transition-colors flex-shrink-0"
-                        >
-                          <Send className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
+            {/* Participants */}
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800">
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center gap-2">
+                <span className="text-sm font-bold text-gray-900 dark:text-white">👥 Participants</span>
+                <span className="text-xs text-gray-400">{participants.length}</span>
+              </div>
+              <div className="p-2">
+                <ParticipantsList />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Student profile modal */}
-        <StudentProfileModal participant={selectedStudent} onClose={() => setSelectedStudent(null)} />
+        {/* Mobile bottom nav */}
+        <div className="fixed bottom-0 left-0 right-0 z-30 lg:hidden shadow-lg">
+          <MobileTabs />
+        </div>
       </div>
+
+      {/* ── LEAVE CONFIRMATION MODAL ─────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showLeave && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowLeave(false)}
+              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 16 }}
+                transition={{ type: "spring", damping: 26, stiffness: 320 }}
+                className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm pointer-events-auto overflow-hidden"
+              >
+                <div className="bg-gradient-to-r from-red-500 to-rose-500 p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">
+                      <LogOut className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-white text-base">Leave Room?</p>
+                      <p className="text-white/70 text-xs">Your progress will be saved</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-5 space-y-3">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {studyMinsInSession > 0
+                      ? `You've studied <strong>${studyMinsInSession} minutes</strong> this session — it'll be saved to your profile.`
+                      : "Are you sure you want to leave this study room?"
+                    }
+                    {isHost && participants.length > 1 && (
+                      <span className="block mt-1 text-amber-600 dark:text-amber-400 font-medium">
+                        As host, the next participant will become the new host.
+                      </span>
+                    )}
+                  </p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowLeave(false)}
+                      className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                      Stay
+                    </button>
+                    <button onClick={confirmLeave}
+                      className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-colors shadow-sm">
+                      Leave Room
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── END SESSION VOTE MODAL ───────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showEndVote && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowEndVote(false)}
+              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 16 }}
+                transition={{ type: "spring", damping: 26, stiffness: 320 }}
+                className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm pointer-events-auto overflow-hidden"
+              >
+                <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center text-xl">
+                      🏁
+                    </div>
+                    <div>
+                      <p className="font-bold text-white text-base">End Session Vote</p>
+                      <p className="text-white/70 text-xs">Ask everyone to vote</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowEndVote(false)} className="text-white/70 hover:text-white">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="p-5 space-y-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    A 90-second vote will be sent to all <strong>{participants.length} participants</strong>.
+                    If the majority vote <strong>Yes</strong>, the session ends for everyone.
+                  </p>
+                  <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 text-xs text-gray-500 dark:text-gray-400">
+                    💡 Tip: You can also let the timer finish naturally, or skip phases with the Skip button.
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowEndVote(false)}
+                      className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                      Cancel
+                    </button>
+                    <button onClick={handleHostEndVote} disabled={endVoteLoading}
+                      className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
+                      {endVoteLoading
+                        ? <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Starting…</>
+                        : "Start Vote 🗳️"
+                      }
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <StudentProfileModal participant={selectedStudent} onClose={() => setSel(null)} />
     </>
   );
 }
