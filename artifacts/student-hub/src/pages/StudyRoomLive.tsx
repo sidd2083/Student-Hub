@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "framer-motion";
@@ -46,41 +46,75 @@ export default function StudyRoomLive() {
     joinActiveRoom, leaveActiveRoom, isHost, studyMinsInSession,
     onHostStart, onHostPause, onHostResume, onHostSkip,
     remainingSeconds, activeRoomId,
+    room: ctxRoom, participants: ctxParticipants,
   } = useActiveRoom();
 
-  const [room, setRoom]           = useState<Room | null>(null);
-  const [participants, setPs]     = useState<RoomParticipant[]>([]);
-  const [votes, setVotes]         = useState<Vote[]>([]);
-  const [messages, setMessages]   = useState<RoomMessage[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [joined, setJoined]       = useState(false);
-  const [selectedStudent, setSel] = useState<RoomParticipant | null>(null);
-  const [mobileTab, setMobileTab] = useState<MobileTab>("class");
-  const [chatMsg, setChatMsg]     = useState("");
-  const [showCopied, setShowCopied] = useState(false);
-  const [flowOpen, setFlowOpen]   = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [floatingEmojis, setFE]   = useState<FloatingEmoji[]>([]);
+  // alreadyIn: true once we've called joinActiveRoom for this room
+  const alreadyIn = activeRoomId === roomId;
 
-  // Leave confirmation
-  const [showLeave, setShowLeave] = useState(false);
-  // End-room vote confirmation (host)
-  const [showEndVote, setShowEndVote] = useState(false);
-  const [endVoteLoading, setEndVoteLoading] = useState(false);
+  // ── Local state — pre-join room preview ──────────────────────────────────────
+  // We only subscribe locally when NOT yet joined to avoid duplicate listeners.
+  // Once joined, we consume room + participants from ActiveRoomContext.
+  const [localRoom,         setLocalRoom]    = useState<Room | null>(null);
+  const [localParticipants, setLocalPs]      = useState<RoomParticipant[]>([]);
+  const [loading,           setLoading]      = useState(true);
+  const [joined,            setJoined]       = useState(false);
+
+  // Always-local state (not in context)
+  const [votes,          setVotes]       = useState<Vote[]>([]);
+  const [messages,       setMessages]    = useState<RoomMessage[]>([]);
+  const [optimisticMsgs, setOptimistic]  = useState<RoomMessage[]>([]); // instant display
+
+  const [selectedStudent, setSel]         = useState<RoomParticipant | null>(null);
+  const [mobileTab,       setMobileTab]   = useState<MobileTab>("class");
+  const [chatMsg,         setChatMsg]     = useState("");
+  const [showCopied,      setShowCopied]  = useState(false);
+  const [flowOpen,        setFlowOpen]    = useState(false);
+  const [isFullscreen,    setIsFullscreen] = useState(false);
+  const [floatingEmojis,  setFE]          = useState<FloatingEmoji[]>([]);
+  const [showLeave,       setShowLeave]   = useState(false);
+  const [showEndVote,     setShowEndVote] = useState(false);
+  const [endVoteLoading,  setEndVoteLoading] = useState(false);
 
   const chatRef      = useRef<HTMLDivElement>(null);
   const seenMsgIds   = useRef<Set<string>>(new Set());
   const emojiCounter = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const alreadyIn    = activeRoomId === roomId;
 
-  // ── subscriptions ────────────────────────────────────────────────────────────
-  useEffect(() => { if (!roomId) return; return subscribeRoom(roomId, (r) => { setRoom(r); setLoading(false); }); }, [roomId]);
-  useEffect(() => { if (!roomId) return; return subscribeParticipants(roomId, setPs); }, [roomId]);
-  useEffect(() => { if (!roomId) return; return subscribeActiveVotes(roomId, setVotes); }, [roomId]);
+  // Derive active room + participants: context when joined, local when browsing
+  const room         = alreadyIn ? ctxRoom         : localRoom;
+  const participants = alreadyIn ? ctxParticipants : localParticipants;
+
+  // ── PRE-JOIN: subscribe to room and participants ONLY while not yet joined ────
+  // After join, the context already subscribes — subscribing again would create
+  // duplicate Firestore listeners and double the read cost.
+  useEffect(() => {
+    if (!roomId || alreadyIn) return;
+    return subscribeRoom(roomId, (r) => { setLocalRoom(r); setLoading(false); });
+  }, [roomId, alreadyIn]);
+
+  useEffect(() => {
+    if (!roomId || alreadyIn) return;
+    return subscribeParticipants(roomId, setLocalPs);
+  }, [roomId, alreadyIn]);
+
+  // Once context room arrives after joining, clear loading
+  useEffect(() => {
+    if (alreadyIn && ctxRoom) setLoading(false);
+  }, [alreadyIn, ctxRoom]);
+
+  // ── ALWAYS: subscribe to votes and messages (not in context) ─────────────────
+  useEffect(() => {
+    if (!roomId) return;
+    return subscribeActiveVotes(roomId, setVotes);
+  }, [roomId]);
+
   useEffect(() => {
     if (!roomId) return;
     return subscribeMessages(roomId, (msgs) => {
+      // Merge optimistic messages that haven't landed yet
+      setOptimistic(prev => prev.filter(o => !msgs.some(m => m.id === o.id)));
+
       for (const msg of msgs) {
         if (msg.type === "reaction" && msg.emoji && !seenMsgIds.current.has(msg.id)) {
           seenMsgIds.current.add(msg.id);
@@ -95,58 +129,92 @@ export default function StudyRoomLive() {
   }, [roomId]);
 
   // auto-scroll chat
-  useEffect(() => { chatRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  useEffect(() => { chatRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, optimisticMsgs]);
 
-  // auto-join — check Firestore directly to avoid double-counting participant
+  // ── AUTO-JOIN — happens once per page visit ───────────────────────────────────
+  // Runs for ALL users (host AND members). Every user's ActiveRoomContext gets
+  // their own timer and study-time accumulation — tracking is per-individual.
   useEffect(() => {
     if (!roomId || !user || !profile || joined || !room || room.status === "finished") return;
+    let cancelled = false;
     async function doJoin() {
       try {
-        // Use server check — local `participants` state may be empty on first render
         const alreadyInRoom = await isParticipant(roomId!, user!.uid);
         if (!alreadyInRoom) {
-          await joinRoom(roomId!, { uid: user!.uid, name: profile!.name, grade: profile!.grade, isHost: room!.hostUid === user!.uid });
+          await joinRoom(roomId!, {
+            uid: user!.uid,
+            name: profile!.name,
+            grade: profile!.grade,
+            isHost: room!.hostUid === user!.uid,
+          });
         }
+        if (cancelled) return;
+        // joinActiveRoom starts the context subscription + per-user study timer
         joinActiveRoom(roomId!);
         setJoined(true);
-      } catch (e) { console.error("[Room] join failed", e); }
+      } catch (e) {
+        console.error("[Room] join failed:", e);
+      }
     }
     doJoin();
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, user, profile, room, joined]);
+  }, [roomId, user, profile, joined, room?.id, room?.status]);
 
-  // fullscreen listener
+  // ── Fullscreen ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const h = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", h);
-    return () => document.removeEventListener("fullscreenchange", h);
+    document.addEventListener("webkitfullscreenchange", h);
+    return () => {
+      document.removeEventListener("fullscreenchange", h);
+      document.removeEventListener("webkitfullscreenchange", h);
+    };
   }, []);
 
-  // ── emoji float ──────────────────────────────────────────────────────────────
-  function spawnEmoji(emoji: string) {
+  // ── Emoji float ───────────────────────────────────────────────────────────────
+  const spawnEmoji = useCallback((emoji: string) => {
     const id = `e${emojiCounter.current++}`;
     const x  = 5 + Math.random() * 80;
     setFE(prev => [...prev, { id, emoji, x }]);
     setTimeout(() => setFE(prev => prev.filter(e => e.id !== id)), 2500);
-  }
+  }, []);
 
-  // ── actions ──────────────────────────────────────────────────────────────────
+  // ── Actions ───────────────────────────────────────────────────────────────────
   async function confirmLeave() {
     await leaveActiveRoom();
     setLocation("/study-rooms");
   }
 
   async function handleSend() {
-    if (!chatMsg.trim() || !user || !profile) return;
+    if (!chatMsg.trim() || !user || !profile || !roomId) return;
     const txt = chatMsg.trim();
     setChatMsg("");
-    await sendMessage(roomId!, { uid: user.uid, name: profile.name, text: txt, type: "message" });
+
+    // Optimistic: show message instantly, Firestore snapshot will replace it
+    const tempId = `opt_${Date.now()}`;
+    const optimistic: RoomMessage = {
+      id: tempId, uid: user.uid, name: profile.name,
+      text: txt, type: "message", createdAt: null,
+    };
+    setOptimistic(prev => [...prev, optimistic]);
+
+    try {
+      await sendMessage(roomId, { uid: user.uid, name: profile.name, text: txt, type: "message" });
+    } catch (e) {
+      console.error("[Chat] send failed:", e);
+      setOptimistic(prev => prev.filter(m => m.id !== tempId));
+    }
   }
 
   async function handleReaction(emoji: string) {
-    if (!user || !profile) return;
+    if (!user || !profile || !roomId) return;
     spawnEmoji(emoji);
-    await sendMessage(roomId!, { uid: user.uid, name: profile.name, emoji, type: "reaction" });
+    try {
+      await sendMessage(roomId, { uid: user.uid, name: profile.name, emoji, type: "reaction" });
+    } catch (e) {
+      console.error("[Reaction] send failed:", e);
+    }
   }
 
   function copyLink() {
@@ -158,13 +226,13 @@ export default function StudyRoomLive() {
 
   function toggleFullscreen() {
     if (!document.fullscreenElement) {
-      (containerRef.current ?? document.documentElement).requestFullscreen().catch(() => {});
+      const el = containerRef.current ?? document.documentElement;
+      (el.requestFullscreen?.() ?? (el as any).webkitRequestFullscreen?.())?.catch(() => {});
     } else {
-      document.exitFullscreen().catch(() => {});
+      (document.exitFullscreen?.() ?? (document as any).webkitExitFullscreen?.())?.catch(() => {});
     }
   }
 
-  // Host: "End" → creates an "end" vote instead of direct end
   async function handleHostEndVote() {
     if (!user || !profile || !roomId) return;
     setEndVoteLoading(true);
@@ -183,7 +251,7 @@ export default function StudyRoomLive() {
     setEndVoteLoading(false);
   }
 
-  // ── render guards ─────────────────────────────────────────────────────────────
+  // ── Render guards ─────────────────────────────────────────────────────────────
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
       <div className="w-10 h-10 rounded-full border-3 border-blue-100 border-t-blue-600 animate-spin" />
@@ -201,14 +269,16 @@ export default function StudyRoomLive() {
 
   const phase      = room.studyFlow[room.currentPhaseIndex];
   const isStudying = room.status === "active" && phase?.type === "study";
-  const isBreak    = room.status === "active" && phase?.type === "break";
   const remaining  = alreadyIn ? remainingSeconds : getRemainingSeconds(room);
   const pctDone    = phase ? Math.max(0, Math.min(100, 100 - (remaining / (phase.durationMins * 60)) * 100)) : 0;
   const timerFmt   = formatTime(remaining);
   const showTimer  = phase && room.status !== "waiting" && room.status !== "finished";
   const activeVoteCount = votes.filter(v => v.status === "active").length;
 
-  // ── SHARED: Right/Side panel content ──────────────────────────────────────────
+  // All messages for the chat: confirmed from Firestore + any not-yet-confirmed optimistic ones
+  const allMessages = [...messages, ...optimisticMsgs.filter(o => !messages.some(m => m.id === o.id))];
+
+  // ── SHARED COMPONENTS ──────────────────────────────────────────────────────────
   function StudyFlow() {
     return (
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
@@ -261,10 +331,10 @@ export default function StudyRoomLive() {
         </div>
         {/* Messages */}
         <div className="flex-1 space-y-2 overflow-y-auto pr-0.5 mb-2" style={{ maxHeight: 320 }}>
-          {messages.length === 0 && (
+          {allMessages.length === 0 && (
             <p className="text-center text-xs text-gray-400 dark:text-gray-500 py-6">No messages yet — say something!</p>
           )}
-          {messages.map(msg => (
+          {allMessages.map(msg => (
             <div key={msg.id}>
               {msg.type === "reaction" ? (
                 <div className="text-center text-base">
@@ -282,7 +352,7 @@ export default function StudyRoomLive() {
                     <p className="text-[10px] text-gray-400">{msg.name.split(" ")[0]}</p>
                     <div className={`px-3 py-1.5 rounded-2xl text-xs leading-relaxed ${
                       msg.uid === user?.uid
-                        ? "bg-blue-500 text-white rounded-tr-sm"
+                        ? `bg-blue-500 text-white rounded-tr-sm ${!msg.createdAt ? "opacity-70" : ""}`
                         : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-tl-sm"
                     }`}>
                       {msg.text}
@@ -327,6 +397,7 @@ export default function StudyRoomLive() {
               <p className="text-sm font-semibold text-gray-900 dark:text-white truncate flex items-center gap-1">
                 {p.name}
                 {p.uid === room.hostUid && <Crown className="w-3 h-3 text-yellow-500 shrink-0" />}
+                {p.uid === user?.uid && <span className="text-[10px] text-gray-400 font-normal">(you)</span>}
               </p>
               <p className="text-xs text-gray-400">Grade {p.grade}</p>
             </div>
@@ -337,7 +408,6 @@ export default function StudyRoomLive() {
     );
   }
 
-  // ── HOST CONTROLS BAR ──────────────────────────────────────────────────────────
   function HostBar() {
     if (!isHost) return null;
     return (
@@ -381,23 +451,18 @@ export default function StudyRoomLive() {
     );
   }
 
-  // ── HEADER BAR ────────────────────────────────────────────────────────────────
   function HeaderBar() {
     return (
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 px-3 py-2.5">
         <div className="flex items-center gap-2">
-          {/* Title */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <h1 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base truncate">
-                {room.title}
-              </h1>
+              <h1 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base truncate">{room.title}</h1>
               <StatusBadge status={room.status} />
             </div>
             <p className="text-[11px] text-gray-400 truncate mt-0.5">{room.subject} · {room.hostName}</p>
           </div>
 
-          {/* Timer pill */}
           {showTimer && (
             <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl shrink-0 font-mono text-sm font-bold ${
               isStudying ? "bg-blue-600 text-white" : "bg-green-600 text-white"
@@ -407,38 +472,32 @@ export default function StudyRoomLive() {
             </div>
           )}
 
-          {/* Participant count */}
           <div className="hidden sm:flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 shrink-0">
             <Users className="w-4 h-4" /> {participants.length}
           </div>
 
-          {/* Study time */}
           {studyMinsInSession > 0 && (
-            <div className="hidden md:flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 shrink-0">
+            <div className="hidden md:flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 font-semibold shrink-0">
               <BookOpen className="w-3.5 h-3.5" /> {studyMinsInSession}m
             </div>
           )}
 
-          {/* Copy invite */}
           <button onClick={copyLink}
             className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors shrink-0">
             {showCopied ? <><CheckCircle className="w-3.5 h-3.5 text-green-500" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Invite</>}
           </button>
 
-          {/* Fullscreen */}
           <button onClick={toggleFullscreen}
             className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 transition-colors shrink-0">
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </button>
 
-          {/* Leave button */}
           <button onClick={() => setShowLeave(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-xs font-bold border border-red-200 dark:border-red-800/40 transition-colors shrink-0">
             <LogOut className="w-3.5 h-3.5" /> Leave
           </button>
         </div>
 
-        {/* Progress bar */}
         {showTimer && (
           <div className="mt-2 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
             <motion.div
@@ -452,7 +511,6 @@ export default function StudyRoomLive() {
     );
   }
 
-  // ── MOBILE BOTTOM TABS ────────────────────────────────────────────────────────
   function MobileTabs() {
     const tabs: { id: MobileTab; label: string; icon: React.ReactNode; badge?: number }[] = [
       { id: "class", label: "Classroom", icon: <School className="w-4 h-4" /> },
@@ -464,13 +522,9 @@ export default function StudyRoomLive() {
         {tabs.map(t => (
           <button key={t.id} onClick={() => setMobileTab(t.id)}
             className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs font-medium relative transition-colors ${
-              mobileTab === t.id
-                ? "text-blue-600 dark:text-blue-400"
-                : "text-gray-500 dark:text-gray-400"
+              mobileTab === t.id ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-gray-400"
             }`}>
-            <span className={`transition-colors ${mobileTab === t.id ? "text-blue-600 dark:text-blue-400" : ""}`}>
-              {t.icon}
-            </span>
+            <span className={`transition-colors ${mobileTab === t.id ? "text-blue-600 dark:text-blue-400" : ""}`}>{t.icon}</span>
             {t.label}
             {t.badge ? (
               <span className="absolute top-2 right-[calc(50%-12px)] w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
@@ -486,7 +540,7 @@ export default function StudyRoomLive() {
     );
   }
 
-  // ── FULLSCREEN SESSION COMPLETE ───────────────────────────────────────────────
+  // ── SESSION COMPLETE ──────────────────────────────────────────────────────────
   if (room.status === "finished") {
     return (
       <div className="max-w-2xl mx-auto px-4 py-10 text-center space-y-5">
@@ -503,7 +557,7 @@ export default function StudyRoomLive() {
     );
   }
 
-  // ── DESKTOP LAYOUT ────────────────────────────────────────────────────────────
+  // ── MAIN LAYOUT ───────────────────────────────────────────────────────────────
   return (
     <>
       <Helmet><title>{room.title} — Study Room</title></Helmet>
@@ -516,11 +570,8 @@ export default function StudyRoomLive() {
 
         {/* ── MOBILE LAYOUT ──────────────────────────────────────────────────── */}
         <div className="lg:hidden flex flex-col gap-3 pb-16">
-          {/* Mobile timer bar (always visible) */}
           {showTimer && (
-            <div className={`flex items-center justify-between px-4 py-3 rounded-2xl ${
-              isStudying ? "bg-blue-600 text-white" : "bg-green-600 text-white"
-            }`}>
+            <div className={`flex items-center justify-between px-4 py-3 rounded-2xl ${isStudying ? "bg-blue-600 text-white" : "bg-green-600 text-white"}`}>
               <div className="flex items-center gap-2">
                 {isStudying ? <BookOpen className="w-4 h-4" /> : <Coffee className="w-4 h-4" />}
                 <span className="text-sm font-semibold">{phase?.label}</span>
@@ -537,7 +588,6 @@ export default function StudyRoomLive() {
             </div>
           )}
 
-          {/* Mobile tab content */}
           <AnimatePresence mode="wait">
             {mobileTab === "class" && (
               <motion.div key="class" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
@@ -549,7 +599,6 @@ export default function StudyRoomLive() {
                   timerLabel={phase?.label} timerPhaseType={phase?.type ?? null}
                   roomStatus={room.status}
                 />
-                {/* Floating emojis */}
                 <AnimatePresence>
                   {floatingEmojis.map(fe => (
                     <motion.div key={fe.id} className="absolute bottom-8 pointer-events-none text-3xl select-none"
@@ -564,14 +613,12 @@ export default function StudyRoomLive() {
                 </AnimatePresence>
               </motion.div>
             )}
-
             {mobileTab === "vote" && (
               <motion.div key="vote" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
                 className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
                 <VotingPanel room={room} votes={votes} participantCount={participants.length} />
               </motion.div>
             )}
-
             {mobileTab === "chat" && (
               <motion.div key="chat" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
                 className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4"
@@ -581,13 +628,11 @@ export default function StudyRoomLive() {
             )}
           </AnimatePresence>
 
-          {/* Study flow (mobile) */}
           <StudyFlow />
         </div>
 
         {/* ── DESKTOP LAYOUT ─────────────────────────────────────────────────── */}
         <div className="hidden lg:grid lg:grid-cols-[1fr_48px_340px] gap-3">
-          {/* Classroom */}
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden relative">
             <ClassroomView
               participants={participants} hostUid={room.hostUid}
@@ -622,7 +667,6 @@ export default function StudyRoomLive() {
 
           {/* Right panel */}
           <div className="flex flex-col gap-3 min-w-0 overflow-y-auto" style={{ maxHeight: "calc(100vh - 180px)" }}>
-            {/* Study stats */}
             {studyMinsInSession > 0 && (
               <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/30 px-4 py-3 flex items-center justify-between">
                 <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">Your study time</span>
@@ -632,7 +676,6 @@ export default function StudyRoomLive() {
 
             <StudyFlow />
 
-            {/* Vote tab */}
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800">
               <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
                 <span className="text-sm font-bold text-gray-900 dark:text-white">
@@ -644,7 +687,6 @@ export default function StudyRoomLive() {
               </div>
             </div>
 
-            {/* Chat */}
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800">
               <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
                 <span className="text-sm font-bold text-gray-900 dark:text-white">💬 Chat</span>
@@ -654,7 +696,6 @@ export default function StudyRoomLive() {
               </div>
             </div>
 
-            {/* Participants */}
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800">
               <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center gap-2">
                 <span className="text-sm font-bold text-gray-900 dark:text-white">👥 Participants</span>
@@ -673,7 +714,7 @@ export default function StudyRoomLive() {
         </div>
       </div>
 
-      {/* ── LEAVE CONFIRMATION MODAL ─────────────────────────────────────────── */}
+      {/* ── LEAVE CONFIRMATION MODAL ───────────────────────────────────────── */}
       <AnimatePresence>
         {showLeave && (
           <>
@@ -695,22 +736,22 @@ export default function StudyRoomLive() {
                     </div>
                     <div>
                       <p className="font-bold text-white text-base">Leave Room?</p>
-                      <p className="text-white/70 text-xs">Your progress will be saved</p>
+                      <p className="text-white/70 text-xs">Your study time will be saved</p>
                     </div>
                   </div>
                 </div>
                 <div className="p-5 space-y-3">
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     {studyMinsInSession > 0
-                      ? `You've studied <strong>${studyMinsInSession} minutes</strong> this session — it'll be saved to your profile.`
+                      ? `You've studied ${studyMinsInSession} minutes this session — it'll be saved to your profile.`
                       : "Are you sure you want to leave this study room?"
                     }
-                    {isHost && participants.length > 1 && (
-                      <span className="block mt-1 text-amber-600 dark:text-amber-400 font-medium">
-                        As host, the next participant will become the new host.
-                      </span>
-                    )}
                   </p>
+                  {isHost && participants.length > 1 && (
+                    <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+                      As host, the next participant will become the new host.
+                    </p>
+                  )}
                   <div className="flex gap-2">
                     <button onClick={() => setShowLeave(false)}
                       className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
@@ -728,7 +769,7 @@ export default function StudyRoomLive() {
         )}
       </AnimatePresence>
 
-      {/* ── END SESSION VOTE MODAL ───────────────────────────────────────────── */}
+      {/* ── END SESSION VOTE MODAL ────────────────────────────────────────── */}
       <AnimatePresence>
         {showEndVote && (
           <>
@@ -745,9 +786,7 @@ export default function StudyRoomLive() {
               >
                 <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center text-xl">
-                      🏁
-                    </div>
+                    <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center text-xl">🏁</div>
                     <div>
                       <p className="font-bold text-white text-base">End Session Vote</p>
                       <p className="text-white/70 text-xs">Ask everyone to vote</p>

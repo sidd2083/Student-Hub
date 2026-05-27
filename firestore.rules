@@ -16,11 +16,6 @@ service cloud.firestore {
     }
 
     // ── Users ────────────────────────────────────────────────────────────────
-    // • Any signed-in user may read profiles (needed for leaderboard).
-    // • Owners may update their own doc BUT cannot change server-managed or
-    //   privileged fields — those are only written by the Admin SDK or admins.
-    // • Numeric fields are bounded to prevent stat injection.
-    // • Only admins may elevate roles, modify badges, or delete accounts.
     match /users/{uid} {
       allow read: if isSignedIn();
 
@@ -36,22 +31,14 @@ service cloud.firestore {
 
       allow update: if isAdmin()
         || (isOwner(uid)
-          // ── Privileged / server-only fields — never writable by the client ──
-          // role: no privilege escalation
-          // uid: no identity spoofing
-          // badges: server / admin only — prevents fake badge injection
-          // hasEarnedStreakToday: internal streak guard, server-only
           && !request.resource.data.diff(resource.data).affectedKeys()
               .hasAny(['role', 'uid', 'badges', 'hasEarnedStreakToday'])
 
-          // ── Bounded numeric fields ────────────────────────────────────────
-          // totalStudyTime: must not decrease, max +240 min per write
           && (!('totalStudyTime' in request.resource.data)
               || (request.resource.data.totalStudyTime is int
                   && request.resource.data.totalStudyTime >= resource.data.get('totalStudyTime', 0)
-                  && request.resource.data.totalStudyTime <= resource.data.get('totalStudyTime', 0) + 240))
+                  && request.resource.data.totalStudyTime <= resource.data.get('totalStudyTime', 0) + 480))
 
-          // streak: can only stay same, increase by 1, or reset to 0
           && (!('streak' in request.resource.data)
               || (request.resource.data.streak is int
                   && request.resource.data.streak >= 0
@@ -60,13 +47,11 @@ service cloud.firestore {
                       || request.resource.data.streak == resource.data.get('streak', 0) + 1
                       || request.resource.data.streak == 0)))
 
-          // todayStudyTime: 0–1440 (one full day in minutes)
           && (!('todayStudyTime' in request.resource.data)
               || (request.resource.data.todayStudyTime is int
                   && request.resource.data.todayStudyTime >= 0
                   && request.resource.data.todayStudyTime <= 1440))
 
-          // lastActiveDate: must be a valid YYYY-MM-DD string if provided
           && (!('lastActiveDate' in request.resource.data)
               || (request.resource.data.lastActiveDate is string
                   && request.resource.data.lastActiveDate.size() == 10
@@ -86,14 +71,11 @@ service cloud.firestore {
       allow update: if isSignedIn()
         && resource.data.uid == request.auth.uid
         && request.resource.data.uid == request.auth.uid
-        // uid cannot be changed on update
         && request.resource.data.uid == resource.data.uid;
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
     // ── Study Logs ───────────────────────────────────────────────────────────
-    // Users may only read/write their own daily log.
-    // studyMinutes is bounded to 1440 (24 h) and cannot be set by another user.
     match /study_logs/{logId} {
       allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
 
@@ -106,7 +88,6 @@ service cloud.firestore {
       allow update: if isSignedIn()
         && resource.data.uid == request.auth.uid
         && request.resource.data.uid == request.auth.uid
-        // uid cannot change on update
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.studyMinutes is int
         && request.resource.data.studyMinutes >= 0
@@ -144,8 +125,6 @@ service cloud.firestore {
     }
 
     // ── Daily Missions ────────────────────────────────────────────────────────
-    // Doc ID is "{uid}_{date}". Owners may read/write their own mission docs.
-    // resource == null check allows getDoc on a non-existent doc to succeed.
     match /daily_missions/{docId} {
       allow read: if isSignedIn()
         && (resource == null || resource.data.uid == request.auth.uid);
@@ -172,11 +151,7 @@ service cloud.firestore {
     }
 
     // ── Study Rooms ───────────────────────────────────────────────────────────
-    // Any signed-in user may list / read rooms (needed to browse & join).
-    // Only the host may change timer state, room status, or sensitive fields.
-    // Any participant may update participantCount by ±1 (batch with join/leave).
     match /studyRooms/{roomId} {
-      // Anyone can browse/read rooms (unauthenticated users can see room listings)
       allow read: if true;
 
       allow create: if isSignedIn()
@@ -187,30 +162,38 @@ service cloud.firestore {
         && request.resource.data.title.size() <= 60;
 
       allow update: if isSignedIn() && (
-        // Host may update anything (timer, status, phase, participant count…)
+        // Host may update anything
         resource.data.hostUid == request.auth.uid
-        // Non-hosts may only update participantCount (join / leave via increment)
+
+        // Admin may update anything
+        || isAdmin()
+
+        // Non-hosts: only participantCount (join / leave via increment)
         || request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['participantCount'])
+
+        // Last participant leaving: allowed to mark room as finished
+        || (request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['participantCount', 'status', 'timerStartedAt'])
+            && request.resource.data.participantCount == 0
+            && request.resource.data.status == 'finished')
       );
 
+      // Host or admin may delete a room
       allow delete: if isSignedIn()
-        && resource.data.hostUid == request.auth.uid;
+        && (resource.data.hostUid == request.auth.uid || isAdmin());
 
       // ── Participants subcollection ────────────────────────────────────────
-      // Each user owns their own participant doc (uid == doc ID).
       match /participants/{uid} {
         allow read:   if isSignedIn();
         allow create: if isSignedIn()
           && request.auth.uid == uid
           && request.resource.data.uid == uid;
-        allow update: if isSignedIn() && request.auth.uid == uid;
-        allow delete: if isSignedIn() && request.auth.uid == uid;
+        allow update: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+        allow delete: if isSignedIn() && (request.auth.uid == uid || isAdmin());
       }
 
       // ── Votes subcollection ───────────────────────────────────────────────
-      // Any participant may start or cast a vote.
-      // Updates are restricted to the voter-arrays and status field only.
       match /votes/{voteId} {
         allow read: if isSignedIn();
         allow create: if isSignedIn()
@@ -221,22 +204,34 @@ service cloud.firestore {
         allow update: if isSignedIn()
           && request.resource.data.diff(resource.data).affectedKeys()
                .hasOnly(['yesVoters', 'noVoters', 'status']);
+        allow delete: if isAdmin();
       }
 
       // ── Messages subcollection ────────────────────────────────────────────
-      // Participants can send short chat messages; no editing / deleting.
+      // Supports both text messages and emoji reactions
       match /messages/{msgId} {
         allow read:   if isSignedIn();
         allow create: if isSignedIn()
           && request.resource.data.uid == request.auth.uid
-          && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 200;
+          && (
+            // Text messages: require non-empty text within length limit
+            (request.resource.data.type == 'message'
+              && request.resource.data.text is string
+              && request.resource.data.text.size() > 0
+              && request.resource.data.text.size() <= 200)
+            // Emoji reactions: require emoji field
+            || (request.resource.data.type == 'reaction'
+              && request.resource.data.emoji is string
+              && request.resource.data.emoji.size() > 0
+              && request.resource.data.emoji.size() <= 10)
+            // System messages (host/server generated)
+            || request.resource.data.type == 'system'
+          );
+        allow delete: if isAdmin();
       }
     }
 
     // ── Study Room Sessions ───────────────────────────────────────────────────
-    // Written when a user leaves a room (records study time for that session).
     match /studyRoomSessions/{sessionId} {
       allow read:   if isSignedIn() && resource.data.uid == request.auth.uid;
       allow create: if isSignedIn()

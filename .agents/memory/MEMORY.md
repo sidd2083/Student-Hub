@@ -1,0 +1,1 @@
+- [Study Room Bug Fixes](study-room-fixes.md) — ghost rooms/users, duplicate listeners, admin delete, reactions, profile cache, per-user study tracking — all root causes and fixes documented.

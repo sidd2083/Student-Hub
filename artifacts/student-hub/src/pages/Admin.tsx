@@ -7,6 +7,7 @@ import {
   collection, getDocs, doc, query, where, orderBy,
   setDoc, getDoc, addDoc, deleteDoc, updateDoc,
 } from "firebase/firestore";
+import { deleteRoomCascade } from "@/lib/studyRooms";
 import { signInWithPopup } from "firebase/auth";
 import { db, auth, googleProvider } from "@/lib/firebase";
 import {
@@ -1984,20 +1985,11 @@ function ManageRooms() {
     if (!confirm(`PERMANENTLY DELETE "${title}"? This cannot be undone.`)) return;
     setActionId(id);
     try {
-      // Delete participants subcollection
-      const pSnap = await getDocs(collection(db, "studyRooms", id, "participants"));
-      for (const p of pSnap.docs) await deleteDoc(p.ref);
-      // Delete votes subcollection
-      const vSnap = await getDocs(collection(db, "studyRooms", id, "votes"));
-      for (const v of vSnap.docs) await deleteDoc(v.ref);
-      // Delete messages subcollection
-      const mSnap = await getDocs(collection(db, "studyRooms", id, "messages"));
-      for (const m of mSnap.docs) await deleteDoc(m.ref);
-      // Delete the room itself
-      await deleteDoc(doc(db, "studyRooms", id));
+      await deleteRoomCascade(id);
       setRooms(prev => prev.filter(r => r.id !== id));
       setMsg({ type: "success", text: `Room "${title}" deleted.` });
-    } catch {
+    } catch (e) {
+      console.error("[Admin] deleteRoom:", e);
       setMsg({ type: "error", text: "Failed to delete room." });
     } finally { setActionId(null); }
   }
