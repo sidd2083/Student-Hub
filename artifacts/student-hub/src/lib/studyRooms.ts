@@ -356,10 +356,17 @@ export function subscribePublicRooms(cb: (rooms: Room[]) => void) {
       collection(db, "studyRooms"),
       where("isPrivate", "==", false),
       where("status", "in", ["waiting", "active", "paused"]),
-      orderBy("createdAt", "desc"),
-      limit(30),
+      limit(50),
     ),
-    (snap) => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as Room))),
+    (snap) => {
+      const rooms = snap.docs.map(d => ({ id: d.id, ...d.data() } as Room));
+      rooms.sort((a, b) => {
+        const aMs = a.createdAt?.toMillis() ?? 0;
+        const bMs = b.createdAt?.toMillis() ?? 0;
+        return bMs - aMs;
+      });
+      cb(rooms.slice(0, 30));
+    },
   );
 }
 

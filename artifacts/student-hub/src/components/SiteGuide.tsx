@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { X, ArrowRight, ArrowLeft, BookOpen, FileText, Bot, Timer, BarChart2, Trophy, Flame, Bookmark } from "lucide-react";
+import { X, ArrowRight, ArrowLeft, BookOpen, FileText, Bot, Timer, BarChart2, Trophy, Flame, Bookmark, Users } from "lucide-react";
 
-const GUIDE_KEY = "studenthub_guide_v1_seen";
+const GUIDE_KEY = "studenthub_guide_v2_seen";
 
 interface Step {
   emoji: string;
@@ -57,6 +57,14 @@ const steps: Step[] = [
     description: "Study every day and build your streak! Miss a day and it resets. The longer your streak, the more badges you earn. Top students have streaks of 30, 60, even 100+ days! Can you beat them? 💪",
     icon: Flame,
     color: "from-orange-500 to-red-500",
+  },
+  {
+    emoji: "🧑‍💻",
+    title: "Virtual Study Rooms — Study Together!",
+    description: "Join a live study room and study alongside real students across Nepal! Rooms have synchronized timers, Pomodoro flows, and group chat. Create your own room or jump into an existing one. It's like a virtual classroom — for free! 🤝",
+    highlight: "Go to Study Rooms →",
+    icon: Users,
+    color: "from-indigo-500 to-blue-600",
   },
   {
     emoji: "📊",

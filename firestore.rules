@@ -176,7 +176,8 @@ service cloud.firestore {
     // Only the host may change timer state, room status, or sensitive fields.
     // Any participant may update participantCount by ±1 (batch with join/leave).
     match /studyRooms/{roomId} {
-      allow read: if isSignedIn();
+      // Anyone can browse/read rooms (unauthenticated users can see room listings)
+      allow read: if true;
 
       allow create: if isSignedIn()
         && request.resource.data.hostUid == request.auth.uid

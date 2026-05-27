@@ -9,12 +9,14 @@ import { db } from "@/lib/firebase";
 import {
   BookOpen, BarChart2, FileText, CheckSquare,
   Timer, MessageCircle, Flame, Megaphone, X, Bookmark,
-  ChevronDown, ChevronRight,
+  ChevronDown, ChevronRight, Users,
 } from "lucide-react";
 import { SiteGuide } from "@/components/SiteGuide";
 import { DailyMissionWidget } from "@/components/DailyMissionWidget";
+import { StudyRoomWidget } from "@/components/study-room/StudyRoomWidget";
 
 const sections = [
+  { href: "/study-rooms", icon: Users,         label: "Study Rooms",        desc: "Study live with other students", color: "bg-indigo-50 text-indigo-600" },
   { href: "/notes",      icon: BookOpen,      label: "Notes",              desc: "Study materials by subject",  color: "bg-blue-50 text-blue-600"    },
   { href: "/report",     icon: BarChart2,     label: "Report Card",        desc: "Track your study progress",   color: "bg-purple-50 text-purple-600" },
   { href: "/pyqs",       icon: FileText,      label: "Important Questions & PYQ", desc: "Past exam papers & key questions", color: "bg-orange-50 text-orange-600" },
@@ -352,6 +354,8 @@ export default function Dashboard() {
         </div>
 
         {uid && <DailyMissionWidget />}
+
+        <StudyRoomWidget />
 
         <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-5 sm:mb-6">
           <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
