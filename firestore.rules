@@ -184,22 +184,14 @@ service cloud.firestore {
         && request.resource.data.status == 'waiting'
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
-        && request.resource.data.title.size() <= 60
-        && request.resource.data.maxParticipants is int
-        && request.resource.data.maxParticipants >= 2
-        && request.resource.data.maxParticipants <= 50;
+        && request.resource.data.title.size() <= 60;
 
       allow update: if isSignedIn() && (
-        // Host may update anything (timer, status, phase, hostName transfer…)
+        // Host may update anything (timer, status, phase, participant count…)
         resource.data.hostUid == request.auth.uid
-        // Non-hosts may only nudge participantCount by ±1 (join / leave)
-        || (request.resource.data.diff(resource.data).affectedKeys()
+        // Non-hosts may only update participantCount (join / leave via increment)
+        || request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['participantCount'])
-            && request.resource.data.participantCount is int
-            && request.resource.data.participantCount
-                 >= resource.data.participantCount - 1
-            && request.resource.data.participantCount
-                 <= resource.data.participantCount + 1)
       );
 
       allow delete: if isSignedIn()

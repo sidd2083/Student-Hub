@@ -78,9 +78,10 @@ export default function StudyRoomCreate() {
       });
 
       setLocation(`/study-rooms/${roomId}`);
-    } catch (err) {
-      console.error(err);
-      setErrors({ submit: "Failed to create room. Please try again." });
+    } catch (err: unknown) {
+      console.error("createRoom error:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrors({ submit: `Failed to create room: ${msg}` });
       setLoading(false);
     }
   }
