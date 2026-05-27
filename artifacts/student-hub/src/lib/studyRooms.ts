@@ -20,11 +20,12 @@ export interface Room {
   subject: string;
   description: string;
   isPrivate: boolean;
-  password?: string;
+  password: string | null;
   hostUid: string;
   hostName: string;
   hostGrade: number;
   createdAt: Timestamp | null;
+  expiresAt: Timestamp | null;
   status: RoomStatus;
   maxParticipants: number;
   studyFlow: StudyPhase[];
@@ -40,7 +41,7 @@ export interface RoomParticipant {
   uid: string;
   name: string;
   grade: number;
-  photoURL?: string;
+  photoURL: string | null;
   joinedAt: Timestamp | null;
   lastSeen: Timestamp | null;
   isHost: boolean;
@@ -117,16 +118,32 @@ export async function createRoom(data: {
   ambientSound: string;
 }): Promise<string> {
   const roomRef = doc(collection(db, "studyRooms"));
-  const room: Omit<Room, "id"> = {
-    ...data,
-    status: "waiting",
+
+  // Build payload explicitly — NEVER send undefined to Firestore
+  const room: Record<string, unknown> = {
+    title: data.title,
+    subject: data.subject,
+    description: data.description,
+    isPrivate: data.isPrivate,
+    // Use null (not undefined) for optional fields — Firestore rejects undefined
+    password: (data.isPrivate && data.password) ? data.password : null,
+    hostUid: data.hostUid,
+    hostName: data.hostName,
+    hostGrade: data.hostGrade,
+    maxParticipants: data.maxParticipants,
+    studyFlow: data.studyFlow,
+    ambientSound: data.ambientSound,
+    status: "waiting" as RoomStatus,
     currentPhaseIndex: 0,
     timerStartedAt: null,
     pausedRemaining: null,
     participantCount: 0,
-    createdAt: serverTimestamp() as unknown as Timestamp,
+    createdAt: serverTimestamp(),
+    // Auto-expire rooms after 24 hours
+    expiresAt: Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000)),
     inviteCode: generateInviteCode(),
   };
+
   await setDoc(roomRef, room);
   return roomRef.id;
 }
@@ -198,7 +215,6 @@ export async function pauseTimer(roomId: string, remainingSeconds: number): Prom
 }
 
 export async function resumeTimer(roomId: string, remainingSeconds: number): Promise<void> {
-  // Set timerStartedAt so elapsed = 0 and remaining = pausedRemaining
   await updateDoc(doc(db, "studyRooms", roomId), {
     status: "active",
     timerStartedAt: serverTimestamp(),
@@ -247,9 +263,14 @@ export async function createVote(roomId: string, vote: {
   totalParticipants: number;
 }): Promise<string> {
   const voteRef = doc(collection(db, "studyRooms", roomId, "votes"));
-  const expiresAt = new Date(Date.now() + 30_000); // 30s to vote
+  const expiresAt = new Date(Date.now() + 60_000); // 60s to vote
   await setDoc(voteRef, {
-    ...vote,
+    description: vote.description,
+    type: vote.type,
+    addMinutes: vote.addMinutes ?? null,
+    createdByUid: vote.createdByUid,
+    createdByName: vote.createdByName,
+    totalParticipants: vote.totalParticipants,
     createdAt: serverTimestamp(),
     expiresAt: Timestamp.fromDate(expiresAt),
     status: "active",
@@ -261,9 +282,6 @@ export async function createVote(roomId: string, vote: {
 
 export async function castVote(roomId: string, voteId: string, uid: string, choice: "yes" | "no"): Promise<void> {
   const voteRef = doc(db, "studyRooms", roomId, "votes", voteId);
-  const snap = await getDoc(voteRef);
-  if (!snap.exists()) return;
-  const vote = snap.data() as Vote;
   const isYes = choice === "yes";
   const addField = isYes ? "yesVoters" : "noVoters";
   const removeField = isYes ? "noVoters" : "yesVoters";
@@ -278,10 +296,16 @@ export async function resolveVote(roomId: string, voteId: string, room: Room): P
   const snap = await getDoc(voteRef);
   if (!snap.exists()) return;
   const vote = snap.data() as Vote;
+
+  // Already resolved
+  if (vote.status !== "active") return;
+
   const yes = vote.yesVoters.length;
   const no = vote.noVoters.length;
+  const isExpired = vote.expiresAt && vote.expiresAt.toMillis() < Date.now();
   const passed = yes > no || (yes === no && yes > 0);
-  await updateDoc(voteRef, { status: passed ? "passed" : "failed" });
+
+  await updateDoc(voteRef, { status: isExpired && yes === 0 ? "expired" : passed ? "passed" : "failed" });
 
   if (!passed) return;
 
@@ -316,8 +340,18 @@ export async function sendMessage(roomId: string, msg: {
   emoji?: string;
   type: "message" | "reaction" | "system";
 }): Promise<void> {
+  // Build message without undefined values
+  const payload: Record<string, unknown> = {
+    uid: msg.uid,
+    name: msg.name,
+    type: msg.type,
+    createdAt: serverTimestamp(),
+  };
+  if (msg.text !== undefined) payload.text = msg.text;
+  if (msg.emoji !== undefined) payload.emoji = msg.emoji;
+
   const msgRef = doc(collection(db, "studyRooms", roomId, "messages"));
-  await setDoc(msgRef, { ...msg, createdAt: serverTimestamp() });
+  await setDoc(msgRef, payload);
 }
 
 // ── Realtime Listeners ─────────────────────────────────────────────────────────
@@ -345,7 +379,7 @@ export function subscribeActiveVotes(roomId: string, cb: (votes: Vote[]) => void
 
 export function subscribeMessages(roomId: string, cb: (msgs: RoomMessage[]) => void) {
   return onSnapshot(
-    query(collection(db, "studyRooms", roomId, "messages"), orderBy("createdAt", "asc"), limit(50)),
+    query(collection(db, "studyRooms", roomId, "messages"), orderBy("createdAt", "asc"), limit(100)),
     (snap) => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as RoomMessage))),
   );
 }
@@ -356,8 +390,7 @@ export async function isParticipant(roomId: string, uid: string): Promise<boolea
 }
 
 export function subscribePublicRooms(cb: (rooms: Room[]) => void) {
-  // Only filter by status (single-field query — no composite index needed).
-  // isPrivate is filtered client-side to avoid needing a composite index.
+  const now = Timestamp.now();
   return onSnapshot(
     query(
       collection(db, "studyRooms"),
@@ -367,7 +400,13 @@ export function subscribePublicRooms(cb: (rooms: Room[]) => void) {
     (snap) => {
       const rooms = snap.docs
         .map(d => ({ id: d.id, ...d.data() } as Room))
-        .filter(r => !r.isPrivate);
+        .filter(r => {
+          // Filter out private rooms
+          if (r.isPrivate) return false;
+          // Filter out expired rooms (older than 24h)
+          if (r.expiresAt && r.expiresAt.toMillis() < Date.now()) return false;
+          return true;
+        });
       rooms.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
       cb(rooms.slice(0, 30));
     },
@@ -375,7 +414,6 @@ export function subscribePublicRooms(cb: (rooms: Room[]) => void) {
 }
 
 // ── Study Time Sync ────────────────────────────────────────────────────────────
-// Sync study room time to the user's main leaderboard stats
 
 export async function syncStudyTimeToLeaderboard(uid: string, additionalMins: number): Promise<void> {
   if (additionalMins <= 0) return;
@@ -384,6 +422,7 @@ export async function syncStudyTimeToLeaderboard(uid: string, additionalMins: nu
     await updateDoc(userRef, {
       totalStudyTime: increment(additionalMins),
       todayStudyTime: increment(additionalMins),
+      weeklyStudyTime: increment(additionalMins),
     });
   } catch (err) {
     console.warn("[StudyRoom] Failed to sync study time:", err);
@@ -411,7 +450,9 @@ export async function getPublicRoomsOnce(): Promise<Room[]> {
       limit(30),
     ),
   );
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Room));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() } as Room))
+    .filter(r => !r.expiresAt || r.expiresAt.toMillis() > Date.now());
 }
 
 export const SUBJECTS = [

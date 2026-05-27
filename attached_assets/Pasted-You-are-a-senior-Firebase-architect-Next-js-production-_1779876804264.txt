@@ -1,0 +1,472 @@
+You are a senior Firebase architect, Next.js production engineer, real-time systems engineer, scalable backend engineer, and performance optimization expert.
+
+IMPORTANT:
+I already have a FULL Virtual Study Room system UI built using:
+
+* Next.js
+* TypeScript
+* Firebase
+* Firestore
+* Tailwind CSS
+
+The frontend UI already exists.
+DO NOT redesign or rebuild the UI.
+
+Your ONLY job is to:
+
+* FIX all backend logic
+* FIX all broken realtime systems
+* FIX all Firebase integration issues
+* COMPLETE all missing functionality
+* OPTIMIZE everything for smooth performance
+
+The final result must feel:
+
+* production-ready
+* smooth
+* realtime
+* scalable
+* fast
+* premium
+* fully functional
+
+==================================================
+CRITICAL CURRENT ERRORS
+=======================
+
+==================================================
+
+1. PUBLIC ROOM CREATION ERROR
+   ==================================================
+
+When creating a PUBLIC room:
+Firestore throws this error:
+
+"Failed to create room:
+Unsupported field value: undefined found in field password"
+
+IMPORTANT:
+This issue ONLY happens when creating PUBLIC rooms.
+
+PRIVATE rooms work because they contain a password.
+
+ROOT CAUSE:
+The createRoom payload is sending:
+
+password: undefined
+
+Firestore DOES NOT allow undefined values.
+
+FIX THIS PROPERLY:
+
+* sanitize ALL optional fields
+* convert undefined → null
+* OR remove undefined fields before Firestore write
+
+CRITICAL RULE:
+NEVER send undefined values to Firestore anywhere in the app.
+
+==================================================
+2. PUBLIC ROOMS NOT SHOWING
+===========================
+
+After creating a public room:
+
+* it does NOT appear in the room list
+* realtime room list does not update
+
+Fix:
+
+* Firestore query
+* realtime listener
+* room state syncing
+
+Public rooms MUST instantly appear after creation.
+
+==================================================
+3. ACTIVE ROOM COUNT IS WRONG
+=============================
+
+Dashboard shows:
+
+* Active Rooms = 0
+
+Even when active rooms exist.
+
+Fix:
+
+* realtime active room tracking
+* Firestore listener synchronization
+* active room query logic
+
+Dashboard stats must update instantly.
+
+==================================================
+4. STUDY TIME IS NOT TRACKED
+============================
+
+BIGGEST ISSUE:
+
+If a user studies for:
+
+* 5 minutes
+* 10 minutes
+* 1 hour
+
+NOTHING updates.
+
+The following are NOT updating:
+
+* leaderboard
+* report card
+* analytics
+* streaks
+* study stats
+
+THIS IS CRITICAL.
+
+==================================================
+STUDY TRACKING SYSTEM (MUST IMPLEMENT)
+======================================
+
+Implement REAL study tracking.
+
+Each user session must track:
+
+* sessionStartTime
+* activeStudyTime
+* breakTime
+* lastActiveTimestamp
+
+The tracking system MUST:
+
+* sync with shared room timer
+* pause during breaks
+* continue during study phases
+* use Firestore server timestamps
+
+DO NOT use fake frontend-only timers.
+
+==================================================
+LEADERBOARD SYNC
+================
+
+When study time increases:
+Automatically update:
+
+* totalStudyTime
+* todayStudyTime
+* weeklyStudyTime
+* streaks
+* rankings
+
+Leaderboard must update in realtime.
+
+==================================================
+REPORT CARD + ANALYTICS
+=======================
+
+User analytics must update automatically:
+
+* total hours studied
+* sessions completed
+* rooms joined
+* average session duration
+* daily study graph
+
+==================================================
+5. CLASSROOM UI IS NOT A REAL CLASSROOM
+=======================================
+
+Current classroom layout looks wrong.
+
+Right now:
+
+* avatars appear in one row only
+
+This does NOT feel like classroom.
+
+==================================================
+FIX CLASSROOM STRUCTURE
+=======================
+
+Implement REAL classroom layout.
+
+Requirements:
+
+* rows
+* columns
+* benches/desks
+* dynamic seating
+
+IMPORTANT:
+Each bench MUST contain ONLY TWO STUDENTS maximum.
+
+Examples:
+
+* 10 students = 5 benches
+* 20 students = 10 benches
+
+Render benches dynamically based on participant count.
+
+==================================================
+AVATAR STRUCTURE
+================
+
+Each student seat must show:
+
+* avatar
+* username
+* class/grade
+
+Username shown above avatar.
+
+==================================================
+USER PROFILE POPUP
+==================
+
+When clicking a student avatar:
+Open profile modal showing:
+
+* avatar
+* username
+* class
+* total study time
+* streak
+* leaderboard rank
+* study statistics
+
+==================================================
+6. TIMER UI + CLASSROOM INTEGRATION
+===================================
+
+Timer currently feels disconnected.
+
+FIX:
+
+* integrate timer directly INSIDE classroom UI
+* place timer at top center
+* large digital clock style
+* highly visible
+* responsive
+
+Timer must:
+
+* sync with Firestore
+* survive refresh
+* sync for all users
+* support late joiners
+
+==================================================
+7. VOTING SYSTEM IS BROKEN
+==========================
+
+Current issue:
+
+* votes appear visually
+* BUT timer does NOT actually change
+
+==================================================
+FIX VOTING SYSTEM
+=================
+
+When vote succeeds:
+
+* MUST update Firestore timer state
+* MUST sync for ALL users
+
+Examples:
+
+* extend timer +10m
+* start break
+* skip break
+* add new session
+
+Votes must affect REAL shared timer state.
+
+==================================================
+CUSTOM VOTES
+============
+
+Users can create votes like:
+
+* "Extend session by 15 minutes?"
+* "Take 10 minute break?"
+
+Vote creator can set:
+
+* custom duration
+* custom action
+
+==================================================
+8. EMOJI SYSTEM NOT WORKING
+===========================
+
+Emoji buttons exist.
+But clicking emojis does nothing.
+
+Fix:
+
+* emoji event system
+* realtime reactions
+* temporary floating reactions
+
+==================================================
+9. FULLSCREEN MODE REQUIRED
+===========================
+
+Add:
+
+* Enter Fullscreen button
+* Exit Fullscreen support
+
+Must work on:
+
+* desktop
+* mobile
+
+Fullscreen must:
+
+* cover entire screen
+* keep timer visible
+* keep classroom responsive
+
+Use Fullscreen API.
+
+==================================================
+10. AUTO DELETE ROOMS AFTER 24 HOURS
+====================================
+
+Every room must expire automatically after 24 hours.
+
+Implement:
+
+* expiresAt field
+* expiration filtering
+* cleanup logic
+
+Expired rooms:
+
+* must not appear
+* must not be joinable
+
+==================================================
+11. ADMIN PANEL REQUIRED
+========================
+
+Create FULL admin room management page.
+
+Admin page must show:
+
+* active rooms
+* inactive rooms
+* expired rooms
+* participant counts
+* room hosts
+* room activity
+
+Admin must be able to:
+
+* delete any room
+* close any room
+* force end sessions
+* kick users
+* monitor room status
+
+Admin page must update in realtime.
+
+==================================================
+12. REALTIME PERFORMANCE OPTIMIZATION
+=====================================
+
+CRITICAL:
+Everything must feel SMOOTH.
+
+NO:
+
+* lag
+* freezes
+* delayed updates
+* unnecessary rerenders
+
+Optimize:
+
+* Firestore reads/writes
+* listeners
+* React rerenders
+* subscriptions
+* DOM updates
+
+Use:
+
+* memoization
+* efficient queries
+* selective listeners
+* cleanup functions
+
+DO NOT:
+
+* rerender entire classroom repeatedly
+* spam Firestore writes
+* use heavy polling
+
+==================================================
+13. FIREBASE SECURITY (PRODUCTION READY)
+========================================
+
+Implement secure Firestore rules.
+
+Requirements:
+
+* authenticated users only
+* only room host can modify room
+* only valid users can join
+* prevent fake timer edits
+* prevent duplicate votes
+* prevent spam
+
+DO NOT use insecure dev rules.
+
+==================================================
+14. DEBUGGING + ERROR HANDLING
+==============================
+
+Add proper logs for:
+
+* room creation
+* study tracking
+* leaderboard updates
+* timer synchronization
+* votes
+* emoji events
+* Firestore failures
+
+Show REAL Firebase errors in UI.
+
+NO silent failures.
+
+==================================================
+FINAL GOAL
+==========
+
+After completing all fixes:
+
+✔ Public room creation works
+✔ No Firestore undefined errors
+✔ Public rooms appear instantly
+✔ Active room count updates correctly
+✔ Study time tracks properly
+✔ Leaderboard updates correctly
+✔ Report card updates correctly
+✔ Classroom feels like real classroom
+✔ Bench system works dynamically
+✔ Timer sync works perfectly
+✔ Voting changes timer correctly
+✔ Emojis work
+✔ Fullscreen works
+✔ Admin room management works
+✔ Rooms auto-delete after 24h
+✔ No lag
+✔ No slowness
+✔ No broken realtime syncing
+✔ Production-ready smooth experience

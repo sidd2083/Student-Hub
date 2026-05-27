@@ -1,11 +1,11 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Play, Pause, SkipForward, Square, Users, Copy,
-  MessageCircle, Send, BookOpen, Coffee, Crown, Volume2, CheckCircle,
-  BarChart2, ChevronRight, ChevronDown,
+  Send, BookOpen, Coffee, Crown, CheckCircle,
+  BarChart2, ChevronRight, ChevronDown, Maximize, Minimize,
 } from "lucide-react";
 import {
   Room, RoomParticipant, Vote, RoomMessage,
@@ -20,12 +20,18 @@ import { StudentProfileModal } from "@/components/study-room/StudentProfileModal
 
 const EMOJI_REACTIONS = ["👍", "🔥", "💪", "🎯", "⚡", "🙏", "😎", "🥳"];
 
+interface FloatingEmoji {
+  id: string;
+  emoji: string;
+  x: number;
+}
+
 function StatusBadge({ status }: { status: Room["status"] }) {
   const map = {
-    waiting: { label: "Waiting", cls: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" },
-    active:  { label: "Studying", cls: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
-    paused:  { label: "Paused", cls: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" },
-    finished:{ label: "Finished", cls: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400" },
+    waiting:  { label: "Waiting",  cls: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" },
+    active:   { label: "Studying", cls: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
+    paused:   { label: "Paused",   cls: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" },
+    finished: { label: "Finished", cls: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400" },
   };
   const { label, cls } = map[status] ?? map.waiting;
   return <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${cls}`}>{label}</span>;
@@ -35,50 +41,66 @@ export default function StudyRoomLive() {
   const { id: roomId } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user, profile } = useAuth();
-  const { joinActiveRoom, leaveActiveRoom, isHost, onHostStart, onHostPause, onHostResume, onHostSkip, onHostEnd, remainingSeconds, activeRoomId, participants: ctxParticipants } = useActiveRoom();
+  const {
+    joinActiveRoom, leaveActiveRoom, isHost,
+    onHostStart, onHostPause, onHostResume, onHostSkip, onHostEnd,
+    remainingSeconds, activeRoomId,
+  } = useActiveRoom();
 
-  const [room, setRoom]               = useState<Room | null>(null);
+  const [room, setRoom]                 = useState<Room | null>(null);
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
-  const [votes, setVotes]             = useState<Vote[]>([]);
-  const [messages, setMessages]       = useState<RoomMessage[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [joined, setJoined]           = useState(false);
+  const [votes, setVotes]               = useState<Vote[]>([]);
+  const [messages, setMessages]         = useState<RoomMessage[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [joined, setJoined]             = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<RoomParticipant | null>(null);
-  const [rightTab, setRightTab]       = useState<"vote" | "chat" | "flow">("vote");
-  const [chatMsg, setChatMsg]         = useState("");
-  const [showCopied, setShowCopied]   = useState(false);
+  const [rightTab, setRightTab]         = useState<"vote" | "chat">("vote");
+  const [chatMsg, setChatMsg]           = useState("");
+  const [showCopied, setShowCopied]     = useState(false);
   const [showFlowExpanded, setShowFlowExpanded] = useState(false);
-  const chatBottomRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [floatingEmojis, setFloatingEmojis] = useState<FloatingEmoji[]>([]);
+  const chatBottomRef  = useRef<HTMLDivElement>(null);
+  const seenMsgIds     = useRef<Set<string>>(new Set());
+  const emojiIdCounter = useRef(0);
+  const containerRef   = useRef<HTMLDivElement>(null);
 
-  // Sync room into active context once joined
   const alreadyInRoom = activeRoomId === roomId;
 
-  // Subscribe to room data
+  // ── Subscriptions ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!roomId) return;
-    const unsub = subscribeRoom(roomId, (r) => {
-      setRoom(r);
-      setLoading(false);
+    return subscribeRoom(roomId, (r) => { setRoom(r); setLoading(false); });
+  }, [roomId]);
+
+  useEffect(() => {
+    if (!roomId) return;
+    return subscribeParticipants(roomId, setParticipants);
+  }, [roomId]);
+
+  useEffect(() => {
+    if (!roomId) return;
+    return subscribeActiveVotes(roomId, setVotes);
+  }, [roomId]);
+
+  useEffect(() => {
+    if (!roomId) return;
+    return subscribeMessages(roomId, (msgs) => {
+      // Detect new reaction messages → spawn floating emojis
+      for (const msg of msgs) {
+        if (msg.type === "reaction" && msg.emoji && !seenMsgIds.current.has(msg.id)) {
+          seenMsgIds.current.add(msg.id);
+          // Only animate reactions that are recent (within last 5 seconds)
+          const age = msg.createdAt ? Date.now() - msg.createdAt.toMillis() : 9999;
+          if (age < 5000) {
+            spawnFloatingEmoji(msg.emoji);
+          }
+        } else {
+          seenMsgIds.current.add(msg.id);
+        }
+      }
+      setMessages(msgs);
     });
-    return unsub;
-  }, [roomId]);
-
-  useEffect(() => {
-    if (!roomId) return;
-    const unsub = subscribeParticipants(roomId, setParticipants);
-    return unsub;
-  }, [roomId]);
-
-  useEffect(() => {
-    if (!roomId) return;
-    const unsub = subscribeActiveVotes(roomId, setVotes);
-    return unsub;
-  }, [roomId]);
-
-  useEffect(() => {
-    if (!roomId) return;
-    const unsub = subscribeMessages(roomId, setMessages);
-    return unsub;
   }, [roomId]);
 
   // Auto-scroll chat
@@ -86,7 +108,7 @@ export default function StudyRoomLive() {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Auto-join room in context on load
+  // ── Auto-join ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!roomId || !user || !profile || joined || !room) return;
     if (room.status === "finished") return;
@@ -112,6 +134,33 @@ export default function StudyRoomLive() {
     doJoin();
   }, [roomId, user, profile, room, participants, joined, joinActiveRoom]);
 
+  // ── Fullscreen ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      (containerRef.current ?? document.documentElement).requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
+
+  // ── Floating emoji reactions ──────────────────────────────────────────────────
+  function spawnFloatingEmoji(emoji: string) {
+    const id = `emoji-${emojiIdCounter.current++}`;
+    const x = 10 + Math.random() * 80; // random horizontal position 10–90%
+    setFloatingEmojis(prev => [...prev, { id, emoji, x }]);
+    // Remove after animation completes
+    setTimeout(() => {
+      setFloatingEmojis(prev => prev.filter(e => e.id !== id));
+    }, 2500);
+  }
+
+  // ── Actions ───────────────────────────────────────────────────────────────────
   async function handleLeave() {
     await leaveActiveRoom();
     setLocation("/study-rooms");
@@ -126,6 +175,8 @@ export default function StudyRoomLive() {
 
   async function handleReaction(emoji: string) {
     if (!user || !profile) return;
+    // Immediately spawn local floating emoji for instant feedback
+    spawnFloatingEmoji(emoji);
     await sendMessage(roomId!, { uid: user.uid, name: profile.name, emoji, type: "reaction" });
   }
 
@@ -155,17 +206,17 @@ export default function StudyRoomLive() {
     );
   }
 
-  const phase      = room.studyFlow[room.currentPhaseIndex];
-  const isStudying = room.status === "active" && phase?.type === "study";
-  const isBreak    = room.status === "active" && phase?.type === "break";
-  const remaining  = alreadyInRoom ? remainingSeconds : getRemainingSeconds(room);
-  const pctComplete = phase ? Math.max(0, Math.min(100, 100 - (remaining / (phase.durationMins * 60)) * 100)) : 0;
+  const phase        = room.studyFlow[room.currentPhaseIndex];
+  const isStudying   = room.status === "active" && phase?.type === "study";
+  const isBreak      = room.status === "active" && phase?.type === "break";
+  const remaining    = alreadyInRoom ? remainingSeconds : getRemainingSeconds(room);
+  const pctComplete  = phase ? Math.max(0, Math.min(100, 100 - (remaining / (phase.durationMins * 60)) * 100)) : 0;
 
   return (
     <>
       <Helmet><title>{room.title} — Study Room</title></Helmet>
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 space-y-4">
+      <div ref={containerRef} className="max-w-7xl mx-auto px-3 sm:px-4 py-4 space-y-4">
         {/* Top bar */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 px-4 py-3">
           <div className="flex items-center gap-3 flex-wrap">
@@ -188,7 +239,7 @@ export default function StudyRoomLive() {
               </p>
             </div>
 
-            {/* Timer pill */}
+            {/* Timer pill (top bar) */}
             {phase && room.status !== "waiting" && room.status !== "finished" && (
               <div className={`flex items-center gap-2 px-4 py-2 rounded-xl flex-shrink-0 ${
                 isStudying ? "bg-blue-600 text-white" : "bg-green-600 text-white"
@@ -207,7 +258,19 @@ export default function StudyRoomLive() {
               onClick={copyInviteLink}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors flex-shrink-0"
             >
-              {showCopied ? <><CheckCircle className="w-3.5 h-3.5 text-green-500" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Invite</>}
+              {showCopied
+                ? <><CheckCircle className="w-3.5 h-3.5 text-green-500" /> Copied</>
+                : <><Copy className="w-3.5 h-3.5" /> Invite</>
+              }
+            </button>
+
+            {/* Fullscreen toggle */}
+            <button
+              onClick={toggleFullscreen}
+              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors flex-shrink-0"
+            >
+              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
             </button>
           </div>
 
@@ -277,16 +340,37 @@ export default function StudyRoomLive() {
 
         {/* Main 3-column layout */}
         <div className="grid lg:grid-cols-[1fr_auto_340px] gap-4">
-          {/* Left: Classroom */}
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+          {/* Left: Classroom — with floating emoji overlay */}
+          <div className="relative bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
             <ClassroomView
               participants={participants}
               hostUid={room.hostUid}
               onSelectStudent={setSelectedStudent}
+              timerDisplay={phase && room.status !== "waiting" && room.status !== "finished" ? formatTime(remaining) : undefined}
+              timerLabel={phase?.label}
+              timerPhaseType={phase?.type ?? null}
+              roomStatus={room.status}
             />
+
+            {/* Floating emoji reaction overlay */}
+            <AnimatePresence>
+              {floatingEmojis.map(fe => (
+                <motion.div
+                  key={fe.id}
+                  className="absolute bottom-8 pointer-events-none text-3xl select-none"
+                  style={{ left: `${fe.x}%` }}
+                  initial={{ y: 0, opacity: 1, scale: 0.8 }}
+                  animate={{ y: -160, opacity: 0, scale: 1.4 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 2.2, ease: "easeOut" }}
+                >
+                  {fe.emoji}
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
 
-          {/* Center: Emoji reactions (collapsed on mobile) */}
+          {/* Center: Emoji reactions column */}
           <div className="hidden lg:flex flex-col gap-2 justify-center">
             {EMOJI_REACTIONS.map(emoji => (
               <button
@@ -353,20 +437,17 @@ export default function StudyRoomLive() {
             {/* Tabs: Vote / Chat */}
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 flex flex-col">
               <div className="flex border-b border-gray-100 dark:border-gray-800 px-2 pt-1">
-                {([
-                  { id: "vote" as const, label: "Vote", icon: "🗳️" },
-                  { id: "chat" as const, label: "Chat", icon: "💬" },
-                ] as const).map(tab => (
+                {(["vote", "chat"] as const).map(tab => (
                   <button
-                    key={tab.id}
-                    onClick={() => setRightTab(tab.id)}
+                    key={tab}
+                    onClick={() => setRightTab(tab)}
                     className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                      rightTab === tab.id
+                      rightTab === tab
                         ? "border-blue-500 text-blue-600 dark:text-blue-400"
                         : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                     }`}
                   >
-                    <span>{tab.icon}</span>{tab.label}
+                    {tab === "vote" ? "🗳️" : "💬"} {tab === "vote" ? "Vote" : "Chat"}
                   </button>
                 ))}
               </div>
@@ -379,12 +460,12 @@ export default function StudyRoomLive() {
                 {rightTab === "chat" && (
                   <div className="flex flex-col gap-2">
                     {/* Mobile emoji row */}
-                    <div className="flex gap-1.5 flex-wrap lg:hidden">
+                    <div className="flex gap-2 flex-wrap lg:hidden">
                       {EMOJI_REACTIONS.map(emoji => (
                         <button
                           key={emoji}
                           onClick={() => handleReaction(emoji)}
-                          className="text-lg hover:scale-110 active:scale-95 transition-transform"
+                          className="text-xl hover:scale-110 active:scale-95 transition-transform"
                         >
                           {emoji}
                         </button>
@@ -395,13 +476,16 @@ export default function StudyRoomLive() {
                     <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                       {messages.length === 0 && (
                         <p className="text-center text-xs text-gray-400 dark:text-gray-500 py-4">
-                          No messages yet. Start the conversation!
+                          No messages yet. Say something!
                         </p>
                       )}
                       {messages.map((msg) => (
-                        <div key={msg.id} className={`${msg.type === "reaction" ? "text-center" : ""}`}>
+                        <div key={msg.id}>
                           {msg.type === "reaction" ? (
-                            <span className="text-2xl">{msg.emoji}</span>
+                            <div className="text-center">
+                              <span className="text-xl">{msg.emoji}</span>
+                              <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-1">{msg.name.split(" ")[0]}</span>
+                            </div>
                           ) : msg.type === "system" ? (
                             <p className="text-center text-xs text-gray-400 dark:text-gray-500 italic">{msg.text}</p>
                           ) : (

@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Vote, createVote, castVote, resolveVote } from "@/lib/studyRooms";
 import type { Room } from "@/lib/studyRooms";
 import { useAuth } from "@/context/AuthContext";
-import { ThumbsUp, ThumbsDown, Plus, Clock, Zap, Coffee, SkipForward, X as XIcon } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Plus, X as XIcon } from "lucide-react";
 
 interface Props {
   room: Room;
@@ -12,10 +12,10 @@ interface Props {
 }
 
 const QUICK_VOTES = [
-  { type: "extend"    as const, label: "Extend +15m",     emoji: "⏰", addMinutes: 15,  desc: "Extend study by 15 minutes?" },
-  { type: "break"     as const, label: "Take 10m break",  emoji: "☕", addMinutes: 10,  desc: "Take a 10 minute break?" },
-  { type: "skip_break"as const, label: "Skip break",      emoji: "⚡", addMinutes: 0,   desc: "Skip the next break?" },
-  { type: "end"       as const, label: "End session",     emoji: "🏁", addMinutes: 0,   desc: "End the study session?" },
+  { type: "extend"     as const, label: "Extend +15m",    emoji: "⏰", addMinutes: 15, desc: "Extend study by 15 minutes?" },
+  { type: "break"      as const, label: "Take 10m break", emoji: "☕", addMinutes: 10, desc: "Take a 10 minute break?" },
+  { type: "skip_break" as const, label: "Skip break",     emoji: "⚡", addMinutes: 0,  desc: "Skip the next break?" },
+  { type: "end"        as const, label: "End session",    emoji: "🏁", addMinutes: 0,  desc: "End the study session?" },
 ];
 
 export function VotingPanel({ room, votes, participantCount }: Props) {
@@ -25,12 +25,50 @@ export function VotingPanel({ room, votes, participantCount }: Props) {
   const [customMins, setCustomMins] = useState(10);
   const [customType, setCustomType] = useState<Vote["type"]>("extend");
   const [loading, setLoading] = useState(false);
+  const resolvingRef = useRef<Set<string>>(new Set());
 
+  // Active votes that haven't expired yet (for display)
   const activeVotes = votes.filter(v => {
     if (v.status !== "active") return false;
     if (!v.expiresAt) return true;
     return v.expiresAt.toMillis() > Date.now();
   });
+
+  // ── Auto-resolve votes ────────────────────────────────────────────────────
+  // Check every second: resolve when expired or all participants have voted
+  useEffect(() => {
+    if (votes.length === 0) return;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      for (const vote of votes) {
+        if (vote.status !== "active") continue;
+        if (resolvingRef.current.has(vote.id)) continue;
+
+        const yes = vote.yesVoters.length;
+        const no = vote.noVoters.length;
+        const totalVoted = yes + no;
+        const isExpired = vote.expiresAt && vote.expiresAt.toMillis() < now;
+        const allVoted = totalVoted >= Math.max(participantCount, 1);
+
+        if (isExpired || allVoted) {
+          resolvingRef.current.add(vote.id);
+          resolveVote(room.id, vote.id, room)
+            .catch((err) => console.warn("[Vote] resolve failed:", err))
+            .finally(() => resolvingRef.current.delete(vote.id));
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [votes, room, participantCount]);
+
+  // ── Countdown display for each vote ──────────────────────────────────────
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => forceUpdate(n => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   async function startQuickVote(preset: typeof QUICK_VOTES[0]) {
     if (!user || !profile) return;
@@ -44,7 +82,9 @@ export function VotingPanel({ room, votes, participantCount }: Props) {
         createdByName: profile.name,
         totalParticipants: participantCount,
       });
-    } catch {}
+    } catch (err) {
+      console.error("[Vote] create failed:", err);
+    }
     setLoading(false);
   }
 
@@ -62,13 +102,19 @@ export function VotingPanel({ room, votes, participantCount }: Props) {
       });
       setCustomDesc("");
       setShowCreate(false);
-    } catch {}
+    } catch (err) {
+      console.error("[Vote] custom create failed:", err);
+    }
     setLoading(false);
   }
 
   async function handleCastVote(voteId: string, choice: "yes" | "no") {
     if (!user) return;
-    await castVote(room.id, voteId, user.uid, choice);
+    try {
+      await castVote(room.id, voteId, user.uid, choice);
+    } catch (err) {
+      console.error("[Vote] cast failed:", err);
+    }
   }
 
   return (
@@ -84,6 +130,11 @@ export function VotingPanel({ room, votes, participantCount }: Props) {
           const hasVotedNo  = user ? vote.noVoters.includes(user.uid)  : false;
           const hasVoted    = hasVotedYes || hasVotedNo;
 
+          // Countdown
+          const secsLeft = vote.expiresAt
+            ? Math.max(0, Math.ceil((vote.expiresAt.toMillis() - Date.now()) / 1000))
+            : null;
+
           return (
             <motion.div
               key={vote.id}
@@ -93,15 +144,26 @@ export function VotingPanel({ room, votes, participantCount }: Props) {
               className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm p-4"
             >
               <div className="flex items-start justify-between gap-2 mb-3">
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 dark:text-white text-sm">{vote.description}</p>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                     by {vote.createdByName}
                   </p>
                 </div>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 font-medium flex-shrink-0">
-                  Vote
-                </span>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {secsLeft !== null && (
+                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${
+                      secsLeft <= 10
+                        ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                        : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400"
+                    }`}>
+                      {secsLeft}s
+                    </span>
+                  )}
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 font-medium">
+                    Vote
+                  </span>
+                </div>
               </div>
 
               {/* Progress bar */}
@@ -139,13 +201,20 @@ export function VotingPanel({ room, votes, participantCount }: Props) {
 
               {hasVoted && (
                 <p className="text-center text-xs text-gray-500 dark:text-gray-400 py-1">
-                  You voted {hasVotedYes ? "✅ yes" : "❌ no"}
+                  You voted {hasVotedYes ? "✅ yes" : "❌ no"} — waiting for others…
                 </p>
               )}
             </motion.div>
           );
         })}
       </AnimatePresence>
+
+      {/* No active votes */}
+      {activeVotes.length === 0 && !showCreate && (
+        <p className="text-center text-xs text-gray-400 dark:text-gray-500 py-2">
+          No active votes. Start one below.
+        </p>
+      )}
 
       {/* Start new vote */}
       {!showCreate ? (

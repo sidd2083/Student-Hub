@@ -35,13 +35,17 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [studyMinsInSession, setStudyMinsInSession] = useState(0);
 
+  // Track study seconds since last sync (unsync'd remainder)
   const studySecondsRef = useRef(0);
+  // Track total minutes already synced to Firestore this session
+  const syncedMinsRef = useRef(0);
   const lastSyncRef = useRef(Date.now());
   const presenceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const unsubRoomRef = useRef<(() => void) | null>(null);
   const unsubParticipantsRef = useRef<(() => void) | null>(null);
   const roomRef = useRef<Room | null>(null);
+  const advancingRef = useRef(false); // prevent race condition on phase advance
 
   roomRef.current = room;
 
@@ -71,7 +75,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     };
   }, [activeRoomId]);
 
-  // ── Local timer tick (client-side countdown, no Firestore writes) ────────────
+  // ── Local timer tick ────────────────────────────────────────────────────────
   useEffect(() => {
     timerIntervalRef.current = setInterval(() => {
       const r = roomRef.current;
@@ -79,28 +83,36 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
       const rem = getRemainingSeconds(r);
       setRemainingSeconds(rem);
 
-      // Track study seconds during active study phases
+      // Track study seconds during active study phases only
       if (r.status === "active") {
         const phase = r.studyFlow[r.currentPhaseIndex];
         if (phase?.type === "study") {
           studySecondsRef.current += 1;
-          setStudyMinsInSession(Math.floor(studySecondsRef.current / 60));
         }
 
-        // Sync study time to leaderboard every 5 minutes
+        // Sync every 5 minutes — only sync the unsync'd portion
         const now = Date.now();
-        if (now - lastSyncRef.current >= 5 * 60_000 && user && studySecondsRef.current > 0) {
+        if (now - lastSyncRef.current >= 5 * 60_000 && user) {
           const minsToSync = Math.floor(studySecondsRef.current / 60);
-          syncStudyTimeToLeaderboard(user.uid, minsToSync).catch(() => {});
-          studySecondsRef.current = 0;
+          if (minsToSync > 0) {
+            syncStudyTimeToLeaderboard(user.uid, minsToSync).catch(() => {});
+            syncedMinsRef.current += minsToSync;
+            // Keep the remainder seconds — don't lose them
+            studySecondsRef.current = studySecondsRef.current - minsToSync * 60;
+          }
           lastSyncRef.current = now;
         }
 
-        // Auto-advance phase when timer hits 0
-        if (rem <= 0 && r.currentPhaseIndex < r.studyFlow.length - 1) {
-          // Only host should advance (prevents race conditions)
+        // Update displayed total = synced + unsync'd
+        setStudyMinsInSession(syncedMinsRef.current + Math.floor(studySecondsRef.current / 60));
+
+        // Auto-advance phase when timer hits 0 — only host, only once
+        if (rem <= 0 && r.currentPhaseIndex < r.studyFlow.length - 1 && !advancingRef.current) {
           if (user && r.hostUid === user.uid) {
-            advancePhase(r.id, r).catch(() => {});
+            advancingRef.current = true;
+            advancePhase(r.id, r)
+              .catch(() => {})
+              .finally(() => { advancingRef.current = false; });
           }
         }
       }
@@ -126,30 +138,36 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (!activeRoomId || !user) return;
     const handleUnload = () => {
-      const mins = Math.floor(studySecondsRef.current / 60) + studyMinsInSession;
-      // Best-effort sync before unload
-      if (mins > 0) syncStudyTimeToLeaderboard(user.uid, mins).catch(() => {});
-      leaveRoom(activeRoomId, user.uid, mins).catch(() => {});
+      // Only sync the unsync'd remainder — syncedMinsRef already went to Firestore
+      const remainderMins = Math.floor(studySecondsRef.current / 60);
+      if (remainderMins > 0) {
+        syncStudyTimeToLeaderboard(user.uid, remainderMins).catch(() => {});
+      }
+      leaveRoom(activeRoomId, user.uid, syncedMinsRef.current + remainderMins).catch(() => {});
     };
     window.addEventListener("beforeunload", handleUnload);
     return () => window.removeEventListener("beforeunload", handleUnload);
-  }, [activeRoomId, user, studyMinsInSession]);
+  }, [activeRoomId, user]);
 
   const joinActiveRoom = useCallback((roomId: string) => {
     setActiveRoomId(roomId);
     studySecondsRef.current = 0;
+    syncedMinsRef.current = 0;
     setStudyMinsInSession(0);
     lastSyncRef.current = Date.now();
+    advancingRef.current = false;
   }, []);
 
   const leaveActiveRoom = useCallback(async () => {
     if (!activeRoomId || !user) return;
 
-    // Final sync
-    const totalMins = Math.floor(studySecondsRef.current / 60) + studyMinsInSession;
-    if (totalMins > 0) {
-      await syncStudyTimeToLeaderboard(user.uid, totalMins).catch(() => {});
+    // Sync only the unsync'd remainder
+    const remainderMins = Math.floor(studySecondsRef.current / 60);
+    if (remainderMins > 0) {
+      await syncStudyTimeToLeaderboard(user.uid, remainderMins).catch(() => {});
     }
+
+    const totalSessionMins = syncedMinsRef.current + remainderMins;
 
     // If host and others remain, transfer host
     const r = roomRef.current;
@@ -160,7 +178,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
       }
     }
 
-    await leaveRoom(activeRoomId, user.uid, totalMins).catch(() => {});
+    await leaveRoom(activeRoomId, user.uid, totalSessionMins).catch(() => {});
 
     unsubRoomRef.current?.();
     unsubParticipantsRef.current?.();
@@ -168,8 +186,9 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     setRoom(null);
     setParticipants([]);
     studySecondsRef.current = 0;
+    syncedMinsRef.current = 0;
     setStudyMinsInSession(0);
-  }, [activeRoomId, user, participants, studyMinsInSession]);
+  }, [activeRoomId, user, participants]);
 
   const onHostStart  = useCallback(async () => { if (activeRoomId) await startTimer(activeRoomId); }, [activeRoomId]);
   const onHostPause  = useCallback(async () => { if (activeRoomId) await pauseTimer(activeRoomId, remainingSeconds); }, [activeRoomId, remainingSeconds]);
