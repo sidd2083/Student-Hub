@@ -350,21 +350,25 @@ export function subscribeMessages(roomId: string, cb: (msgs: RoomMessage[]) => v
   );
 }
 
+export async function isParticipant(roomId: string, uid: string): Promise<boolean> {
+  const snap = await getDoc(doc(db, "studyRooms", roomId, "participants", uid));
+  return snap.exists();
+}
+
 export function subscribePublicRooms(cb: (rooms: Room[]) => void) {
+  // Only filter by status (single-field query — no composite index needed).
+  // isPrivate is filtered client-side to avoid needing a composite index.
   return onSnapshot(
     query(
       collection(db, "studyRooms"),
-      where("isPrivate", "==", false),
       where("status", "in", ["waiting", "active", "paused"]),
-      limit(50),
+      limit(60),
     ),
     (snap) => {
-      const rooms = snap.docs.map(d => ({ id: d.id, ...d.data() } as Room));
-      rooms.sort((a, b) => {
-        const aMs = a.createdAt?.toMillis() ?? 0;
-        const bMs = b.createdAt?.toMillis() ?? 0;
-        return bMs - aMs;
-      });
+      const rooms = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as Room))
+        .filter(r => !r.isPrivate);
+      rooms.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
       cb(rooms.slice(0, 30));
     },
   );
