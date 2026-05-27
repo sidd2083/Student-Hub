@@ -1,0 +1,498 @@
+You are a senior startup engineer, Firebase architect, real-time systems engineer, scalable backend engineer, UI/UX designer, and performance optimization expert.
+
+Build a COMPLETE production-grade Virtual Study Room System for my student platform called StudentHub.
+
+This is one of the CORE FEATURES of the platform.
+
+The system must feel:
+
+* social
+* motivating
+* calm
+* modern
+* premium
+* lightweight
+* addictive
+* highly engaging
+
+The goal is to psychologically make students feel like they are studying together inside a real classroom or study hall.
+
+IMPORTANT:
+This is NOT Discord.
+This is NOT Zoom.
+This is NOT a voice/video call app.
+
+This is a synchronized virtual study environment.
+
+Students can:
+
+* create study rooms
+* join public/private rooms
+* study together
+* sync to a shared timer
+* see other students studying
+* vote for actions
+* stay motivated socially
+* increase leaderboard study time
+
+The experience should feel:
+
+* peaceful
+* focused
+* community-driven
+* productive
+
+Use:
+
+* Next.js App Router
+* TypeScript
+* Firebase Authentication
+* Firebase Firestore
+* Tailwind CSS
+* Framer Motion
+
+Deployment:
+
+* Vercel
+
+The site must remain FAST on:
+
+* low-end Android phones
+* slow internet
+* multiple simultaneous users
+
+Build:
+
+1. Public Room Listing Page
+2. Room Creation Page
+3. Live Study Room Page
+4. Session History Page
+
+The room listing page should show:
+
+* active rooms
+* participant count
+* room title
+* subject/category
+* current timer state
+* study mode
+* remaining study time
+
+Example:
+
+* "SEE Science Focus Room"
+* 18 students studying
+* 42 minutes remaining
+
+Users can:
+
+* join room
+* search rooms
+* filter rooms
+* preview rooms
+
+Users can create rooms.
+
+Room creation must be EXTREMELY customizable.
+
+VERY IMPORTANT:
+
+The room creator can create FULL CUSTOM STUDY FLOWS.
+
+NOT just one Pomodoro timer.
+
+The creator can create sequences like:
+
+Study 50m
+Break 10m
+Study 45m
+Break 15m
+Study 1h
+Break 20m
+
+OR
+
+Study 2h
+Break 30m
+
+OR
+
+Unlimited stopwatch mode.
+
+The creator can:
+
+* add unlimited study phases
+* add unlimited break phases
+* reorder phases
+* delete phases
+* customize every timer
+
+The system must support:
+
+* classic Pomodoro
+* long study sessions
+* fully custom study flows
+
+VERY IMPORTANT:
+
+The timer is HOST-CONTROLLED.
+
+The host controls:
+
+* start session
+* pause session
+* skip phase
+* end session
+
+ALL USERS IN THE ROOM MUST FOLLOW THE SAME TIMER.
+
+Late joiners sync automatically to the remaining time.
+
+Example:
+Host started:
+2 hour study session
+
+1h 40m already passed.
+
+New user joins.
+
+New user sees:
+20 minutes remaining.
+
+NOT a new timer.
+
+The timer must:
+
+* survive refreshes
+* survive reconnections
+* continue server-side
+* stay synchronized
+* use backend timestamps
+
+DO NOT use local-only timers.
+
+Use Firestore timestamp synchronization.
+
+The room should visually feel like:
+
+* classroom
+* library
+* study hall
+
+The classroom UI is EXTREMELY IMPORTANT.
+
+The classroom must visually contain:
+
+* rows
+* benches/desks
+* students sitting inside desks
+
+VERY IMPORTANT:
+
+Each bench/desk should contain ONLY TWO STUDENTS maximum.
+
+The layout should visually feel like:
+
+* real classroom benches
+* organized seating
+* calm study environment
+
+Each student seat shows:
+
+* avatar
+* username
+* class/grade
+
+The username and class should appear above the avatar.
+
+Example:
+Siddhant
+Class 10
+
+If someone clicks another student's avatar:
+
+Open a smooth profile popup/modal.
+
+The popup should show:
+
+* avatar
+* username
+* class
+* total study hours
+* current streak
+* leaderboard rank
+* today's study time
+* joined date
+* room participation stats
+
+The popup should feel modern and premium.
+
+VERY IMPORTANT:
+
+Study time from study rooms MUST sync with the global leaderboard system.
+
+If a user studies inside a room:
+
+* study time increases
+* leaderboard updates
+* streaks update
+* analytics update
+
+The study room is directly connected to:
+
+* total study time
+* global rankings
+* streak systems
+
+VERY IMPORTANT:
+
+Users should NOT be forced to stay only on the room page.
+
+If a user joins a room:
+
+* they can still browse notes
+* they can still browse important questions
+* they can still use other study tools INSIDE the app
+
+The study session should CONTINUE in the background inside the app.
+
+Example:
+User joins study room.
+Then opens:
+
+* notes
+* PYQs
+* tools
+* flashcards
+
+The room session remains active.
+
+The session should ONLY stop if:
+
+* user leaves the room
+* user closes app/site
+* user becomes inactive too long
+
+NOT if:
+
+* user changes pages INSIDE the app
+
+TOP BAR:
+
+* room title
+* current phase
+* shared timer
+* participant count
+
+CENTER:
+
+* classroom benches
+* avatars
+* live statuses
+
+RIGHT PANEL:
+
+* voting
+* room analytics
+* room controls
+
+BOTTOM:
+
+* music/focus controls
+* current study flow
+* session details
+
+VERY IMPORTANT:
+The voting system must be highly interactive and customizable.
+
+Users can start votes for:
+
+* extend study time
+* take break
+* skip break
+* end room
+* add extra study session
+
+VERY IMPORTANT:
+
+Votes are NOT fixed actions only.
+
+The user who creates the vote can also set:
+
+* custom duration
+* custom timer amount
+
+Example:
+"Extend study session by 20 minutes?"
+
+OR
+
+"Take a 15 minute break?"
+
+OR
+
+"Add another 45 minute study round?"
+
+When a vote is started:
+
+* all users see popup
+* users vote yes/no
+* majority wins
+
+If vote succeeds:
+
+* backend automatically modifies the shared study flow
+* timer updates for everyone
+
+Host abilities:
+
+* start/pause timer
+* skip phase
+* end session
+* modify room
+* manage participants
+
+If host disconnects:
+Automatically transfer host to:
+
+* most active participant
+  OR
+* oldest participant in room
+
+IMPORTANT:
+DO NOT aggressively punish users.
+
+Students may:
+
+* read silently
+* think
+* solve homework physically
+* not move mouse often
+
+THIS IS NORMAL.
+
+If suspicious inactivity happens:
+show lightweight popup.
+
+Examples:
+
+* "Still studying? 📚"
+* "Focused? 🔥"
+
+Frequency:
+
+* maximum once per hour
+* non-annoying
+* intelligent
+
+If ignored too long:
+
+* temporarily pause leaderboard counting
+
+NOT:
+
+* instant punishment
+* instant kick
+
+Use:
+
+* Firestore realtime listeners
+* event-driven syncing
+
+DO NOT use aggressive polling.
+
+Realtime updates ONLY for:
+
+* joins
+* leaves
+* votes
+* timer changes
+* status updates
+* host changes
+
+The system must remain smooth with:
+
+* 100+ simultaneous users
+* multiple rooms
+* low-end phones
+
+Optimize:
+
+* Firestore reads/writes
+* bundle size
+* DOM updates
+* rerenders
+* listeners
+
+DO NOT:
+
+* send per-second Firestore writes
+* rerender whole classroom
+* overload Firestore
+
+The mobile experience is EXTREMELY IMPORTANT.
+
+The UI must:
+
+* work perfectly on phones
+* feel smooth
+* use touch-friendly controls
+* remain lightweight
+
+Add:
+
+* ambient sounds
+* local uploaded songs
+* YouTube URL player
+* focus atmosphere system
+
+Add:
+
+* lightweight room chat
+* emoji reactions
+* invite links
+* room sharing
+
+Prevent:
+
+* fake timer edits
+* fake votes
+* unauthorized room control
+* spam joins
+* leaderboard abuse
+
+Design scalable Firestore collections for:
+
+* rooms
+* participants
+* timer states
+* votes
+* analytics
+* presence
+* session history
+
+Provide:
+
+1. Full system architecture
+2. Firestore schema
+3. Firestore security rules
+4. Real-time synchronization logic
+5. Shared timer synchronization strategy
+6. Voting system logic
+7. Classroom UI implementation
+8. Mobile optimization strategy
+9. Performance optimization strategy
+10. Presence system
+11. Production-ready code
+12. Full scalable backend structure
+
+The final result must feel:
+
+* startup-quality
+* premium
+* modern
+* smooth
+* motivating
+* social
+* scalable
+* addictive
