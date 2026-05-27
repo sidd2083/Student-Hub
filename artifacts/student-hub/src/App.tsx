@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/context/AuthContext";
 import { TimerProvider } from "@/context/TimerContext";
+import { ActiveRoomProvider } from "@/context/ActiveRoomContext";
 import {
   PrivateRoute,
   AdminDashboardRoute,
@@ -45,6 +46,9 @@ const GpaCalculator       = lazy(() => import("@/pages/GpaCalculator"));
 const AttendanceCalculator = lazy(() => import("@/pages/AttendanceCalculator"));
 const Badges              = lazy(() => import("@/pages/Badges"));
 const DailyMissions       = lazy(() => import("@/pages/DailyMissions"));
+const StudyRooms          = lazy(() => import("@/pages/StudyRooms"));
+const StudyRoomCreate     = lazy(() => import("@/pages/StudyRoomCreate"));
+const StudyRoomLive       = lazy(() => import("@/pages/StudyRoomLive"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -172,6 +176,9 @@ function AppRoutes() {
         <Route path="/mcq"         component={McqPractice} />
 
         <Route path="/badges"      component={Badges} />
+        <Route path="/study-rooms/create" component={StudyRoomCreate} />
+        <Route path="/study-rooms/:id"    component={StudyRoomLive} />
+        <Route path="/study-rooms"        component={StudyRooms} />
         <Route path="/dashboard">
           <PrivateRoute><Dashboard /></PrivateRoute>
         </Route>
@@ -223,10 +230,12 @@ function App() {
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <AuthProvider>
               <TimerProvider>
-                <StudyGuardian />
-                <ErrorBoundary>
-                  <Router />
-                </ErrorBoundary>
+                <ActiveRoomProvider>
+                  <StudyGuardian />
+                  <ErrorBoundary>
+                    <Router />
+                  </ErrorBoundary>
+                </ActiveRoomProvider>
               </TimerProvider>
             </AuthProvider>
           </WouterRouter>

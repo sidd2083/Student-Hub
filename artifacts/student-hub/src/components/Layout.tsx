@@ -6,21 +6,23 @@ import {
   BookOpen, FileText, CheckSquare, Timer,
   MessageCircle, Trophy, LayoutDashboard, LogOut,
   Shield, Settings, User, Home, Wrench, ArrowLeft, X, BarChart2,
-  Pause, Play, Bookmark, Download, Calculator, Zap,
+  Pause, Play, Bookmark, Download, Calculator, Zap, Users,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { ActiveRoomBar } from "@/components/study-room/ActiveRoomBar";
 
 const sidebarNav = [
-  { href: "/dashboard",   icon: LayoutDashboard, label: "Dashboard"       },
-  { href: "/missions",    icon: Zap,             label: "Daily Missions"  },
-  { href: "/notes",       icon: BookOpen,         label: "Notes"           },
-  { href: "/pyqs",        icon: FileText,         label: "Imp Questions"   },
-  { href: "/saved",       icon: Bookmark,         label: "Saved"           },
-  { href: "/ai",          icon: MessageCircle,    label: "Nep AI"          },
-  { href: "/pomodoro",    icon: Timer,            label: "Pomodoro"        },
-  { href: "/todo",        icon: CheckSquare,      label: "To-do"           },
-  { href: "/report",      icon: BarChart2,        label: "Report Card"     },
-  { href: "/leaderboard", icon: Trophy,           label: "Leaderboard"     },
+  { href: "/dashboard",    icon: LayoutDashboard, label: "Dashboard"       },
+  { href: "/missions",     icon: Zap,             label: "Daily Missions"  },
+  { href: "/study-rooms",  icon: Users,           label: "Study Rooms"     },
+  { href: "/notes",        icon: BookOpen,        label: "Notes"           },
+  { href: "/pyqs",         icon: FileText,        label: "Imp Questions"   },
+  { href: "/saved",        icon: Bookmark,        label: "Saved"           },
+  { href: "/ai",           icon: MessageCircle,   label: "Nep AI"          },
+  { href: "/pomodoro",     icon: Timer,           label: "Pomodoro"        },
+  { href: "/todo",         icon: CheckSquare,     label: "To-do"           },
+  { href: "/report",       icon: BarChart2,       label: "Report Card"     },
+  { href: "/leaderboard",  icon: Trophy,          label: "Leaderboard"     },
 ];
 
 const bottomNavItems = [
@@ -114,6 +116,7 @@ export function Layout({ children }: LayoutProps) {
       style={{ height: "100%", overflow: "hidden" }}
     >
       <FloatingTimerBar />
+      <ActiveRoomBar />
 
       {/* ── Sidebar (desktop) ── */}
       <aside className="hidden md:flex w-64 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 flex-col shadow-sm flex-shrink-0">
