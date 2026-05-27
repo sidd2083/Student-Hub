@@ -59,6 +59,7 @@ export default function StudyRoomLive() {
   const [localParticipants, setLocalPs]      = useState<RoomParticipant[]>([]);
   const [loading,           setLoading]      = useState(true);
   const [joined,            setJoined]       = useState(false);
+  const [joinError,         setJoinError]    = useState("");
 
   // Always-local state (not in context)
   const [votes,          setVotes]       = useState<Vote[]>([]);
@@ -135,9 +136,13 @@ export default function StudyRoomLive() {
   // Runs for ALL users (host AND members). Every user's ActiveRoomContext gets
   // their own timer and study-time accumulation — tracking is per-individual.
   useEffect(() => {
-    if (!roomId || !user || !profile || joined || !room || room.status === "finished") return;
+    if (!roomId || !room || room.status === "finished") return;
+    if (!user || !profile) return; // not signed in — handled by render guard below
+    if (joined) return;
+
     let cancelled = false;
     async function doJoin() {
+      setJoinError("");
       try {
         const alreadyInRoom = await isParticipant(roomId!, user!.uid);
         if (!alreadyInRoom) {
@@ -153,7 +158,10 @@ export default function StudyRoomLive() {
         joinActiveRoom(roomId!);
         setJoined(true);
       } catch (e) {
+        if (cancelled) return;
+        const err = e as Error;
         console.error("[Room] join failed:", e);
+        setJoinError(err.message || "Failed to join room. Please try again.");
       }
     }
     doJoin();
@@ -264,6 +272,49 @@ export default function StudyRoomLive() {
       <button onClick={() => setLocation("/study-rooms")} className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm">
         Browse Rooms
       </button>
+    </div>
+  );
+
+  // Must be signed in to join a room
+  if (!user || !profile) return (
+    <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4">
+      <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-50 flex items-center justify-center mb-2">
+        <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      </div>
+      <p className="text-gray-900 dark:text-gray-100 text-lg font-semibold">{room.title}</p>
+      <p className="text-gray-500 dark:text-gray-400 text-sm">Sign in with Google to join this study room.</p>
+      <button
+        onClick={() => setLocation("/login?next=/study-rooms/" + roomId)}
+        className="px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors"
+      >
+        Sign In to Join
+      </button>
+      <button onClick={() => setLocation("/study-rooms")} className="block mx-auto text-sm text-gray-400 hover:text-gray-600 transition-colors">
+        Back to rooms
+      </button>
+    </div>
+  );
+
+  // Show join error if something went wrong
+  if (joinError) return (
+    <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4">
+      <div className="w-16 h-16 mx-auto rounded-2xl bg-red-50 flex items-center justify-center mb-2">
+        <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <p className="text-gray-900 dark:text-gray-100 text-lg font-semibold">Couldn't Join Room</p>
+      <p className="text-red-500 text-sm font-mono bg-red-50 rounded-xl px-4 py-3">{joinError}</p>
+      <div className="flex gap-3 justify-center">
+        <button onClick={() => setJoinError("")} className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors">
+          Try Again
+        </button>
+        <button onClick={() => setLocation("/study-rooms")} className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-colors">
+          Browse Rooms
+        </button>
+      </div>
     </div>
   );
 

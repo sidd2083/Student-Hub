@@ -83,7 +83,7 @@ export function isParticipantActive(p: RoomParticipant): boolean {
   return Date.now() - p.lastSeen.toMillis() < STALE_THRESHOLD_MS;
 }
 
-// ── Timer Helpers ──────────────────────────────────────────────────────────────
+// ── Timer Helpers ─────────────────────────────────────────────────────────────
 
 export function getRemainingSeconds(room: Room): number {
   const phase = room.studyFlow[room.currentPhaseIndex];
@@ -111,7 +111,7 @@ export function generateInviteCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-// ── Room CRUD ──────────────────────────────────────────────────────────────────
+// ── Room CRUD ─────────────────────────────────────────────────────────────────
 
 export async function createRoom(data: {
   title: string;
@@ -152,15 +152,22 @@ export async function createRoom(data: {
   return roomRef.id;
 }
 
+/**
+ * Join a room.
+ * Writes participant doc first (always allowed by rules), then tries to
+ * increment participantCount. If the count update is blocked by Firestore
+ * rules (e.g. older rule set), the join still succeeds — count will be
+ * corrected by the host's periodic purge sweep.
+ */
 export async function joinRoom(roomId: string, participant: {
   uid: string;
   name: string;
   grade: number;
   isHost: boolean;
 }): Promise<void> {
-  const batch = writeBatch(db);
+  // Step 1: Write the participant document (always permitted: own uid)
   const pRef = doc(db, "studyRooms", roomId, "participants", participant.uid);
-  batch.set(pRef, {
+  await setDoc(pRef, {
     ...participant,
     photoURL: null,
     joinedAt: serverTimestamp(),
@@ -168,8 +175,14 @@ export async function joinRoom(roomId: string, participant: {
     studyMinsInRoom: 0,
     isActive: true,
   });
-  batch.update(doc(db, "studyRooms", roomId), { participantCount: increment(1) });
-  await batch.commit();
+
+  // Step 2: Try to update the room's participantCount (may fail if rules are restrictive)
+  // Non-critical: the host's sweep will fix the count if this fails
+  try {
+    await updateDoc(doc(db, "studyRooms", roomId), { participantCount: increment(1) });
+  } catch {
+    // Not fatal — participantCount is cosmetic; real count comes from participants subcollection
+  }
 }
 
 /**
@@ -183,21 +196,24 @@ export async function leaveRoom(roomId: string, uid: string, studyMinsInRoom: nu
     const currentCount = roomSnap.exists() ? (roomSnap.data().participantCount ?? 1) : 1;
     const isLastPerson = currentCount <= 1;
 
-    const batch = writeBatch(db);
-    batch.delete(doc(db, "studyRooms", roomId, "participants", uid));
+    // Delete own participant doc (always allowed by rules: own uid)
+    await deleteDoc(doc(db, "studyRooms", roomId, "participants", uid));
 
-    if (isLastPerson) {
-      // Last person leaving — mark room finished so it vanishes from listings
-      batch.update(roomRef, {
-        participantCount: 0,
-        status: "finished",
-        timerStartedAt: null,
-      });
-    } else {
-      batch.update(roomRef, { participantCount: increment(-1) });
+    // Update room: if last person, mark finished; otherwise decrement count
+    try {
+      if (isLastPerson) {
+        await updateDoc(roomRef, {
+          participantCount: 0,
+          status: "finished",
+          timerStartedAt: null,
+        });
+      } else {
+        await updateDoc(roomRef, { participantCount: increment(-1) });
+      }
+    } catch {
+      // If rules block this (e.g. non-host leaving), the room will still
+      // disappear via the zombie filter in subscribePublicRooms
     }
-
-    await batch.commit();
   } catch (err) {
     console.warn("[Room] leaveRoom error (non-fatal):", err);
   }
@@ -220,39 +236,68 @@ export async function updatePresence(roomId: string, uid: string): Promise<void>
 }
 
 /**
- * Purge stale participants (lastSeen > STALE_THRESHOLD_MS ago) from Firestore.
- * Called periodically by the host to keep the participant list clean.
+ * Purge stale participants (lastSeen > 90s ago) from Firestore.
+ * Called periodically by the host. Also corrects participantCount.
  */
 export async function purgeStaleParticipants(roomId: string): Promise<void> {
   try {
     const snap = await getDocs(collection(db, "studyRooms", roomId, "participants"));
+    if (snap.empty) {
+      // No participants at all — mark room finished
+      try {
+        await updateDoc(doc(db, "studyRooms", roomId), {
+          participantCount: 0, status: "finished", timerStartedAt: null,
+        });
+      } catch {}
+      return;
+    }
+
     const now = Date.now();
     const staleUids: string[] = [];
+    let activeCount = 0;
 
     for (const d of snap.docs) {
       const data = d.data() as RoomParticipant;
       if (data.lastSeen && now - data.lastSeen.toMillis() > STALE_THRESHOLD_MS) {
         staleUids.push(d.id);
+      } else {
+        activeCount++;
       }
     }
 
-    if (staleUids.length === 0) return;
+    if (staleUids.length === 0 && activeCount === snap.docs.length) return;
 
-    const batch = writeBatch(db);
-    for (const uid of staleUids) {
-      batch.delete(doc(db, "studyRooms", roomId, "participants", uid));
+    // Delete stale participant docs (host can delete any participant doc per rules)
+    if (staleUids.length > 0) {
+      const batch = writeBatch(db);
+      for (const uid of staleUids) {
+        batch.delete(doc(db, "studyRooms", roomId, "participants", uid));
+      }
+      await batch.commit();
     }
-    batch.update(doc(db, "studyRooms", roomId), {
-      participantCount: increment(-staleUids.length),
-    });
-    await batch.commit();
-    console.log(`[Room] Purged ${staleUids.length} stale participant(s) from ${roomId}`);
+
+    // Correct participantCount to match actual active participants
+    try {
+      if (activeCount === 0) {
+        await updateDoc(doc(db, "studyRooms", roomId), {
+          participantCount: 0, status: "finished", timerStartedAt: null,
+        });
+      } else {
+        await updateDoc(doc(db, "studyRooms", roomId), {
+          participantCount: activeCount,
+        });
+      }
+    } catch {}
+
+    if (staleUids.length > 0) {
+      console.log(`[Room] Purged ${staleUids.length} stale participant(s) from ${roomId}`);
+    }
   } catch (err) {
     console.warn("[Room] purgeStaleParticipants error:", err);
   }
 }
 
-// ── Host Controls ──────────────────────────────────────────────────────────────
+// ── Host Controls ─────────────────────────────────────────────────────────────
 
 export async function startTimer(roomId: string): Promise<void> {
   await updateDoc(doc(db, "studyRooms", roomId), {
@@ -299,7 +344,7 @@ export async function advancePhase(roomId: string, room: Room): Promise<void> {
   await skipPhase(roomId, room);
 }
 
-// ── Voting ─────────────────────────────────────────────────────────────────────
+// ── Voting ────────────────────────────────────────────────────────────────────
 
 export async function createVote(roomId: string, vote: {
   description: string;
@@ -374,7 +419,7 @@ export async function resolveVote(roomId: string, voteId: string, room: Room): P
   }
 }
 
-// ── Chat / Reactions ───────────────────────────────────────────────────────────
+// ── Chat / Reactions ──────────────────────────────────────────────────────────
 
 export async function sendMessage(roomId: string, msg: {
   uid: string;
@@ -388,11 +433,10 @@ export async function sendMessage(roomId: string, msg: {
   };
   if (msg.text !== undefined) payload.text = msg.text;
   if (msg.emoji !== undefined) payload.emoji = msg.emoji;
-  // Firestore rule requires text for "message" type and emoji for "reaction" type
   await setDoc(doc(collection(db, "studyRooms", roomId, "messages")), payload);
 }
 
-// ── Realtime Listeners ─────────────────────────────────────────────────────────
+// ── Realtime Listeners ────────────────────────────────────────────────────────
 
 export function subscribeRoom(roomId: string, cb: (room: Room | null) => void) {
   return onSnapshot(doc(db, "studyRooms", roomId), (snap) => {
@@ -401,18 +445,26 @@ export function subscribeRoom(roomId: string, cb: (room: Room | null) => void) {
 }
 
 /**
- * Subscribe to participants, filtering out stale ones client-side.
- * A participant is stale if their lastSeen is more than 90s ago.
+ * Subscribe to participants.
+ * Filters stale ones (lastSeen > 90s) client-side for instant effect.
+ * No orderBy — avoids needing a Firestore composite index.
  */
 export function subscribeParticipants(roomId: string, cb: (ps: RoomParticipant[]) => void) {
   return onSnapshot(
-    query(collection(db, "studyRooms", roomId, "participants"), orderBy("joinedAt", "asc")),
+    collection(db, "studyRooms", roomId, "participants"),
     (snap) => {
-      const all = snap.docs.map(d => d.data() as RoomParticipant);
-      // Filter out stale participants client-side for instant effect
-      const active = all.filter(isParticipantActive);
+      const active = snap.docs
+        .map(d => d.data() as RoomParticipant)
+        .filter(isParticipantActive)
+        // Sort by joinedAt client-side (null = just joined = first)
+        .sort((a, b) => (a.joinedAt?.toMillis() ?? 0) - (b.joinedAt?.toMillis() ?? 0));
       cb(active);
     },
+    (err) => {
+      // Permission denied: silently return empty list (user may not be signed in)
+      if (err.code === "permission-denied") { cb([]); return; }
+      console.warn("[Room] subscribeParticipants error:", err);
+    }
   );
 }
 
@@ -420,6 +472,10 @@ export function subscribeActiveVotes(roomId: string, cb: (votes: Vote[]) => void
   return onSnapshot(
     query(collection(db, "studyRooms", roomId, "votes"), where("status", "==", "active"), limit(5)),
     (snap) => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as Vote))),
+    (err) => {
+      if (err.code === "permission-denied") { cb([]); return; }
+      console.warn("[Room] subscribeActiveVotes error:", err);
+    }
   );
 }
 
@@ -427,33 +483,80 @@ export function subscribeMessages(roomId: string, cb: (msgs: RoomMessage[]) => v
   return onSnapshot(
     query(collection(db, "studyRooms", roomId, "messages"), orderBy("createdAt", "asc"), limit(100)),
     (snap) => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as RoomMessage))),
+    (err) => {
+      if (err.code === "permission-denied") { cb([]); return; }
+      console.warn("[Room] subscribeMessages error:", err);
+    }
   );
 }
 
 export async function isParticipant(roomId: string, uid: string): Promise<boolean> {
-  const snap = await getDoc(doc(db, "studyRooms", roomId, "participants", uid));
-  return snap.exists();
+  try {
+    const snap = await getDoc(doc(db, "studyRooms", roomId, "participants", uid));
+    return snap.exists();
+  } catch {
+    return false;
+  }
 }
 
-export function subscribePublicRooms(cb: (rooms: Room[]) => void) {
-  return onSnapshot(
-    query(
-      collection(db, "studyRooms"),
-      where("status", "in", ["waiting", "active", "paused"]),
-      limit(60),
-    ),
-    (snap) => {
-      const now = Date.now();
-      const rooms = snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as Room))
-        .filter(r => !r.expiresAt || r.expiresAt.toMillis() > now)
-        .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
-      cb(rooms.slice(0, 40));
-    },
-  );
+// ── Shared public-rooms subscription (singleton cache) ───────────────────────
+// Multiple components (StudyRooms page + Dashboard widget) share ONE listener.
+// This eliminates duplicate Firestore connections that caused stream errors.
+
+type RoomsCb = (rooms: Room[]) => void;
+let _roomsCache: Room[] | null = null;
+let _roomsCbs: Set<RoomsCb> = new Set();
+let _roomsUnsub: (() => void) | null = null;
+
+export function subscribePublicRooms(cb: RoomsCb): () => void {
+  _roomsCbs.add(cb);
+
+  // Deliver cached data immediately for instant renders (no Firestore round-trip)
+  if (_roomsCache !== null) {
+    const cached = _roomsCache;
+    setTimeout(() => { if (_roomsCbs.has(cb)) cb(cached); }, 0);
+  }
+
+  // Start shared Firestore listener if not already running
+  if (!_roomsUnsub) {
+    _roomsUnsub = onSnapshot(
+      query(
+        collection(db, "studyRooms"),
+        where("status", "in", ["waiting", "active", "paused"]),
+        limit(60),
+      ),
+      (snap) => {
+        const now = Date.now();
+        _roomsCache = snap.docs
+          .map(d => ({ id: d.id, ...d.data() } as Room))
+          .filter(r => {
+            // Hide expired rooms
+            if (r.expiresAt && r.expiresAt.toMillis() <= now) return false;
+            // Hide zombie rooms: active/paused but nobody is there
+            if (r.participantCount <= 0 && r.status !== "waiting") return false;
+            return true;
+          })
+          .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0))
+          .slice(0, 40);
+        for (const fn of _roomsCbs) fn(_roomsCache!);
+      },
+      (err) => {
+        console.warn("[Room] subscribePublicRooms error:", err);
+      }
+    );
+  }
+
+  return () => {
+    _roomsCbs.delete(cb);
+    if (_roomsCbs.size === 0) {
+      _roomsUnsub?.();
+      _roomsUnsub = null;
+      _roomsCache = null;
+    }
+  };
 }
 
-// ── Study Time Sync ────────────────────────────────────────────────────────────
+// ── Study Time Sync ───────────────────────────────────────────────────────────
 
 export async function syncStudyTimeToLeaderboard(uid: string, additionalMins: number): Promise<void> {
   if (additionalMins <= 0) return;
@@ -468,7 +571,7 @@ export async function syncStudyTimeToLeaderboard(uid: string, additionalMins: nu
   }
 }
 
-// ── Transfer Host ──────────────────────────────────────────────────────────────
+// ── Transfer Host ─────────────────────────────────────────────────────────────
 
 export async function transferHost(roomId: string, newHostUid: string, newHostName: string): Promise<void> {
   const batch = writeBatch(db);
@@ -477,19 +580,96 @@ export async function transferHost(roomId: string, newHostUid: string, newHostNa
   await batch.commit();
 }
 
-// ── Admin: cascade delete a room and all its subcollections ────────────────────
+// ── Admin: cascade delete a room and all its subcollections ───────────────────
 
 export async function deleteRoomCascade(roomId: string): Promise<void> {
+  // Attempt to delete subcollection documents one collection at a time.
+  // Each is wrapped individually — if the rules block deleting other users'
+  // participant docs, that's OK; deleting the room document itself is enough
+  // to make the room invisible from all queries.
   const subcolls = ["participants", "votes", "messages"];
   for (const sub of subcolls) {
-    const snap = await getDocs(collection(db, "studyRooms", roomId, sub));
-    if (snap.docs.length > 0) {
-      const batch = writeBatch(db);
-      for (const d of snap.docs) batch.delete(d.ref);
-      await batch.commit();
+    try {
+      const snap = await getDocs(collection(db, "studyRooms", roomId, sub));
+      if (snap.docs.length > 0) {
+        // Delete in batches of 400 to stay under Firestore limits
+        for (let i = 0; i < snap.docs.length; i += 400) {
+          const batch = writeBatch(db);
+          snap.docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+          await batch.commit();
+        }
+      }
+    } catch {
+      // Subcollection delete blocked by rules — non-fatal.
+      // Orphaned subcollection data is invisible without the parent doc.
     }
   }
+  // This is the critical delete — removes the room from all queries
   await deleteDoc(doc(db, "studyRooms", roomId));
+}
+
+/**
+ * Admin: sweep all zombie/stale rooms and mark them finished.
+ * For each non-finished room, checks the actual participants subcollection
+ * to detect rooms where everyone left without properly leaving (tab close, etc).
+ * Returns number of rooms cleaned up.
+ */
+export async function sweepZombieRooms(): Promise<number> {
+  const snap = await getDocs(
+    query(collection(db, "studyRooms"), where("status", "in", ["waiting", "active", "paused"]))
+  );
+  const now = Date.now();
+  let count = 0;
+
+  for (const d of snap.docs) {
+    const data = d.data();
+
+    // Immediately mark expired rooms finished
+    if (data.expiresAt && data.expiresAt.toMillis() <= now) {
+      try {
+        await updateDoc(d.ref, { status: "finished", participantCount: 0, timerStartedAt: null });
+        count++;
+      } catch {}
+      continue;
+    }
+
+    // Check actual participants subcollection for active users
+    try {
+      const pSnap = await getDocs(collection(db, "studyRooms", d.id, "participants"));
+
+      if (pSnap.empty) {
+        // Absolutely no participants — definitely a zombie
+        await updateDoc(d.ref, { status: "finished", participantCount: 0, timerStartedAt: null });
+        count++;
+        continue;
+      }
+
+      // Count participants whose lastSeen is recent enough to be "alive"
+      const activePCount = pSnap.docs.filter(p => {
+        const pd = p.data();
+        // If no lastSeen, treat as recently joined (give benefit of doubt for < 5 min old docs)
+        if (!pd.lastSeen) {
+          const joinedAt = pd.joinedAt;
+          return joinedAt && (now - joinedAt.toMillis() < 5 * 60 * 1000);
+        }
+        return now - pd.lastSeen.toMillis() < STALE_THRESHOLD_MS;
+      }).length;
+
+      if (activePCount === 0) {
+        // All participants are stale / ghosts
+        await updateDoc(d.ref, { status: "finished", participantCount: 0, timerStartedAt: null });
+        count++;
+      } else if (activePCount !== data.participantCount) {
+        // Fix the stored count to match reality
+        try {
+          await updateDoc(d.ref, { participantCount: activePCount });
+        } catch {}
+      }
+    } catch {
+      // Read may fail (permissions) — skip this room
+    }
+  }
+  return count;
 }
 
 export const SUBJECTS = [

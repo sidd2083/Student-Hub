@@ -7,7 +7,7 @@ import {
   collection, getDocs, doc, query, where, orderBy,
   setDoc, getDoc, addDoc, deleteDoc, updateDoc,
 } from "firebase/firestore";
-import { deleteRoomCascade } from "@/lib/studyRooms";
+import { deleteRoomCascade, sweepZombieRooms } from "@/lib/studyRooms";
 import { signInWithPopup } from "firebase/auth";
 import { db, auth, googleProvider } from "@/lib/firebase";
 import {
@@ -1934,6 +1934,7 @@ interface AdminRoom {
 function ManageRooms() {
   const [rooms, setRooms]           = useState<AdminRoom[]>([]);
   const [loading, setLoading]       = useState(true);
+  const [sweeping, setSweeping]     = useState(false);
   const [actionId, setActionId]     = useState<string | null>(null);
   const [statusFilter, setStatusF]  = useState<string>("all");
   const [search, setSearch]         = useState("");
@@ -1961,7 +1962,8 @@ function ManageRooms() {
         } as AdminRoom;
       }));
     } catch (e) {
-      console.error("[Admin] loadRooms:", e);
+      const err = e as Error;
+      setMsg({ type: "error", text: `Failed to load rooms: ${err.message}` });
     } finally {
       setLoading(false);
     }
@@ -1969,15 +1971,35 @@ function ManageRooms() {
 
   useEffect(() => { loadRooms(); }, [loadRooms]);
 
+  async function handleSweep() {
+    if (!confirm("Sweep all zombie rooms? This marks any room with 0 participants as finished.")) return;
+    setSweeping(true);
+    try {
+      const count = await sweepZombieRooms();
+      setMsg({ type: "success", text: count > 0 ? `Swept ${count} ghost room(s). Reloading…` : "No ghost rooms found — all clean!" });
+      await loadRooms();
+    } catch (e) {
+      const err = e as Error;
+      setMsg({ type: "error", text: `Sweep failed: ${err.message}` });
+    } finally { setSweeping(false); }
+  }
+
   async function handleEndRoom(id: string, title: string) {
-    if (!confirm(`End session for "${title}"? This will mark it as finished.`)) return;
+    if (!confirm(`Force-end "${title}"? This marks it finished and clears participants.`)) return;
     setActionId(id);
     try {
-      await updateDoc(doc(db, "studyRooms", id), { status: "finished", timerStartedAt: null });
+      // Set participantCount: 0 as well — this satisfies the Firestore rule that
+      // allows any signed-in user to mark a room finished when count reaches 0.
+      await updateDoc(doc(db, "studyRooms", id), {
+        status: "finished",
+        participantCount: 0,
+        timerStartedAt: null,
+      });
       setMsg({ type: "success", text: `Room "${title}" ended.` });
       loadRooms();
-    } catch {
-      setMsg({ type: "error", text: "Failed to end room." });
+    } catch (e) {
+      const err = e as Error;
+      setMsg({ type: "error", text: `Failed to end room: ${err.message}` });
     } finally { setActionId(null); }
   }
 
@@ -1989,8 +2011,9 @@ function ManageRooms() {
       setRooms(prev => prev.filter(r => r.id !== id));
       setMsg({ type: "success", text: `Room "${title}" deleted.` });
     } catch (e) {
+      const err = e as Error;
       console.error("[Admin] deleteRoom:", e);
-      setMsg({ type: "error", text: "Failed to delete room." });
+      setMsg({ type: "error", text: `Delete failed: ${err.message}` });
     } finally { setActionId(null); }
   }
 
@@ -2020,15 +2043,22 @@ function ManageRooms() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Study Rooms Control</h2>
           <p className="text-sm text-gray-500 mt-0.5">View, end, or delete any study room</p>
         </div>
-        <button onClick={loadRooms} disabled={loading}
-          className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 disabled:opacity-50 transition-all">
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleSweep} disabled={sweeping || loading}
+            className="flex items-center gap-2 px-3 py-2 text-sm border border-orange-200 rounded-xl hover:bg-orange-50 text-orange-600 disabled:opacity-50 transition-all font-medium">
+            <RefreshCw className={`w-3.5 h-3.5 ${sweeping ? "animate-spin" : ""}`} />
+            {sweeping ? "Sweeping…" : "Sweep Ghosts"}
+          </button>
+          <button onClick={loadRooms} disabled={loading}
+            className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 disabled:opacity-50 transition-all">
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </button>
+        </div>
       </div>
 
       {msg && (
