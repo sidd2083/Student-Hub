@@ -28,16 +28,14 @@ export function ActiveRoomBar() {
         } text-white shadow-lg`}
       >
         <div className="flex items-center justify-between px-3 py-2 max-w-screen-lg mx-auto">
-          <Link href={`/study-rooms/${activeRoomId}`}>
-            <a className="flex items-center gap-2 flex-1 min-w-0">
-              {isStudy
-                ? <BookOpen className="w-4 h-4 flex-shrink-0 opacity-90" />
-                : <Coffee className="w-4 h-4 flex-shrink-0 opacity-90" />
-              }
-              <span className="text-sm font-semibold truncate">{room.title}</span>
-              <span className="text-white/70 text-xs hidden sm:inline">·</span>
-              <span className="text-white/80 text-xs hidden sm:inline truncate">{phase?.label}</span>
-            </a>
+          <Link href={`/study-rooms/${activeRoomId}`} className="flex items-center gap-2 flex-1 min-w-0 min-h-0 overflow-hidden">
+            {isStudy
+              ? <BookOpen className="w-4 h-4 flex-shrink-0 opacity-90" />
+              : <Coffee className="w-4 h-4 flex-shrink-0 opacity-90" />
+            }
+            <span className="text-sm font-semibold truncate">{room.title}</span>
+            <span className="text-white/70 text-xs hidden sm:inline">·</span>
+            <span className="text-white/80 text-xs hidden sm:inline truncate">{phase?.label}</span>
           </Link>
 
           <div className="flex items-center gap-3 flex-shrink-0">

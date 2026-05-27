@@ -106,10 +106,8 @@ export default function StudyRooms() {
             </p>
           </div>
           {user && (
-            <Link href="/study-rooms/create">
-              <button className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm transition-all flex-shrink-0">
-                <Plus className="w-4 h-4" /> Create Room
-              </button>
+            <Link href="/study-rooms/create" className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm transition-all flex-shrink-0">
+              <Plus className="w-4 h-4" /> Create Room
             </Link>
           )}
         </div>
@@ -195,10 +193,8 @@ export default function StudyRooms() {
               </p>
             </div>
             {user && (
-              <Link href="/study-rooms/create">
-                <button className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm">
-                  <Plus className="w-4 h-4" /> Create Study Room
-                </button>
+              <Link href="/study-rooms/create" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm">
+                <Plus className="w-4 h-4" /> Create Study Room
               </Link>
             )}
           </motion.div>
@@ -216,10 +212,8 @@ export default function StudyRooms() {
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-5 text-white text-center">
             <p className="font-semibold mb-1">Sign in to join or create study rooms</p>
             <p className="text-white/70 text-sm mb-3">Your study time syncs to the leaderboard automatically</p>
-            <Link href="/login">
-              <button className="px-5 py-2 rounded-xl bg-white text-blue-600 text-sm font-semibold hover:bg-blue-50 transition-colors">
-                Sign In with Google
-              </button>
+            <Link href="/login" className="px-5 py-2 rounded-xl bg-white text-blue-600 text-sm font-semibold hover:bg-blue-50 transition-colors">
+              Sign In with Google
             </Link>
           </div>
         )}

@@ -6,6 +6,14 @@ import { Room, subscribePublicRooms, getRemainingSeconds, formatTime } from "@/l
 import { useAuth } from "@/context/AuthContext";
 
 function MiniRoomCard({ room }: { room: Room }) {
+  // Tick every second so the countdown is live
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (room.status !== "active") return;
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [room.status, room.id]);
+
   const phase = room.studyFlow[room.currentPhaseIndex];
   const remaining = getRemainingSeconds(room);
   const isStudy = phase?.type === "study";
@@ -86,10 +94,8 @@ export function StudyRoomWidget() {
               : "Virtual study rooms with timer sync & live chat"}
           </p>
         </div>
-        <Link href="/study-rooms">
-          <div className="flex items-center gap-1 bg-white/20 hover:bg-white/30 transition-all text-white text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0 cursor-pointer">
-            View all <ArrowRight className="w-3.5 h-3.5" />
-          </div>
+        <Link href="/study-rooms" className="flex items-center gap-1 bg-white/20 hover:bg-white/30 transition-all text-white text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0">
+          View all <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
 
@@ -100,10 +106,8 @@ export function StudyRoomWidget() {
               <MiniRoomCard key={room.id} room={room} />
             ))}
             {activeRooms.length > 2 && (
-              <Link href="/study-rooms">
-                <p className="text-center text-xs text-blue-500 dark:text-blue-400 hover:underline cursor-pointer">
-                  +{activeRooms.length - 2} more rooms
-                </p>
+              <Link href="/study-rooms" className="block text-center text-xs text-blue-500 dark:text-blue-400 hover:underline">
+                +{activeRooms.length - 2} more rooms
               </Link>
             )}
           </>
@@ -116,16 +120,18 @@ export function StudyRoomWidget() {
         )}
 
         <div className="flex gap-2 pt-1">
-          <Link href="/study-rooms" className="flex-1">
-            <button className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
-              Browse Rooms
-            </button>
+          <Link
+            href="/study-rooms"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold hover:bg-gray-50 transition-colors"
+          >
+            Browse Rooms
           </Link>
           {user && (
-            <Link href="/study-rooms/create" className="flex-1">
-              <button className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors">
-                <Plus className="w-3.5 h-3.5" /> Create Room
-              </button>
+            <Link
+              href="/study-rooms/create"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" /> Create Room
             </Link>
           )}
         </div>

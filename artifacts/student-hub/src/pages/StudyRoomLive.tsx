@@ -565,8 +565,8 @@ export default function StudyRoomLive() {
       <div ref={containerRef}
         className={`${isFullscreen ? "fixed inset-0 z-50 bg-white dark:bg-gray-950 overflow-auto" : "max-w-screen-xl mx-auto"} px-2 sm:px-4 py-3 flex flex-col gap-3`}
       >
-        <HeaderBar />
-        <HostBar />
+        {HeaderBar()}
+        {HostBar()}
 
         {/* ── MOBILE LAYOUT ──────────────────────────────────────────────────── */}
         <div className="lg:hidden flex flex-col gap-3 pb-16">
@@ -623,12 +623,12 @@ export default function StudyRoomLive() {
               <motion.div key="chat" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
                 className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4"
                 style={{ minHeight: 400 }}>
-                <ChatPanel />
+                {ChatPanel()}
               </motion.div>
             )}
           </AnimatePresence>
 
-          <StudyFlow />
+          {StudyFlow()}
         </div>
 
         {/* ── DESKTOP LAYOUT ─────────────────────────────────────────────────── */}
@@ -674,7 +674,7 @@ export default function StudyRoomLive() {
               </div>
             )}
 
-            <StudyFlow />
+            {StudyFlow()}
 
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800">
               <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
@@ -692,7 +692,7 @@ export default function StudyRoomLive() {
                 <span className="text-sm font-bold text-gray-900 dark:text-white">💬 Chat</span>
               </div>
               <div className="p-3">
-                <ChatPanel />
+                {ChatPanel()}
               </div>
             </div>
 
@@ -702,7 +702,7 @@ export default function StudyRoomLive() {
                 <span className="text-xs text-gray-400">{participants.length}</span>
               </div>
               <div className="p-2">
-                <ParticipantsList />
+                {ParticipantsList()}
               </div>
             </div>
           </div>
@@ -710,7 +710,7 @@ export default function StudyRoomLive() {
 
         {/* Mobile bottom nav */}
         <div className="fixed bottom-0 left-0 right-0 z-30 lg:hidden shadow-lg">
-          <MobileTabs />
+          {MobileTabs()}
         </div>
       </div>
 

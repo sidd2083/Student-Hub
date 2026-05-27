@@ -1,5 +1,6 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Users, Clock, Lock, Unlock, BookOpen, Coffee, Timer } from "lucide-react";
+import { Users, Lock, Unlock, BookOpen, Coffee, Timer } from "lucide-react";
 import { Room, getRemainingSeconds, formatTime } from "@/lib/studyRooms";
 
 interface Props {
@@ -32,6 +33,14 @@ function statusLabel(room: Room) {
 }
 
 export function RoomCard({ room, onJoin }: Props) {
+  // Tick every second so the countdown stays live while the room is running
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (room.status !== "active") return;
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [room.status, room.id]);
+
   const status       = statusLabel(room);
   const phase        = room.studyFlow[room.currentPhaseIndex];
   const remaining    = getRemainingSeconds(room);
