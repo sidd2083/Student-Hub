@@ -84,7 +84,8 @@ export function getRemainingSeconds(room: Room): number {
   if (room.status === "paused") return room.pausedRemaining ?? totalSeconds;
   if (!room.timerStartedAt) return totalSeconds;
   const elapsed = (Date.now() - room.timerStartedAt.toMillis()) / 1000;
-  return Math.max(0, totalSeconds - elapsed);
+  const base = room.pausedRemaining ?? totalSeconds;
+  return Math.max(0, base - elapsed);
 }
 
 export function formatTime(seconds: number): string {

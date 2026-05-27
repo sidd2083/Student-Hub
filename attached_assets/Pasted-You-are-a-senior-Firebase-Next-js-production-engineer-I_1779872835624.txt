@@ -1,0 +1,178 @@
+You are a senior Firebase + Next.js production engineer.
+
+IMPORTANT CONTEXT:
+I already have a complete Virtual Study Room UI built in Next.js + TypeScript.
+
+BUT THE APP IS NOT FUNCTIONAL:
+- Create Room fails
+- Firebase not working properly
+- Real-time sync broken
+- Voting and timer not working
+
+YOUR TASK:
+ONLY FIX FUNCTIONALITY AND MAKE IT PRODUCTION READY.
+
+DO NOT change UI.
+
+==================================================
+CORE REQUIREMENT
+==================================================
+
+This must NOT be a temporary or insecure fix.
+
+You must implement:
+
+👉 FULLY SECURE FIREBASE ARCHITECTURE
+👉 PRODUCTION-READY FIRESTORE RULES
+👉 AUTH-BASED ACCESS CONTROL
+👉 OWNERSHIP VALIDATION
+
+NO open access rules allowed.
+
+==================================================
+STEP 1: FIREBASE INITIALIZATION
+==================================================
+
+Fix:
+- Firebase must be initialized once only
+- Correct use of modular SDK (v9+)
+- Ensure env variables are used correctly:
+  NEXT_PUBLIC_FIREBASE_API_KEY
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID
+  NEXT_PUBLIC_FIREBASE_APP_ID
+
+Fail loudly if missing.
+
+==================================================
+STEP 2: AUTH SYSTEM (STRICT)
+==================================================
+
+Rules:
+- Every action MUST require authenticated user
+- No anonymous writes
+- user.uid must be required everywhere
+
+==================================================
+STEP 3: FIRESTORE SECURITY RULES (PRODUCTION SAFE)
+
+Implement STRICT rules:
+
+1. Rooms Collection:
+- Only authenticated users can read
+- Only authenticated users can create rooms
+- Only room host (hostId == request.auth.uid) can update/delete room
+
+2. Participants:
+- Only authenticated users can join
+- User can only add/remove THEMSELVES
+- No fake user injection allowed
+
+3. Timer State:
+- ONLY host can modify timer
+- Others can only read
+
+4. Votes:
+- Only authenticated users can create vote once per voteId
+- One user = one vote per vote session
+- Prevent spam voting
+
+5. General Rule:
+- No public write access anywhere
+
+==================================================
+STEP 4: CREATE ROOM FIX (SECURE)
+==================================================
+
+Fix createRoom:
+
+- must verify auth
+- must attach hostId = request.auth.uid
+- must validate all input fields
+- must sanitize data
+- must reject invalid payloads
+
+Room schema must include:
+- id
+- title
+- hostId
+- createdAt (serverTimestamp)
+- participants (array with host included)
+- timerConfig (structured object)
+- currentPhaseIndex
+- status (active/paused/ended)
+
+==================================================
+STEP 5: JOIN ROOM FIX
+==================================================
+
+- user can join only if authenticated
+- user added ONLY if not already in room
+- prevent duplicate entries
+- update participants safely using transaction
+
+==================================================
+STEP 6: TIMER SYSTEM (SECURE + SERVER CONTROLLED)
+
+- ONLY host can update timer state
+- timer must be based on Firestore server timestamps
+- no client-side authority
+- prevent manipulation from frontend
+
+==================================================
+STEP 7: VOTING SYSTEM (SECURE)
+
+- each vote tied to userId
+- prevent duplicate votes
+- only allow one active vote per session
+- votes stored securely in Firestore
+
+When vote passes:
+- ONLY backend logic (or host-controlled trigger) modifies timer
+
+==================================================
+STEP 8: REAL-TIME SYNC
+
+Use Firestore listeners ONLY for:
+- room updates
+- participants
+- votes
+- timer state
+
+Ensure:
+- proper cleanup
+- no duplicate listeners
+- no memory leaks
+
+==================================================
+STEP 9: DEBUGGING (MANDATORY)
+
+Log:
+- auth state
+- firebase initialization
+- firestore read/write errors
+- room creation payload
+- rule violations
+
+Show real Firebase error messages in UI.
+
+==================================================
+STRICT RULE
+
+DO NOT:
+- downgrade security for testing
+- use open Firestore rules
+- allow unauthenticated writes
+- bypass auth checks
+
+EVERYTHING MUST BE SECURE BY DEFAULT.
+==================================================
+
+FINAL GOAL:
+After fix:
+- Create Room works
+- Join Room works
+- Timer sync works
+- Voting works
+- Firebase fully secure
+- No runtime errors
