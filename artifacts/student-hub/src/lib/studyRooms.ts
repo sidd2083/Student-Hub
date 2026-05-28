@@ -613,53 +613,75 @@ export function subscribePublicRooms(cb: RoomsCb): () => void {
 
 // ── Study Time Sync ───────────────────────────────────────────────────────────
 
+/** NPT (Nepal Time) = UTC + 5:45 */
+const NPT_MS = (5 * 60 + 45) * 60 * 1000;
+function getNptDate(): string {
+  return new Date(Date.now() + NPT_MS).toISOString().slice(0, 10);
+}
+
 /**
- * Sync study minutes earned in a study room back to the user's profile
- * AND to the daily study_log entry (so the report card + leaderboard update).
- * Mirrors the same write pattern as TimerContext.
+ * Sync study minutes earned in a study room to:
+ *   1. users/{uid}  — totalStudyTime, todayStudyTime, weeklyStudyTime (leaderboard)
+ *   2. study_logs/{uid_date} — studyMinutes (report card)
+ *
+ * Uses the same getDoc+setDoc(merge) pattern as TimerContext to avoid any
+ * Firestore rules type-check issues with FieldValue.increment().
  */
 export async function syncStudyTimeToLeaderboard(uid: string, additionalMins: number): Promise<void> {
   if (additionalMins <= 0 || !uid) return;
+  const mins = Math.round(additionalMins); // ensure integer
+  const today = getNptDate();
 
-  // ── 1. Update users/{uid} — leaderboard & streak ──────────────────────────
+  // ── 1. users/{uid} ────────────────────────────────────────────────────────
   try {
-    // Get today's Nepali date (offset NPT = UTC+5:45)
-    const NPT_OFFSET_MS = 5 * 60 * 60 * 1000 + 45 * 60 * 1000;
-    const today = new Date(Date.now() + NPT_OFFSET_MS)
-      .toISOString().slice(0, 10); // "YYYY-MM-DD"
+    const userRef  = doc(db, "users", uid);
+    const userSnap = await getDoc(userRef);
+    const d        = userSnap.exists() ? userSnap.data() : {};
 
-    await updateDoc(doc(db, "users", uid), {
-      totalStudyTime:  increment(additionalMins),
-      todayStudyTime:  increment(additionalMins),
-      weeklyStudyTime: increment(additionalMins),
+    const lastActive = (d.lastActiveDate as string) ?? "";
+    const prevToday  = lastActive === today ? Math.round(d.todayStudyTime  ?? 0) : 0;
+    const prevTotal  = Math.round(d.totalStudyTime  ?? 0);
+    const prevWeekly = Math.round(d.weeklyStudyTime ?? 0);
+
+    await setDoc(userRef, {
+      totalStudyTime:  prevTotal  + mins,
+      todayStudyTime:  prevToday  + mins,
+      weeklyStudyTime: prevWeekly + mins,
       lastActiveDate:  today,
-    });
+    }, { merge: true });
   } catch (err) {
-    console.warn("[StudyRoom] users write failed:", err);
+    console.warn("[StudyRoom] users sync failed:", err);
   }
 
-  // ── 2. Update study_logs/{uid_date} — report card ─────────────────────────
+  // ── 2. study_logs/{uid_date} ───────────────────────────────────────────────
   try {
-    const NPT_OFFSET_MS = 5 * 60 * 60 * 1000 + 45 * 60 * 1000;
-    const today = new Date(Date.now() + NPT_OFFSET_MS).toISOString().slice(0, 10);
-    const logRef = doc(db, "study_logs", `${uid}_${today}`);
+    const logRef  = doc(db, "study_logs", `${uid}_${today}`);
     const logSnap = await getDoc(logRef);
     if (logSnap.exists()) {
-      await updateDoc(logRef, {
-        studyMinutes: increment(additionalMins),
-      });
+      const prev = Math.round(logSnap.data().studyMinutes ?? 0);
+      await updateDoc(logRef, { studyMinutes: prev + mins });
     } else {
       await setDoc(logRef, {
-        uid,
-        date: today,
-        studyMinutes: additionalMins,
-        tasksCompleted: 0,
-        notesViewed: 0,
+        uid, date: today, studyMinutes: mins, tasksCompleted: 0, notesViewed: 0,
       });
     }
   } catch (err) {
-    console.warn("[StudyRoom] study_logs write failed:", err);
+    console.warn("[StudyRoom] study_logs sync failed:", err);
   }
+}
+
+/**
+ * Update the participant doc's studyMinsInRoom so the classroom avatar
+ * badge shows live study time to everyone in the room.
+ */
+export async function updateParticipantStudyMins(
+  roomId: string, uid: string, studyMins: number,
+): Promise<void> {
+  try {
+    await updateDoc(doc(db, "studyRooms", roomId, "participants", uid), {
+      studyMinsInRoom: Math.round(studyMins),
+    });
+  } catch {} // non-critical, ignore silently
 }
 
 // ── Transfer Host ─────────────────────────────────────────────────────────────

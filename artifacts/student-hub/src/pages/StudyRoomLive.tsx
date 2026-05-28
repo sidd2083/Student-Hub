@@ -398,34 +398,49 @@ export default function StudyRoomLive() {
           {allMessages.length === 0 && (
             <p className="text-center text-xs text-gray-400 dark:text-gray-500 py-6">No messages yet — say something!</p>
           )}
-          {allMessages.map(msg => (
-            <div key={msg.id}>
-              {msg.type === "reaction" ? (
-                <div className="text-center text-base">
-                  {msg.emoji}
-                  <span className="text-[10px] text-gray-400 ml-1">{msg.name.split(" ")[0]}</span>
-                </div>
-              ) : msg.type === "system" ? (
-                <p className="text-center text-xs italic text-gray-400">{msg.text}</p>
-              ) : (
-                <div className={`flex gap-1.5 ${msg.uid === user?.uid ? "flex-row-reverse" : ""}`}>
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5">
-                    {msg.name.charAt(0)}
+          {allMessages.map((msg, idx) => {
+            const prev = allMessages[idx - 1];
+            const isContinuation =
+              msg.type === "message" &&
+              prev?.type === "message" &&
+              prev?.uid === msg.uid;
+            const isMine = msg.uid === user?.uid;
+            return (
+              <div key={msg.id} className={isContinuation ? "mt-0.5" : idx > 0 ? "mt-2" : ""}>
+                {msg.type === "reaction" ? (
+                  <div className="text-center text-base">
+                    {msg.emoji}
+                    <span className="text-[10px] text-gray-400 ml-1">{msg.name.split(" ")[0]}</span>
                   </div>
-                  <div className={`max-w-[78%] flex flex-col gap-0.5 ${msg.uid === user?.uid ? "items-end" : "items-start"}`}>
-                    <p className="text-[10px] text-gray-400">{msg.name.split(" ")[0]}</p>
-                    <div className={`px-3 py-1.5 rounded-2xl text-xs leading-relaxed ${
-                      msg.uid === user?.uid
-                        ? `bg-blue-500 text-white rounded-tr-sm ${!msg.createdAt ? "opacity-70" : ""}`
-                        : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-tl-sm"
-                    }`}>
-                      {msg.text}
+                ) : msg.type === "system" ? (
+                  <p className="text-center text-xs italic text-gray-400 py-0.5">{msg.text}</p>
+                ) : (
+                  <div className={`flex gap-1.5 items-end ${isMine ? "flex-row-reverse" : ""}`}>
+                    {/* Avatar — only shown for first message in a consecutive group */}
+                    {!isContinuation ? (
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                        {msg.name.charAt(0)}
+                      </div>
+                    ) : (
+                      <div className="w-6 shrink-0" />
+                    )}
+                    <div className={`max-w-[78%] flex flex-col gap-0.5 ${isMine ? "items-end" : "items-start"}`}>
+                      {!isContinuation && (
+                        <p className="text-[10px] text-gray-400 px-1">{msg.name.split(" ")[0]}</p>
+                      )}
+                      <div className={`px-3 py-1.5 rounded-2xl text-xs leading-relaxed ${
+                        isMine
+                          ? `bg-blue-500 text-white ${isContinuation ? "rounded-tr-2xl" : "rounded-tr-sm"} ${!msg.createdAt ? "opacity-70" : ""}`
+                          : `bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 ${isContinuation ? "rounded-tl-2xl" : "rounded-tl-sm"}`
+                      }`}>
+                        {msg.text}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          ))}
+                )}
+              </div>
+            );
+          })}
           <div ref={chatRef} />
         </div>
         {/* Input */}

@@ -35,6 +35,13 @@ function avatarGradient(name: string) {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
 }
 
+function fmtStudyMins(mins: number): string {
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h${m}m` : `${h}h`;
+}
+
 // ── Empty seat ────────────────────────────────────────────────────────────────
 const EmptySeat = memo(function EmptySeat({ compact }: { compact: boolean }) {
   const sz = compact ? "w-9 h-9" : "w-12 h-12";
@@ -74,6 +81,14 @@ const OccupiedSeat = memo(function OccupiedSeat({
       className={`flex flex-col items-center gap-1.5 ${compact ? "w-14" : "w-20"} cursor-pointer group focus:outline-none`}
     >
       <div className="relative">
+        {/* Study time badge — floats above crown/avatar */}
+        {p.studyMinsInRoom > 0 && (
+          <div className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap z-20 ${isHost ? "-top-9" : "-top-6"}`}>
+            <span className="inline-flex items-center bg-emerald-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow leading-none">
+              {fmtStudyMins(p.studyMinsInRoom)}
+            </span>
+          </div>
+        )}
         {isHost && (
           <Crown className="absolute -top-3 left-1/2 -translate-x-1/2 w-3.5 h-3.5 text-yellow-400 drop-shadow-sm z-10" />
         )}

@@ -4,7 +4,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import {
   Room, RoomParticipant, subscribeRoom, subscribeParticipants,
-  leaveRoom, updatePresence, syncStudyTimeToLeaderboard,
+  leaveRoom, updatePresence, syncStudyTimeToLeaderboard, updateParticipantStudyMins,
   pauseTimer, resumeTimer, startTimer, skipPhase, endRoom,
   advancePhase, getRemainingSeconds, transferHost, purgeStaleParticipants,
 } from "@/lib/studyRooms";
@@ -103,7 +103,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
           studySecondsRef.current += 1;
         }
 
-        // Sync to leaderboard every 60s for every participant
+        // Sync to leaderboard + update classroom badge every 60s
         const now = Date.now();
         if (now - lastSyncRef.current >= 60_000 && user) {
           const minsToSync = Math.floor(studySecondsRef.current / 60);
@@ -112,6 +112,9 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
             syncedMinsRef.current   += minsToSync;
             studySecondsRef.current -= minsToSync * 60;
           }
+          // Push live study time to participant doc so other members see badge
+          const totalMins = syncedMinsRef.current + Math.floor(studySecondsRef.current / 60);
+          updateParticipantStudyMins(r.id, user.uid, totalMins).catch(() => {});
           lastSyncRef.current = now;
         }
 

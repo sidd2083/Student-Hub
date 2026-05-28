@@ -3,10 +3,10 @@ import {
   deleteObject,
 } from "firebase/storage";
 import { doc, updateDoc } from "firebase/firestore";
-import { storage, db, isConfigured } from "@/lib/firebase";
+import { storage, db } from "@/lib/firebase";
 
-const MAX_PX      = 512;   // max width or height
-const JPEG_Q      = 0.82;  // single-pass quality — good balance of size vs clarity
+const MAX_PX = 512;
+const JPEG_Q = 0.82;
 
 /** Resize + JPEG-compress an image File using an off-screen Canvas. */
 async function compressImage(file: File): Promise<Blob> {
@@ -17,7 +17,6 @@ async function compressImage(file: File): Promise<Blob> {
     img.onload = () => {
       URL.revokeObjectURL(objectUrl);
 
-      // Scale down to fit MAX_PX × MAX_PX while keeping aspect ratio
       let { naturalWidth: w, naturalHeight: h } = img;
       if (w > MAX_PX || h > MAX_PX) {
         if (w >= h) { h = Math.round(h * MAX_PX / w); w = MAX_PX; }
@@ -31,7 +30,6 @@ async function compressImage(file: File): Promise<Blob> {
       const ctx = canvas.getContext("2d");
       if (!ctx) { reject(new Error("Canvas unavailable")); return; }
 
-      // White background so transparent PNGs get a clean JPEG background
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
@@ -39,7 +37,7 @@ async function compressImage(file: File): Promise<Blob> {
       canvas.toBlob(
         (blob) => {
           if (blob) resolve(blob);
-          else reject(new Error("Canvas toBlob returned null"));
+          else reject(new Error("Compression failed — try a different image"));
         },
         "image/jpeg",
         JPEG_Q,
@@ -48,72 +46,101 @@ async function compressImage(file: File): Promise<Blob> {
 
     img.onerror = () => {
       URL.revokeObjectURL(objectUrl);
-      reject(new Error("Image failed to load — file may be corrupt"));
+      reject(new Error("Could not read image — file may be corrupt"));
     };
 
     img.src = objectUrl;
   });
 }
 
+/** Human-readable message from a Firebase Storage error. */
+function storageErrorMsg(err: unknown): string {
+  const code = (err as { code?: string }).code ?? "";
+  if (code === "storage/unauthorized")      return "Permission denied — make sure you are signed in.";
+  if (code === "storage/bucket-not-found")  return "Storage not configured — add VITE_FIREBASE_STORAGE_BUCKET to your environment variables.";
+  if (code === "storage/object-not-found")  return "Photo not found — it may have already been deleted.";
+  if (code === "storage/quota-exceeded")    return "Storage quota exceeded — contact support.";
+  if (code === "storage/unauthenticated")   return "Sign in first, then try again.";
+  if (code === "storage/invalid-argument")  return "Invalid file — please pick a regular image (JPG, PNG, WEBP).";
+  if (code === "storage/canceled")          return "Upload cancelled.";
+  if (code.startsWith("storage/"))         return `Upload failed (${code}) — please try again.`;
+  const msg = (err as { message?: string }).message ?? "";
+  if (msg.toLowerCase().includes("cors"))  return "CORS error — Firebase Storage CORS is not configured for this origin.";
+  return "Upload failed — please try again.";
+}
+
 /**
- * Upload a profile photo to Firebase Storage, report real byte-level progress,
- * and save the public download URL to Firestore `users/{uid}.photoURL`.
- *
- * Progress values: 0 → 15 (compress) → 15–95 (upload) → 100 (Firestore saved)
+ * Upload a profile photo, report real byte-level progress (0→100 %),
+ * and save the download URL to Firestore users/{uid}.photoURL.
  */
 export async function uploadProfilePhoto(
   uid: string,
   file: File,
   onProgress?: (pct: number) => void,
 ): Promise<string> {
-  if (!isConfigured) throw new Error("Firebase not configured");
-  if (!file.type.startsWith("image/")) throw new Error("Please pick an image file");
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Please pick an image file (JPG, PNG, WEBP, etc.)");
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    throw new Error("File too large — maximum 20 MB.");
+  }
 
   onProgress?.(5);
 
   // ── 1. Compress ────────────────────────────────────────────────────────────
-  const blob = await compressImage(file);
+  let blob: Blob;
+  try {
+    blob = await compressImage(file);
+  } catch (err) {
+    throw new Error((err as Error).message || "Compression failed");
+  }
   onProgress?.(15);
 
-  // ── 2. Upload with real progress ───────────────────────────────────────────
-  const storageRef  = ref(storage, `avatars/${uid}.jpg`);
-  const uploadTask  = uploadBytesResumable(blob, { contentType: "image/jpeg" });
+  // ── 2. Upload with real byte-level progress ────────────────────────────────
+  const storageRef = ref(storage, `avatars/${uid}.jpg`);
+  const task       = uploadBytesResumable(blob, { contentType: "image/jpeg" });
 
   await new Promise<void>((resolve, reject) => {
-    uploadTask.on(
+    task.on(
       "state_changed",
-      (snapshot) => {
-        // Map upload bytes → 15 … 95 % range
-        const uploadPct = snapshot.bytesTransferred / snapshot.totalBytes;
-        onProgress?.(Math.round(15 + uploadPct * 80));
+      (snap) => {
+        const pct = snap.bytesTransferred / snap.totalBytes;
+        onProgress?.(Math.round(15 + pct * 80));   // 15 → 95
       },
-      (err) => reject(err),
+      (err) => reject(new Error(storageErrorMsg(err))),
       () => resolve(),
     );
   });
 
   onProgress?.(96);
 
-  // ── 3. Get public URL ──────────────────────────────────────────────────────
-  const url = await getDownloadURL(uploadTask.snapshot.ref);
+  // ── 3. Get download URL ────────────────────────────────────────────────────
+  let url: string;
+  try {
+    url = await getDownloadURL(task.snapshot.ref);
+  } catch (err) {
+    throw new Error(storageErrorMsg(err));
+  }
   onProgress?.(98);
 
-  // ── 4. Save to Firestore ───────────────────────────────────────────────────
-  await updateDoc(doc(db, "users", uid), { photoURL: url });
+  // ── 4. Persist to Firestore ────────────────────────────────────────────────
+  try {
+    await updateDoc(doc(db, "users", uid), { photoURL: url });
+  } catch (err) {
+    console.warn("[Photo] Firestore update failed:", err);
+    // Return the URL anyway — user can still use the photo
+  }
   onProgress?.(100);
 
   return url;
 }
 
-/**
- * Delete the profile photo from Storage and clear the Firestore field.
- */
+/** Delete photo from Storage + clear Firestore field. */
 export async function removeProfilePhoto(uid: string): Promise<void> {
-  if (!isConfigured) return;
   try {
     await deleteObject(ref(storage, `avatars/${uid}.jpg`)).catch(() => {});
     await updateDoc(doc(db, "users", uid), { photoURL: null });
   } catch (err) {
-    console.warn("[Photo] removeProfilePhoto error:", err);
+    console.warn("[Photo] removeProfilePhoto:", err);
   }
 }
