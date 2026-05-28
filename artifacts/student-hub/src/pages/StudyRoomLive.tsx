@@ -100,6 +100,9 @@ export default function StudyRoomLive() {
   // auto-join — check Firestore directly to avoid double-counting participant
   useEffect(() => {
     if (!roomId || !user || !profile || joined || !room || room.status === "finished") return;
+    // If context is already tracking this room (user navigated away and back),
+    // just mark as joined locally — don't reset accumulated study time
+    if (activeRoomId === roomId) { setJoined(true); return; }
     async function doJoin() {
       try {
         // Use server check — local `participants` state may be empty on first render
@@ -113,7 +116,7 @@ export default function StudyRoomLive() {
     }
     doJoin();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, user, profile, room, joined]);
+  }, [roomId, user, profile, room, joined, activeRoomId]);
 
   // fullscreen listener
   useEffect(() => {
@@ -441,10 +444,9 @@ export default function StudyRoomLive() {
         {/* Progress bar */}
         {showTimer && (
           <div className="mt-2 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-            <motion.div
-              className={`h-full rounded-full ${isStudying ? "bg-blue-500" : "bg-green-500"}`}
+            <div
+              className={`h-full rounded-full transition-[width] duration-1000 ease-linear ${isStudying ? "bg-blue-500" : "bg-green-500"}`}
               style={{ width: `${pctDone}%` }}
-              transition={{ duration: 1, ease: "linear" }}
             />
           </div>
         )}
@@ -478,7 +480,7 @@ export default function StudyRoomLive() {
               </span>
             ) : null}
             {mobileTab === t.id && (
-              <motion.div layoutId="tab-underline" className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-blue-500 rounded-full" />
+              <div className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-blue-500 rounded-full" />
             )}
           </button>
         ))}
@@ -511,8 +513,8 @@ export default function StudyRoomLive() {
       <div ref={containerRef}
         className={`${isFullscreen ? "fixed inset-0 z-50 bg-white dark:bg-gray-950 overflow-auto" : "max-w-screen-xl mx-auto"} px-2 sm:px-4 py-3 flex flex-col gap-3`}
       >
-        <HeaderBar />
-        <HostBar />
+        {HeaderBar()}
+        {HostBar()}
 
         {/* ── MOBILE LAYOUT ──────────────────────────────────────────────────── */}
         <div className="lg:hidden flex flex-col gap-3 pb-16">
@@ -576,13 +578,13 @@ export default function StudyRoomLive() {
               <motion.div key="chat" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
                 className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4"
                 style={{ minHeight: 400 }}>
-                <ChatPanel />
+                {ChatPanel()}
               </motion.div>
             )}
           </AnimatePresence>
 
           {/* Study flow (mobile) */}
-          <StudyFlow />
+          {StudyFlow()}
         </div>
 
         {/* ── DESKTOP LAYOUT ─────────────────────────────────────────────────── */}
@@ -630,7 +632,7 @@ export default function StudyRoomLive() {
               </div>
             )}
 
-            <StudyFlow />
+            {StudyFlow()}
 
             {/* Vote tab */}
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800">
@@ -650,7 +652,7 @@ export default function StudyRoomLive() {
                 <span className="text-sm font-bold text-gray-900 dark:text-white">💬 Chat</span>
               </div>
               <div className="p-3">
-                <ChatPanel />
+                {ChatPanel()}
               </div>
             </div>
 
@@ -661,7 +663,7 @@ export default function StudyRoomLive() {
                 <span className="text-xs text-gray-400">{participants.length}</span>
               </div>
               <div className="p-2">
-                <ParticipantsList />
+                {ParticipantsList()}
               </div>
             </div>
           </div>
@@ -669,7 +671,7 @@ export default function StudyRoomLive() {
 
         {/* Mobile bottom nav */}
         <div className="fixed bottom-0 left-0 right-0 z-30 lg:hidden shadow-lg">
-          <MobileTabs />
+          {MobileTabs()}
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import {
   createContext, useContext, useEffect, useRef, useState, useCallback,
 } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { auth } from "@/lib/firebase";
 import {
   Room, RoomParticipant, subscribeRoom, subscribeParticipants,
   leaveRoom, updatePresence, syncStudyTimeToLeaderboard,
@@ -68,6 +69,30 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     };
   }, [activeRoomId]);
 
+  // ── Internal helper: save minutes via the same API as the Pomodoro timer ────
+  // This ensures streak, lastActiveDate, study_logs, etc. are updated identically.
+  const syncStudyMins = useCallback(async (uid: string, mins: number) => {
+    if (mins < 1) return;
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (token) {
+        const res = await fetch("/api/study/save", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({ uid, minutes: mins }),
+        });
+        if (res.ok) return;
+      }
+    } catch {
+      // fall through to Firestore fallback
+    }
+    // Firestore direct fallback
+    await syncStudyTimeToLeaderboard(uid, mins).catch(() => {});
+  }, []);
+
   // ── Timer tick — runs every second, shared for all users ───────────────────
   useEffect(() => {
     const interval = setInterval(() => {
@@ -89,7 +114,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
         if (now - lastSyncRef.current >= 60_000 && user) {
           const minsToSync = Math.floor(studySecondsRef.current / 60);
           if (minsToSync > 0) {
-            syncStudyTimeToLeaderboard(user.uid, minsToSync).catch(() => {});
+            syncStudyMins(user.uid, minsToSync).catch(() => {});
             syncedMinsRef.current += minsToSync;
             studySecondsRef.current -= minsToSync * 60; // keep sub-minute remainder
           }
@@ -109,7 +134,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, syncStudyMins]);
 
   // ── Presence heartbeat (every 30s) ──────────────────────────────────────────
   useEffect(() => {
@@ -140,12 +165,18 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
 
   // ── Public API ───────────────────────────────────────────────────────────────
   const joinActiveRoom = useCallback((roomId: string) => {
-    studySecondsRef.current = 0;
-    syncedMinsRef.current   = 0;
-    lastSyncRef.current     = Date.now();
-    advancingRef.current    = false;
-    setStudyMinsInSession(0);
-    setActiveRoomId(roomId);
+    // Already tracking this exact room — don't wipe accumulated study time
+    // (happens when user navigates away and comes back to the same room)
+    setActiveRoomId(prev => {
+      if (prev === roomId) return prev; // no-op
+      // New room — reset tracking
+      studySecondsRef.current = 0;
+      syncedMinsRef.current   = 0;
+      lastSyncRef.current     = Date.now();
+      advancingRef.current    = false;
+      setStudyMinsInSession(0);
+      return roomId;
+    });
   }, []);
 
   const leaveActiveRoom = useCallback(async () => {
@@ -154,7 +185,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     // Sync the unsync'd remainder before leaving
     const remainderMins = Math.floor(studySecondsRef.current / 60);
     if (remainderMins > 0) {
-      await syncStudyTimeToLeaderboard(user.uid, remainderMins).catch(() => {});
+      await syncStudyMins(user.uid, remainderMins);
     }
     const totalSessionMins = syncedMinsRef.current + remainderMins;
 
