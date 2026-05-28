@@ -129,9 +129,9 @@ function LeaderboardContent() {
   const [gradeFilter, setGradeFilter] = useState<number | "all">("all");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(() => leaderboardCache ? new Date(leaderboardCache.ts) : null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     const now = Date.now();
-    if (leaderboardCache && now - leaderboardCache.ts < LEADER_CACHE_TTL) return;
+    if (!force && leaderboardCache && now - leaderboardCache.ts < LEADER_CACHE_TTL) return;
     if (!leaderboardCache) setLoading(true);
     try {
       const today     = getNepaliDate();
@@ -167,9 +167,19 @@ function LeaderboardContent() {
   }, []);
 
   useEffect(() => {
-    load();
+    // Always force-refresh on mount so study time from a just-left room
+    // is visible immediately — cache is stale at that point.
+    load(true);
     const id = setInterval(load, 60_000);
-    return () => clearInterval(id);
+
+    // Also refresh when the tab comes back into focus
+    const onVisible = () => { if (document.visibilityState === "visible") load(true); };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [load]);
 
   const filtered = entries

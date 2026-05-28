@@ -88,7 +88,10 @@ export default function Settings() {
     } catch (err) {
       URL.revokeObjectURL(local);
       setPhotoPreview(null);
-      setPhotoError("Upload failed — please try again.");
+      // Show the actual error from uploadProfilePhoto (Firebase Storage errors
+      // are already translated to human-readable messages in photoUpload.ts).
+      const msg = (err as Error).message || "Upload failed — please try again.";
+      setPhotoError(msg);
       console.error("[Settings] Upload error:", err);
     } finally {
       setUploadPct(null);

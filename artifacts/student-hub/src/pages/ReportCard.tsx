@@ -304,8 +304,15 @@ function ReportContent() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    const id = setInterval(load, 120_000);
-    return () => clearInterval(id);
+    // Auto-refresh every 60 s (was 120 s) and immediately on tab focus so
+    // study time from a just-left room is visible without manual refresh.
+    const id = setInterval(load, 60_000);
+    const onVisible = () => { if (document.visibilityState === "visible") load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [load]);
 
   if (loading) {

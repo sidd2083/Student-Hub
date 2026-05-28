@@ -657,12 +657,14 @@ export async function syncStudyTimeToLeaderboard(uid: string, additionalMins: nu
     const lastActive = snap.exists() ? ((snap.data().lastActiveDate as string) ?? "") : "";
     const sameDay    = lastActive === today;
 
-    await updateDoc(userRef, {
+    // Use setDoc+merge so this works even if the user doc doesn't exist yet.
+    // increment() is supported inside setDoc({merge:true}) just like updateDoc.
+    await setDoc(userRef, {
       totalStudyTime:  increment(mins),          // atomic — avoids stale-cache overwrite
       weeklyStudyTime: increment(mins),          // atomic
       todayStudyTime:  sameDay ? increment(mins) : mins,  // reset if new day
       lastActiveDate:  today,
-    });
+    }, { merge: true });
   } catch (err) {
     console.warn("[StudyRoom] users sync:", err);
   }

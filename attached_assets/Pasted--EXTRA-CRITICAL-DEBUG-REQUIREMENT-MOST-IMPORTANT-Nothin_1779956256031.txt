@@ -1,0 +1,164 @@
+# EXTRA CRITICAL DEBUG REQUIREMENT (MOST IMPORTANT)
+
+Nothing is actually solved yet.
+
+The UI changes slightly, but the REAL CORE PROBLEMS still exist.
+
+You must STOP doing surface-level fixes and actually debug the realtime architecture and Firestore synchronization properly.
+
+========================================================
+🔥 MAIN REAL ISSUE
+==================
+
+The entire timing system is still fundamentally broken.
+
+Currently:
+
+* study time disappears
+* report card resets
+* leaderboard not updating
+* popup stats incorrect
+* study time not persisting
+* room timer not synced correctly
+* members not tracked correctly
+
+Example:
+
+If user studies for 1 minute:
+
+* popup may show 1 minute
+
+But:
+
+* after navigating to report card page and returning
+  → that 1 minute disappears completely
+
+Meaning:
+THE DATA IS NOT BEING SAVED/PERSISTED PROPERLY.
+
+This means:
+
+* Firestore writes are broken
+  OR
+* state sync is broken
+  OR
+* timer aggregation logic is broken
+
+========================================================
+🔥 THIS MUST BE DEBUGGED PROPERLY
+=================================
+
+You MUST now:
+
+1. Trace ALL timer writes
+2. Trace ALL study time calculations
+3. Trace ALL Firestore updates
+4. Trace ALL leaderboard updates
+5. Trace ALL report card updates
+6. Trace ALL room participation tracking
+
+DO NOT GUESS.
+
+Actually debug the architecture and fix root cause.
+
+========================================================
+🔥 STUDY TIME MUST PERSIST
+==========================
+
+When user studies:
+
+* time must save permanently
+* must survive refresh/navigation
+* must appear correctly everywhere
+
+Meaning:
+If user studies 5 minutes:
+Then ALL of these must show SAME value:
+
+* room popup
+* report card
+* leaderboard
+* today study time
+* streak calculations
+
+NO inconsistencies allowed.
+
+========================================================
+🔥 TIMER MUST BE SOURCE OF TRUTH
+================================
+
+Currently different parts of app calculate different times.
+
+This is WRONG.
+
+There must be ONE CENTRAL SOURCE OF TRUTH.
+
+Use:
+
+* server timestamps
+* Firestore synchronized timing
+* centralized study aggregation
+
+NOT multiple frontend timers.
+
+========================================================
+🔥 PROFILE PICTURE STILL BROKEN
+===============================
+
+The profile picture upload STILL does not work.
+
+Currently:
+upload → "something went wrong"
+
+You MUST debug:
+
+* Firebase Storage rules
+* upload path
+* auth permissions
+* file conversion
+* upload handling
+* Firestore photoURL update
+
+DO NOT fake completion.
+Actually make upload functional.
+
+========================================================
+🔥 HOST TRANSFER STILL BROKEN
+=============================
+
+Currently after host leaves:
+
+* sometimes no host exists
+* room becomes unstable
+
+Fix:
+When host leaves:
+→ instantly transfer host
+→ to oldest active participant
+
+Must update:
+
+* Firestore
+* local state
+* room controls
+
+in realtime.
+
+========================================================
+🔥 FINAL REQUIREMENT
+====================
+
+DO NOT say fixed unless:
+
+✔ study time persists correctly
+✔ report card keeps exact values
+✔ leaderboard stays synced
+✔ popup stats accurate
+✔ room timer fully synced
+✔ members tracked correctly
+✔ profile picture upload actually works
+✔ host transfer works every time
+✔ no disappearing study minutes
+✔ no inconsistent timing anywhere
+
+The ENTIRE realtime timing architecture must become stable and production-ready.

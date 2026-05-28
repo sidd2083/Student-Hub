@@ -176,6 +176,33 @@ export default function StudyRoomLive() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, user, profile, joined, room?.id, room?.status]);
 
+  // ── UNMOUNT CLEANUP — sync study time + leave on SPA navigation ───────────────
+  // This fires whenever the user navigates away from the room page WITHOUT
+  // pressing the Leave button (clicking nav links, browser back, etc.).
+  // leaveActiveRoom() banks accumulated study time, transfers host if needed,
+  // and removes the participant from Firestore — same as the explicit Leave flow.
+  //
+  // We store everything in refs so the cleanup always uses the latest values
+  // even though useEffect(fn, []) only captures the initial render's closure.
+  const joinedRef        = useRef(false);
+  const leaveRef         = useRef(leaveActiveRoom);
+  leaveRef.current       = leaveActiveRoom;
+
+  useEffect(() => {
+    if (joined) joinedRef.current = true;
+  }, [joined]);
+
+  useEffect(() => {
+    return () => {
+      if (joinedRef.current) {
+        // Fire-and-forget: Firestore SDK (offline persistence) writes to IndexedDB
+        // immediately, so data is durable even if the async finishes after unmount.
+        leaveRef.current().catch(() => {});
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Fullscreen ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const h = () => setIsFullscreen(!!document.fullscreenElement);
@@ -197,6 +224,8 @@ export default function StudyRoomLive() {
 
   // ── Actions ───────────────────────────────────────────────────────────────────
   async function confirmLeave() {
+    // Prevent the unmount cleanup from double-calling leaveActiveRoom
+    joinedRef.current = false;
     setShowLeave(false);
     // Exit fullscreen first so the leave doesn't break the layout
     if (document.fullscreenElement) {

@@ -278,7 +278,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
         if (studyWallStartRef.current !== null && roomRef.current && isRoomStudying(roomRef.current)) {
           // Bank time up to when tab was hidden
           const r = roomRef.current;
-          const phaseTotal = r.studyFlow[r.currentPhaseIndex]?.durationMins * 60 ?? 0;
+          const phaseTotal = (r.studyFlow[r.currentPhaseIndex]?.durationMins ?? 0) * 60;
           const elapsed    = getRemainingSeconds(r);
           // Clamp accumulated so it can't exceed the phase total
           const maxAccum   = phaseTotal - elapsed;
@@ -332,7 +332,10 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
 
     // 2. Sync remaining unsent study time through backend (streak-aware)
     const totalSecs  = studyAccumulatedRef.current;
-    const minsEarned = Math.floor(totalSecs / 60);
+    // Round up any partial minute ≥ 30 seconds so short sessions still count.
+    const minsEarned = totalSecs >= 30
+      ? Math.max(1, Math.floor(totalSecs / 60))
+      : Math.floor(totalSecs / 60);
     const minsAlreadySynced = Math.floor(lastSyncedSecsRef.current / 60);
     const remainderMins = minsEarned - minsAlreadySynced;
     if (remainderMins > 0) {
