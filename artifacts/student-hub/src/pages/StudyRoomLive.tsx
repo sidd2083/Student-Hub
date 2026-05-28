@@ -12,7 +12,7 @@ import { useRoomSound } from "@/hooks/useAmbientSound";
 import {
   Room, RoomParticipant, Vote, RoomMessage,
   subscribeRoom, subscribeParticipants, subscribeActiveVotes, subscribeMessages,
-  joinRoom, isParticipant, sendMessage, getRemainingSeconds, formatTime, createVote,
+  joinRoom, sendMessage, getRemainingSeconds, formatTime, createVote,
 } from "@/lib/studyRooms";
 import { useActiveRoom } from "@/context/ActiveRoomContext";
 import { useAuth } from "@/context/AuthContext";
@@ -151,18 +151,17 @@ export default function StudyRoomLive() {
     async function doJoin() {
       setJoinError("");
       try {
-        const alreadyInRoom = await isParticipant(roomId!, user!.uid);
-        if (!alreadyInRoom) {
-          await joinRoom(roomId!, {
-            uid:      user!.uid,
-            name:     profile!.name,
-            grade:    profile!.grade,
-            isHost:   room!.hostUid === user!.uid,
-            photoURL: profile!.photoURL ?? null,
-          });
-        }
+        // Always call joinRoom — it detects reconnects internally and only refreshes
+        // lastSeen without double-counting. This ensures the avatar ALWAYS appears
+        // even when re-joining after a page refresh or tab reopen.
+        await joinRoom(roomId!, {
+          uid:      user!.uid,
+          name:     profile!.name,
+          grade:    profile!.grade,
+          isHost:   room!.hostUid === user!.uid,
+          photoURL: profile!.photoURL ?? null,
+        });
         if (cancelled) return;
-        // joinActiveRoom starts the context subscription + per-user study timer
         joinActiveRoom(roomId!);
         setJoined(true);
       } catch (e) {

@@ -168,26 +168,40 @@ export async function joinRoom(roomId: string, participant: {
   isHost: boolean;
   photoURL?: string | null;
 }): Promise<void> {
-  // Step 1: Write the participant document (always permitted: own uid)
   const pRef = doc(db, "studyRooms", roomId, "participants", participant.uid);
-  await setDoc(pRef, {
-    uid: participant.uid,
-    name: participant.name,
-    grade: participant.grade,
-    isHost: participant.isHost,
-    photoURL: participant.photoURL ?? null,
-    joinedAt: serverTimestamp(),
-    lastSeen: serverTimestamp(),
-    studyMinsInRoom: 0,
-    isActive: true,
-  });
 
-  // Step 2: Try to update the room's participantCount (may fail if rules are restrictive)
-  // Non-critical: the host's sweep will fix the count if this fails
-  try {
-    await updateDoc(doc(db, "studyRooms", roomId), { participantCount: increment(1) });
-  } catch {
-    // Not fatal — participantCount is cosmetic; real count comes from participants subcollection
+  // Check whether a participant doc already exists so we can decide whether
+  // to count this as a fresh join or a reconnect (page refresh / tab reopen).
+  const existing = await getDoc(pRef);
+  const isNewJoin = !existing.exists();
+
+  if (isNewJoin) {
+    // Brand-new join: write full document and increment the room count.
+    await setDoc(pRef, {
+      uid:            participant.uid,
+      name:           participant.name,
+      grade:          participant.grade,
+      isHost:         participant.isHost,
+      photoURL:       participant.photoURL ?? null,
+      joinedAt:       serverTimestamp(),
+      lastSeen:       serverTimestamp(),
+      studyMinsInRoom: 0,
+      isActive:       true,
+    });
+    try {
+      await updateDoc(doc(db, "studyRooms", roomId), { participantCount: increment(1) });
+    } catch {
+      // Non-fatal — host sweep corrects the count periodically
+    }
+  } else {
+    // Reconnect (refresh / tab reopen): only freshen presence fields.
+    // Do NOT increment participantCount — user was already counted.
+    await updateDoc(pRef, {
+      lastSeen:  serverTimestamp(),
+      isHost:    participant.isHost,
+      photoURL:  participant.photoURL ?? null,
+      isActive:  true,
+    });
   }
 }
 

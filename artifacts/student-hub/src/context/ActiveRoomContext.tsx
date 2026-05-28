@@ -184,11 +184,23 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     const handleUnload = () => {
       if (unloadedRef.current) return;
       unloadedRef.current = true;
+
+      // Sync any remaining study seconds
       const remainderMins = Math.floor(studySecondsRef.current / 60);
       if (remainderMins > 0) {
-        const body = JSON.stringify({ uid: user.uid, mins: remainderMins });
-        navigator.sendBeacon?.("/api/study/sync", body);
+        navigator.sendBeacon?.("/api/study/sync", JSON.stringify({ uid: user.uid, mins: remainderMins }));
       }
+
+      // Remove participant doc so ghost avatars don't linger in the classroom.
+      // keepalive: true ensures the request completes even after the page unloads.
+      try {
+        fetch("/api/study/leave", {
+          method:    "POST",
+          headers:   { "Content-Type": "application/json" },
+          body:      JSON.stringify({ roomId: activeRoomId, uid: user.uid }),
+          keepalive: true,
+        }).catch(() => {});
+      } catch { /* silent */ }
     };
 
     const handleVisibilityChange = () => {

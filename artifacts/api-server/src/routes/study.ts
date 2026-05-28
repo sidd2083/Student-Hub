@@ -128,6 +128,56 @@ router.post(
   },
 );
 
+// ── Participant leave cleanup ─────────────────────────────────────────────────
+// Called via `fetch(..., { keepalive: true })` when the user closes their tab
+// so ghost avatars are removed immediately without waiting for the 90 s heartbeat.
+router.post("/study/leave", async (req: Request, res: Response) => {
+  try {
+    const { roomId, uid } = req.body as { roomId?: string; uid?: string };
+    if (!roomId || !uid || typeof roomId !== "string" || typeof uid !== "string") {
+      return res.status(400).json({ ok: false, error: "roomId and uid required" });
+    }
+
+    const db = getAdminDb();
+    if (!db) return res.json({ ok: false });
+
+    // Delete the participant doc (scoped to the sender's uid — cannot abuse)
+    const pRef = db
+      .collection("studyRooms")
+      .doc(roomId)
+      .collection("participants")
+      .doc(uid);
+
+    await pRef.delete();
+
+    // Correct participantCount to match the real remaining participants
+    const snap = await db
+      .collection("studyRooms")
+      .doc(roomId)
+      .collection("participants")
+      .get();
+
+    const activeCount = snap.size;
+    const roomRef = db.collection("studyRooms").doc(roomId);
+
+    if (activeCount === 0) {
+      await roomRef.update({
+        participantCount: 0,
+        status:           "finished",
+        timerStartedAt:   null,
+      }).catch(() => {});
+    } else {
+      await roomRef.update({ participantCount: activeCount }).catch(() => {});
+    }
+
+    logger.info({ roomId, uid, remaining: activeCount }, "[Study] Participant left");
+    return res.json({ ok: true, remaining: activeCount });
+  } catch (err) {
+    logger.warn(err, "[Study] leave cleanup non-fatal");
+    return res.json({ ok: false }); // always 200 — beacon doesn't retry on error
+  }
+});
+
 router.post("/study/session",  (_req: Request, res: Response) => res.status(501).json({ error: "Use /study/save" }));
 router.post("/study/log-task", (_req: Request, res: Response) => res.status(501).json({ error: "Use Firestore directly" }));
 router.post("/study/log-note", (_req: Request, res: Response) => res.status(501).json({ error: "Use Firestore directly" }));
