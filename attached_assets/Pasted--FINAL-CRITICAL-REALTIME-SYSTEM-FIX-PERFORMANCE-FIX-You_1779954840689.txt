@@ -1,0 +1,267 @@
+# FINAL CRITICAL REALTIME SYSTEM FIX + PERFORMANCE FIX
+
+You are a senior Firebase realtime systems engineer and production-level Next.js architect.
+
+The Virtual Study Room application UI is already fully built.
+
+DO NOT redesign UI.
+DO NOT rebuild pages.
+DO NOT change styling heavily.
+
+ONLY FIX:
+
+* realtime synchronization
+* timing system
+* study tracking
+* report card calculations
+* streak calculations
+* profile picture upload
+* performance and smoothness
+
+The system currently feels broken because the CORE REALTIME LOGIC is incorrect.
+
+This must now be fixed properly at architecture level.
+
+This is the BIGGEST issue in the entire app.
+
+Currently:
+
+* room timer is inaccurate
+* study time increases incorrectly
+* study time freezes
+* sometimes resets backwards
+* sometimes becomes smaller again
+* leaderboard time incorrect
+* report card incorrect
+* profile popup incorrect
+* room study stats incorrect
+
+This problem exists for:
+
+* host
+* members
+* all participants
+
+Example:
+Room timer starts from 25:00.
+
+But:
+
+* at 22:00 remaining
+  it may still show only 1 minute studied
+
+Then:
+
+* after 6–7 real minutes
+  it may show 2 minutes
+
+Then:
+
+* suddenly reset to 1 minute again
+
+Sometimes:
+
+* timer freezes
+* study time stops
+* values become inconsistent everywhere
+
+This is COMPLETELY WRONG.
+
+The timer system MUST become:
+
+* server-based
+* reference-based
+* realtime synchronized
+
+DO NOT run separate independent client timers.
+
+When room starts:
+Store in Firestore:
+
+* roomStartTimestamp
+* phaseDuration
+* phaseType
+* pausedState
+
+Then calculate:
+remaining time =
+current server timestamp - roomStartTimestamp
+
+This ensures:
+
+* ALL users see SAME timer
+* no timer drift
+* no desync
+* no fake local timing
+
+If study timer starts at 25:00:
+
+Then:
+24:00 → 1 minute studied
+23:00 → 2 minutes studied
+22:00 → 3 minutes studied
+20:00 → 5 minutes studied
+
+The calculation must be EXACT.
+
+NO:
+
+* random resets
+* freezing
+* backward counting
+* jumping values
+
+This same system MUST work for ALL participants.
+
+If another user joins room at:
+18:36 remaining
+
+Then:
+
+* their personal study tracking starts from join time
+* their own study minutes calculate accurately
+* their report card updates accurately
+* their streak updates accurately
+
+DO NOT tie study tracking only to host.
+
+Study tracking must be PER USER.
+
+When clicking avatar popup:
+"studied in room"
+always shows zero.
+
+Fix:
+
+* calculate room participation time properly
+* sync realtime room study duration per user
+
+Current issue:
+User studies 5+ minutes,
+BUT:
+
+* streak still shows 0
+* today study time incorrect
+* report card inconsistent
+
+This issue started after room timing logic became broken.
+
+My streak rule is:
+
+If user studies >= 5 minutes in a day:
+→ increase streak by 1
+
+If less than 5 minutes:
+→ do not increase streak
+
+Fix:
+
+* accurate daily study aggregation
+* correct date handling
+* no duplicate increments
+* no missed streak updates
+
+Today study time must:
+
+* update correctly
+* sync with actual study duration
+* include room study sessions properly
+
+All calculations must match:
+
+* room stats
+* report card
+* popup stats
+
+Everything must stay consistent.
+
+Current issue:
+When uploading avatar/profile picture:
+"Something went wrong"
+
+The system is not integrated properly.
+
+Use:
+Firebase Storage ONLY.
+
+DO NOT store images inside Firestore.
+
+1. Upload image to Firebase Storage
+
+2. Save ONLY URL in Firestore:
+   users/{userId}.photoURL
+
+3. Avatar used ONLY in:
+
+* classroom avatar
+* profile popup
+
+NOT in chat.
+
+VERY IMPORTANT:
+The avatar system MUST NOT slow website.
+
+Requirements:
+
+* compress image intelligently
+* maintain good quality
+* resize to 256x256 or 512x512
+* convert to optimized WebP/JPEG
+* max ~150KB–300KB
+
+Also:
+
+* lazy load images
+* cache images properly
+* avoid repeated downloads
+
+The ENTIRE website/app must become:
+
+* smooth
+* fast
+* responsive
+* addictive
+* professional
+
+Right now:
+
+* many things lag
+* updates delayed
+* UI feels inconsistent
+* realtime sync unreliable
+
+Fix:
+
+* duplicate Firestore listeners
+* excessive rerenders
+* heavy state updates
+* timer recalculations
+* slow popup rendering
+* slow mobile performance
+
+Use:
+
+* React.memo
+* useMemo
+* useCallback
+* efficient subscriptions
+* batched updates
+
+Also after host levae there is one one host in the site fix this after bost leave the room the host have to be transsfered to any another persion in the room 
+
+After all fixes:
+
+✔ Timer perfectly synchronized
+✔ Study time accurate everywhere
+✔ Leaderboard accurate
+✔ Report card accurate
+✔ Popup stats accurate
+✔ Streak system accurate
+✔ Members tracked correctly
+✔ No timer freezing
+✔ No resetting
+✔ No inconsistent values
+✔ Profile picture upload works
+✔ Website smooth on mobile
+✔ Everything realtime and fast
+✔ Production-quality user experience

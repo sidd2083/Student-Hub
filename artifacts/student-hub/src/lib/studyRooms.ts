@@ -353,12 +353,13 @@ export async function skipPhase(roomId: string, room: Room): Promise<void> {
     });
     return;
   }
-  const nextDuration = room.studyFlow[nextIndex].durationMins * 60;
+  // Start the next phase fresh: null out pausedRemaining so getRemainingSeconds
+  // uses the full phase duration rather than a stale leftover value.
   await updateDoc(doc(db, "studyRooms", roomId), {
     currentPhaseIndex: nextIndex,
-    status: "active",
-    timerStartedAt: serverTimestamp(),
-    pausedRemaining: nextDuration,
+    status:            "active",
+    timerStartedAt:    serverTimestamp(),
+    pausedRemaining:   null,
   });
 }
 

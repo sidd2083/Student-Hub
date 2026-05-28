@@ -178,6 +178,52 @@ router.post("/study/leave", async (req: Request, res: Response) => {
   }
 });
 
+// ── Anonymous beacon sync — called via sendBeacon on tab close ────────────────
+// Cannot carry auth headers so uid comes from the body.
+// No streak update — just persists study time. Strict caps prevent abuse.
+const ANON_SYNC_LIMIT_MS = 60_000; // max one beacon per user per minute
+const anonSyncLastCall = new Map<string, number>();
+
+router.post("/study/sync-anon", async (req: Request, res: Response) => {
+  try {
+    const { uid, mins } = req.body as { uid?: string; mins?: number };
+    if (!uid || typeof uid !== "string" || uid.length < 10 || uid.length > 128) {
+      return res.status(400).json({ ok: false });
+    }
+    const cappedMins = typeof mins === "number" && Number.isFinite(mins)
+      ? Math.max(0, Math.min(Math.floor(mins), 5)) // max 5 min per beacon call
+      : 0;
+    if (cappedMins === 0) return res.json({ ok: true });
+
+    // Rate-limit: one beacon per uid per minute
+    const now = Date.now();
+    const last = anonSyncLastCall.get(uid) ?? 0;
+    if (now - last < ANON_SYNC_LIMIT_MS) return res.json({ ok: true });
+    anonSyncLastCall.set(uid, now);
+
+    const db = getAdminDb();
+    if (!db) return res.json({ ok: false });
+
+    const NPT_OFFSET_MS = (5 * 60 + 45) * 60 * 1000;
+    const today = new Date(now + NPT_OFFSET_MS).toISOString().slice(0, 10);
+    const userRef = db.collection("users").doc(uid);
+    const FieldValue = (await import("firebase-admin/firestore")).FieldValue;
+
+    // Only increment totals — do NOT update streak (requires verified token)
+    await userRef.set({
+      totalStudyTime:  FieldValue.increment(cappedMins),
+      weeklyStudyTime: FieldValue.increment(cappedMins),
+      todayStudyTime:  FieldValue.increment(cappedMins),
+      lastActiveDate:  today,
+    }, { merge: true }).catch(() => {});
+
+    return res.json({ ok: true });
+  } catch (err) {
+    logger.warn(err, "[Study] sync-anon non-fatal");
+    return res.json({ ok: false });
+  }
+});
+
 router.post("/study/session",  (_req: Request, res: Response) => res.status(501).json({ error: "Use /study/save" }));
 router.post("/study/log-task", (_req: Request, res: Response) => res.status(501).json({ error: "Use Firestore directly" }));
 router.post("/study/log-note", (_req: Request, res: Response) => res.status(501).json({ error: "Use Firestore directly" }));
