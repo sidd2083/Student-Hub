@@ -3,7 +3,6 @@ import { getAuth, GoogleAuthProvider, Auth } from "firebase/auth";
 import {
   initializeFirestore,
   persistentLocalCache,
-  persistentMultipleTabManager,
   getFirestore,
   Firestore,
 } from "firebase/firestore";
@@ -42,9 +41,7 @@ if (isConfigured) {
   // Falls back to memory-only if the browser blocks IndexedDB (private mode, etc.)
   try {
     db = initializeFirestore(app, {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager(),
-      }),
+      localCache: persistentLocalCache(),   // single-tab — faster than multi-tab manager
     });
   } catch {
     db = getFirestore(app);

@@ -624,33 +624,32 @@ function getNptDate(): string {
  *   1. users/{uid}  — totalStudyTime, todayStudyTime, weeklyStudyTime (leaderboard)
  *   2. study_logs/{uid_date} — studyMinutes (report card)
  *
- * Uses the same getDoc+setDoc(merge) pattern as TimerContext to avoid any
- * Firestore rules type-check issues with FieldValue.increment().
+ * Uses server-side increment() for totalStudyTime/weeklyStudyTime/studyMinutes so
+ * each sync is ATOMIC — no stale-cache reads that would silently overwrite previous
+ * increments and keep the total stuck at 1.
+ * todayStudyTime is handled separately: same-day → increment(), new day → reset.
  */
 export async function syncStudyTimeToLeaderboard(uid: string, additionalMins: number): Promise<void> {
   if (additionalMins <= 0 || !uid) return;
-  const mins = Math.round(additionalMins); // ensure integer
+  const mins  = Math.round(additionalMins);
   const today = getNptDate();
 
   // ── 1. users/{uid} ────────────────────────────────────────────────────────
   try {
     const userRef  = doc(db, "users", uid);
-    const userSnap = await getDoc(userRef);
-    const d        = userSnap.exists() ? userSnap.data() : {};
+    // Only read lastActiveDate — fine if slightly stale (just for day-reset logic)
+    const snap       = await getDoc(userRef);
+    const lastActive = snap.exists() ? ((snap.data().lastActiveDate as string) ?? "") : "";
+    const sameDay    = lastActive === today;
 
-    const lastActive = (d.lastActiveDate as string) ?? "";
-    const prevToday  = lastActive === today ? Math.round(d.todayStudyTime  ?? 0) : 0;
-    const prevTotal  = Math.round(d.totalStudyTime  ?? 0);
-    const prevWeekly = Math.round(d.weeklyStudyTime ?? 0);
-
-    await setDoc(userRef, {
-      totalStudyTime:  prevTotal  + mins,
-      todayStudyTime:  prevToday  + mins,
-      weeklyStudyTime: prevWeekly + mins,
+    await updateDoc(userRef, {
+      totalStudyTime:  increment(mins),          // atomic — avoids stale-cache overwrite
+      weeklyStudyTime: increment(mins),          // atomic
+      todayStudyTime:  sameDay ? increment(mins) : mins,  // reset if new day
       lastActiveDate:  today,
-    }, { merge: true });
+    });
   } catch (err) {
-    console.warn("[StudyRoom] users sync failed:", err);
+    console.warn("[StudyRoom] users sync:", err);
   }
 
   // ── 2. study_logs/{uid_date} ───────────────────────────────────────────────
@@ -658,15 +657,17 @@ export async function syncStudyTimeToLeaderboard(uid: string, additionalMins: nu
     const logRef  = doc(db, "study_logs", `${uid}_${today}`);
     const logSnap = await getDoc(logRef);
     if (logSnap.exists()) {
-      const prev = Math.round(logSnap.data().studyMinutes ?? 0);
-      await updateDoc(logRef, { studyMinutes: prev + mins });
+      await updateDoc(logRef, { studyMinutes: increment(mins) }); // atomic
     } else {
       await setDoc(logRef, {
-        uid, date: today, studyMinutes: mins, tasksCompleted: 0, notesViewed: 0,
+        uid, date: today,
+        studyMinutes:   mins,
+        tasksCompleted: 0,
+        notesViewed:    0,
       });
     }
   } catch (err) {
-    console.warn("[StudyRoom] study_logs sync failed:", err);
+    console.warn("[StudyRoom] study_logs sync:", err);
   }
 }
 

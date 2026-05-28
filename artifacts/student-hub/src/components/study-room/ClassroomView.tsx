@@ -15,18 +15,18 @@ interface Props {
 }
 
 const AVATAR_COLORS = [
-  "from-blue-500 to-blue-600",
-  "from-violet-500 to-purple-600",
-  "from-emerald-500 to-green-600",
+  "from-blue-500 to-blue-700",
+  "from-violet-500 to-purple-700",
+  "from-emerald-500 to-green-700",
   "from-orange-500 to-amber-600",
   "from-pink-500 to-rose-600",
   "from-cyan-500 to-sky-600",
   "from-indigo-500 to-indigo-700",
-  "from-teal-500 to-teal-600",
-  "from-rose-500 to-pink-600",
-  "from-amber-500 to-orange-500",
-  "from-lime-500 to-green-500",
-  "from-fuchsia-500 to-pink-500",
+  "from-teal-500 to-teal-700",
+  "from-rose-500 to-pink-700",
+  "from-amber-500 to-orange-600",
+  "from-lime-500 to-green-600",
+  "from-fuchsia-500 to-pink-600",
 ];
 
 function avatarGradient(name: string) {
@@ -35,23 +35,22 @@ function avatarGradient(name: string) {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
 }
 
-function fmtStudyMins(mins: number): string {
-  if (mins < 60) return `${mins}m`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m > 0 ? `${h}h${m}m` : `${h}h`;
+function fmtMins(m: number) {
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return r > 0 ? `${h}h${r}m` : `${h}h`;
 }
 
 // ── Empty seat ────────────────────────────────────────────────────────────────
 const EmptySeat = memo(function EmptySeat({ compact }: { compact: boolean }) {
-  const sz = compact ? "w-9 h-9" : "w-12 h-12";
+  const sz = compact ? "w-9 h-9" : "w-11 h-11";
   return (
-    <div className={`flex flex-col items-center gap-1.5 ${compact ? "w-14" : "w-20"}`}>
-      <div className={`${sz} rounded-full border-2 border-dashed border-gray-200/70 dark:border-gray-700/70 flex items-center justify-center`}>
-        <span className="text-gray-200 dark:text-gray-600 text-lg">·</span>
+    <div className={`flex flex-col items-center gap-1 ${compact ? "w-14" : "w-18"}`}>
+      <div className={`${sz} rounded-full border-2 border-dashed border-amber-300/50 bg-amber-50/40 flex items-center justify-center`}>
+        <span className="text-amber-300/60 text-lg">·</span>
       </div>
-      <div className={`h-2 ${compact ? "w-8" : "w-11"} bg-gray-100/70 dark:bg-gray-800/70 rounded-full`} />
-      <div className="h-1.5 w-6 bg-gray-100/50 dark:bg-gray-800/50 rounded-full" />
+      <div className="h-1.5 w-8 bg-amber-200/40 rounded-full" />
     </div>
   );
 });
@@ -60,65 +59,56 @@ const EmptySeat = memo(function EmptySeat({ compact }: { compact: boolean }) {
 const OccupiedSeat = memo(function OccupiedSeat({
   p, isHost, onClick, compact,
 }: {
-  p: RoomParticipant;
-  isHost: boolean;
-  onClick?: () => void;
-  compact: boolean;
+  p: RoomParticipant; isHost: boolean; onClick?: () => void; compact: boolean;
 }) {
   const initial  = p.name.charAt(0).toUpperCase();
   const gradient = avatarGradient(p.name);
-  const sz       = compact ? "w-9 h-9 text-sm" : "w-12 h-12 text-base";
+  const sz       = compact ? "w-9 h-9 text-sm" : "w-11 h-11 text-base";
   const hasPhoto = !!p.photoURL;
 
   return (
     <motion.button
-      initial={{ opacity: 0, scale: 0.6, y: 8 }}
+      initial={{ opacity: 0, scale: 0.6, y: 10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.6, y: 8 }}
-      whileHover={{ scale: 1.06, y: -2 }}
-      whileTap={{ scale: 0.94 }}
+      exit={{ opacity: 0, scale: 0.5, y: 8 }}
+      whileHover={{ scale: 1.08, y: -3 }}
+      whileTap={{ scale: 0.92 }}
       onClick={onClick}
-      className={`flex flex-col items-center gap-1.5 ${compact ? "w-14" : "w-20"} cursor-pointer group focus:outline-none`}
+      className={`flex flex-col items-center gap-1 ${compact ? "w-14" : "w-18"} cursor-pointer group focus:outline-none`}
     >
       <div className="relative">
-        {/* Study time badge — floats above crown/avatar */}
+        {/* Study time badge */}
         {p.studyMinsInRoom > 0 && (
           <div className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap z-20 ${isHost ? "-top-9" : "-top-6"}`}>
-            <span className="inline-flex items-center bg-emerald-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow leading-none">
-              {fmtStudyMins(p.studyMinsInRoom)}
+            <span className="inline-flex items-center bg-emerald-500 text-white text-[7px] font-bold px-1.5 py-0.5 rounded-full shadow-sm leading-none">
+              {fmtMins(p.studyMinsInRoom)}
             </span>
           </div>
         )}
+        {/* Crown for host */}
         {isHost && (
-          <Crown className="absolute -top-3 left-1/2 -translate-x-1/2 w-3.5 h-3.5 text-yellow-400 drop-shadow-sm z-10" />
+          <Crown className="absolute -top-3.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 text-yellow-400 drop-shadow z-10" />
         )}
-        <div className={`${sz} rounded-full flex items-center justify-center text-white font-bold shadow-md group-hover:shadow-lg transition-all relative overflow-hidden ${hasPhoto ? "" : `bg-gradient-to-br ${gradient}`}`}>
+        {/* Avatar circle */}
+        <div className={`${sz} rounded-full flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-white/60 group-hover:ring-white transition-all relative overflow-hidden ${hasPhoto ? "" : `bg-gradient-to-br ${gradient}`}`}>
           {hasPhoto ? (
-            <img
-              src={p.photoURL!}
-              alt={p.name}
-              className="w-full h-full object-cover rounded-full"
-              loading="lazy"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-            />
+            <img src={p.photoURL!} alt={p.name} className="w-full h-full object-cover rounded-full" loading="lazy"
+              onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
           ) : (
-            <span className="relative z-10">{initial}</span>
+            <span className="relative z-10 drop-shadow-sm">{initial}</span>
           )}
         </div>
-        {/* Online indicator */}
-        <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white dark:border-gray-900 shadow-sm" />
+        {/* Online dot */}
+        <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white shadow-sm" />
       </div>
-      <p className={`${compact ? "text-[9px]" : "text-[10px]"} font-semibold text-gray-700 dark:text-gray-200 truncate max-w-full leading-tight text-center group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors`}>
+      <p className={`${compact ? "text-[9px]" : "text-[10px]"} font-semibold text-amber-900/80 truncate max-w-full leading-tight text-center group-hover:text-amber-800 transition-colors`}>
         {p.name.split(" ")[0]}
-      </p>
-      <p className={`${compact ? "text-[8px]" : "text-[9px]"} text-gray-400 dark:text-gray-500 -mt-0.5`}>
-        G{p.grade}
       </p>
     </motion.button>
   );
 });
 
-// ── Bench (pair of seats + desk) ──────────────────────────────────────────────
+// ── Wooden desk bench ─────────────────────────────────────────────────────────
 const Bench = memo(function Bench({
   left, right, hostUid, onSelect, compact,
 }: {
@@ -128,52 +118,73 @@ const Bench = memo(function Bench({
   onSelect: (p: RoomParticipant) => void;
   compact: boolean;
 }) {
-  const deskW = compact ? "w-32" : "w-44 sm:w-52";
-  const gap   = compact ? "gap-4" : "gap-6 sm:gap-8";
+  const deskW = compact ? "w-36" : "w-48 sm:w-56";
+  const gap   = compact ? "gap-4" : "gap-6 sm:gap-10";
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div className={`flex items-end ${gap}`}>
+    <div className="flex flex-col items-center" style={{ gap: 0 }}>
+      {/* Students sitting behind desk */}
+      <div className={`flex items-end ${gap} mb-1`}>
         <AnimatePresence mode="popLayout">
-          {left ? (
-            <OccupiedSeat
-              key={left.uid}
-              p={left}
-              isHost={left.uid === hostUid}
-              onClick={() => onSelect(left)}
-              compact={compact}
-            />
-          ) : (
-            <EmptySeat key="el" compact={compact} />
-          )}
-          {right ? (
-            <OccupiedSeat
-              key={right.uid}
-              p={right}
-              isHost={right.uid === hostUid}
-              onClick={() => onSelect(right)}
-              compact={compact}
-            />
-          ) : (
-            <EmptySeat key="er" compact={compact} />
-          )}
+          {left
+            ? <OccupiedSeat key={left.uid} p={left} isHost={left.uid === hostUid} onClick={() => onSelect(left)} compact={compact} />
+            : <EmptySeat key="el" compact={compact} />}
+          {right
+            ? <OccupiedSeat key={right.uid} p={right} isHost={right.uid === hostUid} onClick={() => onSelect(right)} compact={compact} />
+            : <EmptySeat key="er" compact={compact} />}
         </AnimatePresence>
       </div>
-      {/* Desk surface */}
+
+      {/* Desk surface — wooden look with 3D depth */}
       <div className={`relative ${deskW}`}>
-        {/* Books / items on desk */}
-        <div className="absolute -top-1 left-3 flex gap-1.5">
-          <div className="w-3 h-1.5 bg-blue-400/50 dark:bg-blue-600/50 rounded-t-sm" />
-          <div className="w-2.5 h-2 bg-red-400/40 dark:bg-red-600/40 rounded-t-sm" />
-          <div className="w-2 h-1 bg-yellow-400/50 dark:bg-yellow-600/40 rounded-t-sm" />
+        {/* Tiny items on desk */}
+        <div className="absolute -top-1.5 left-4 flex gap-1.5 z-10">
+          <div className="w-3.5 h-2 bg-blue-500/60 rounded-t-sm shadow-sm" />
+          <div className="w-2.5 h-2.5 bg-red-400/55 rounded-t-sm shadow-sm" />
+          <div className="w-2 h-1.5 bg-yellow-400/60 rounded-sm" />
+          {Math.abs(left?.uid.charCodeAt(0) ?? 0) % 2 === 0 && (
+            <div className="w-3 h-1.5 bg-green-400/50 rounded-t-sm shadow-sm" />
+          )}
         </div>
-        <div className="h-3 bg-gradient-to-b from-amber-200 to-amber-300 dark:from-amber-700 dark:to-amber-800 rounded-t-xl shadow border border-amber-300/60 dark:border-amber-600/50" />
-        <div className="h-1.5 bg-amber-400/80 dark:bg-amber-600/80 rounded-b" />
+        {/* Desk top surface */}
+        <div className="h-4 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 rounded-xl shadow-md border-t border-amber-200/80 border-x border-amber-500/30" />
+        {/* Desk front edge (3D depth) */}
+        <div className="h-2 bg-gradient-to-b from-amber-600 to-amber-700 rounded-b-lg shadow-sm" />
+        {/* Desk legs */}
         <div className="flex justify-between px-5 mt-0.5">
-          <div className="w-1.5 h-3 bg-amber-500/70 dark:bg-amber-700/70 rounded-b" />
-          <div className="w-1.5 h-3 bg-amber-500/70 dark:bg-amber-700/70 rounded-b" />
+          <div className="w-1.5 h-3.5 bg-amber-700/80 rounded-b shadow-sm" />
+          <div className="w-1.5 h-3.5 bg-amber-700/80 rounded-b shadow-sm" />
         </div>
+        {/* Connecting beam between legs */}
+        <div className="mx-6 h-px bg-amber-700/40 mt-1" />
       </div>
+    </div>
+  );
+});
+
+// ── Window with curtain ────────────────────────────────────────────────────────
+const Window = memo(function Window({ compact }: { compact: boolean }) {
+  const w = compact ? "w-10 h-14" : "w-13 h-18";
+  return (
+    <div className="flex flex-col items-center">
+      {/* Curtain rod */}
+      <div className="w-[110%] h-1 bg-amber-800/60 rounded-full mb-0" />
+      {/* Window frame */}
+      <div className={`relative ${w} border-2 border-amber-800/40 bg-sky-200/80 rounded-t-sm overflow-hidden shadow-inner`}>
+        {/* Sky through glass */}
+        <div className="absolute inset-0 bg-gradient-to-b from-sky-300/70 to-sky-100/80" />
+        {/* Window pane dividers */}
+        <div className="absolute inset-x-0 top-1/2 h-px bg-amber-800/25" />
+        <div className="absolute inset-y-0 left-1/2 w-px bg-amber-800/25" />
+        {/* Left curtain */}
+        <div className="absolute top-0 left-0 bottom-0 w-2.5 bg-gradient-to-r from-red-800 via-red-700 to-transparent opacity-85" />
+        {/* Right curtain */}
+        <div className="absolute top-0 right-0 bottom-0 w-2.5 bg-gradient-to-l from-red-800 via-red-700 to-transparent opacity-85" />
+        {/* Light glare */}
+        <div className="absolute top-1 left-2 w-1.5 h-5 bg-white/30 rounded-full rotate-12" />
+      </div>
+      {/* Window sill */}
+      <div className="w-[115%] h-1.5 bg-amber-200/80 rounded-b border-b border-amber-400/30" />
     </div>
   );
 });
@@ -191,114 +202,149 @@ export const ClassroomView = memo(function ClassroomView({
 
   const isStudying = timerPhaseType === "study" && roomStatus === "active";
   const isBreak    = timerPhaseType === "break"  && roomStatus === "active";
-  const showTimer  = timerDisplay && roomStatus && roomStatus !== "waiting" && roomStatus !== "finished";
-  const isWaiting  = roomStatus === "waiting";
   const isPaused   = roomStatus === "paused";
+  const isWaiting  = roomStatus === "waiting";
+  const showTimer  = !!timerDisplay && roomStatus && roomStatus !== "waiting" && roomStatus !== "finished";
 
   return (
-    <div className="relative w-full overflow-hidden" style={{ minHeight: compact ? 300 : 400 }}>
-      {/* Sky gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-sky-50/80 via-slate-50/90 to-stone-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950" />
+    <div className="relative w-full overflow-hidden select-none" style={{ minHeight: compact ? 310 : 420 }}>
 
-      {/* Subtle floor lines */}
-      <div className="absolute inset-0 opacity-[0.025] dark:opacity-[0.015]" style={{
-        backgroundImage: "repeating-linear-gradient(0deg,transparent,transparent 60px,#64748b 60px,#64748b 61px)",
-        backgroundPosition: "0 200px",
-      }} />
+      {/* ── WALL BACKGROUND ─────────────────────────────────────────────────── */}
+      {/* Warm cream plaster wall */}
+      <div className="absolute inset-0 bg-gradient-to-b from-amber-50 via-stone-50 to-amber-100" />
 
-      {/* Classroom walls subtle border */}
-      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-amber-200/40 dark:via-amber-800/30 to-transparent" />
+      {/* Warm ceiling glow from above */}
+      <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-amber-100/70 to-transparent pointer-events-none" />
 
-      {/* Windows */}
-      <div className="absolute top-3 left-3 w-12 h-16 rounded-t-lg border-2 border-sky-200/70 dark:border-sky-800/40 bg-sky-100/50 dark:bg-sky-900/20 grid grid-cols-2 gap-0.5 p-1">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-sky-200/60 dark:bg-sky-800/25 rounded-sm" />
-        ))}
+      {/* Subtle horizontal wall wainscoting line */}
+      <div className="absolute inset-x-0 bg-amber-200/50" style={{ top: "62%", height: 2 }} />
+      {/* Lower wall — slightly warmer tint */}
+      <div className="absolute inset-x-0 bottom-0 bg-amber-100/40" style={{ top: "62%" }} />
+
+      {/* ── CEILING LIGHT FIXTURE ────────────────────────────────────────────── */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none">
+        <div className="w-1 h-3 bg-amber-700/40" />
+        <div className="w-14 h-2.5 bg-gradient-to-b from-amber-100 to-amber-200 border border-amber-300/60 rounded-sm shadow" />
+        <div className="w-20 h-1.5 bg-amber-50/80 border-b border-amber-200/40 rounded-b" />
       </div>
-      <div className="absolute top-3 right-3 w-12 h-16 rounded-t-lg border-2 border-sky-200/70 dark:border-sky-800/40 bg-sky-100/50 dark:bg-sky-900/20 grid grid-cols-2 gap-0.5 p-1">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-sky-200/60 dark:bg-sky-800/25 rounded-sm" />
-        ))}
+      {/* Radial glow from ceiling light */}
+      <div className="absolute inset-x-0 top-0 h-32 pointer-events-none"
+        style={{ background: "radial-gradient(ellipse 60% 60% at 50% 0%, rgba(254,243,199,0.55) 0%, transparent 100%)" }} />
+
+      {/* ── WINDOWS ──────────────────────────────────────────────────────────── */}
+      <div className={`absolute ${compact ? "top-3 left-2" : "top-4 left-3"}`}>
+        <Window compact={compact} />
+      </div>
+      <div className={`absolute ${compact ? "top-3 right-2" : "top-4 right-3"}`}>
+        <Window compact={compact} />
       </div>
 
-      {/* Blackboard */}
-      <div className="relative mx-auto max-w-sm px-4 pt-4">
-        <div className="relative bg-emerald-800 dark:bg-emerald-900/90 rounded-xl shadow-lg border-[3px] border-amber-800/30 dark:border-amber-900/50 overflow-hidden">
-          {/* Chalk marks texture */}
-          <div className="absolute inset-0 opacity-[0.04]">
-            <div className="absolute top-2 left-6 w-8 h-px bg-white rotate-12" />
-            <div className="absolute top-4 right-10 w-5 h-px bg-white -rotate-6" />
-            <div className="absolute bottom-3 left-12 w-6 h-px bg-white rotate-3" />
-            <div className="absolute top-3 right-6 w-3 h-px bg-white rotate-45" />
-          </div>
+      {/* ── BLACKBOARD ───────────────────────────────────────────────────────── */}
+      <div className={`relative mx-auto ${compact ? "max-w-[220px] pt-3" : "max-w-xs pt-4"} px-2`}>
+        {/* Wooden frame outer */}
+        <div className="bg-gradient-to-b from-amber-800 to-amber-900 rounded-sm p-1.5 shadow-xl"
+          style={{ boxShadow: "inset 0 1px 0 rgba(255,200,100,0.15), 0 4px 16px rgba(0,0,0,0.25)" }}>
+          {/* Chalk board surface */}
+          <div className="relative bg-gradient-to-br from-emerald-900 via-emerald-900 to-emerald-950 rounded-[2px] overflow-hidden"
+            style={{ minHeight: compact ? 64 : 80 }}>
 
-          {showTimer ? (
-            <div className="relative flex flex-col items-center justify-center py-3 px-4">
-              <div className="flex items-center gap-1.5 mb-1">
-                {isStudying && <BookOpen className="w-3 h-3 text-emerald-300/70" />}
-                {isBreak    && <Coffee   className="w-3 h-3 text-green-300/70" />}
-                {isPaused   && <span className="text-[10px] text-orange-300/70">⏸</span>}
-                <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-emerald-300/60">
-                  {timerLabel ?? (isStudying ? "Studying" : isBreak ? "Break" : isPaused ? "Paused" : "Session")}
+            {/* Subtle chalk texture smudges */}
+            <div className="absolute inset-0 opacity-[0.06] pointer-events-none">
+              {[
+                { top:"15%", left:"8%",  w:40, rot:8 },
+                { top:"25%", right:"12%",w:28, rot:-5 },
+                { top:"60%", left:"20%", w:35, rot:3 },
+                { top:"70%", right:"18%",w:22, rot:-8 },
+              ].map((s, i) => (
+                <div key={i} className="absolute h-px bg-white rounded-full"
+                  style={{ top: s.top, left: s.left, right: s.right, width: s.w, transform: `rotate(${s.rot}deg)` }} />
+              ))}
+            </div>
+
+            {/* Board content */}
+            {showTimer ? (
+              <div className="relative flex flex-col items-center justify-center py-3 px-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  {isStudying && <BookOpen className="w-3 h-3 text-emerald-300/70" />}
+                  {isBreak    && <Coffee   className="w-3 h-3 text-green-300/70" />}
+                  {isPaused   && <span className="text-[10px] text-orange-300/70">⏸</span>}
+                  <p className="text-[9px] font-medium tracking-[0.2em] uppercase text-emerald-300/60">
+                    {timerLabel ?? (isStudying ? "Studying" : isBreak ? "Break" : isPaused ? "Paused" : "Session")}
+                  </p>
+                </div>
+                <p className={`font-mono font-black tracking-tight leading-none ${compact ? "text-3xl" : "text-4xl"} ${
+                  isStudying ? "text-white" : isBreak ? "text-green-300" : isPaused ? "text-orange-300" : "text-emerald-200"
+                }`} style={{ textShadow: "0 0 20px rgba(255,255,255,0.15)" }}>
+                  {timerDisplay}
                 </p>
               </div>
-              <p className={`font-mono font-black tracking-tight leading-none ${compact ? "text-3xl" : "text-4xl sm:text-5xl"} ${
-                isStudying ? "text-white" : isBreak ? "text-green-300" : isPaused ? "text-orange-300" : "text-emerald-200"
-              }`}>
-                {timerDisplay}
-              </p>
-              <div className="h-px w-full bg-emerald-700/50 rounded mt-3" />
-            </div>
-          ) : (
-            <div className="py-3 px-4 text-center">
-              <p className="text-emerald-200/60 text-xs font-light tracking-[0.2em]">✦ STUDY TOGETHER ✦</p>
-              <p className="text-emerald-200/35 text-[10px] mt-0.5">
-                {isWaiting ? "Waiting for host to start…" : "focus · grow · achieve"}
-              </p>
-              <div className="h-px w-full bg-emerald-700/50 rounded mt-2" />
-            </div>
-          )}
+            ) : (
+              <div className="py-4 px-3 text-center">
+                <p className="text-emerald-200/50 text-[11px] font-light tracking-[0.25em]">✦ STUDY TOGETHER ✦</p>
+                <p className="text-emerald-200/30 text-[9px] mt-1">
+                  {isWaiting ? "Waiting for host to start…" : "focus · grow · achieve"}
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Chalk tray */}
-          <div className="flex gap-1 justify-center pb-1.5">
-            {["bg-white/60","bg-yellow-200/60","bg-pink-200/60","bg-blue-200/60","bg-green-200/50"].map((c,i) => (
-              <div key={i} className={`w-4 h-1 rounded-full ${c}`} />
+          <div className="flex gap-1 items-center justify-center pt-1 pb-0.5 px-1">
+            {["bg-white/65","bg-yellow-200/65","bg-pink-200/55","bg-blue-200/60","bg-green-200/55","bg-orange-200/55"].map((c, i) => (
+              <div key={i} className={`h-1 rounded-full ${c}`} style={{ width: compact ? 12 : 16 }} />
             ))}
           </div>
         </div>
 
-        {/* Teacher's desk */}
-        <div className="flex justify-center mt-3 mb-5">
+        {/* Board shadow on wall */}
+        <div className="mx-4 h-2 bg-black/10 rounded-b-full blur-sm" />
+
+        {/* ── TEACHER'S DESK ─────────────────────────────────────────────────── */}
+        <div className="flex justify-center mt-2.5 mb-5">
           <div className="relative">
-            <div className="absolute -top-2 left-1/2 -translate-x-1/2 flex gap-4">
-              <div className="w-1.5 h-2 bg-blue-400/70 rounded-t-sm" />
-              <div className="w-1 h-2 bg-red-400/60 rounded-t-sm" />
-              <div className="w-1.5 h-1.5 bg-yellow-400/60 rounded-full" />
+            {/* Items on teacher's desk */}
+            <div className="absolute -top-2 left-1/2 -translate-x-1/2 flex gap-3">
+              <div className="w-1.5 h-3 bg-blue-500/55 rounded-t-sm" />
+              <div className="w-3 h-2 bg-red-500/50 rounded-sm" />
+              <div className="w-2 h-3 bg-amber-400/60 rounded-t-sm" />
+              <div className="w-1 h-3 bg-amber-500/50 rounded-t-sm" />
             </div>
-            <div className="w-28 h-3 bg-gradient-to-b from-amber-300 to-amber-400 dark:from-amber-700 dark:to-amber-800 rounded-t shadow border border-amber-300/50 dark:border-amber-600/50" />
-            <div className="w-28 h-1.5 bg-amber-500/80 dark:bg-amber-600/80 rounded-b" />
+            {/* Desk surface */}
+            <div className={`${compact ? "w-28" : "w-36"} h-3.5 bg-gradient-to-b from-amber-600 to-amber-700 rounded-t-lg shadow-md border-t border-amber-400/40`} />
+            <div className={`${compact ? "w-28" : "w-36"} h-2 bg-amber-800 rounded-b-sm`} />
           </div>
         </div>
       </div>
 
-      {/* Student rows */}
-      <div className={`relative px-4 pb-6 ${compact ? "space-y-5" : "space-y-6 sm:space-y-7"}`}>
+      {/* ── STUDENT ROWS ─────────────────────────────────────────────────────── */}
+      <div className={`relative px-3 pb-5 ${compact ? "space-y-4" : "space-y-5"}`}>
         {pairs.map((pair, row) => (
           <div key={row} className="flex justify-center">
             <Bench
-              left={pair[0]}
-              right={pair[1]}
+              left={pair[0]} right={pair[1]}
               hostUid={hostUid}
-              onSelect={(p) => onSelectStudent?.(p)}
+              onSelect={p => onSelectStudent?.(p)}
               compact={compact}
             />
           </div>
         ))}
       </div>
 
-      {/* Participant count badge */}
-      <div className="absolute bottom-2 right-3">
-        <p className="text-[10px] text-gray-400/60 dark:text-gray-500/60 font-medium">
+      {/* ── FLOOR ────────────────────────────────────────────────────────────── */}
+      <div className="absolute bottom-0 inset-x-0 h-6 pointer-events-none"
+        style={{ background: "linear-gradient(to top, rgba(180,130,80,0.18) 0%, transparent 100%)" }} />
+
+      {/* Floor planks */}
+      <div className="absolute bottom-0 inset-x-0 pointer-events-none" style={{ height: 6 }}>
+        {[...Array(8)].map((_, i) => (
+          <div key={i} className="absolute bottom-0 bg-amber-700/15"
+            style={{ left: `${i * 12.5}%`, width: "11.5%", height: "100%", borderRight: "1px solid rgba(139,90,43,0.12)" }} />
+        ))}
+      </div>
+
+      {/* Student count */}
+      <div className="absolute bottom-1.5 right-2 pointer-events-none">
+        <p className="text-[9px] text-amber-800/40 font-medium">
           {participants.length} student{participants.length !== 1 ? "s" : ""}
         </p>
       </div>

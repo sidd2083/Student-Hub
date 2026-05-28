@@ -692,6 +692,25 @@ export default function StudyRoomLive() {
             {mobileTab === "class" && (
               <motion.div key="class" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
                 className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden relative">
+                {/* Sound mute toggle — always visible on mobile classroom tab */}
+                {roomSoundId !== "none" && joined && (
+                  <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-xl px-2 py-1 shadow-sm border border-gray-200/60 dark:border-gray-700/60">
+                    <button
+                      onClick={() => setMuted(!isMuted)}
+                      className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                    >
+                      {isMuted ? <VolumeX className="w-3.5 h-3.5 text-red-400" /> : <Volume2 className="w-3.5 h-3.5 text-blue-500" />}
+                      <span className="text-[10px]">{isMuted ? "Muted" : "Sound"}</span>
+                    </button>
+                    {!isMuted && (
+                      <input
+                        type="range" min={0} max={1} step={0.1} value={volume}
+                        onChange={e => setVolume(parseFloat(e.target.value))}
+                        className="w-14 accent-blue-500 cursor-pointer"
+                      />
+                    )}
+                  </div>
+                )}
                 <ClassroomView
                   participants={participants} hostUid={room.hostUid}
                   onSelectStudent={setSel} compact
