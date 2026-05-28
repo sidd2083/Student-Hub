@@ -1,0 +1,309 @@
+# EXTRA CRITICAL ROOM SESSION + TIMER PERSISTENCE FIX
+
+New major issues were introduced after previous fixes.
+
+You must now STOP patching individual UI problems and properly stabilize the ROOM SESSION ARCHITECTURE.
+
+========================================================
+🔥 1. ROOM CLOSES WHEN SWITCHING PAGE (CRITICAL BUG)
+====================================================
+
+Current issue:
+When user is inside a room and switches to another page:
+
+* room session closes automatically
+* user leaves room unexpectedly
+
+THIS IS WRONG.
+
+========================================================
+CORRECT BEHAVIOR
+================
+
+If user:
+
+* changes page
+* opens report card
+* opens leaderboard
+* opens another section
+
+THEN:
+→ user MUST remain connected to room
+
+The room should ONLY close if:
+
+* user explicitly clicks Leave Room
+* user closes tab/app
+* disconnect timeout happens
+
+========================================================
+FIX ROOM SESSION PERSISTENCE
+============================
+
+Implement persistent room session state.
+
+Room membership must survive:
+
+* route changes
+* page navigation
+* refresh recovery (optional if possible)
+
+DO NOT tie room presence to current page component lifecycle.
+
+Currently room cleanup is probably happening during component unmount.
+
+This is WRONG.
+
+Presence cleanup should ONLY happen when:
+
+* explicit leave
+* disconnect
+* timeout
+
+========================================================
+🔥 2. TIMER STILL NOT UPDATING LIKE POMODORO TIMER
+==================================================
+
+This issue is STILL NOT FIXED.
+
+The normal Pomodoro timer already updates:
+
+* report card
+* leaderboard
+* today study time
+  correctly.
+
+BUT ROOM TIMER DOES NOT.
+
+========================================================
+IMPORTANT REQUIREMENT
+=====================
+
+The ROOM TIMER must use EXACT SAME STUDY TRACKING SYSTEM as Pomodoro timer.
+
+Meaning:
+If room timer increases study time:
+→ it must update:
+
+* today study time
+* leaderboard
+* weekly study time
+* monthly study time
+* streak
+* analytics
+  EXACTLY SAME as Pomodoro timer.
+
+Right now:
+Room study sessions are NOT integrated correctly into global study aggregation.
+
+This is the ROOT problem.
+
+========================================================
+FIX REQUIRED
+============
+
+Unify BOTH systems:
+
+* Pomodoro study tracking
+* Room study tracking
+
+Both must feed into SAME centralized study aggregation service.
+
+DO NOT create separate inconsistent logic.
+
+========================================================
+🔥 3. PROFILE PICTURE ERROR
+===========================
+
+Current error:
+t._throwIfRoot is not a function
+
+This means Firebase Storage upload implementation is incorrect.
+
+========================================================
+FIX PROFILE PICTURE SYSTEM PROPERLY
+===================================
+
+Debug:
+
+* Firebase Storage SDK version mismatch
+* incorrect ref usage
+* uploadBytes usage
+* root reference handling
+
+Implement proper Firebase v9 modular syntax.
+
+Correct structure:
+
+* create storage ref properly
+* upload image correctly
+* get download URL
+* save URL to Firestore
+
+The upload MUST actually work.
+
+========================================================
+🔥 4. ROOM STUDY TIME MUST BE FULLY ACCURATE
+============================================
+
+This is the MOST IMPORTANT REQUIREMENT IN ENTIRE APP.
+
+If any user studies inside room:
+the system MUST accurately calculate:
+
+* today study time
+* leaderboard ranking
+* weekly study
+* monthly study
+* total study time
+
+This should behave IDENTICALLY to Pomodoro timer.
+
+Currently:
+
+* room timing behaves separately
+* values disappear
+* report card resets
+* no persistence
+
+THIS IS COMPLETELY WRONG.
+
+========================================================
+FINAL REQUIREMENT
+=================
+
+After fixing:
+
+✔ Switching pages does NOT leave room
+✔ Room session persists correctly
+✔ Room timer integrated with global study tracking
+✔ Room study time updates report card correctly
+✔ Room study time updates leaderboard correctly
+✔ Weekly/monthly study updates correctly
+✔ Study minutes never disappear
+✔ Profile picture upload actually works
+✔ Firebase Storage errors resolved
+✔ Timing system stable and production-ready
+
+# EXTRA FINAL CRITICAL REQUIREMENT — ROOM STUDY TIME FOR ALL USERS
+
+This is STILL not working properly.
+
+Currently:
+
+* sometimes only host gets proper study tracking
+* members inside room are not updating correctly
+* room participation study time inaccurate
+* "studied in room" values incorrect or zero
+
+THIS MUST BE FIXED WITH NO COMPROMISE.
+
+========================================================
+🔥 ROOM STUDY TIME MUST WORK FOR ALL USERS
+==========================================
+
+If ANY user is inside room during STUDY phase:
+→ their study time MUST increase accurately.
+
+NOT ONLY HOST.
+
+ALL MEMBERS must receive:
+
+* today study time updates
+* leaderboard updates
+* weekly study updates
+* monthly study updates
+* total study updates
+* streak updates
+* room participation updates
+
+========================================================
+EXACT BEHAVIOR REQUIRED
+=======================
+
+Example:
+
+Room timer:
+25:00
+
+At:
+24:00 remaining
+→ every active user inside room should have +1 minute study
+
+23:00 remaining
+→ +2 minutes
+
+20:00 remaining
+→ +5 minutes
+
+This must happen:
+
+* accurately
+* consistently
+* without reset
+* without disappearing values
+
+========================================================
+ROOM STUDY TIME MUST PERSIST
+============================
+
+If user:
+
+* refreshes
+* changes page
+* opens report card
+* returns to room
+
+The study time MUST remain saved correctly.
+
+NO disappearing values allowed.
+
+========================================================
+"STUDIED IN ROOM" POPUP FIX
+===========================
+
+When clicking avatar popup:
+"studied in room"
+must show:
+
+* accurate room participation duration
+* realtime updates
+* proper accumulated time
+
+Currently it often shows:
+0
+
+This is WRONG.
+
+========================================================
+IMPORTANT ARCHITECTURE RULE
+===========================
+
+DO NOT calculate study time independently on frontend.
+
+Use:
+
+* centralized server-based timing
+* Firestore synchronized timestamps
+* shared room session timing
+* per-user study aggregation
+
+The room study system and Pomodoro system must BOTH feed into SAME global study tracking architecture.
+
+========================================================
+FINAL REQUIREMENT
+=================
+
+After fixing:
+
+✔ ALL users receive study tracking
+✔ NOT only host
+✔ Room study time perfectly accurate
+✔ Report card perfectly synced
+✔ Leaderboard perfectly synced
+✔ Weekly/monthly stats accurate
+✔ Popup room study accurate
+✔ No disappearing values
+✔ No reset issues
+✔ Production-level timing architecture
+

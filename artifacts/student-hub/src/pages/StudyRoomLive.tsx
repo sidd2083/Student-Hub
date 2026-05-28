@@ -58,8 +58,10 @@ export default function StudyRoomLive() {
   // Once joined, we consume room + participants from ActiveRoomContext.
   const [localRoom,         setLocalRoom]    = useState<Room | null>(null);
   const [localParticipants, setLocalPs]      = useState<RoomParticipant[]>([]);
-  const [loading,           setLoading]      = useState(true);
-  const [joined,            setJoined]       = useState(false);
+  const [loading,           setLoading]      = useState(!alreadyIn);
+  // Initialize joined from alreadyIn: if user is already in the room context
+  // (i.e. they navigated away and came back), skip the join flow entirely.
+  const [joined,            setJoined]       = useState(alreadyIn);
   const [joinError,         setJoinError]    = useState("");
 
   // Always-local state (not in context)
@@ -176,32 +178,20 @@ export default function StudyRoomLive() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, user, profile, joined, room?.id, room?.status]);
 
-  // ── UNMOUNT CLEANUP — sync study time + leave on SPA navigation ───────────────
-  // This fires whenever the user navigates away from the room page WITHOUT
-  // pressing the Leave button (clicking nav links, browser back, etc.).
-  // leaveActiveRoom() banks accumulated study time, transfers host if needed,
-  // and removes the participant from Firestore — same as the explicit Leave flow.
-  //
-  // We store everything in refs so the cleanup always uses the latest values
-  // even though useEffect(fn, []) only captures the initial render's closure.
-  const joinedRef        = useRef(false);
+  // ── Prevent double-leave on explicit Leave button press ──────────────────────
+  // joinedRef tracks whether this component instance called joinActiveRoom.
+  // We set it to true on join and false before the explicit confirmLeave()
+  // call so leaveActiveRoom is never invoked twice.
+  // NOTE: We do NOT auto-leave on unmount. The room session must survive
+  // page navigation — the user stays connected until they explicitly press
+  // "Leave", close the tab, or get disconnected via timeout.
+  const joinedRef        = useRef(alreadyIn);
   const leaveRef         = useRef(leaveActiveRoom);
   leaveRef.current       = leaveActiveRoom;
 
   useEffect(() => {
     if (joined) joinedRef.current = true;
   }, [joined]);
-
-  useEffect(() => {
-    return () => {
-      if (joinedRef.current) {
-        // Fire-and-forget: Firestore SDK (offline persistence) writes to IndexedDB
-        // immediately, so data is durable even if the async finishes after unmount.
-        leaveRef.current().catch(() => {});
-      }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // ── Fullscreen ────────────────────────────────────────────────────────────────
   useEffect(() => {

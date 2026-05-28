@@ -98,7 +98,7 @@ export async function uploadProfilePhoto(
 
   // ── 2. Upload with real byte-level progress ────────────────────────────────
   const storageRef = ref(storage, `avatars/${uid}.jpg`);
-  const task       = uploadBytesResumable(blob, { contentType: "image/jpeg" });
+  const task       = uploadBytesResumable(storageRef, blob, { contentType: "image/jpeg" });
 
   await new Promise<void>((resolve, reject) => {
     task.on(
