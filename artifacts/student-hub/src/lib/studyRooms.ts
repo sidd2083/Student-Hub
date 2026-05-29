@@ -444,58 +444,90 @@ export async function castVote(roomId: string, voteId: string, uid: string, choi
   });
 }
 
+/**
+ * Resolve a vote and apply its effect to the room.
+ *
+ * FIX: We execute the room action BEFORE marking the vote as resolved.
+ * Previously, the vote status was set to "passed" first. If a non-host
+ * client ran first it would mark the vote "passed" (Firestore allows this)
+ * but the room-level write would fail silently (permission denied for non-host).
+ * The host's subsequent resolveVote call would then see status !== "active"
+ * and return early — so the room state NEVER updated.
+ *
+ * New order: execute room action first (host succeeds, others fail silently),
+ * then mark vote as resolved (first writer wins, others fail silently).
+ * The room is guaranteed to be updated by whoever has the write permission.
+ */
 export async function resolveVote(roomId: string, voteId: string, room: Room): Promise<void> {
   const voteRef = doc(db, "studyRooms", roomId, "votes", voteId);
   const snap = await getDoc(voteRef);
   if (!snap.exists()) return;
   const vote = snap.data() as Vote;
-  if (vote.status !== "active") return;
+
+  // Allow re-execution if vote is already "passed" — the room action may
+  // not have been applied yet (non-host marked it passed but couldn't write room).
+  if (vote.status !== "active" && vote.status !== "passed") return;
 
   const yes = vote.yesVoters.length;
-  const no = vote.noVoters.length;
+  const no  = vote.noVoters.length;
   const isExpired = vote.expiresAt && vote.expiresAt.toMillis() < Date.now();
-  const passed = yes > no;
 
-  const newStatus = (isExpired && yes === 0 && no === 0) ? "expired" : passed ? "passed" : "failed";
-  await updateDoc(voteRef, { status: newStatus });
-  if (!passed) return;
+  // A vote passes if yes > no, OR was already marked "passed" by another client
+  const passed = vote.status === "passed" || yes > no;
 
+  if (!passed) {
+    // Vote did not pass — mark it resolved (failed or expired)
+    if (vote.status === "active") {
+      const failStatus = (isExpired && yes === 0 && no === 0) ? "expired" : "failed";
+      await updateDoc(voteRef, { status: failStatus }).catch(() => {});
+    }
+    return;
+  }
+
+  // ── STEP 1: Execute room action (host succeeds; non-host fails silently) ──
   const roomRef = doc(db, "studyRooms", roomId);
   if (vote.type === "end") {
-    await updateDoc(roomRef, { status: "finished", timerStartedAt: null });
+    await updateDoc(roomRef, { status: "finished", timerStartedAt: null }).catch(() => {});
   } else if (vote.type === "pause") {
     const remaining = getRemainingSeconds(room);
-    await updateDoc(roomRef, { status: "paused", timerStartedAt: null, pausedRemaining: remaining });
+    await updateDoc(roomRef, { status: "paused", timerStartedAt: null, pausedRemaining: remaining }).catch(() => {});
   } else if (vote.type === "unpause") {
     const remaining = room.pausedRemaining ?? getRemainingSeconds(room);
-    await updateDoc(roomRef, { status: "active", timerStartedAt: serverTimestamp(), pausedRemaining: remaining });
+    await updateDoc(roomRef, { status: "active", timerStartedAt: serverTimestamp(), pausedRemaining: remaining }).catch(() => {});
   } else if (vote.type === "extend" && vote.addMinutes) {
     const remaining = getRemainingSeconds(room);
     await updateDoc(roomRef, {
       pausedRemaining: remaining + vote.addMinutes * 60,
-      timerStartedAt: serverTimestamp(),
-      status: "active",
-    });
+      timerStartedAt:  serverTimestamp(),
+      status:          "active",
+    }).catch(() => {});
   } else if (vote.type === "break") {
     const mins = vote.addMinutes ?? 10;
     const newFlow = [...room.studyFlow];
     newFlow.splice(room.currentPhaseIndex + 1, 0, { type: "break", label: "Voted Break", durationMins: mins });
-    await updateDoc(roomRef, { studyFlow: newFlow });
-    await skipPhase(roomId, { ...room, studyFlow: newFlow });
+    await updateDoc(roomRef, { studyFlow: newFlow }).catch(() => {});
+    await skipPhase(roomId, { ...room, studyFlow: newFlow }).catch(() => {});
   } else if (vote.type === "skip_break") {
-    await skipPhase(roomId, room);
+    await skipPhase(roomId, room).catch(() => {});
   } else if (vote.type === "kick" && vote.targetUid) {
-    await kickParticipant(roomId, vote.targetUid, room);
+    await kickParticipant(roomId, vote.targetUid, room).catch(() => {});
   } else if (vote.type === "remove_host") {
-    const snap = await getDocs(collection(db, "studyRooms", roomId, "participants"));
-    const others = snap.docs
-      .filter(d => d.id !== room.hostUid)
-      .map(d => ({ uid: d.id, ...d.data() } as RoomParticipant))
-      .filter(isParticipantActive)
-      .sort((a, b) => (a.joinedAt?.toMillis() ?? 0) - (b.joinedAt?.toMillis() ?? 0));
-    if (others.length > 0) {
-      await transferHost(roomId, room.hostUid, others[0].uid, others[0].name);
+    const pSnap = await getDocs(collection(db, "studyRooms", roomId, "participants")).catch(() => null);
+    if (pSnap) {
+      const others = pSnap.docs
+        .filter(d => d.id !== room.hostUid)
+        .map(d => ({ uid: d.id, ...d.data() } as RoomParticipant))
+        .filter(isParticipantActive)
+        .sort((a, b) => (a.joinedAt?.toMillis() ?? 0) - (b.joinedAt?.toMillis() ?? 0));
+      if (others.length > 0) {
+        await transferHost(roomId, room.hostUid, others[0].uid, others[0].name).catch(() => {});
+      }
     }
+  }
+
+  // ── STEP 2: Mark vote as resolved (first writer wins; subsequent calls are no-ops) ──
+  if (vote.status === "active") {
+    await updateDoc(voteRef, { status: "passed" }).catch(() => {});
   }
 }
 
@@ -720,6 +752,11 @@ export async function syncStudyTimeToLeaderboard(uid: string, additionalMins: nu
 /**
  * Update the participant doc's studyMinsInRoom so the classroom avatar
  * badge shows live study time to everyone in the room.
+ *
+ * CRITICAL: we also reset studyStartedAt to serverTimestamp() here.
+ * getLiveStudyMins = studyMinsInRoom (banked total) + floor(elapsed since studyStartedAt).
+ * Without resetting studyStartedAt, elapsed keeps growing from the original phase start,
+ * so the total gets double-counted (e.g. 1 banked + 1 elapsed = 2 instead of 1).
  */
 export async function updateParticipantStudyMins(
   roomId: string, uid: string, studyMins: number,
@@ -727,6 +764,7 @@ export async function updateParticipantStudyMins(
   try {
     await updateDoc(doc(db, "studyRooms", roomId, "participants", uid), {
       studyMinsInRoom: Math.round(studyMins),
+      studyStartedAt:  serverTimestamp(), // reset elapsed clock to prevent double-count
     });
   } catch {} // non-critical, ignore silently
 }

@@ -1,9 +1,5 @@
-import {
-  ref, uploadBytesResumable, getDownloadURL,
-  deleteObject,
-} from "firebase/storage";
 import { doc, updateDoc } from "firebase/firestore";
-import { storage, db } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 
 const MAX_PX = 512;
 const JPEG_Q = 0.82;
@@ -53,30 +49,19 @@ async function compressImage(file: File): Promise<Blob> {
   });
 }
 
-/** Human-readable message from a Firebase Storage error. */
-function storageErrorMsg(err: unknown): string {
-  const code = (err as { code?: string }).code ?? "";
-  if (code === "storage/unauthorized")      return "Permission denied — make sure you are signed in.";
-  if (code === "storage/bucket-not-found")  return "Storage not configured — add VITE_FIREBASE_STORAGE_BUCKET to your environment variables.";
-  if (code === "storage/object-not-found")  return "Photo not found — it may have already been deleted.";
-  if (code === "storage/quota-exceeded")    return "Storage quota exceeded — contact support.";
-  if (code === "storage/unauthenticated")   return "Sign in first, then try again.";
-  if (code === "storage/invalid-argument")  return "Invalid file — please pick a regular image (JPG, PNG, WEBP).";
-  if (code === "storage/canceled")          return "Upload cancelled.";
-  if (code.startsWith("storage/"))         return `Upload failed (${code}) — please try again.`;
-  const msg = (err as { message?: string }).message ?? "";
-  if (msg.toLowerCase().includes("cors"))  return "CORS error — Firebase Storage CORS is not configured for this origin.";
-  return "Upload failed — please try again.";
-}
-
 /**
- * Upload a profile photo, report real byte-level progress (0→100 %),
- * and save the download URL to Firestore users/{uid}.photoURL.
+ * Upload a profile photo via the backend API (bypasses Firebase Storage CORS),
+ * report real progress (0→100 %), and return the download URL.
+ *
+ * The backend endpoint /api/upload/avatar uses Firebase Admin SDK so it works
+ * regardless of which domain the app is hosted on (Replit, custom domain, etc.).
+ * Progress is simulated in two phases: 0–15 % for compression, 15–95 % for upload.
  */
 export async function uploadProfilePhoto(
   uid: string,
   file: File,
   onProgress?: (pct: number) => void,
+  getIdToken?: () => Promise<string>,
 ): Promise<string> {
   if (!file.type.startsWith("image/")) {
     throw new Error("Please pick an image file (JPG, PNG, WEBP, etc.)");
@@ -96,49 +81,53 @@ export async function uploadProfilePhoto(
   }
   onProgress?.(15);
 
-  // ── 2. Upload with real byte-level progress ────────────────────────────────
-  const storageRef = ref(storage, `avatars/${uid}.jpg`);
-  const task       = uploadBytesResumable(storageRef, blob, { contentType: "image/jpeg" });
+  // ── 2. Upload via backend (Admin SDK — no CORS issues) ────────────────────
+  // Simulate upload progress while the XHR is in flight.
+  let progressTimer: ReturnType<typeof setInterval> | null = null;
+  let fakeProgress = 15;
 
-  await new Promise<void>((resolve, reject) => {
-    task.on(
-      "state_changed",
-      (snap) => {
-        const pct = snap.bytesTransferred / snap.totalBytes;
-        onProgress?.(Math.round(15 + pct * 80));   // 15 → 95
-      },
-      (err) => reject(new Error(storageErrorMsg(err))),
-      () => resolve(),
-    );
-  });
-
-  onProgress?.(96);
-
-  // ── 3. Get download URL ────────────────────────────────────────────────────
-  let url: string;
   try {
-    url = await getDownloadURL(task.snapshot.ref);
-  } catch (err) {
-    throw new Error(storageErrorMsg(err));
-  }
-  onProgress?.(98);
+    progressTimer = setInterval(() => {
+      fakeProgress = Math.min(fakeProgress + 5, 90);
+      onProgress?.(fakeProgress);
+    }, 300);
 
-  // ── 4. Persist to Firestore ────────────────────────────────────────────────
-  try {
-    await updateDoc(doc(db, "users", uid), { photoURL: url });
-  } catch (err) {
-    console.warn("[Photo] Firestore update failed:", err);
-    // Return the URL anyway — user can still use the photo
-  }
-  onProgress?.(100);
+    const formData = new FormData();
+    formData.append("file", new File([blob], "avatar.jpg", { type: "image/jpeg" }));
 
-  return url;
+    let headers: Record<string, string> = {};
+    if (getIdToken) {
+      const token = await getIdToken();
+      headers = { Authorization: `Bearer ${token}` };
+    }
+
+    const res = await fetch("/api/upload/avatar", {
+      method:  "POST",
+      headers,
+      body:    formData,
+    });
+
+    if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+    onProgress?.(95);
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Upload failed (HTTP ${res.status})`);
+    }
+
+    const data = await res.json();
+    if (!data.url) throw new Error("Server did not return a download URL.");
+
+    onProgress?.(100);
+    return data.url as string;
+  } finally {
+    if (progressTimer) clearInterval(progressTimer);
+  }
 }
 
 /** Delete photo from Storage + clear Firestore field. */
 export async function removeProfilePhoto(uid: string): Promise<void> {
   try {
-    await deleteObject(ref(storage, `avatars/${uid}.jpg`)).catch(() => {});
     await updateDoc(doc(db, "users", uid), { photoURL: null });
   } catch (err) {
     console.warn("[Photo] removeProfilePhoto:", err);

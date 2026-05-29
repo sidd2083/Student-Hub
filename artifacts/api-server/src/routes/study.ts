@@ -224,6 +224,78 @@ router.post("/study/sync-anon", async (req: Request, res: Response) => {
   }
 });
 
+// ── Claim host when current host is stale ─────────────────────────────────────
+// Called by the oldest active non-host participant every 30 s when they detect
+// the current host's lastSeen is > 90 s old (i.e. host crashed/closed tab).
+// Uses Firebase Admin SDK so it bypasses Firestore rules that only allow the
+// current host to update room.hostUid.
+router.post("/study/claim-host", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { roomId } = req.body as { roomId?: string };
+    if (!roomId || typeof roomId !== "string") {
+      return res.status(400).json({ error: "roomId required" });
+    }
+
+    const claimerUid = req.uid!;
+    const db = getAdminDb();
+    if (!db) return res.status(503).json({ error: "Admin DB unavailable" });
+
+    const roomRef  = db.collection("studyRooms").doc(roomId);
+    const roomSnap = await roomRef.get();
+    if (!roomSnap.exists) return res.status(404).json({ error: "Room not found" });
+
+    const room = roomSnap.data()!;
+    if (room.status === "finished") return res.status(409).json({ error: "Room already finished" });
+
+    // Claimer must be a current participant
+    const claimerRef  = roomRef.collection("participants").doc(claimerUid);
+    const claimerSnap = await claimerRef.get();
+    if (!claimerSnap.exists) return res.status(403).json({ error: "Not a participant" });
+
+    const currentHostUid: string = room.hostUid;
+    if (currentHostUid === claimerUid) return res.json({ ok: true, message: "Already host" });
+
+    // Check if current host is stale (lastSeen > 90 s ago or participant doc missing)
+    const STALE_MS = 90_000;
+    const hostRef  = roomRef.collection("participants").doc(currentHostUid);
+    const hostSnap = await hostRef.get();
+
+    let isHostStale = !hostSnap.exists;
+    if (!isHostStale && hostSnap.exists) {
+      const lastSeen = hostSnap.data()?.lastSeen?.toMillis() ?? 0;
+      isHostStale = Date.now() - lastSeen > STALE_MS;
+    }
+
+    if (!isHostStale) {
+      return res.status(409).json({ error: "Current host is still active" });
+    }
+
+    // Transfer host to claimer
+    const claimerName: string = claimerSnap.data()?.name ?? "Unknown";
+    const batch = db.batch();
+    batch.update(roomRef, { hostUid: claimerUid, hostName: claimerName });
+    batch.update(claimerRef, { isHost: true });
+    if (hostSnap.exists) {
+      batch.update(hostRef, { isHost: false });
+    }
+    await batch.commit();
+
+    // Post system message
+    await roomRef.collection("messages").add({
+      uid: "system", name: "System",
+      text: `${claimerName} is now the host (previous host disconnected).`,
+      type: "system",
+      createdAt: (await import("firebase-admin/firestore")).FieldValue.serverTimestamp(),
+    }).catch(() => {});
+
+    logger.info({ roomId, claimerUid, prevHostUid: currentHostUid }, "[Study] Host claimed after stale");
+    return res.json({ ok: true, newHostUid: claimerUid });
+  } catch (err) {
+    logger.error(err, "[Study] claim-host failed");
+    return res.status(500).json({ error: "Failed to claim host" });
+  }
+});
+
 router.post("/study/session",  (_req: Request, res: Response) => res.status(501).json({ error: "Use /study/save" }));
 router.post("/study/log-task", (_req: Request, res: Response) => res.status(501).json({ error: "Use Firestore directly" }));
 router.post("/study/log-note", (_req: Request, res: Response) => res.status(501).json({ error: "Use Firestore directly" }));

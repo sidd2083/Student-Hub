@@ -8,6 +8,7 @@ import {
   updateParticipantStudyStart, updateParticipantStudyEnd,
   pauseTimer, resumeTimer, startTimer, skipPhase, endRoom,
   advancePhase, getRemainingSeconds, transferHost, purgeStaleParticipants,
+  getLiveStudyMins, isParticipantActive,
 } from "@/lib/studyRooms";
 import { playBell } from "@/hooks/useAmbientSound";
 
@@ -77,16 +78,18 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   const lastSyncTimeRef     = useRef(Date.now());
   const prevStudyingRef     = useRef(false);
 
-  const remainingSecsRef = useRef(0);  // always fresh for onHostPause
-  const roomRef          = useRef<Room | null>(null);
-  const prevPhaseRef     = useRef<string | null>(null);
-  const prevStatusRef    = useRef<string | null>(null);
-  const advancingRef     = useRef(false);
-  const unsubRoomRef     = useRef<(() => void) | null>(null);
-  const unsubPartsRef    = useRef<(() => void) | null>(null);
-  const unloadedRef      = useRef(false);
+  const remainingSecsRef   = useRef(0);  // always fresh for onHostPause
+  const roomRef            = useRef<Room | null>(null);
+  const participantsRef    = useRef<RoomParticipant[]>([]);
+  const prevPhaseRef       = useRef<string | null>(null);
+  const prevStatusRef      = useRef<string | null>(null);
+  const advancingRef       = useRef(false);
+  const unsubRoomRef       = useRef<(() => void) | null>(null);
+  const unsubPartsRef      = useRef<(() => void) | null>(null);
+  const unloadedRef        = useRef(false);
 
-  roomRef.current = room;
+  roomRef.current         = room;
+  participantsRef.current = participants;
 
   const isHost = !!(room && user && room.hostUid === user.uid);
 
@@ -170,9 +173,14 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
       setRemainingSeconds(rem);
       remainingSecsRef.current = rem;
 
-      // Live study minute display (wall-clock accurate)
-      const totalStudySecs = getTotalStudySeconds();
-      const displayMins = Math.floor(totalStudySecs / 60);
+      // Live study minute display — prefer Firestore participant data for cross-device
+      // consistency (same source as avatar badges). Fall back to local wall-clock
+      // on the first few ticks before Firestore data has arrived.
+      // Use participantsRef (not the stale closure) so we always see fresh data.
+      const myParticipant = user ? participantsRef.current.find(p => p.uid === user.uid) : undefined;
+      const displayMins = (myParticipant && myParticipant.studyStartedAt != null)
+        ? getLiveStudyMins(myParticipant)
+        : Math.floor(getTotalStudySeconds() / 60);
       setStudyMinsInSession(displayMins);
 
       if (r.status === "active") {
@@ -222,6 +230,46 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     const interval = setInterval(() => {
       purgeStaleParticipants(activeRoomId).catch(() => {});
     }, 60_000);
+    return () => clearInterval(interval);
+  }, [activeRoomId, user, isHost]);
+
+  // ── Non-host: claim host if current host is stale (> 90 s since lastSeen) ──
+  // Fixes the "host transfer broken on disconnect" bug. Only the host runs
+  // purgeStaleParticipants, so if the host crashes or closes their tab without
+  // calling leaveActiveRoom, no one transfers the host and the room is stuck.
+  // All non-host participants now poll every 30 s and the oldest active one
+  // calls the backend /api/study/claim-host endpoint (Admin SDK bypasses rules).
+  useEffect(() => {
+    if (!activeRoomId || !user || isHost) return;
+    const STALE_MS = 90_000;
+
+    const interval = setInterval(async () => {
+      const r    = roomRef.current;
+      const pArr = participantsRef.current; // always-fresh via ref — avoids interval restart on each join/leave
+      if (!r || r.status === "finished" || r.status === "waiting") return;
+
+      // Check if the current host is stale
+      const hostParticipant = pArr.find(p => p.uid === r.hostUid);
+      const isHostStale = !hostParticipant ||
+        (hostParticipant.lastSeen && Date.now() - hostParticipant.lastSeen.toMillis() > STALE_MS);
+      if (!isHostStale) return;
+
+      // Only the oldest active non-host participant should claim
+      const sorted = pArr
+        .filter(p => p.uid !== r.hostUid && isParticipantActive(p))
+        .sort((a, b) => (a.joinedAt?.toMillis() ?? 0) - (b.joinedAt?.toMillis() ?? 0));
+      if (sorted[0]?.uid !== user.uid) return;
+
+      try {
+        const token = await user.getIdToken();
+        await fetch("/api/study/claim-host", {
+          method:  "POST",
+          headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+          body:    JSON.stringify({ roomId: activeRoomId }),
+        });
+      } catch { /* silent — will retry next tick */ }
+    }, 30_000);
+
     return () => clearInterval(interval);
   }, [activeRoomId, user, isHost]);
 

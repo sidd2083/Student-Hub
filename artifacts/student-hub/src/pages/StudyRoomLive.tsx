@@ -690,9 +690,14 @@ export default function StudyRoomLive() {
         <div className="lg:hidden flex flex-col gap-3 pb-16">
           {showTimer && (
             <div className={`flex items-center justify-between px-4 py-3 rounded-2xl ${isStudying ? "bg-blue-600 text-white" : "bg-green-600 text-white"}`}>
-              <div className="flex items-center gap-2">
-                {isStudying ? <BookOpen className="w-4 h-4" /> : <Coffee className="w-4 h-4" />}
-                <span className="text-sm font-semibold">{phase?.label}</span>
+              <div className="flex items-center gap-2 flex-col items-start">
+                <div className="flex items-center gap-1.5">
+                  {isStudying ? <BookOpen className="w-4 h-4" /> : <Coffee className="w-4 h-4" />}
+                  <span className="text-sm font-semibold">{phase?.label}</span>
+                </div>
+                {studyMinsInSession > 0 && (
+                  <span className="text-xs opacity-80 font-medium">{studyMinsInSession}m studied</span>
+                )}
               </div>
               <span className="font-mono text-2xl font-black tabular-nums">{timerFmt}</span>
               <div className="flex items-center gap-1 text-sm opacity-80">

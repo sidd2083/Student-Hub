@@ -115,4 +115,64 @@ router.post(
   },
 );
 
+// ── Profile avatar upload ─────────────────────────────────────────────────────
+// Routes through the backend (Admin SDK) to avoid browser CORS restrictions
+// on Firebase Storage when hosted on Replit or custom domains.
+// The avatar is always stored at avatars/{uid}.jpg and the Firestore
+// users/{uid}.photoURL is updated atomically after upload.
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits:  { fileSize: 2 * 1024 * 1024 }, // 2 MB max (already compressed by client)
+});
+
+router.post(
+  "/upload/avatar",
+  requireAuth,
+  avatarUpload.single("file"),
+  async (req: Request, res: Response) => {
+    try {
+      const file = req.file;
+      if (!file) return res.status(400).json({ error: "No file provided." });
+
+      if (!file.mimetype.startsWith("image/")) {
+        return res.status(400).json({ error: "Only image files are allowed." });
+      }
+
+      const storage = getAdminStorage();
+      const db      = getAdminDb();
+      if (!storage || !STORAGE_BUCKET) {
+        return res.status(503).json({
+          error: "Storage not available — FIREBASE_SERVICE_ACCOUNT_JSON required.",
+        });
+      }
+
+      const uid  = req.uid!;
+      const path = `avatars/${uid}.jpg`;
+      const token = crypto.randomUUID();
+
+      const bucket  = storage.bucket(STORAGE_BUCKET);
+      const fileRef = bucket.file(path);
+      await fileRef.save(file.buffer, {
+        contentType: "image/jpeg",
+        metadata:    { firebaseStorageDownloadTokens: token },
+      });
+
+      const downloadUrl =
+        `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(STORAGE_BUCKET)}` +
+        `/o/${encodeURIComponent(path)}?alt=media&token=${token}`;
+
+      // Update Firestore users/{uid}.photoURL
+      if (db) {
+        await db.collection("users").doc(uid).update({ photoURL: downloadUrl }).catch(() => {});
+      }
+
+      logger.info({ uid, size: file.size }, "[Upload] Avatar saved");
+      return res.json({ url: downloadUrl });
+    } catch (err) {
+      logger.error(err, "[Upload] Avatar error");
+      return res.status(500).json({ error: "Avatar upload failed." });
+    }
+  },
+);
+
 export default router;

@@ -81,7 +81,7 @@ export default function Settings() {
     setUploadPct(0);
 
     try {
-      const url = await uploadProfilePhoto(user.uid, file, (pct) => setUploadPct(pct));
+      const url = await uploadProfilePhoto(user.uid, file, (pct) => setUploadPct(pct), () => user.getIdToken());
       URL.revokeObjectURL(local);
       setPhotoPreview(url);
       setProfile({ ...profile!, photoURL: url });
