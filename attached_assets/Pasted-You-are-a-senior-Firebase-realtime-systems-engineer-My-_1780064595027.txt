@@ -1,0 +1,180 @@
+You are a senior Firebase realtime systems engineer.
+
+My Virtual Study Room app is already fully built.
+
+DO NOT change UI.
+
+ONLY FIX REAL-TIME SYNC, TIMERS, AND DATA CONSISTENCY.
+
+========================================================
+🔥 CORE PROBLEM (MOST IMPORTANT)
+========================================================
+
+Study time is NOT synced across the system.
+
+Different parts show different values:
+
+- Room panel shows 9 minutes
+- Avatar popup shows 7 minutes
+- Report card shows 30 minutes
+- Another device shows different values
+- Mobile and laptop are out of sync
+
+THIS IS COMPLETELY WRONG.
+
+========================================================
+🔥 ROOT CAUSE
+========================================================
+
+There is NO single source of truth.
+
+Different components are:
+- calculating study time separately
+- updating at different intervals
+- reading stale Firestore values
+- using local state instead of centralized time
+
+This causes:
+- delay
+- mismatch
+- random resets
+- inconsistent UI values
+
+========================================================
+🔥 REQUIRED FIX (MOST IMPORTANT)
+========================================================
+
+You MUST implement a SINGLE REAL-TIME STUDY TIME SOURCE.
+
+RULE:
+
+Study time MUST be derived ONLY from:
+
+👉 serverTimestamp (room start time)
+👉 user join timestamp
+👉 current server time
+
+NOT from:
+- frontend intervals
+- local state counters
+- independent timers per component
+
+========================================================
+🔥 EXACT BEHAVIOR REQUIRED
+========================================================
+
+If user has studied in room:
+
+ALL UI MUST SHOW EXACT SAME VALUE INSTANTLY:
+
+- room panel study time
+- avatar popup study time
+- report card
+- leaderboard
+- mobile view
+- desktop view
+
+NO EXCEPTIONS.
+
+========================================================
+🔥 SYNC RULE (CRITICAL)
+========================================================
+
+When study time increases:
+
+It must update:
+- instantly in Firestore
+- instantly in all listeners
+- instantly in all devices
+- instantly in all components
+
+No delay allowed.
+
+No 1–2 second lag.
+No half-second mismatch.
+
+========================================================
+🔥 MULTI-DEVICE ISSUE
+========================================================
+
+Problem:
+Laptop shows 22 min
+Mobile shows 30 min
+Half-second delay exists
+
+Fix:
+- remove local state timers
+- use Firestore realtime listeners only
+- ensure deterministic calculation from timestamps
+- ensure same formula across all devices
+
+========================================================
+🔥 AVATAR POPUP BUG
+========================================================
+
+Problem:
+Avatar popup shows outdated study time.
+
+Fix:
+- popup must NOT store local value
+- must always read from live computed Firestore-derived value
+
+========================================================
+🔥 REPORT CARD BUG
+========================================================
+
+Problem:
+Report card shows higher value than room panel.
+
+Fix:
+- report card must derive from SAME data source as room
+- no separate calculation logic allowed
+
+========================================================
+🔥 ROOM HOST TRANSFER BUG
+========================================================
+
+When host leaves:
+- host becomes NULL
+
+Fix:
+- automatically transfer host to:
+  → longest active participant
+- update Firestore immediately
+- update all clients instantly
+
+========================================================
+🔥 PROFILE PICTURE UPLOAD BUG
+========================================================
+
+Problem:
+Upload stuck at 15%
+or fails during upload
+
+Fix:
+- fix Firebase Storage upload pipeline
+- ensure proper uploadBytesResumable usage
+- ensure progress listener works
+- ensure correct storage reference path
+- ensure auth permissions are valid
+
+Must:
+- complete upload fully
+- return download URL
+- store in Firestore correctly
+
+========================================================
+🔥 FINAL REQUIREMENT
+========================================================
+
+After fixes:
+
+✔ ALL devices show SAME study time
+✔ NO delay between components
+✔ NO mismatch between UI sections
+✔ NO ghost or stale values
+✔ REPORT CARD = ROOM = LEADERBOARD = AVATAR POPUP
+✔ Host transfer works instantly
+✔ Profile upload works 100%
+✔ No lag or inconsistent updates
+✔ Production-level realtime system
