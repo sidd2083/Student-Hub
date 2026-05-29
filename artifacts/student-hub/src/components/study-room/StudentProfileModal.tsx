@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { doc, getDoc } from "firebase/firestore";
+import { onSnapshot, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { RoomParticipant } from "@/lib/studyRooms";
+import { RoomParticipant, getLiveStudyMins } from "@/lib/studyRooms";
 import { X, Flame, Trophy, Clock, Calendar, BookOpen } from "lucide-react";
 
 interface UserStats {
@@ -17,8 +17,6 @@ interface Props {
   participant: RoomParticipant | null;
   onClose: () => void;
 }
-
-const statsCache = new Map<string, UserStats>();
 
 const AVATAR_COLORS = [
   "from-blue-500 to-blue-600", "from-purple-500 to-purple-600",
@@ -37,42 +35,47 @@ export function StudentProfileModal({ participant, onClose }: Props) {
   const [stats,       setStats]       = useState<UserStats | null>(null);
   const [loading,     setLoading]     = useState(false);
   const [photoBroken, setPhotoBroken] = useState(false);
+  // Live tick so getLiveStudyMins stays fresh while the popup is open
+  const [, setTick] = useState(0);
 
+  // Live Firestore listener — no stale cache, always fresh
   useEffect(() => {
     if (!participant) return;
     setPhotoBroken(false);
-
-    const cached = statsCache.get(participant.uid);
-    if (cached) {
-      setStats(cached);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
     setStats(null);
+    setLoading(true);
 
-    getDoc(doc(db, "users", participant.uid)).then((snap) => {
-      if (snap.exists()) {
-        const d = snap.data();
-        const s: UserStats = {
-          totalStudyTime: d.totalStudyTime ?? 0,
-          streak:         d.streak ?? 0,
-          createdAt:      d.createdAt ?? "",
-          todayStudyTime: d.todayStudyTime ?? 0,
-          photoURL:       d.photoURL ?? undefined,
-        };
-        statsCache.set(participant.uid, s);
-        setStats(s);
-      }
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    const unsub = onSnapshot(
+      doc(db, "users", participant.uid),
+      (snap) => {
+        if (snap.exists()) {
+          const d = snap.data();
+          setStats({
+            totalStudyTime: d.totalStudyTime ?? 0,
+            streak:         d.streak ?? 0,
+            createdAt:      d.createdAt ?? "",
+            todayStudyTime: d.todayStudyTime ?? 0,
+            photoURL:       d.photoURL ?? undefined,
+          });
+        }
+        setLoading(false);
+      },
+      () => setLoading(false),
+    );
+
+    return unsub;
+  }, [participant?.uid]);
+
+  // Tick every 30 s so "In this room" live minutes stay current
+  useEffect(() => {
+    if (!participant) return;
+    const id = setInterval(() => setTick(t => t + 1), 30_000);
+    return () => clearInterval(id);
   }, [participant?.uid]);
 
   if (!participant) return null;
 
-  // Only use the custom-uploaded photo from Firestore users doc. Never Google photo.
-  const photoURL = (!photoBroken && stats?.photoURL) || null;
+  const photoURL   = (!photoBroken && stats?.photoURL) || null;
   const initial    = participant.name.charAt(0).toUpperCase();
   const gradient   = avatarGradient(participant.name);
   const totalHours = stats ? (stats.totalStudyTime / 60).toFixed(1) : "—";
@@ -80,7 +83,10 @@ export function StudentProfileModal({ participant, onClose }: Props) {
   const joinedDate = stats?.createdAt
     ? new Date(stats.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })
     : "—";
-  const roomHours = (participant.studyMinsInRoom / 60).toFixed(1);
+
+  // Live room minutes derived from Firestore timestamps — same value on every device
+  const liveRoomMins  = getLiveStudyMins(participant);
+  const roomHours     = (liveRoomMins / 60).toFixed(1);
 
   return (
     <AnimatePresence>

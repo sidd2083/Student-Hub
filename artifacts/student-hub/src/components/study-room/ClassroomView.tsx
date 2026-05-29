@@ -1,6 +1,6 @@
-import { memo } from "react";
+import { memo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RoomParticipant } from "@/lib/studyRooms";
+import { RoomParticipant, getLiveStudyMins } from "@/lib/studyRooms";
 import { Crown, BookOpen, Coffee } from "lucide-react";
 
 interface Props {
@@ -57,9 +57,9 @@ const EmptySeat = memo(function EmptySeat({ compact }: { compact: boolean }) {
 
 // ── Occupied seat ─────────────────────────────────────────────────────────────
 const OccupiedSeat = memo(function OccupiedSeat({
-  p, isHost, onClick, compact,
+  p, isHost, onClick, compact, liveMins,
 }: {
-  p: RoomParticipant; isHost: boolean; onClick?: () => void; compact: boolean;
+  p: RoomParticipant; isHost: boolean; onClick?: () => void; compact: boolean; liveMins: number;
 }) {
   const initial  = p.name.charAt(0).toUpperCase();
   const gradient = avatarGradient(p.name);
@@ -77,11 +77,11 @@ const OccupiedSeat = memo(function OccupiedSeat({
       className={`flex flex-col items-center gap-1 ${compact ? "w-14" : "w-18"} cursor-pointer group focus:outline-none`}
     >
       <div className="relative">
-        {/* Study time badge */}
-        {p.studyMinsInRoom > 0 && (
+        {/* Study time badge — derived from Firestore server timestamps, consistent across all devices */}
+        {liveMins > 0 && (
           <div className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap z-20 ${isHost ? "-top-9" : "-top-6"}`}>
             <span className="inline-flex items-center bg-emerald-500 text-white text-[7px] font-bold px-1.5 py-0.5 rounded-full shadow-sm leading-none">
-              {fmtMins(p.studyMinsInRoom)}
+              {fmtMins(liveMins)}
             </span>
           </div>
         )}
@@ -127,10 +127,10 @@ const Bench = memo(function Bench({
       <div className={`flex items-end ${gap} mb-1`}>
         <AnimatePresence mode="popLayout">
           {left
-            ? <OccupiedSeat key={left.uid} p={left} isHost={left.uid === hostUid} onClick={() => onSelect(left)} compact={compact} />
+            ? <OccupiedSeat key={left.uid} p={left} isHost={left.uid === hostUid} onClick={() => onSelect(left)} compact={compact} liveMins={getLiveStudyMins(left)} />
             : <EmptySeat key="el" compact={compact} />}
           {right
-            ? <OccupiedSeat key={right.uid} p={right} isHost={right.uid === hostUid} onClick={() => onSelect(right)} compact={compact} />
+            ? <OccupiedSeat key={right.uid} p={right} isHost={right.uid === hostUid} onClick={() => onSelect(right)} compact={compact} liveMins={getLiveStudyMins(right)} />
             : <EmptySeat key="er" compact={compact} />}
         </AnimatePresence>
       </div>
@@ -194,6 +194,13 @@ export const ClassroomView = memo(function ClassroomView({
   participants, hostUid, onSelectStudent,
   timerDisplay, timerLabel, timerPhaseType, roomStatus, compact = false,
 }: Props) {
+  // Tick every 30 s so getLiveStudyMins() re-evaluates between Firestore updates
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
   const pairs: (RoomParticipant | null)[][] = [];
   for (let i = 0; i < participants.length; i += 2) {
     pairs.push([participants[i] ?? null, participants[i + 1] ?? null]);

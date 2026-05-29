@@ -46,7 +46,20 @@ export interface RoomParticipant {
   lastSeen: Timestamp | null;
   isHost: boolean;
   studyMinsInRoom: number;
+  /** Server timestamp written when this participant enters a study phase; cleared on pause/break/leave. */
+  studyStartedAt: Timestamp | null;
   isActive: boolean;
+}
+
+/**
+ * Compute a participant's live study minutes deterministically from Firestore data.
+ * Uses studyStartedAt (server timestamp) so every device shows the same value.
+ */
+export function getLiveStudyMins(p: RoomParticipant): number {
+  const base = p.studyMinsInRoom ?? 0;
+  if (!p.studyStartedAt) return base;
+  const extraSecs = Math.max(0, (Date.now() - p.studyStartedAt.toMillis()) / 1000);
+  return base + Math.floor(extraSecs / 60);
 }
 
 export interface Vote {
@@ -299,6 +312,22 @@ export async function purgeStaleParticipants(roomId: string): Promise<void> {
         batch.delete(doc(db, "studyRooms", roomId, "participants", uid));
       }
       await batch.commit();
+    }
+
+    // If the host was among the stale participants, transfer host to the oldest active member
+    const roomSnap = await getDoc(doc(db, "studyRooms", roomId)).catch(() => null);
+    if (roomSnap?.exists()) {
+      const roomData = roomSnap.data();
+      const currentHostUid: string = roomData.hostUid ?? "";
+      if (staleUids.includes(currentHostUid) && activeCount > 0) {
+        const activeParts = snap.docs
+          .map(d => ({ uid: d.id, ...d.data() } as RoomParticipant))
+          .filter(p => !staleUids.includes(p.uid))
+          .sort((a, b) => (a.joinedAt?.toMillis() ?? 0) - (b.joinedAt?.toMillis() ?? 0));
+        if (activeParts.length > 0) {
+          await transferHost(roomId, currentHostUid, activeParts[0].uid, activeParts[0].name).catch(() => {});
+        }
+      }
     }
 
     // Correct participantCount to match actual active participants
@@ -700,6 +729,34 @@ export async function updateParticipantStudyMins(
       studyMinsInRoom: Math.round(studyMins),
     });
   } catch {} // non-critical, ignore silently
+}
+
+/**
+ * Mark the moment a participant enters a study phase.
+ * Written as a server timestamp so any device can derive live study minutes
+ * deterministically via: studyMinsInRoom + floor((now - studyStartedAt) / 60).
+ */
+export async function updateParticipantStudyStart(roomId: string, uid: string): Promise<void> {
+  try {
+    await updateDoc(doc(db, "studyRooms", roomId, "participants", uid), {
+      studyStartedAt: serverTimestamp(),
+    });
+  } catch {}
+}
+
+/**
+ * Bank accumulated study minutes and clear the running-clock marker.
+ * Called when leaving a study phase (pause, break, leave).
+ */
+export async function updateParticipantStudyEnd(
+  roomId: string, uid: string, totalMinsInRoom: number,
+): Promise<void> {
+  try {
+    await updateDoc(doc(db, "studyRooms", roomId, "participants", uid), {
+      studyMinsInRoom: Math.round(totalMinsInRoom),
+      studyStartedAt:  null,
+    });
+  } catch {}
 }
 
 // ── Transfer Host ─────────────────────────────────────────────────────────────

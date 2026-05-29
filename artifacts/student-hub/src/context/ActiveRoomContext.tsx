@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   Room, RoomParticipant, subscribeRoom, subscribeParticipants,
   leaveRoom, updatePresence, syncStudyTimeToLeaderboard, updateParticipantStudyMins,
+  updateParticipantStudyStart, updateParticipantStudyEnd,
   pauseTimer, resumeTimer, startTimer, skipPhase, endRoom,
   advancePhase, getRemainingSeconds, transferHost, purgeStaleParticipants,
 } from "@/lib/studyRooms";
@@ -108,13 +109,20 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
       const nowStudying = isRoomStudying(r);
 
       if (!prevStudyingRef.current && nowStudying) {
-        // Entered study phase — start wall clock
+        // Entered study phase — start wall clock AND write server timestamp to Firestore
         studyWallStartRef.current = Date.now();
+        if (user) {
+          updateParticipantStudyStart(activeRoomId, user.uid).catch(() => {});
+        }
       } else if (prevStudyingRef.current && !nowStudying) {
-        // Left study phase (paused / break / finished) — bank elapsed time
+        // Left study phase (paused / break / finished) — bank elapsed time and clear Firestore marker
         if (studyWallStartRef.current !== null) {
           studyAccumulatedRef.current += Math.max(0, (Date.now() - studyWallStartRef.current) / 1000);
           studyWallStartRef.current = null;
+        }
+        if (user) {
+          const bankedMins = Math.floor(studyAccumulatedRef.current / 60);
+          updateParticipantStudyEnd(activeRoomId, user.uid, bankedMins).catch(() => {});
         }
       }
       prevStudyingRef.current = nowStudying;
@@ -342,6 +350,9 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
       await saveStudyMinutes(user.uid, () => user.getIdToken(), remainderMins).catch(() => {});
     }
     const totalSessionMins = minsEarned;
+
+    // Clear Firestore study-clock marker so other participants see accurate final value
+    await updateParticipantStudyEnd(activeRoomId, user.uid, totalSessionMins).catch(() => {});
 
     // 3. Transfer host if needed (oldest active non-self participant)
     const r = roomRef.current;
