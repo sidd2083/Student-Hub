@@ -1,0 +1,148 @@
+You are a senior production-level full stack + Firebase performance engineer.
+
+The Virtual Study Room app is now FUNCTIONALLY WORKING, but NOT production ready.
+
+DO NOT add new features.
+
+ONLY focus on:
+- performance optimization
+- realtime sync delay fix
+- UI consistency
+- stability improvements
+- bug fixes
+
+========================================================
+🔥 1. REALTIME SYNC DELAY (IMPORTANT)
+========================================================
+
+Study time updates are correct but slightly delayed.
+
+Problem:
+- user studies 1 minute
+- UI updates after delay
+- not instant sync
+
+Fix required:
+- remove any debounce/throttle on study updates
+- ensure Firestore onSnapshot is used efficiently
+- ensure all UI components subscribe to same realtime source
+- ensure updates propagate instantly
+
+Goal:
+ZERO visible delay between study action and UI update.
+
+========================================================
+🔥 2. PROFILE PICTURE UPLOAD BUG (CRITICAL)
+========================================================
+
+Current issue:
+- upload reaches 100%
+- then shows "upload failed"
+
+This is NOT upload failure.
+
+Fix required:
+- ensure Firebase Storage upload completes fully
+- ensure getDownloadURL is successfully executed
+- ensure Firestore user profile update is completed AFTER upload
+- only show SUCCESS if BOTH steps succeed
+
+Fix silent failure after upload completion.
+
+========================================================
+🔥 3. PERFORMANCE OPTIMIZATION (VERY IMPORTANT)
+========================================================
+
+Current issue:
+- app feels slow
+- UI lag on actions
+- delayed updates
+- not smooth
+
+Fix required:
+- reduce unnecessary Firestore listeners
+- prevent duplicate subscriptions
+- memoize components properly
+- avoid full page rerenders on small updates
+- batch state updates
+- optimize realtime listeners per room
+
+Goal:
+App must feel instant and smooth like a professional production app.
+
+========================================================
+🔥 4. HOST TRANSFER + ROOM STATE FIX
+========================================================
+
+When host leaves:
+- host transfer must be instant and reliable
+
+Fix:
+- if host disconnects
+→ assign new host to oldest active user
+→ update Firestore immediately
+→ sync across all clients instantly
+
+No room should exist without host.
+
+========================================================
+🔥 5. VOTING + ROOM STATE CONSISTENCY
+========================================================
+
+Voting system must:
+- immediately reflect room state changes
+- update all users in realtime
+- not show false success UI
+
+If vote passes:
+→ room state must actually change in backend
+
+========================================================
+🔥 6. CLASSROOM UI IMPROVEMENT (IMPORTANT UX)
+========================================================
+
+Improve classroom feel:
+- make UI feel like real study environment
+- add subtle aesthetic background (Nepal-inspired visual/map theme)
+- add “Student Hub” branding inside classroom
+- improve spacing, layout, immersion
+- make it feel focused and productive
+
+DO NOT overdesign. Keep it clean and lightweight.
+
+========================================================
+🔥 7. MUSIC SYSTEM FIX
+========================================================
+
+Current issue:
+- music feels irritating
+- not study-friendly
+
+Replace with:
+- lo-fi ambient study tracks
+- soft instrumental background
+- optional rain + lo-fi mix
+- smooth looping audio
+
+Add:
+- mute/unmute control
+- volume control (simple)
+
+========================================================
+🔥 FINAL GOAL
+========================================================
+
+After fixes:
+
+✔ study time updates instantly (no delay)
+✔ report card synced perfectly
+✔ leaderboard synced perfectly
+✔ avatar synced perfectly
+✔ profile upload works 100% correctly
+✔ app feels fast and smooth
+✔ no lag or freezing
+✔ host transfer always works
+✔ voting always consistent
+✔ classroom feels aesthetic and immersive
+✔ music feels relaxing, not annoying
+✔ production-grade user experience

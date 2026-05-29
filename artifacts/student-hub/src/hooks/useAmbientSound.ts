@@ -46,7 +46,7 @@ interface SoundGraph {
   schedulers?: ReturnType<typeof setInterval>[];
 }
 
-// ── RAIN — filtered brown noise, soft and calming ─────────────────────────────
+// ── RAIN — filtered white noise, soft and calming ─────────────────────────────
 function buildRain(ctx: AudioContext, master: GainNode): SoundGraph {
   const buf = makeWhiteNoise(ctx, 6);
   const src = ctx.createBufferSource();
@@ -64,25 +64,27 @@ function buildRain(ctx: AudioContext, master: GainNode): SoundGraph {
   return { stop: () => { try { src.stop(); } catch {} } };
 }
 
-// ── LOFI — warm ambient pad (Am chord, slow LFO, NO harsh beats) ──────────────
+// ── LOFI — warm ambient pad, slow chord shifts, never jarring ─────────────────
+// Chord interval: 18 s (was 9 s) — gives the ear time to settle
+// Transition ramp: 6 s (was 3 s) — ultra-smooth crossfade between chords
 function buildLofi(ctx: AudioContext, master: GainNode): SoundGraph {
-  // Brown noise base (vinyl warmth)
+  // Brown noise base (vinyl warmth) — very subtle
   const buf = makeBrownNoise(ctx, 6);
   const src = ctx.createBufferSource();
   src.buffer = buf; src.loop = true;
-  const noiseG = ctx.createGain(); noiseG.gain.value = 0.035;
+  const noiseG = ctx.createGain(); noiseG.gain.value = 0.025;  // quieter vinyl hiss
   const noiseLpf = ctx.createBiquadFilter();
-  noiseLpf.type = "lowpass"; noiseLpf.frequency.value = 600;
+  noiseLpf.type = "lowpass"; noiseLpf.frequency.value = 500;
   src.connect(noiseLpf); noiseLpf.connect(noiseG); noiseG.connect(master);
   src.start();
 
-  // Soft A-minor chord pad: A2, A3, C4, E4, G4
+  // Soft Am7 chord pad: A2, A3, C4, E4, G4 (minor 7th = more relaxing)
   const NOTES = [
-    { f: 110.0, v: 0.040 },
-    { f: 220.0, v: 0.055 },
-    { f: 261.6, v: 0.045 },
-    { f: 329.6, v: 0.038 },
-    { f: 392.0, v: 0.028 },
+    { f: 110.0, v: 0.032 },  // A2 — sub bass
+    { f: 220.0, v: 0.042 },  // A3 — bass
+    { f: 261.6, v: 0.036 },  // C4 — minor third
+    { f: 329.6, v: 0.028 },  // E4 — fifth
+    { f: 392.0, v: 0.020 },  // G4 — minor seventh
   ];
   const oscs: OscillatorNode[] = [];
 
@@ -93,38 +95,41 @@ function buildLofi(ctx: AudioContext, master: GainNode): SoundGraph {
     const lfoG = ctx.createGain();
 
     osc.type = "sine";
-    osc.frequency.value = f + (idx % 2 === 0 ? 0.4 : -0.4);
+    osc.frequency.value = f + (idx % 2 === 0 ? 0.3 : -0.3);  // subtle chorus detune
 
-    // Very slow tremolo per note
-    lfo.type = "sine"; lfo.frequency.value = 0.04 + idx * 0.007;
-    lfoG.gain.value = v * 0.3;
+    // Very slow tremolo — barely perceptible, adds organic warmth
+    lfo.type = "sine"; lfo.frequency.value = 0.03 + idx * 0.005;
+    lfoG.gain.value = v * 0.2;
     lfo.connect(lfoG); lfoG.connect(env.gain);
 
+    // Long fade-in so there's no click on start
     env.gain.setValueAtTime(0, ctx.currentTime);
-    env.gain.linearRampToValueAtTime(v, ctx.currentTime + 3 + idx);
+    env.gain.linearRampToValueAtTime(v, ctx.currentTime + 5 + idx * 0.8);
 
     osc.connect(env); env.connect(master);
     osc.start(); lfo.start();
     oscs.push(osc, lfo);
   });
 
-  // Slow chord shifts Am → C → G → Am every 9s
+  // Chord progression: Am7 → Cmaj7 → Gmaj7 → Am7
+  // Each chord stays 18 s; transition takes 6 s — extremely smooth
   const CHORDS = [
-    [110.0, 220.0, 261.6, 329.6, 392.0],
-    [130.8, 261.6, 329.6, 392.0, 493.9],
-    [ 98.0, 196.0, 246.9, 293.7, 392.0],
+    [110.0, 220.0, 261.6, 329.6, 392.0],  // Am7:  A C E G
+    [130.8, 261.6, 329.6, 392.0, 493.9],  // Cmaj7: C E G B
+    [ 98.0, 196.0, 246.9, 293.7, 392.0],  // Gmaj7: G B D F#
   ];
   let ci = 0;
   const chordTimer = setInterval(() => {
     if (ctx.state !== "running") return;
     ci = (ci + 1) % CHORDS.length;
+    // 6-second linear ramp — sounds like a pad morphing, not a jump
     oscs.filter((_, i) => i % 2 === 0).forEach((osc, i) => {
       osc.frequency.linearRampToValueAtTime(
-        CHORDS[ci][i] + (i % 2 === 0 ? 0.4 : -0.4),
-        ctx.currentTime + 3,
+        CHORDS[ci][i] + (i % 2 === 0 ? 0.3 : -0.3),
+        ctx.currentTime + 6,
       );
     });
-  }, 9000);
+  }, 18_000);
 
   return {
     stop: () => {
@@ -136,7 +141,30 @@ function buildLofi(ctx: AudioContext, master: GainNode): SoundGraph {
   };
 }
 
-// ── NATURE / FOREST — soft wind + occasional gentle bird chirps ───────────────
+// ── LOFI + RAIN blend ─────────────────────────────────────────────────────────
+function buildLofiRain(ctx: AudioContext, master: GainNode): SoundGraph {
+  // Split the master gain so each layer has its own mix level
+  const lofiG = ctx.createGain(); lofiG.gain.value = 0.7; lofiG.connect(master);
+  const rainG = ctx.createGain(); rainG.gain.value = 0.5; rainG.connect(master);
+
+  const lofiGraph = buildLofi(ctx, lofiG);
+  const rainGraph = buildRain(ctx, rainG);
+
+  const allSchedulers = [
+    ...(lofiGraph.schedulers ?? []),
+    ...(rainGraph.schedulers ?? []),
+  ];
+
+  return {
+    stop: () => {
+      lofiGraph.stop();
+      rainGraph.stop();
+    },
+    schedulers: allSchedulers,
+  };
+}
+
+// ── NATURE / FOREST — soft wind + gentle bird chirps ─────────────────────────
 function buildForest(ctx: AudioContext, master: GainNode): SoundGraph {
   const buf = makeWhiteNoise(ctx, 6);
   const src = ctx.createBufferSource();
@@ -149,7 +177,6 @@ function buildForest(ctx: AudioContext, master: GainNode): SoundGraph {
   src.connect(lpf); lpf.connect(windG); windG.connect(master);
   src.start();
 
-  // Slow wind swell
   const lfo = ctx.createOscillator();
   const lfoG = ctx.createGain();
   lfo.type = "sine"; lfo.frequency.value = 0.07;
@@ -237,6 +264,7 @@ function buildGraph(id: string, ctx: AudioContext, master: GainNode): SoundGraph
   switch (id) {
     case "rain":       return buildRain(ctx, master);
     case "lofi":       return buildLofi(ctx, master);
+    case "lofirain":   return buildLofiRain(ctx, master);
     case "forest":
     case "nature":     return buildForest(ctx, master);
     case "whitenoise":
@@ -330,12 +358,13 @@ export function useAmbientSound(soundId: string, autoPlay = false): UseAmbientSo
   }, []);
 
   useEffect(() => {
-    if (!autoPlay) return;
+    if (!autoPlay) return undefined;
     stopSound();
     if (soundId && soundId !== "none") {
       const t = setTimeout(() => startSound(soundId), 300);
       return () => clearTimeout(t);
     }
+    return undefined;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [soundId, autoPlay]);
 

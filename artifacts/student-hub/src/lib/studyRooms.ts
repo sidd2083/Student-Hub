@@ -936,10 +936,11 @@ export const SUBJECTS = [
 ];
 
 export const AMBIENT_SOUNDS = [
-  { id: "none",       label: "No Sound",     emoji: "🔇" },
-  { id: "rain",       label: "Rain",          emoji: "🌧️" },
-  { id: "cafe",       label: "Café",          emoji: "☕" },
-  { id: "forest",     label: "Forest",        emoji: "🌿" },
-  { id: "whitenoise", label: "White Noise",   emoji: "🔊" },
-  { id: "lofi",       label: "Lo-Fi Beats",   emoji: "🎵" },
+  { id: "none",       label: "No Sound",      emoji: "🔇" },
+  { id: "rain",       label: "Rain",           emoji: "🌧️" },
+  { id: "lofi",       label: "Lo-Fi",          emoji: "🎵" },
+  { id: "lofirain",   label: "Lo-Fi + Rain",   emoji: "🎶" },
+  { id: "cafe",       label: "Café",           emoji: "☕" },
+  { id: "forest",     label: "Forest",         emoji: "🌿" },
+  { id: "whitenoise", label: "White Noise",    emoji: "🔊" },
 ];

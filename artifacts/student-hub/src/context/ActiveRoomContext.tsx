@@ -76,6 +76,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   const studyAccumulatedRef = useRef(0);
   const lastSyncedSecsRef   = useRef(0);
   const lastSyncTimeRef     = useRef(Date.now());
+  const lastBadgeSyncRef    = useRef(Date.now());
   const prevStudyingRef     = useRef(false);
 
   const remainingSecsRef   = useRef(0);  // always fresh for onHostPause
@@ -186,19 +187,23 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
       if (r.status === "active") {
         const now = Date.now();
 
-        // Sync to backend every 60 s when at least 1 full minute has been studied
+        // Push live study time to participant badge every 30 s so other
+        // members see fresh minutes without waiting a full minute.
+        if (now - lastBadgeSyncRef.current >= 30_000 && user) {
+          const totalMins = Math.floor(getTotalStudySeconds() / 60);
+          updateParticipantStudyMins(r.id, user.uid, totalMins).catch(() => {});
+          lastBadgeSyncRef.current = now;
+        }
+
+        // Sync study minutes to backend leaderboard every 60 s
         if (now - lastSyncTimeRef.current >= 60_000 && user) {
-          const totalSecs    = getTotalStudySeconds();
-          const minsEarned   = Math.floor(totalSecs / 60);
-          const minsToSync   = minsEarned - Math.floor(lastSyncedSecsRef.current / 60);
+          const totalSecs  = getTotalStudySeconds();
+          const minsEarned = Math.floor(totalSecs / 60);
+          const minsToSync = minsEarned - Math.floor(lastSyncedSecsRef.current / 60);
           if (minsToSync >= 1) {
             lastSyncedSecsRef.current = minsEarned * 60;
             saveStudyMinutes(user.uid, () => user.getIdToken(), minsToSync).catch(() => {});
           }
-
-          // Push live study time to participant doc so other members see badge
-          const totalMins = Math.floor(getTotalStudySeconds() / 60);
-          updateParticipantStudyMins(r.id, user.uid, totalMins).catch(() => {});
           lastSyncTimeRef.current = now;
         }
 
