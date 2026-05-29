@@ -161,9 +161,14 @@ router.post(
         `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(STORAGE_BUCKET)}` +
         `/o/${encodeURIComponent(path)}?alt=media&token=${token}`;
 
-      // Update Firestore users/{uid}.photoURL
+      // Update Firestore users/{uid}.photoURL — must succeed before reporting success
       if (db) {
-        await db.collection("users").doc(uid).update({ photoURL: downloadUrl }).catch(() => {});
+        try {
+          await db.collection("users").doc(uid).update({ photoURL: downloadUrl });
+        } catch (fsErr) {
+          logger.error({ err: fsErr, uid }, "[Upload] Firestore photoURL update failed");
+          return res.status(500).json({ error: "Photo saved but profile update failed — please try again." });
+        }
       }
 
       logger.info({ uid, size: file.size }, "[Upload] Avatar saved");

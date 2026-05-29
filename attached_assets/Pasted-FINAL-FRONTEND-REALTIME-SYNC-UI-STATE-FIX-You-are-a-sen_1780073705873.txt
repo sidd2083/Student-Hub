@@ -1,0 +1,114 @@
+FINAL FRONTEND REALTIME SYNC + UI STATE FIX
+
+You are a senior frontend + Firebase realtime architecture engineer.
+
+The backend study tracking system is NOW mostly working correctly.
+
+Report card and leaderboard are now updating correctly from history room study time.
+
+HOWEVER:
+Frontend UI is NOT synchronized properly.
+
+========================================================
+🔥 CORE PROBLEM
+========================================================
+
+Different UI components are NOT reflecting the same realtime data.
+
+Backend is correct, but UI is inconsistent.
+
+Problem areas:
+- avatar top study time lagging or missing
+- side panel study time delayed
+- mobile view missing study display
+- UI components not updating instantly
+- profile upload completes but fails after 100%
+
+========================================================
+🔥 REQUIRED FIX (VERY IMPORTANT)
+========================================================
+
+ALL UI components MUST use ONE shared realtime state source.
+
+DO NOT:
+- calculate study time separately in UI components
+- use local state counters for study display
+- use cached snapshots
+
+ONLY USE:
+- Firestore realtime listeners (onSnapshot)
+- OR centralized global state store (Context / Zustand / Redux)
+
+========================================================
+🔥 SINGLE SOURCE OF TRUTH FOR UI
+========================================================
+
+Create ONE unified state:
+
+roomStudyTimeState
+
+This must drive ALL UI:
+
+- avatar top display
+- side panel display
+- mobile display
+- desktop display
+- popup display
+
+EVERYTHING must read from SAME value.
+
+========================================================
+🔥 REALTIME REQUIREMENT
+========================================================
+
+When study time updates in backend:
+
+UI MUST update instantly:
+- no delay
+- no mismatch
+- no 1-minute lag
+- no stale UI
+
+========================================================
+🔥 MOBILE FIX
+========================================================
+
+Mobile is missing study UI.
+
+Fix:
+- add same room study time display as desktop
+- ensure same component logic reused
+- ensure same Firestore listener used
+
+========================================================
+🔥 PROFILE PICTURE BUG (IMPORTANT)
+========================================================
+
+Current issue:
+- upload reaches 100%
+- then fails
+
+Fix required:
+- ensure upload success callback is handled properly
+- ensure Firestore update after upload does not fail silently
+- ensure try/catch handles final step
+- ensure loading state is not incorrectly ending early
+
+Must only show success AFTER full completion:
+upload + URL save
+
+========================================================
+🔥 FINAL REQUIREMENT
+========================================================
+
+After fixes:
+
+✔ report card = correct
+✔ leaderboard = correct
+✔ avatar = instantly synced
+✔ side panel = instantly synced
+✔ mobile = fully synced UI
+✔ no delay anywhere
+✔ no mismatched values
+✔ profile upload works fully (no fake success)
+✔ all UI uses ONE live state source

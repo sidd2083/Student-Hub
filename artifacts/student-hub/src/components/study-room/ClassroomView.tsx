@@ -194,10 +194,10 @@ export const ClassroomView = memo(function ClassroomView({
   participants, hostUid, onSelectStudent,
   timerDisplay, timerLabel, timerPhaseType, roomStatus, compact = false,
 }: Props) {
-  // Tick every 30 s so getLiveStudyMins() re-evaluates between Firestore updates
+  // Tick every second so getLiveStudyMins() updates the badge in real-time
   const [, setTick] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 30_000);
+    const id = setInterval(() => setTick(t => t + 1), 1_000);
     return () => clearInterval(id);
   }, []);
 

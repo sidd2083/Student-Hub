@@ -80,20 +80,26 @@ export default function Settings() {
     setPhotoPreview(local);
     setUploadPct(0);
 
+    let uploadedUrl: string | null = null;
     try {
       const url = await uploadProfilePhoto(user.uid, file, (pct) => setUploadPct(pct), () => user.getIdToken());
+      uploadedUrl = url;
       URL.revokeObjectURL(local);
       setPhotoPreview(url);
       setProfile({ ...profile!, photoURL: url });
     } catch (err) {
       URL.revokeObjectURL(local);
       setPhotoPreview(null);
-      // Show the actual error from uploadProfilePhoto (Firebase Storage errors
-      // are already translated to human-readable messages in photoUpload.ts).
       const msg = (err as Error).message || "Upload failed — please try again.";
       setPhotoError(msg);
       console.error("[Settings] Upload error:", err);
     } finally {
+      // Only clear the uploading state after fully confirming success or failure.
+      // If upload succeeded (uploadedUrl is set), briefly show 100% before clearing.
+      if (uploadedUrl) {
+        setUploadPct(100);
+        await new Promise(r => setTimeout(r, 600));
+      }
       setUploadPct(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }

@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { useTimer } from "@/context/TimerContext";
+import { useActiveRoom } from "@/context/ActiveRoomContext";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 import {
   BookOpen, FileText, CheckSquare, Timer,
@@ -10,6 +11,13 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { ActiveRoomBar } from "@/components/study-room/ActiveRoomBar";
+
+function fmtStudyMins(m: number): string {
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return r > 0 ? `${h}h ${r}m` : `${h}h`;
+}
 
 const sidebarNav = [
   { href: "/dashboard",    icon: LayoutDashboard, label: "Dashboard"       },
@@ -77,6 +85,7 @@ function FloatingTimerBar() {
 export function Layout({ children }: LayoutProps) {
   const [location, setLocation] = useLocation();
   const { user, profile, signOut } = useAuth();
+  const { activeRoomId, studyMinsInSession } = useActiveRoom();
   const [toolsOpen, setToolsOpen] = useState(false);
   const { isInstallable, installApp } = usePwaInstall();
 
@@ -173,7 +182,13 @@ export function Layout({ children }: LayoutProps) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{profile?.name || "Student"}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-500">Grade {profile?.grade}</p>
+                {activeRoomId && studyMinsInSession > 0 ? (
+                  <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                    📚 {fmtStudyMins(studyMinsInSession)} studied
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-500 dark:text-gray-500">Grade {profile?.grade}</p>
+                )}
               </div>
               <Settings className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 flex-shrink-0" />
             </div>
@@ -241,8 +256,15 @@ export function Layout({ children }: LayoutProps) {
               </button>
             )}
             <Link href="/settings">
-              <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-300 font-semibold text-sm cursor-pointer">
-                {profile?.name?.charAt(0)?.toUpperCase() || "?"}
+              <div className="relative flex items-center cursor-pointer">
+                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-300 font-semibold text-sm">
+                  {profile?.name?.charAt(0)?.toUpperCase() || "?"}
+                </div>
+                {activeRoomId && studyMinsInSession > 0 && (
+                  <span className="absolute -bottom-1 -right-1 bg-emerald-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full leading-none whitespace-nowrap shadow">
+                    {fmtStudyMins(studyMinsInSession)}
+                  </span>
+                )}
               </div>
             </Link>
           </div>
