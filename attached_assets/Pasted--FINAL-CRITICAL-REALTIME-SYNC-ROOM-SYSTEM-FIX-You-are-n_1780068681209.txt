@@ -1,0 +1,269 @@
+# FINAL CRITICAL REALTIME SYNC + ROOM SYSTEM FIX
+
+You are now acting as a senior realtime systems engineer.
+
+STOP making surface-level UI changes.
+
+The app UI is already mostly complete.
+
+The REAL problem is:
+THE ENTIRE REALTIME ROOM ARCHITECTURE IS STILL BROKEN.
+
+You must now FULLY STABILIZE:
+
+* room timing
+* study synchronization
+* cross-device sync
+* room voting
+* host transfer
+* mobile/desktop consistency
+* profile uploads
+
+Everything must now behave like a REAL production app.
+
+========================================================
+🔥 1. TIMER + STUDY SYNC IS STILL COMPLETELY BROKEN
+===================================================
+
+This is STILL the biggest issue.
+
+I tested with:
+
+* laptop host
+* mobile member
+
+And the timings are STILL inconsistent.
+
+========================================================
+CURRENT BROKEN BEHAVIOR
+=======================
+
+Example:
+
+Room timer:
+25:00
+
+At 24:00:
+
+* avatar top showed 1 min study
+* side panel showed 1 min study
+
+GOOD.
+
+BUT immediately after:
+without another minute passing,
+avatar suddenly showed:
+2 min study
+
+while room timer was STILL at 24 minutes.
+
+THIS IS WRONG.
+
+The timer logic is still broken.
+
+========================================================
+ANOTHER MAJOR ISSUE
+===================
+
+Desktop side panel:
+4 min studied
+
+Avatar top:
+7 min studied
+
+NOT SAME VALUE.
+
+This MUST NEVER happen.
+
+========================================================
+REQUIRED FIX
+============
+
+ALL study time values in ENTIRE APP must come from ONE CENTRALIZED SOURCE.
+
+NOT:
+
+* separate component timers
+* local frontend counters
+* independent calculations
+
+EVERYTHING must derive from:
+
+* roomStartTimestamp
+* userJoinTimestamp
+* serverTimestamp
+
+ONLY.
+
+========================================================
+🔥 ALL THESE MUST ALWAYS MATCH EXACTLY
+======================================
+
+These MUST show SAME value instantly:
+
+* avatar top study time
+* room side panel study time
+* report card today study
+* leaderboard study time
+* mobile room study time
+* desktop room study time
+* popup study time
+
+NO DELAY.
+NO DIFFERENT VALUES.
+NO RANDOM JUMPS.
+
+========================================================
+🔥 STUDY TIME UPDATE RULE
+=========================
+
+If user studies 1 minute:
+→ EVERYWHERE must instantly become +1 minute.
+
+NOT:
+
+* delayed update
+* partial update
+* missing update
+* random reset
+
+If user studies:
+5 min
+
+Then:
+EVERY section in app must show EXACT SAME VALUE.
+
+========================================================
+🔥 NEW USERS JOINING ROOM
+=========================
+
+When new user joins room:
+their study tracking must:
+
+* start correctly
+* sync correctly
+* update correctly
+
+NO incorrect jumping.
+NO delayed counting.
+
+========================================================
+🔥 MOBILE VIEW PROBLEM
+======================
+
+Desktop shows:
+"studied in room"
+
+BUT mobile does NOT show it properly.
+
+FIX:
+Add same study-time-in-room display to mobile view.
+
+Mobile and desktop must have SAME functionality.
+
+========================================================
+🔥 2. REPORT CARD + LEADERBOARD STILL NOT UPDATING
+==================================================
+
+Current issue:
+
+User studies inside room.
+
+BUT:
+
+* report card does not update
+* leaderboard does not update
+* today study time incorrect
+
+This is STILL BROKEN.
+
+========================================================
+REQUIRED FIX
+============
+
+Room study sessions MUST feed into:
+
+* today study
+* weekly study
+* monthly study
+* leaderboard
+* streaks
+* analytics
+
+EXACT SAME WAY as normal Pomodoro timer.
+
+Currently:
+Pomodoro timer works.
+Room timer does NOT.
+
+Fix this architecture.
+
+========================================================
+🔥 3. HOST TRANSFER STILL BROKEN
+================================
+
+Current issue:
+
+When host leaves:
+→ NO NEW HOST exists.
+
+This breaks room control.
+
+========================================================
+REQUIRED FIX
+============
+
+When host disconnects/leaves:
+→ automatically assign new host
+
+New host =
+oldest active participant in room.
+
+Must sync instantly to:
+
+* mobile
+* desktop
+* all users
+
+========================================================
+🔥 4. ROOM END VOTING BROKEN
+============================
+
+Current issue:
+
+As member:
+I voted to end room.
+
+System:
+
+* played sound
+* showed room ended
+
+BUT room was STILL running.
+
+This means:
+vote state changes are NOT properly applied to room state.
+
+========================================================
+REQUIRED FIX
+============
+
+When vote passes:
+→ room state must ACTUALLY change.
+
+If ending room:
+
+* stop timer
+* close session
+* notify users
+* clean room state
+
+NOT only UI animation/sound.
+
+========================================================
+🔥 5. PROFILE PICTURE STILL BROKEN
+==================================
+still when uploading the profile pic it stuck in 15% and after some time it push ewrror this is also a problom fix this 
+
+
+this all mentioned error are masive error and critical error in the app and this has hig priority fix this all now and make perfect finishing production ready addictivcve good userr expericne app to publish 
