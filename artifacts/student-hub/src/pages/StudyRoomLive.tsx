@@ -46,7 +46,7 @@ export default function StudyRoomLive() {
   const {
     joinActiveRoom, leaveActiveRoom, isHost, studyMinsInSession,
     onHostStart, onHostPause, onHostResume, onHostSkip,
-    remainingSeconds, activeRoomId,
+    remainingSeconds, activeRoomId, wasKicked,
     room: ctxRoom, participants: ctxParticipants,
   } = useActiveRoom();
 
@@ -112,6 +112,13 @@ export default function StudyRoomLive() {
   useEffect(() => {
     if (alreadyIn && ctxRoom) setLoading(false);
   }, [alreadyIn, ctxRoom]);
+
+  // ── Kick redirect — when the context evicts us, navigate away immediately ──
+  useEffect(() => {
+    if (wasKicked) {
+      setLocation("/study-rooms");
+    }
+  }, [wasKicked, setLocation]);
 
   // ── ALWAYS: subscribe to votes and messages (not in context) ─────────────────
   useEffect(() => {
@@ -376,24 +383,39 @@ export default function StudyRoomLive() {
           {flowOpen ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
         </button>
         <AnimatePresence>
-          {flowOpen && (
-            <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
-              <div className="px-3 pb-3 space-y-1">
-                {room.studyFlow.map((p, i) => (
-                  <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs ${
-                    i === room.currentPhaseIndex ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-semibold"
-                    : i < room.currentPhaseIndex ? "text-gray-400 dark:text-gray-500 line-through"
-                    : "text-gray-600 dark:text-gray-400"
-                  }`}>
-                    {p.type === "study" ? <BookOpen className="w-3.5 h-3.5 shrink-0" /> : <Coffee className="w-3.5 h-3.5 shrink-0" />}
-                    <span className="flex-1 truncate">{p.label}</span>
-                    <span className="font-mono shrink-0">{p.durationMins}m</span>
-                    {i === room.currentPhaseIndex && <span className="shrink-0 bg-blue-500 text-white text-[9px] px-1.5 py-0.5 rounded-full">NOW</span>}
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
+          {flowOpen && room && (() => {
+            const r            = room;
+            const totalMins    = r.studyFlow.reduce((s, p) => s + p.durationMins, 0);
+            const elapsedMins  = r.studyFlow.slice(0, r.currentPhaseIndex).reduce((s, p) => s + p.durationMins, 0);
+            const totalH = Math.floor(totalMins / 60);
+            const totalM = totalMins % 60;
+            const totalLabel = totalH > 0 ? `${totalH}h ${totalM > 0 ? `${totalM}m` : ""}` : `${totalM}m`;
+            return (
+              <motion.div key="flow" initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
+                <div className="px-3 pb-2 space-y-1">
+                  {r.studyFlow.map((p, i) => (
+                    <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs ${
+                      i === r.currentPhaseIndex ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-semibold"
+                      : i < r.currentPhaseIndex ? "text-gray-400 dark:text-gray-500 line-through"
+                      : "text-gray-600 dark:text-gray-400"
+                    }`}>
+                      {p.type === "study" ? <BookOpen className="w-3.5 h-3.5 shrink-0" /> : <Coffee className="w-3.5 h-3.5 shrink-0" />}
+                      <span className="flex-1 truncate">{p.label}</span>
+                      <span className="font-mono shrink-0">{p.durationMins}m</span>
+                      {i === r.currentPhaseIndex && <span className="shrink-0 bg-blue-500 text-white text-[9px] px-1.5 py-0.5 rounded-full">NOW</span>}
+                    </div>
+                  ))}
+                </div>
+                {/* Total session summary */}
+                <div className="mx-3 mb-3 px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700/50 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                  <span>Total session</span>
+                  <span className="font-semibold text-gray-700 dark:text-gray-300">
+                    {elapsedMins}m elapsed · {totalLabel} total
+                  </span>
+                </div>
+              </motion.div>
+            );
+          })()}
         </AnimatePresence>
       </div>
     );

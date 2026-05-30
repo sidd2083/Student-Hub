@@ -1,0 +1,316 @@
+# FINAL PRODUCTION STABILIZATION + PERFECT TIMER SYNC FIX
+
+You are now acting as a senior realtime systems architect and production optimization engineer.
+
+STOP adding random fixes.
+
+STOP patching UI independently.
+
+The Study Room system must now become:
+
+* mathematically accurate
+* perfectly synchronized
+* production ready
+* realtime stable
+* fast
+* professional
+
+The CURRENT BIGGEST ISSUE is:
+the room timing system is STILL not truly synchronized and deterministic.
+
+========================================================
+🔥 1. TIMER SYSTEM IS STILL NOT MATHEMATICALLY ACCURATE
+=======================================================
+
+The Pomodoro timer outside rooms works perfectly.
+
+The Study Room timer MUST behave EXACTLY SAME.
+
+Current issue:
+Study time calculations are inconsistent and delayed.
+
+========================================================
+EXACT REQUIRED BEHAVIOR
+=======================
+
+If room timer:
+25:00
+
+Then:
+24:00 → user study time becomes 1 min
+23:00 → user study time becomes 2 min
+22:00 → user study time becomes 3 min
+
+EXACTLY.
+
+NOT:
+
+* delayed
+* approximate
+* eventually updated
+* async feeling
+
+This must behave mathematically exact.
+
+Same logic for:
+60-minute timer:
+59:00 → 1 min
+58:00 → 2 min
+
+========================================================
+🔥 CURRENT MAJOR BUG
+====================
+
+When users:
+
+* minimize room
+* switch tabs
+* go to notes page
+* open another page
+
+their room study tracking becomes inconsistent.
+
+Sometimes:
+newer users show MORE study time than older users.
+
+This MUST NEVER happen.
+
+========================================================
+REQUIRED FIX
+============
+
+DO NOT rely on:
+
+* component mounted state
+* page visibility
+* browser tab activity
+* local counters
+
+Study tracking MUST use:
+
+* server timestamps
+* active room membership state
+* realtime room session timestamps
+
+Room study tracking must continue correctly EVEN IF:
+
+* tab changes
+* page changes
+* mobile backgrounding
+* minimization
+
+The room session must remain alive until:
+
+* explicit leave
+* kick
+* disconnect timeout
+
+========================================================
+🔥 2. KICK USER SYSTEM IS STILL BROKEN
+======================================
+
+Current issue:
+After voting kick:
+
+* avatar disappears
+  BUT user is STILL inside room logically.
+
+They can:
+
+* still see timer
+* still interact
+* still receive updates
+
+This is critically broken.
+
+========================================================
+REQUIRED FIX
+============
+
+When user is kicked:
+
+* immediately revoke room membership
+* remove room session
+* unsubscribe realtime listeners
+* remove active timers
+* redirect user outside room
+* prevent all further room updates
+
+Kicked user must be FULLY removed from room state.
+
+========================================================
+🔥 3. PROFILE PICTURE STILL FAILING
+===================================
+
+Current issue:
+
+* upload reaches 100%
+* fails afterward
+
+This is STILL not fixed.
+
+========================================================
+REQUIRED FIX
+============
+
+Fix ENTIRE upload pipeline:
+
+1. upload image
+2. getDownloadURL
+3. save URL to Firestore
+4. update avatar state
+5. refresh UI
+
+Add proper error logging for EACH step.
+
+Current issue is likely:
+
+* Firestore write failure
+* invalid state update
+* bad async handling
+
+Must fully stabilize this system.
+
+========================================================
+🔥 4. STUDY FLOW / TIMELINE DISPLAY BUG
+=======================================
+
+Current issue:
+If:
+25 min focus
++ 15 min break
+
+System STILL shows:
+25 min
+
+instead of:
+40 min total elapsed flow.
+
+========================================================
+REQUIRED FIX
+============
+
+Study flow timeline must display:
+TOTAL cumulative elapsed session time.
+
+Example:
+25 focus + 15 break = 40 total elapsed
+
+This must dynamically update properly.
+
+========================================================
+🔥 5. APP STILL FEELS SLOW
+==========================
+
+Current issue:
+Website still feels:
+
+* laggy
+* delayed
+* unprofessional
+* heavy
+
+This is unacceptable for production.
+
+========================================================
+REQUIRED PERFORMANCE FIXES
+==========================
+
+Optimize ENTIRE realtime architecture:
+
+* reduce unnecessary Firestore reads
+* remove duplicate listeners
+* prevent unnecessary rerenders
+* memoize expensive components
+* optimize room state subscriptions
+* batch updates
+* avoid full UI refreshes
+* virtualize heavy lists if needed
+
+Goal:
+App must feel:
+
+* instant
+* smooth
+* responsive
+* production-grade
+
+========================================================
+🔥 6. CLASSROOM UI STILL TOO BASIC
+==================================
+
+Current classroom:
+
+* looks like boxes
+* not immersive
+* not aesthetic
+* not motivating
+
+========================================================
+REQUIRED CLASSROOM REDESIGN
+===========================
+
+Make classroom feel:
+
+* productive
+* immersive
+* modern
+* aesthetic
+* realistic
+
+Add:
+
+* Nepal classroom inspiration
+* subtle Nepal map/poster
+* Student Hub branding
+* better classroom spacing
+* better desk arrangement
+* depth/shadow/light polish
+* cleaner seating layout
+* more immersive environment
+
+IMPORTANT:
+Keep it lightweight and fast.
+NO heavy graphics.
+
+========================================================
+🔥 7. FINAL PRODUCTION REQUIREMENT
+==================================
+
+The Study Room system must now behave like:
+
+* Discord-level realtime consistency
+* professional Pomodoro synchronization
+* production-grade study platform
+
+NO:
+
+* timer drift
+* delayed updates
+* inconsistent values
+* fake UI sync
+* desynchronized avatars
+* broken room states
+
+========================================================
+🔥 FINAL EXPECTED RESULT
+========================
+
+After this stabilization:
+
+✔ timer sync mathematically exact
+✔ all users perfectly synchronized
+✔ tab switching does NOT break tracking
+✔ leaderboard updates instantly
+✔ report card updates instantly
+✔ avatar time updates instantly
+✔ room side panel updates instantly
+✔ mobile + desktop identical
+✔ kicked users fully removed
+✔ profile upload fully works
+✔ app feels fast and smooth
+✔ classroom feels immersive
+✔ room system production-ready
+✔ no more timing inconsistencies
+✔ no more state drift
+✔ no more fake syncing

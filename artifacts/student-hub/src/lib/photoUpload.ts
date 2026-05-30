@@ -1,5 +1,6 @@
 import { doc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "@/lib/firebase";
 
 const MAX_PX = 512;
 const JPEG_Q = 0.82;
@@ -108,18 +109,45 @@ export async function uploadProfilePhoto(
     });
 
     if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
-    onProgress?.(95);
 
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || `Upload failed (HTTP ${res.status})`);
+    // ── Backend succeeded (Admin SDK path) ────────────────────────────────────
+    if (res.ok) {
+      const data = await res.json();
+      if (!data.url) throw new Error("Server did not return a download URL.");
+      onProgress?.(100);
+      return data.url as string;
     }
 
-    const data = await res.json();
-    if (!data.url) throw new Error("Server did not return a download URL.");
+    // ── Backend unavailable (503 = no service account) → client-side fallback ─
+    // Upload directly to Firebase Storage using the client SDK.
+    // Requires Firebase Storage rules to allow authenticated users to write
+    // avatars/{uid}.jpg — this works on all Replit domains without CORS issues.
+    if (res.status === 503) {
+      console.info("[PhotoUpload] Backend unavailable — using client-side Firebase Storage fallback");
+      onProgress?.(50);
 
-    onProgress?.(100);
-    return data.url as string;
+      const sRef = storageRef(storage, `avatars/${uid}.jpg`);
+      const snap = await uploadBytes(sRef, blob, { contentType: "image/jpeg" });
+      onProgress?.(85);
+
+      const url = await getDownloadURL(snap.ref);
+      onProgress?.(95);
+
+      // Update Firestore photoURL so profile syncs everywhere
+      try {
+        await updateDoc(doc(db, "users", uid), { photoURL: url });
+      } catch (fsErr) {
+        console.error("[PhotoUpload] Firestore photoURL update failed:", fsErr);
+        throw new Error("Photo saved but profile update failed — please try again.");
+      }
+
+      onProgress?.(100);
+      return url;
+    }
+
+    // ── Other HTTP error ───────────────────────────────────────────────────────
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || `Upload failed (HTTP ${res.status})`);
   } finally {
     if (progressTimer) clearInterval(progressTimer);
   }

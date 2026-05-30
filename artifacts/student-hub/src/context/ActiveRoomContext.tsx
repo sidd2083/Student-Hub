@@ -19,6 +19,7 @@ interface ActiveRoomContextType {
   isHost: boolean;
   remainingSeconds: number;
   studyMinsInSession: number;
+  wasKicked: boolean;
   joinActiveRoom: (roomId: string) => void;
   leaveActiveRoom: () => Promise<void>;
   onHostStart: () => Promise<void>;
@@ -67,6 +68,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   const [participants, setParticipants]  = useState<RoomParticipant[]>([]);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [studyMinsInSession, setStudyMinsInSession] = useState(0);
+  const [wasKicked, setWasKicked] = useState(false);
 
   // ── Wall-clock study tracking ─────────────────────────────────────────────
   // studyWallStartRef  — Date.now() when the current study segment began (null = not studying)
@@ -174,14 +176,30 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
       setRemainingSeconds(rem);
       remainingSecsRef.current = rem;
 
-      // Live study minute display — prefer Firestore participant data for cross-device
-      // consistency (same source as avatar badges). Fall back to local wall-clock
-      // on the first few ticks before Firestore data has arrived.
-      // Use participantsRef (not the stale closure) so we always see fresh data.
+      // ── Mathematically-exact study time display ─────────────────────────────
+      // Priority 1: participant's studyStartedAt (server timestamp) → exact, tab-safe,
+      //   cross-device consistent. This is the stable state for all mid-session ticks.
+      // Priority 2: room's timerStartedAt-derived elapsed → covers the ~1 s bootstrap
+      //   window before updateParticipantStudyStart has propagated to Firestore.
+      // Priority 3: banked studyMinsInRoom → accurate during break / paused states.
+      // We NEVER rely on local Date.now() differences for the display value.
       const myParticipant = user ? participantsRef.current.find(p => p.uid === user.uid) : undefined;
-      const displayMins = (myParticipant && myParticipant.studyStartedAt != null)
-        ? getLiveStudyMins(myParticipant)
-        : Math.floor(getTotalStudySeconds() / 60);
+      let displayMins: number;
+      if (myParticipant?.studyStartedAt != null) {
+        // Server-timestamp-based: always exact, works across tab switches
+        displayMins = getLiveStudyMins(myParticipant);
+      } else if (isRoomStudying(r)) {
+        // Bootstrap: studyStartedAt not yet written — derive from room's timerStartedAt
+        const ph = r.studyFlow[r.currentPhaseIndex];
+        const phaseSecs = (ph?.durationMins ?? 0) * 60;
+        const phaseElapsed = Math.max(0, phaseSecs - rem);
+        displayMins = (myParticipant?.studyMinsInRoom ?? 0) + Math.floor(phaseElapsed / 60);
+      } else {
+        // Break / paused / waiting: show banked total (no active elapsed)
+        displayMins = myParticipant
+          ? getLiveStudyMins(myParticipant)   // studyStartedAt null → returns banked total
+          : Math.floor(getTotalStudySeconds() / 60);
+      }
       setStudyMinsInSession(displayMins);
 
       if (r.status === "active") {
@@ -278,15 +296,25 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     return () => clearInterval(interval);
   }, [activeRoomId, user, isHost]);
 
-  // ── Kick detection — if our participant doc disappears, auto-leave ─────────
+  // ── Kick detection — if our participant doc disappears, fully clean up ──────
   useEffect(() => {
     if (!activeRoomId || !user) return;
     const isStillIn = participants.some(p => p.uid === user.uid);
     if (participants.length > 0 && !isStillIn) {
+      // Immediately unsubscribe all Firestore listeners so no further updates arrive
+      unsubRoomRef.current?.();
+      unsubPartsRef.current?.();
+      unsubRoomRef.current  = null;
+      unsubPartsRef.current = null;
+
+      // Reset all tracking state
       studyWallStartRef.current   = null;
       studyAccumulatedRef.current = 0;
       lastSyncedSecsRef.current   = 0;
+
+      // Signal the UI to redirect and clear room state
       setStudyMinsInSession(0);
+      setWasKicked(true);
       setActiveRoomId(null);
       setRoom(null);
       setParticipants([]);
@@ -379,6 +407,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     prevPhaseRef.current        = null;
     prevStatusRef.current       = null;
     setStudyMinsInSession(0);
+    setWasKicked(false);
     setActiveRoomId(roomId);
   }, []);
 
@@ -456,7 +485,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   return (
     <ActiveRoomContext.Provider value={{
       activeRoomId, room, participants, isHost, remainingSeconds,
-      studyMinsInSession, joinActiveRoom, leaveActiveRoom,
+      studyMinsInSession, wasKicked, joinActiveRoom, leaveActiveRoom,
       onHostStart, onHostPause, onHostResume, onHostSkip, onHostEnd,
     }}>
       {children}
