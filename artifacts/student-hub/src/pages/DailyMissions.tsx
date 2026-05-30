@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
-import { useDailyMissions } from "@/hooks/useDailyMissions";
+import { useDailyMissions, getMissionCompletedDays } from "@/hooks/useDailyMissions";
+import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
 import {
   CheckCircle2, Circle, Zap, BookOpen,
@@ -272,7 +273,77 @@ function missionTypeLabel(id: string): string {
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
+function LevelProgressCard({ level, uid }: { level: MissionLevel; uid: string | null }) {
+  const mcd = getMissionCompletedDays(uid ?? "");
+
+  // Thresholds
+  const INTERMEDIATE_AT = 5;
+  const ADVANCED_AT     = 15;
+
+  let progressPct: number;
+  let current: number;
+  let total: number;
+  let nextLabel: string;
+  let barColor: string;
+  let isMax = false;
+
+  if (level === "beginner") {
+    current    = mcd;
+    total      = INTERMEDIATE_AT;
+    progressPct = Math.min(100, (current / total) * 100);
+    nextLabel  = `${total - current} more day${total - current === 1 ? "" : "s"} to reach ⚡ Intermediate`;
+    barColor   = "from-emerald-400 to-teal-500";
+  } else if (level === "intermediate") {
+    current    = mcd - INTERMEDIATE_AT;
+    total      = ADVANCED_AT - INTERMEDIATE_AT;
+    progressPct = Math.min(100, (current / total) * 100);
+    nextLabel  = `${total - current} more day${total - current === 1 ? "" : "s"} to reach 🔥 Advanced`;
+    barColor   = "from-blue-400 to-indigo-500";
+  } else {
+    current    = mcd;
+    total      = mcd;
+    progressPct = 100;
+    nextLabel  = "Maximum level — keep the streak alive!";
+    barColor   = "from-orange-400 to-rose-500";
+    isMax      = true;
+  }
+
+  const levelColors: Record<MissionLevel, string> = {
+    beginner:     "bg-emerald-100 text-emerald-700 border-emerald-200",
+    intermediate: "bg-blue-100 text-blue-700 border-blue-200",
+    advanced:     "bg-orange-100 text-orange-700 border-orange-200",
+  };
+
+  return (
+    <div className="mb-5 bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${levelColors[level]}`}>
+            {levelLabel(level)}
+          </span>
+          <span className="text-xs text-gray-400">
+            {mcd} completed day{mcd !== 1 ? "s" : ""}
+          </span>
+        </div>
+        {isMax && <span className="text-base">🏆</span>}
+      </div>
+
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
+        <div
+          className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-700`}
+          style={{ width: `${progressPct}%` }}
+        />
+      </div>
+
+      <p className="text-[11px] text-gray-500 leading-snug">
+        {isMax ? "🔥 You've reached the top. Complete missions daily to stay here." : `📅 ${nextLabel} — complete all today's missions to count!`}
+      </p>
+    </div>
+  );
+}
+
 function DailyMissionsContent() {
+  const { user } = useAuth();
   const {
     missions, loading, completeMission, startMission, missionProgress, resetMissions,
     completedCount, allCompleted, progressPct,
@@ -309,8 +380,10 @@ function DailyMissionsContent() {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Daily Missions</h1>
           {allCompleted && <Sparkles className="w-5 h-5 text-yellow-400 animate-bounce" />}
         </div>
-        <p className="text-sm text-gray-500">{date} · {levelLabel(level)}</p>
+        <p className="text-sm text-gray-500">{date}</p>
       </div>
+
+      <LevelProgressCard level={level} uid={user?.uid ?? null} />
 
       {isSaturday && (
         <div className="mb-5 bg-amber-50 border border-amber-100 rounded-2xl p-4">
