@@ -1,6 +1,5 @@
 import { doc, updateDoc } from "firebase/firestore";
-import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 
 const MAX_PX   = 512;
 const JPEG_Q   = 0.82;
@@ -130,7 +129,9 @@ export async function uploadProfilePhoto(
       return data.url as string;
     }
 
-    // Backend not configured — fall through to client-side paths
+    // Backend not configured (503) or auth issue — fall through to Firestore data-URL.
+    // We skip the Firebase Storage client SDK path because it suffers CORS issues
+    // on Replit domains when the Admin SDK isn't available to set the token.
     if (res.status !== 503 && res.status !== 401 && res.status !== 403) {
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.error || `Upload failed (HTTP ${res.status})`);
@@ -140,22 +141,8 @@ export async function uploadProfilePhoto(
     if (progressTimer) clearInterval(progressTimer);
   }
 
-  // ── 3. Try Firebase Storage client SDK ─────────────────────────────────────
-  onProgress?.(50);
-  try {
-    const sRef = storageRef(storage, `avatars/${uid}.jpg`);
-    const snap = await uploadBytes(sRef, blob, { contentType: "image/jpeg" });
-    onProgress?.(80);
-    const url = await getDownloadURL(snap.ref);
-    onProgress?.(92);
-    await updateDoc(doc(db, "users", uid), { photoURL: url });
-    onProgress?.(100);
-    return url;
-  } catch (storageErr) {
-    console.warn("[PhotoUpload] Firebase Storage unavailable, falling back to Firestore data-URL:", storageErr);
-  }
-
-  // ── 4. Firestore data-URL fallback (always works if user is authenticated) ──
+  // ── 3. Firestore data-URL fallback (always works if user is authenticated) ──
+  // Skips Firebase Storage client SDK to avoid CORS failures on Replit domains.
   onProgress?.(60);
   let dataURL: string;
   try {

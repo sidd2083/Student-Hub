@@ -36,7 +36,7 @@ interface CachedMissionState {
 }
 
 // Bump this whenever mission structure changes to force a regeneration for all users
-const MISSION_VERSION = 5;
+const MISSION_VERSION = 6;
 const CACHE_KEY  = (uid: string, date: string) => `sh_dm_${uid}_${date}`;
 export const POMODORO_MISSION_KEY = "sh_mission_timer";
 
@@ -79,9 +79,40 @@ function pick<T>(arr: T[], rand: () => number): T {
   return arr[Math.floor(rand() * arr.length)];
 }
 
-export function getUserLevel(streak: number, totalStudyMins: number): MissionLevel {
-  if (streak >= 30 || totalStudyMins >= 1200) return "advanced";
-  if (streak >= 7  || totalStudyMins >= 300)  return "intermediate";
+// ── Mission level progression ─────────────────────────────────────────────────
+// Level is based on the number of days the student has completed ALL daily missions.
+// Beginner → Intermediate: 5 completed days | Intermediate → Advanced: 15 completed days
+const MCD_KEY = (uid: string) => `sh_mcd_${uid}`;
+
+export function getMissionCompletedDays(uid: string): number {
+  if (!uid) return 0;
+  try {
+    const raw = localStorage.getItem(MCD_KEY(uid));
+    if (!raw) return 0;
+    return (JSON.parse(raw) as { days: number; lastDate: string }).days ?? 0;
+  } catch { return 0; }
+}
+
+export function incrementMissionCompletedDays(uid: string, date: string): number {
+  if (!uid) return 0;
+  try {
+    const key = MCD_KEY(uid);
+    const raw = localStorage.getItem(key);
+    let data: { days: number; lastDate: string } = { days: 0, lastDate: "" };
+    if (raw) data = JSON.parse(raw);
+    if (data.lastDate === date) return data.days; // idempotent — already counted today
+    data.days += 1;
+    data.lastDate = date;
+    localStorage.setItem(key, JSON.stringify(data));
+    // Background sync to Firestore so level persists across devices
+    updateDoc(doc(db, "users", uid), { missionCompletedDays: data.days }).catch(() => {});
+    return data.days;
+  } catch { return 0; }
+}
+
+export function getUserLevel(missionCompletedDays: number): MissionLevel {
+  if (missionCompletedDays >= 15) return "advanced";
+  if (missionCompletedDays >= 5)  return "intermediate";
   return "beginner";
 }
 
@@ -96,7 +127,25 @@ function getPomodoroMission(level: MissionLevel, grade: number): Mission {
   const mins = minsMap[level];
 
   let text: string;
-  if (level === "beginner") {
+  if (grade === 13) { // CEE
+    text = level === "beginner"
+      ? `Study for ${mins} minutes using the Pomodoro timer today. Focus on Biology, Chemistry, or Physics for your CEE preparation.`
+      : level === "intermediate"
+      ? `Log ${mins} minutes of focused Pomodoro study for CEE. Work through MCQs in your weakest science subject — no phone, full focus.`
+      : `Complete ${mins} minutes of intensive CEE preparation using the Pomodoro timer. Exam conditions — solve MCQs under pressure, no shortcuts.`;
+  } else if (grade === 14) { // IOE
+    text = level === "beginner"
+      ? `Study for ${mins} minutes using the Pomodoro timer today. Focus on Math, Physics, or Chemistry for your IOE preparation.`
+      : level === "intermediate"
+      ? `Log ${mins} minutes of focused Pomodoro study for IOE preparation. Work on your most difficult subject — timer running, no distractions.`
+      : `Complete ${mins} minutes of serious IOE preparation. Full concentration on problem-solving — timer running the whole time, no shortcuts.`;
+  } else if (grade === 15) { // Bachelor's
+    text = level === "beginner"
+      ? `Study for ${mins} minutes using the Pomodoro timer today. Pick your most demanding subject and let the timer track your focus.`
+      : level === "intermediate"
+      ? `Log ${mins} minutes of focused Pomodoro study for your bachelor's subjects. Deep work — one subject, full focus, no phone.`
+      : `Complete ${mins} minutes of serious study using the Pomodoro timer. This is your deep work session — every minute counts.`;
+  } else if (level === "beginner") {
     text = isBoardYear
       ? `Study for ${mins} minutes using the Pomodoro timer for your ${examName} prep. Start the timer, stay at your desk, and let it track your focus time automatically.`
       : `Study for ${mins} minutes using the Pomodoro timer today. Start the timer, pick one subject, and stay focused until it finishes.`;
@@ -131,8 +180,16 @@ function getSchoolTaskMission(grade: number): Mission {
     text = "Finish your homework and any pending SEE preparation tasks today. Open the Notes section if you need to revise any chapter quickly.";
   } else if (grade === 11) {
     text = "Complete all your school assignments for today. Open Notes below to review any +2 topic or chapter you are unclear about.";
-  } else {
+  } else if (grade === 12) {
     text = "Finish your board revision assignments for today. Use the Notes section to quickly revise any chapter before you write your answers.";
+  } else if (grade === 13) { // CEE
+    text = "Complete your daily CEE MCQ revision set. Focus on Biology, Chemistry, and Physics topics that frequently appear in entrance exams.";
+  } else if (grade === 14) { // IOE
+    text = "Finish your daily IOE practice problems in Math, Physics, or Chemistry. Consistent MCQ practice every day separates toppers from the rest.";
+  } else if (grade === 15) { // Bachelor's
+    text = "Complete your assignments and required readings for today's bachelor's subjects. Staying on top of coursework prevents last-minute cramming.";
+  } else {
+    text = "Finish all your pending study tasks for today. Open Notes if you need help reviewing any topic.";
   }
   return {
     id: "school_task",
@@ -154,8 +211,11 @@ function getSubjectStudyMission(level: MissionLevel, grade: number): Mission {
     10: { beginner: 30, intermediate: 50, advanced: 75  },
     11: { beginner: 30, intermediate: 50, advanced: 75  },
     12: { beginner: 40, intermediate: 60, advanced: 90  },
+    13: { beginner: 40, intermediate: 60, advanced: 90  }, // CEE
+    14: { beginner: 40, intermediate: 60, advanced: 90  }, // IOE
+    15: { beginner: 30, intermediate: 50, advanced: 75  }, // Bachelor's
   };
-  const gradeKey = [9, 10, 11, 12].includes(grade) ? grade : 10;
+  const gradeKey = [9, 10, 11, 12, 13, 14, 15].includes(grade) ? grade : 10;
   const mins = minsMap[gradeKey][level];
 
   let text: string;
@@ -171,6 +231,18 @@ function getSubjectStudyMission(level: MissionLevel, grade: number): Mission {
     if (level === "beginner")     text = `Pick the +2 subject you find most difficult and study it for ${mins} minutes — understand it, do not just memorize.`;
     else if (level === "intermediate") text = `Study your most challenging +2 subject for ${mins} minutes. Focus on understanding concepts, not just reading.`;
     else                          text = `${mins} minutes of deep study on the hardest +2 subject for you. Write your own notes as you go.`;
+  } else if (grade === 13) { // CEE
+    if (level === "beginner")     text = `Pick your weakest CEE subject — Biology, Chemistry, or Physics — and study it for ${mins} minutes. Phone away, full focus.`;
+    else if (level === "intermediate") text = `${mins} minutes on your hardest CEE subject. Solve MCQs and write explanations for any you get wrong.`;
+    else                          text = `${mins} minutes of exam-condition CEE practice on your weakest science subject. Timed, no notes — full concentration.`;
+  } else if (grade === 14) { // IOE
+    if (level === "beginner")     text = `Pick your weakest IOE subject — Math, Physics, or Chemistry — and study it for ${mins} minutes. No phone, just problem-solving.`;
+    else if (level === "intermediate") text = `${mins} minutes on your hardest IOE subject. Work through past problems and write out full solutions for every error.`;
+    else                          text = `${mins} minutes of timed IOE problem-solving on your weakest subject. No calculator crutch — build exam speed.`;
+  } else if (grade === 15) { // Bachelor's
+    if (level === "beginner")     text = `Pick your most challenging bachelor's subject and study it for ${mins} minutes — notes open, phone away.`;
+    else if (level === "intermediate") text = `${mins} minutes of deep study on your hardest bachelor's subject. Write summaries — do not just re-read.`;
+    else                          text = `${mins} minutes of focused study on your most difficult course. Write notes, solve problems, engage actively.`;
   } else {
     if (level === "beginner")     text = `Pick any one subject you find hard and study it for ${mins} minutes — no phone, just the book and your notebook.`;
     else if (level === "intermediate") text = `${mins} minutes on your weakest subject using the Pomodoro timer. Focus completely — no distractions.`;
@@ -208,6 +280,46 @@ const WELLNESS_MISSIONS: Array<{ text: string; emoji: string }> = [
 function getGradeMission(level: MissionLevel, grade: number, rand: () => number): Mission {
   const isBoardYear = grade === 10 || grade === 12;
   const diff: MissionDifficulty = level === "advanced" ? "hard" : level === "intermediate" ? "mid" : "easy";
+
+  // ── CEE (13) — Medical entrance exam ─────────────────────────────────────
+  if (grade === 13) {
+    const count = level === "beginner" ? 15 : level === "intermediate" ? 30 : 50;
+    const text = level === "beginner"
+      ? `Open the Important Questions section and answer ${count} Biology or Chemistry MCQs. Check every answer carefully after you finish.`
+      : level === "intermediate"
+      ? `Solve ${count} mixed CEE MCQs from Biology, Chemistry, and Physics without looking at answers. Grade yourself honestly and review every mistake.`
+      : `Attempt a full timed CEE mock set of ${count} questions — exam conditions, no notes, no phone. Analyze every wrong answer after.`;
+    return { id: "grade_mission", text, difficulty: diff, type: "manual", completed: false,
+      emoji: level === "advanced" ? "🏆" : level === "intermediate" ? "📄" : "📝",
+      actionLink: "/pyqs", actionLabel: "Open Practice Questions" };
+  }
+
+  // ── IOE (14) — Engineering entrance exam ──────────────────────────────────
+  if (grade === 14) {
+    const count = level === "beginner" ? 10 : level === "intermediate" ? 20 : 40;
+    const text = level === "beginner"
+      ? `Solve ${count} IOE-style problems in Math or Physics. Write full solutions — do not skip steps.`
+      : level === "intermediate"
+      ? `Complete ${count} timed IOE problems in your weakest subject. Review every wrong answer and understand the concept behind it.`
+      : `Attempt a full timed IOE mock section — ${count} problems, exam conditions, no shortcuts. Analyze your errors after.`;
+    return { id: "grade_mission", text, difficulty: diff, type: "manual", completed: false,
+      emoji: level === "advanced" ? "🏆" : level === "intermediate" ? "📐" : "🔢",
+      actionLink: "/pyqs", actionLabel: "Open Practice Questions" };
+  }
+
+  // ── Bachelor's (15) — University student ──────────────────────────────────
+  if (grade === 15) {
+    const options: Array<{ text: string; emoji: string }> = [
+      { text: "Write a 1-page summary of the most complex topic from your current course — in your own words, without copying from notes.", emoji: "📝" },
+      { text: "Solve or attempt all the exercise questions from the chapter you studied today. Do not skip any — check your answers after.", emoji: "📖" },
+      { text: "Pick your most difficult subject and create a structured mind map connecting all key concepts from the current unit.", emoji: "🗺️" },
+      { text: "Review your lecture notes from this week and mark every concept you are uncertain about. Start studying the first one right now.", emoji: "🔍" },
+      { text: "Write out all the key definitions, formulas, and theorems from your current chapter — from memory first, then check accuracy.", emoji: "✏️" },
+      { text: "Read ahead in your most challenging subject and prepare a question list for your next class or study session.", emoji: "📋" },
+    ];
+    const chosen = pick(options, rand);
+    return { id: "grade_mission", text: chosen.text, difficulty: diff, type: "manual", completed: false, emoji: chosen.emoji };
+  }
 
   // ── Board year grades (10 = SEE, 12 = NEB) ────────────────────────────────
   if (isBoardYear) {
@@ -297,18 +409,17 @@ export function buildMissions(
         difficulty: "easy", type: "manual", completed: false, emoji: "📚",
         actionLink: "/notes", actionLabel: "Open Notes",
       },
-      { ...getSubjectStudyMission(level, grade), startedAt: studyMinsNow },
+      getSubjectStudyMission(level, grade),
     ];
   }
 
   const wellnessItem = pick(WELLNESS_MISSIONS, rand);
 
   return [
-    // Mission 1: auto-starts immediately — tracks total daily study time in background.
-    { ...getPomodoroMission(level, grade), startedAt: studyMinsNow },
+    // Mission 1 & 3: both require the student to press "Start This Mission" so each
+    // tracks independently from the moment they deliberately begin that specific task.
+    getPomodoroMission(level, grade),
     getSchoolTaskMission(grade),
-    // Mission 3: does NOT auto-start. The user must tap "Go to Pomodoro" on this
-    // card to begin tracking, keeping it fully independent of Mission 1.
     getSubjectStudyMission(level, grade),
     {
       id: "wellness",
@@ -340,12 +451,9 @@ export function useDailyMissions() {
   const uid = (user?.uid ?? (profile as Record<string, unknown> | null)?.["uid"] as string | undefined) ?? null;
 
   const level = useMemo(() => {
-    const d = profile as Record<string, unknown> | null;
-    return getUserLevel(
-      (d?.["streak"]         as number | undefined) ?? 0,
-      (d?.["totalStudyTime"] as number | undefined) ?? 0,
-    );
-  }, [profile]);
+    return getUserLevel(getMissionCompletedDays(uid ?? ""));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid]);
 
   // Try to read cached state even before Firebase Auth resolves (uid is null
   // on the first render). Scan localStorage for any sh_dm_*_<date> key so the
@@ -512,6 +620,18 @@ export function useDailyMissions() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedMinutesToday, missions, studyMinsAtStart]);
+
+  // ── Level progression: increment mission-completed-days on full completion ──
+  // Uses a ref to avoid double-counting within a session. The increment function
+  // itself is idempotent (won't count the same calendar day twice).
+  const mcdIncrementedRef = useRef(false);
+  useEffect(() => {
+    if (!uid || !allCompleted || mcdIncrementedRef.current) return;
+    mcdIncrementedRef.current = true;
+    incrementMissionCompletedDays(uid, date);
+  }, [allCompleted, uid, date]);
+  // Reset flag when the date rolls over (new day = new missions)
+  useEffect(() => { mcdIncrementedRef.current = false; }, [date]);
 
   // ── Listen for external mission completions (from StudyGuardian) ───────────
   // StudyGuardian runs at app level and completes missions while the user is on

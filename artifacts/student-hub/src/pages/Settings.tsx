@@ -236,7 +236,7 @@ export default function Settings() {
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Grade</label>
                 {gradeSaving && <span className="text-xs text-blue-500 animate-pulse">Saving…</span>}
               </div>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-2 mb-2">
                 {[9, 10, 11, 12].map((g) => (
                   <button key={g} type="button" disabled={saving} onClick={() => handleGradeSwitch(g)}
                     className={`py-3 rounded-xl border-2 text-sm font-semibold transition-all disabled:opacity-60 ${
@@ -245,6 +245,24 @@ export default function Settings() {
                         : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-blue-300"
                     }`}
                   >Grade {g}</button>
+                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-2 mb-2">
+                {([
+                  { value: 13, label: "CEE", sub: "Medical" },
+                  { value: 14, label: "IOE", sub: "Engineering" },
+                  { value: 15, label: "Bachelor's", sub: "University" },
+                ] as const).map(({ value, label, sub }) => (
+                  <button key={value} type="button" disabled={saving} onClick={() => handleGradeSwitch(value)}
+                    className={`py-3 rounded-xl border-2 flex flex-col items-center gap-0.5 transition-all disabled:opacity-60 ${
+                      grade === value
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                        : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-blue-300"
+                    }`}
+                  >
+                    <span className="text-sm font-bold">{label}</span>
+                    <span className="text-[9px] opacity-60">{sub}</span>
+                  </button>
                 ))}
               </div>
               <p className="text-xs text-gray-400 mt-2">Grade updates instantly — no save needed.</p>
@@ -291,7 +309,9 @@ export default function Settings() {
           <div className="space-y-3 text-sm">
             {[
               { label: "Email", value: profile?.email ?? user?.email ?? "—" },
-              { label: "Grade", value: profile?.grade ? `Grade ${profile.grade}` : "—" },
+              { label: "Grade", value: profile?.grade
+                  ? ({ 13: "CEE (Medical)", 14: "IOE (Engineering)", 15: "Bachelor's" } as Record<number,string>)[profile.grade] ?? `Grade ${profile.grade}`
+                  : "—" },
               { label: "Role",  value: profile?.role ?? "user" },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between py-2 border-b border-gray-50 dark:border-gray-800">

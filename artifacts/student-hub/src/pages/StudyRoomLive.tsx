@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useParams, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "framer-motion";
@@ -141,7 +141,9 @@ export default function StudyRoomLive() {
     if (!roomId) return;
     return subscribeMessages(roomId, (msgs) => {
       // Merge optimistic messages that haven't landed yet
-      setOptimistic(prev => prev.filter(o => !msgs.some(m => m.id === o.id)));
+      // Clear optimistic messages matched by uid+text (Firestore assigns its own IDs,
+      // so matching by optimistic ID `opt_${Date.now()}` never removes them)
+      setOptimistic(prev => prev.filter(o => !msgs.some(m => m.uid === o.uid && m.text === o.text)));
 
       for (const msg of msgs) {
         if (msg.type === "reaction" && msg.emoji && !seenMsgIds.current.has(msg.id)) {
@@ -431,8 +433,11 @@ export default function StudyRoomLive() {
   const showTimer  = phase && room.status !== "waiting" && room.status !== "finished";
   const activeVoteCount = votes.filter(v => v.status === "active").length;
 
-  // All messages for the chat: confirmed from Firestore + any not-yet-confirmed optimistic ones
-  const allMessages = [...messages, ...optimisticMsgs.filter(o => !messages.some(m => m.id === o.id))];
+  // All messages for the chat: confirmed from Firestore + pending optimistic ones.
+  // Filter optimistic messages by uid+text match (Firestore IDs differ from opt_${Date.now()}).
+  const allMessages = useMemo(() =>
+    [...messages, ...optimisticMsgs.filter(o => !messages.some(m => m.uid === o.uid && m.text === o.text))],
+  [messages, optimisticMsgs]);
 
   // ── SHARED COMPONENTS ──────────────────────────────────────────────────────────
   function StudyFlow() {

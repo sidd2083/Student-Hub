@@ -1,1 +1,6 @@
 - [Study Room Bug Fixes](study-room-fixes.md) — ghost rooms/users, duplicate listeners, admin delete, reactions, profile cache, per-user study tracking — all root causes and fixes documented.
+- [Mission Level Progression](mission-level.md) — level now based on missionCompletedDays (not streak/study mins); key: `sh_mcd_${uid}`; 5 days → intermediate, 15 days → advanced; idempotent daily increment.
+- [Grade System Extension](grade-system.md) — grades 13 (CEE/Medical), 14 (IOE/Engineering), 15 (Bachelor's) added throughout; Onboarding + Settings selectors updated; missions have grade-specific text for all new grades.
+- [Pomodoro Mission Fix](pomodoro-mission.md) — removed auto-start (startedAt) from Mission 1; both pomodoro missions now require explicit "Start This Mission" press so they track and complete independently; MISSION_VERSION bumped to 6.
+- [Photo Upload Fix](photo-upload.md) — when backend returns 503 (no FIREBASE_SERVICE_ACCOUNT_JSON), skip Firebase Storage client SDK (CORS fails on Replit domains), go straight to Firestore data-URL fallback (220px JPEG ~10-20KB, always works if authenticated).
+- [Chat Duplicate Fix](chat-duplicate.md) — optimistic messages filtered by uid+text match (not ID) since Firestore assigns its own IDs; both setOptimistic calls and allMessages memo updated.

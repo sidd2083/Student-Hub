@@ -186,7 +186,7 @@ const EdisonBulb = memo(function EdisonBulb({ compact }: { compact: boolean }) {
   const cw = compact ? 20 : 28;
   const ch = compact ? 26 : 36;
   return (
-    <div className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none" style={{ zIndex: 10 }}>
+    <div className="absolute top-0 flex flex-col items-center pointer-events-none" style={{ zIndex: 10, left: compact ? "18%" : "16%" }}>
       <div className="w-px bg-amber-700/60" style={{ height: compact ? 14 : 20 }} />
       <div className="w-3.5 h-2 bg-gradient-to-b from-slate-500 to-slate-600 rounded-sm" />
       <div className="w-2.5 h-1 bg-slate-400/60 rounded-sm" />
@@ -378,13 +378,13 @@ export const ClassroomView = memo(function ClassroomView({
       {/* ── WALL BACKGROUND ──────────────────────────────────────────────── */}
       <div className={`absolute inset-0 bg-gradient-to-b ${tc.wallBg}`} />
 
-      {/* ── NIGHT: warm lamp glow fills the whole room from bulb ─────────── */}
+      {/* ── NIGHT: warm lamp glow radiates from the side bulb ───────────── */}
       {theme === "night" && (
         <>
           <div className="absolute inset-0 pointer-events-none"
-            style={{ background: "radial-gradient(ellipse 80% 90% at 50% 6%, rgba(251,191,36,0.32) 0%, rgba(245,158,11,0.16) 30%, rgba(180,83,9,0.07) 55%, transparent 75%)" }} />
+            style={{ background: "radial-gradient(ellipse 70% 85% at 17% 5%, rgba(251,191,36,0.30) 0%, rgba(245,158,11,0.14) 35%, rgba(180,83,9,0.06) 60%, transparent 80%)" }} />
           <div className="absolute inset-0 pointer-events-none"
-            style={{ background: "radial-gradient(ellipse 60% 50% at 50% 6%, rgba(255,220,100,0.18) 0%, transparent 50%)" }} />
+            style={{ background: "radial-gradient(ellipse 50% 45% at 17% 5%, rgba(255,220,100,0.16) 0%, transparent 50%)" }} />
         </>
       )}
 

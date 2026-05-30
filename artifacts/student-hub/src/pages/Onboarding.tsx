@@ -136,6 +136,28 @@ export default function Onboarding() {
                   </button>
                 ))}
               </div>
+              <div className="grid grid-cols-3 gap-2 mb-2">
+                {([
+                  { value: 13, label: "CEE", sub: "Medical Entrance" },
+                  { value: 14, label: "IOE", sub: "Engineering Entrance" },
+                  { value: 15, label: "Bachelor's", sub: "University" },
+                ] as const).map(({ value, label, sub }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    disabled={saving}
+                    onClick={() => setGrade(value)}
+                    className={`py-3 rounded-2xl border-2 transition-all flex flex-col items-center gap-0.5 disabled:opacity-60 ${
+                      grade === value
+                        ? "border-blue-500 bg-blue-50 text-blue-600 shadow-sm"
+                        : "border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50/50"
+                    }`}
+                  >
+                    <span className="text-sm font-bold leading-none">{label}</span>
+                    <span className="text-[9px] text-gray-400">{sub}</span>
+                  </button>
+                ))}
+              </div>
               <button
                 type="button"
                 data-testid="grade-btn-other"

@@ -451,7 +451,7 @@ export function StudyGuardian() {
   // ── Idle-on-page detection ────────────────────────────────────────────────
   // Catches students who start the timer on the Pomodoro page then do nothing —
   // tab stays visible so tab-away logic doesn't fire, but they're not studying.
-  // Fires if: timer running + tab visible + work phase + no mouse/key/touch for 6 min.
+  // Fires if: timer running + tab visible + work phase + no mouse/key/touch for 4 min.
   // Cooldown: 20 min so genuine slow readers don't get nagged repeatedly.
   useEffect(() => {
     const id = setInterval(() => {
@@ -461,7 +461,7 @@ export function StudyGuardian() {
       if (phaseRef.current !== "work") return;
 
       const idleMs = Date.now() - lastActivityRef.current;
-      if (idleMs < 6 * 60_000) return; // < 6 min idle → still probably studying
+      if (idleMs < 4 * 60_000) return; // < 4 min idle → still probably studying
 
       // Cooldown: don't show more than once per 20 min
       if (lastIdleCheckRef.current && Date.now() - lastIdleCheckRef.current < 20 * 60_000) return;
