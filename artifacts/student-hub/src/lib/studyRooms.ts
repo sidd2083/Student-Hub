@@ -14,7 +14,7 @@ export interface StudyPhase {
 
 export type RoomStatus = "waiting" | "active" | "paused" | "finished";
 
-export type RoomTheme = "classic" | "night" | "rain";
+export type RoomTheme = "classic" | "night";
 
 export interface Room {
   id: string;

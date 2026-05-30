@@ -2,11 +2,13 @@ import { doc, updateDoc } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 
-const MAX_PX = 512;
-const JPEG_Q = 0.82;
+const MAX_PX   = 512;
+const JPEG_Q   = 0.82;
+const MINI_PX  = 220;   // for Firestore data-URL fallback
+const MINI_Q   = 0.65;
 
 /** Resize + JPEG-compress an image File using an off-screen Canvas. */
-async function compressImage(file: File): Promise<Blob> {
+async function compressImage(file: File, maxPx = MAX_PX, quality = JPEG_Q): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();
@@ -15,9 +17,9 @@ async function compressImage(file: File): Promise<Blob> {
       URL.revokeObjectURL(objectUrl);
 
       let { naturalWidth: w, naturalHeight: h } = img;
-      if (w > MAX_PX || h > MAX_PX) {
-        if (w >= h) { h = Math.round(h * MAX_PX / w); w = MAX_PX; }
-        else        { w = Math.round(w * MAX_PX / h); h = MAX_PX; }
+      if (w > maxPx || h > maxPx) {
+        if (w >= h) { h = Math.round(h * maxPx / w); w = maxPx; }
+        else        { w = Math.round(w * maxPx / h); h = maxPx; }
       }
 
       const canvas = document.createElement("canvas");
@@ -37,7 +39,7 @@ async function compressImage(file: File): Promise<Blob> {
           else reject(new Error("Compression failed — try a different image"));
         },
         "image/jpeg",
-        JPEG_Q,
+        quality,
       );
     };
 
@@ -50,13 +52,25 @@ async function compressImage(file: File): Promise<Blob> {
   });
 }
 
+/** Compress to a tiny JPEG and return a base64 data URL suitable for Firestore. */
+async function compressToDataURL(file: File): Promise<string> {
+  const blob = await compressImage(file, MINI_PX, MINI_Q);
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Failed to read compressed image"));
+    reader.readAsDataURL(blob);
+  });
+}
+
 /**
- * Upload a profile photo via the backend API (bypasses Firebase Storage CORS),
- * report real progress (0→100 %), and return the download URL.
+ * Upload a profile photo.
  *
- * The backend endpoint /api/upload/avatar uses Firebase Admin SDK so it works
- * regardless of which domain the app is hosted on (Replit, custom domain, etc.).
- * Progress is simulated in two phases: 0–15 % for compression, 15–95 % for upload.
+ * Strategy (in order):
+ *   1. POST /api/upload/avatar  — Express + Firebase Admin SDK (best: works on any domain)
+ *   2. Firebase Storage client SDK  — if backend returns 503 (no service account)
+ *   3. Firestore data-URL  — if Storage is also unavailable/blocked
+ *      (220 px JPEG ~8-20 KB, well within Firestore's 1 MB document limit)
  */
 export async function uploadProfilePhoto(
   uid: string,
@@ -73,7 +87,7 @@ export async function uploadProfilePhoto(
 
   onProgress?.(5);
 
-  // ── 1. Compress ────────────────────────────────────────────────────────────
+  // ── 1. Compress for backend / Storage upload ────────────────────────────────
   let blob: Blob;
   try {
     blob = await compressImage(file);
@@ -82,14 +96,13 @@ export async function uploadProfilePhoto(
   }
   onProgress?.(15);
 
-  // ── 2. Upload via backend (Admin SDK — no CORS issues) ────────────────────
-  // Simulate upload progress while the XHR is in flight.
+  // ── 2. Try backend (Admin SDK path) ────────────────────────────────────────
   let progressTimer: ReturnType<typeof setInterval> | null = null;
   let fakeProgress = 15;
 
   try {
     progressTimer = setInterval(() => {
-      fakeProgress = Math.min(fakeProgress + 5, 90);
+      fakeProgress = Math.min(fakeProgress + 5, 85);
       onProgress?.(fakeProgress);
     }, 300);
 
@@ -98,19 +111,18 @@ export async function uploadProfilePhoto(
 
     let headers: Record<string, string> = {};
     if (getIdToken) {
-      const token = await getIdToken();
-      headers = { Authorization: `Bearer ${token}` };
+      try { headers = { Authorization: `Bearer ${await getIdToken()}` }; }
+      catch { /* proceed without auth header */ }
     }
 
     const res = await fetch("/api/upload/avatar", {
-      method:  "POST",
+      method: "POST",
       headers,
-      body:    formData,
+      body:   formData,
     });
 
     if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
 
-    // ── Backend succeeded (Admin SDK path) ────────────────────────────────────
     if (res.ok) {
       const data = await res.json();
       if (!data.url) throw new Error("Server did not return a download URL.");
@@ -118,62 +130,49 @@ export async function uploadProfilePhoto(
       return data.url as string;
     }
 
-    // ── Backend unavailable (503 = no service account) → client-side fallback ─
-    // Upload directly to Firebase Storage using the client SDK.
-    // Firebase Storage rules allow any authenticated user to write to
-    // avatars/{uid}.jpg — the SDK includes the user's auth token automatically.
-    if (res.status === 503) {
-      console.info("[PhotoUpload] Backend unavailable — using client-side Firebase Storage");
-      onProgress?.(50);
-
-      let snap;
-      try {
-        const sRef = storageRef(storage, `avatars/${uid}.jpg`);
-        console.info("[PhotoUpload] Uploading blob to avatars/%s.jpg (%d KB)", uid, Math.round(blob.size / 1024));
-        snap = await uploadBytes(sRef, blob, { contentType: "image/jpeg" });
-        console.info("[PhotoUpload] Storage upload succeeded — fetching download URL");
-      } catch (storageErr) {
-        const msg = (storageErr as Error).message ?? "unknown";
-        console.error("[PhotoUpload] Firebase Storage upload failed:", storageErr);
-        // Surface a clear message — the most common cause is unauthenticated
-        // or Storage rules rejecting the write.
-        if (msg.includes("unauthorized") || msg.includes("403")) {
-          throw new Error("Photo upload blocked by Storage rules — make sure you are signed in and try again.");
-        }
-        throw new Error(`Photo upload failed: ${msg}`);
-      }
-
-      onProgress?.(85);
-
-      let url: string;
-      try {
-        url = await getDownloadURL(snap.ref);
-        console.info("[PhotoUpload] Got download URL — updating Firestore profile");
-      } catch (urlErr) {
-        console.error("[PhotoUpload] getDownloadURL failed:", urlErr);
-        throw new Error("Photo saved but could not retrieve its URL — please try again.");
-      }
-
-      onProgress?.(95);
-
-      // Update Firestore photoURL so profile syncs everywhere
-      try {
-        await updateDoc(doc(db, "users", uid), { photoURL: url });
-      } catch (fsErr) {
-        console.error("[PhotoUpload] Firestore photoURL update failed:", fsErr);
-        throw new Error("Photo saved but profile update failed — please try again.");
-      }
-
-      onProgress?.(100);
-      return url;
+    // Backend not configured — fall through to client-side paths
+    if (res.status !== 503 && res.status !== 401 && res.status !== 403) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `Upload failed (HTTP ${res.status})`);
     }
 
-    // ── Other HTTP error ───────────────────────────────────────────────────────
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error || `Upload failed (HTTP ${res.status})`);
   } finally {
     if (progressTimer) clearInterval(progressTimer);
   }
+
+  // ── 3. Try Firebase Storage client SDK ─────────────────────────────────────
+  onProgress?.(50);
+  try {
+    const sRef = storageRef(storage, `avatars/${uid}.jpg`);
+    const snap = await uploadBytes(sRef, blob, { contentType: "image/jpeg" });
+    onProgress?.(80);
+    const url = await getDownloadURL(snap.ref);
+    onProgress?.(92);
+    await updateDoc(doc(db, "users", uid), { photoURL: url });
+    onProgress?.(100);
+    return url;
+  } catch (storageErr) {
+    console.warn("[PhotoUpload] Firebase Storage unavailable, falling back to Firestore data-URL:", storageErr);
+  }
+
+  // ── 4. Firestore data-URL fallback (always works if user is authenticated) ──
+  onProgress?.(60);
+  let dataURL: string;
+  try {
+    dataURL = await compressToDataURL(file);
+  } catch (err) {
+    throw new Error("Could not compress image for upload. Try a different photo.");
+  }
+
+  onProgress?.(80);
+  try {
+    await updateDoc(doc(db, "users", uid), { photoURL: dataURL });
+  } catch (err) {
+    throw new Error("Profile update failed — make sure you are signed in and try again.");
+  }
+
+  onProgress?.(100);
+  return dataURL;
 }
 
 /** Delete photo from Storage + clear Firestore field. */

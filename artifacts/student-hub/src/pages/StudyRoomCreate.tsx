@@ -313,11 +313,10 @@ export default function StudyRoomCreate() {
                 <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1.5">
                   Classroom Theme
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {([
-                    { id: "classic", emoji: "🏫", label: "Classic",     desc: "Himalayan classroom" },
-                    { id: "night",   emoji: "🌙", label: "Late Night",  desc: "Lamp-lit study session" },
-                    { id: "rain",    emoji: "🌧️", label: "Rainy Day",   desc: "Cozy & focused" },
+                    { id: "classic", emoji: "🏫", label: "Classic",    desc: "Himalayan daytime classroom" },
+                    { id: "night",   emoji: "🌙", label: "Late Night", desc: "Cozy lamp-lit study room" },
                   ] as { id: RoomTheme; emoji: string; label: string; desc: string }[]).map((t) => (
                     <button
                       key={t.id}
