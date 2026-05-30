@@ -7,6 +7,7 @@ import {
   Send, BookOpen, Coffee, Crown, CheckCircle, BarChart2,
   ChevronRight, ChevronDown, Maximize, Minimize, LogOut, X,
   MessageCircle, ListChecks, School, Volume2, VolumeX,
+  Lock, Eye, EyeOff,
 } from "lucide-react";
 import { useRoomSound } from "@/hooks/useAmbientSound";
 import {
@@ -85,6 +86,16 @@ export default function StudyRoomLive() {
   const emojiCounter = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // ── Private room password gate ────────────────────────────────────────────
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPwError]       = useState("");
+  const [showPw,        setShowPw]        = useState(false);
+  // Persist verified rooms in sessionStorage so a page refresh doesn't re-ask
+  const [passwordVerified, setPwVerified] = useState(() => {
+    if (!roomId) return false;
+    try { return !!sessionStorage.getItem(`vrm_${roomId}`); } catch { return false; }
+  });
+
   // Derive active room + participants: context when joined, local when browsing
   const room         = alreadyIn ? ctxRoom         : localRoom;
   const participants = alreadyIn ? ctxParticipants : localParticipants;
@@ -156,6 +167,9 @@ export default function StudyRoomLive() {
     if (!user || !profile) return; // not signed in — handled by render guard below
     if (joined) return;
 
+    // Private room — don't auto-join until the user provides the correct password
+    if (room.isPrivate && !passwordVerified && !alreadyIn) return;
+
     let cancelled = false;
     async function doJoin() {
       setJoinError("");
@@ -183,7 +197,7 @@ export default function StudyRoomLive() {
     doJoin();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, user, profile, joined, room?.id, room?.status]);
+  }, [roomId, user, profile, joined, room?.id, room?.status, passwordVerified]);
 
   // ── Prevent double-leave on explicit Leave button press ──────────────────────
   // joinedRef tracks whether this component instance called joinActiveRoom.
@@ -270,6 +284,18 @@ export default function StudyRoomLive() {
     });
   }
 
+  function handlePasswordSubmit() {
+    if (!room) return;
+    if (passwordInput.trim() === (room.password ?? "").trim()) {
+      try { sessionStorage.setItem(`vrm_${room.id}`, "1"); } catch {}
+      setPwVerified(true);
+      setPwError("");
+    } else {
+      setPwError("Wrong password — try again.");
+      setPasswordInput("");
+    }
+  }
+
   function toggleFullscreen() {
     if (!document.fullscreenElement) {
       const el = containerRef.current ?? document.documentElement;
@@ -328,6 +354,47 @@ export default function StudyRoomLive() {
         className="px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors"
       >
         Sign In to Join
+      </button>
+      <button onClick={() => setLocation("/study-rooms")} className="block mx-auto text-sm text-gray-400 hover:text-gray-600 transition-colors">
+        Back to rooms
+      </button>
+    </div>
+  );
+
+  // Private room password gate — shown when room is loaded but password not yet verified
+  if (!loading && !alreadyIn && room?.isPrivate && !passwordVerified) return (
+    <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4">
+      <div className="w-16 h-16 mx-auto rounded-2xl bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center mb-2">
+        <Lock className="w-8 h-8 text-orange-500" />
+      </div>
+      <p className="text-gray-900 dark:text-gray-100 text-lg font-semibold">{room.title}</p>
+      <p className="text-gray-500 dark:text-gray-400 text-sm">
+        This is a private room. Enter the password to join.
+      </p>
+      <div className="relative">
+        <input
+          type={showPw ? "text" : "password"}
+          value={passwordInput}
+          onChange={e => { setPasswordInput(e.target.value); setPwError(""); }}
+          onKeyDown={e => e.key === "Enter" && handlePasswordSubmit()}
+          placeholder="Room password"
+          autoFocus
+          className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        <button
+          type="button"
+          onClick={() => setShowPw(v => !v)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+        >
+          {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+      </div>
+      {passwordError && <p className="text-red-500 text-sm font-medium">{passwordError}</p>}
+      <button
+        onClick={handlePasswordSubmit}
+        className="w-full px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors"
+      >
+        Enter Room
       </button>
       <button onClick={() => setLocation("/study-rooms")} className="block mx-auto text-sm text-gray-400 hover:text-gray-600 transition-colors">
         Back to rooms
@@ -762,6 +829,7 @@ export default function StudyRoomLive() {
                   timerDisplay={showTimer ? timerFmt : undefined}
                   timerLabel={phase?.label} timerPhaseType={phase?.type ?? null}
                   roomStatus={room.status}
+                  theme={room.theme ?? "classic"}
                 />
                 <AnimatePresence>
                   {floatingEmojis.map(fe => (
@@ -804,6 +872,7 @@ export default function StudyRoomLive() {
               timerDisplay={showTimer ? timerFmt : undefined}
               timerLabel={phase?.label} timerPhaseType={phase?.type ?? null}
               roomStatus={room.status}
+              theme={room.theme ?? "classic"}
             />
             <AnimatePresence>
               {floatingEmojis.map(fe => (

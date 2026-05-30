@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Lock, Unlock, Users, Music, ChevronRight, Volume2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { StudyFlowBuilder } from "@/components/study-room/StudyFlowBuilder";
-import { createRoom, joinRoom, StudyPhase, SUBJECTS, AMBIENT_SOUNDS } from "@/lib/studyRooms";
+import { createRoom, joinRoom, StudyPhase, SUBJECTS, AMBIENT_SOUNDS, RoomTheme } from "@/lib/studyRooms";
 import { useAmbientSound } from "@/hooks/useAmbientSound";
 
 const DEFAULT_FLOW: StudyPhase[] = [
@@ -29,6 +29,7 @@ export default function StudyRoomCreate() {
   const [password,        setPassword]        = useState("");
   const [maxParticipants, setMaxParticipants] = useState(20);
   const [ambientSound,    setAmbientSound]    = useState("none");
+  const [theme,           setTheme]           = useState<RoomTheme>("classic");
   const [studyFlow,       setStudyFlow]       = useState<StudyPhase[]>(DEFAULT_FLOW);
   const [loading,         setLoading]         = useState(false);
   const [step,            setStep]            = useState<"details" | "flow">("details");
@@ -88,6 +89,7 @@ export default function StudyRoomCreate() {
         maxParticipants,
         studyFlow,
         ambientSound,
+        theme,
       });
 
       await joinRoom(roomId, {
@@ -304,6 +306,35 @@ export default function StudyRoomCreate() {
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">
                   Click a sound to preview it (5s). This plays for all room members automatically.
                 </p>
+              </div>
+
+              {/* Classroom Theme */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1.5">
+                  Classroom Theme
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { id: "classic", emoji: "🏫", label: "Classic",     desc: "Himalayan classroom" },
+                    { id: "night",   emoji: "🌙", label: "Late Night",  desc: "Lamp-lit study session" },
+                    { id: "rain",    emoji: "🌧️", label: "Rainy Day",   desc: "Cozy & focused" },
+                  ] as { id: RoomTheme; emoji: string; label: string; desc: string }[]).map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setTheme(t.id)}
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-medium transition-all ${
+                        theme === t.id
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 shadow-sm"
+                          : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600"
+                      }`}
+                    >
+                      <span className="text-2xl">{t.emoji}</span>
+                      <span className="font-semibold">{t.label}</span>
+                      <span className="text-[10px] text-gray-400 dark:text-gray-500 leading-tight text-center">{t.desc}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <button

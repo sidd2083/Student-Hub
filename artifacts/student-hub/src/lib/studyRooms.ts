@@ -14,6 +14,8 @@ export interface StudyPhase {
 
 export type RoomStatus = "waiting" | "active" | "paused" | "finished";
 
+export type RoomTheme = "classic" | "night" | "rain";
+
 export interface Room {
   id: string;
   title: string;
@@ -35,6 +37,7 @@ export interface Room {
   participantCount: number;
   ambientSound: string;
   inviteCode: string;
+  theme: RoomTheme;
 }
 
 export interface RoomParticipant {
@@ -140,6 +143,7 @@ export async function createRoom(data: {
   maxParticipants: number;
   studyFlow: StudyPhase[];
   ambientSound: string;
+  theme?: RoomTheme;
 }): Promise<string> {
   const roomRef = doc(collection(db, "studyRooms"));
   const room: Record<string, unknown> = {
@@ -154,6 +158,7 @@ export async function createRoom(data: {
     maxParticipants: data.maxParticipants,
     studyFlow: data.studyFlow,
     ambientSound: data.ambientSound,
+    theme: data.theme ?? "classic",
     status: "waiting" as RoomStatus,
     currentPhaseIndex: 0,
     timerStartedAt: null,
@@ -527,7 +532,9 @@ export async function resolveVote(roomId: string, voteId: string, room: Room): P
         .filter(isParticipantActive)
         .sort((a, b) => (a.joinedAt?.toMillis() ?? 0) - (b.joinedAt?.toMillis() ?? 0));
       if (others.length > 0) {
-        await transferHost(roomId, room.hostUid, others[0].uid, others[0].name).catch(() => {});
+        // Do NOT swallow this error — if the caller lacks host permission the
+        // error propagates, the vote stays "active", and the host client retries.
+        await transferHost(roomId, room.hostUid, others[0].uid, others[0].name);
       }
     }
   }
@@ -815,13 +822,12 @@ export async function updateParticipantStudyEnd(
 // ── Transfer Host ─────────────────────────────────────────────────────────────
 
 export async function transferHost(roomId: string, oldHostUid: string, newHostUid: string, newHostName: string): Promise<void> {
-  const batch = writeBatch(db);
-  batch.update(doc(db, "studyRooms", roomId), { hostUid: newHostUid, hostName: newHostName });
-  batch.update(doc(db, "studyRooms", roomId, "participants", newHostUid), { isHost: true });
-  try {
-    batch.update(doc(db, "studyRooms", roomId, "participants", oldHostUid), { isHost: false });
-  } catch {}
-  await batch.commit();
+  // This write requires host/admin permission — will THROW for non-hosts so that
+  // resolveVote keeps the vote "active" until the actual host client runs it.
+  await updateDoc(doc(db, "studyRooms", roomId), { hostUid: newHostUid, hostName: newHostName });
+  // These participant writes are best-effort — errors are non-fatal.
+  await updateDoc(doc(db, "studyRooms", roomId, "participants", newHostUid), { isHost: true }).catch(() => {});
+  await updateDoc(doc(db, "studyRooms", roomId, "participants", oldHostUid), { isHost: false }).catch(() => {});
   // System message
   try {
     await setDoc(doc(collection(db, "studyRooms", roomId, "messages")), {
