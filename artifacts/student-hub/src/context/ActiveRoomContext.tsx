@@ -8,7 +8,7 @@ import {
   updateParticipantStudyStart, updateParticipantStudyEnd,
   pauseTimer, resumeTimer, startTimer, skipPhase, endRoom,
   advancePhase, getRemainingSeconds, transferHost, purgeStaleParticipants,
-  getLiveStudyMins, isParticipantActive,
+  getLiveStudyMins, isParticipantActive, syncParticipantCount,
 } from "@/lib/studyRooms";
 import { playBell } from "@/hooks/useAmbientSound";
 
@@ -90,6 +90,11 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   const unsubRoomRef       = useRef<(() => void) | null>(null);
   const unsubPartsRef      = useRef<(() => void) | null>(null);
   const unloadedRef        = useRef(false);
+  // Guards kick detection from firing when the user deliberately leaves.
+  // Without this, leaveRoom() deletes the participant doc → Firestore snapshot
+  // fires before unsubscription → kick detection marks wasKicked = true →
+  // rejoining is blocked (wasKicked redirect fires before joinActiveRoom resets it).
+  const isLeavingRef       = useRef(false);
 
   roomRef.current         = room;
   participantsRef.current = participants;
@@ -140,7 +145,18 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
         remainingSecsRef.current = rem;
       }
     });
-    unsubPartsRef.current = subscribeParticipants(activeRoomId, setParticipants);
+
+    unsubPartsRef.current = subscribeParticipants(activeRoomId, (ps) => {
+      setParticipants(ps);
+      // ── Member count correction ────────────────────────────────────────────
+      // participantCount on the room doc drifts when tabs crash or network
+      // cuts — subscribeParticipants already filters stale docs, so ps.length
+      // is always accurate. Any participant can safely correct the count.
+      const r = roomRef.current;
+      if (r && r.id === activeRoomId && ps.length > 0 && r.participantCount !== ps.length) {
+        syncParticipantCount(activeRoomId, ps.length).catch(() => {});
+      }
+    });
 
     return () => {
       unsubRoomRef.current?.();
@@ -299,6 +315,12 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   // ── Kick detection — if our participant doc disappears, fully clean up ──────
   useEffect(() => {
     if (!activeRoomId || !user) return;
+    // Skip when the user deliberately called leaveActiveRoom — in that path
+    // we already unsubscribed listeners, but a queued Firestore snapshot can
+    // still fire and falsely trigger the kick flow, setting wasKicked = true
+    // and making rejoining impossible (the redirect fires before joinActiveRoom
+    // resets wasKicked). The isLeavingRef flag prevents that race condition.
+    if (isLeavingRef.current) return;
     const isStillIn = participants.some(p => p.uid === user.uid);
     if (participants.length > 0 && !isStillIn) {
       // Immediately unsubscribe all Firestore listeners so no further updates arrive
@@ -414,6 +436,22 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   const leaveActiveRoom = useCallback(async () => {
     if (!activeRoomId || !user) return;
 
+    // ── Guard: prevent kick-detection race condition ──────────────────────────
+    // Set BEFORE any Firestore writes. leaveRoom() deletes the participant doc,
+    // which causes a snapshot to fire. If the listener is still subscribed at
+    // that moment, kick detection sees the user has disappeared and sets
+    // wasKicked=true — making it impossible to rejoin. The flag short-circuits
+    // that code path for the duration of the intentional leave.
+    isLeavingRef.current = true;
+
+    // ── Unsubscribe listeners BEFORE Firestore writes ─────────────────────────
+    // This is the primary defence. Even if isLeavingRef is checked asynchronously,
+    // unsubscribing first guarantees no stale snapshot can arrive.
+    unsubRoomRef.current?.();
+    unsubPartsRef.current?.();
+    unsubRoomRef.current  = null;
+    unsubPartsRef.current = null;
+
     // 1. Bank any in-progress study segment
     if (studyWallStartRef.current !== null) {
       studyAccumulatedRef.current += Math.max(0, (Date.now() - studyWallStartRef.current) / 1000);
@@ -450,9 +488,8 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     // 4. Remove from room
     await leaveRoom(activeRoomId, user.uid, totalSessionMins).catch(() => {});
 
-    // 5. Cleanup
-    unsubRoomRef.current?.();
-    unsubPartsRef.current?.();
+    // 5. Reset state — isLeavingRef must be cleared AFTER all state is reset
+    //    so any in-flight React effects don't re-trigger with stale state.
     studyWallStartRef.current   = null;
     studyAccumulatedRef.current = 0;
     lastSyncedSecsRef.current   = 0;
@@ -460,6 +497,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     setActiveRoomId(null);
     setRoom(null);
     setParticipants([]);
+    isLeavingRef.current = false;
   }, [activeRoomId, user, participants]);
 
   const onHostStart  = useCallback(async () => {

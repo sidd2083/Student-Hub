@@ -380,18 +380,39 @@ export const ClassroomView = memo(function ClassroomView({
         </div>
       </div>
 
-      {/* ── STUDENT ROWS ──────────────────────────────────────────────────── */}
-      <div className={`relative px-3 pb-5 ${compact ? "space-y-4" : "space-y-5"}`}>
-        {pairs.map((pair, row) => (
-          <div key={row} className="flex justify-center">
-            <Bench
-              left={pair[0]} right={pair[1]}
-              hostUid={hostUid}
-              onSelect={handleSelect}
-              compact={compact}
-            />
-          </div>
-        ))}
+      {/* ── STUDENT ROWS — perspective depth effect ───────────────────────── */}
+      {/* Each row is scaled slightly larger toward the viewer (front row) and  */}
+      {/* smaller toward the board (back row), creating a natural classroom     */}
+      {/* depth illusion without CSS 3D transforms that can cause blur on HiDPI.*/}
+      <div className="relative px-3 pb-5" style={{ perspective: "none" }}>
+        {pairs.map((pair, row) => {
+          const totalRows = Math.max(pairs.length, 1);
+          // Front row (highest index) → scale 1; back row (index 0) → smaller
+          const depthFactor = row / Math.max(totalRows - 1, 1); // 0 = back, 1 = front
+          const scale       = 0.82 + depthFactor * 0.18;        // 0.82 → 1.0
+          const opacity     = 0.7 + depthFactor * 0.30;         // 0.70 → 1.0
+          return (
+            <div
+              key={row}
+              className="flex justify-center"
+              style={{
+                marginBottom: compact ? 12 : 16,
+                transform: `scale(${scale})`,
+                transformOrigin: "center bottom",
+                opacity,
+                // Rows closer to the board sit higher up (already handled by
+                // document flow — row 0 renders first, nearest the blackboard)
+              }}
+            >
+              <Bench
+                left={pair[0]} right={pair[1]}
+                hostUid={hostUid}
+                onSelect={handleSelect}
+                compact={compact}
+              />
+            </div>
+          );
+        })}
       </div>
 
       {/* ── FLOOR ─────────────────────────────────────────────────────────── */}

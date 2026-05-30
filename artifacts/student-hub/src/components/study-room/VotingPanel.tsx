@@ -5,6 +5,8 @@ import type { Room } from "@/lib/studyRooms";
 import { useAuth } from "@/context/AuthContext";
 import { ThumbsUp, ThumbsDown, Plus, X as XIcon, UserX, Crown, Pause, Play } from "lucide-react";
 import { playBell } from "@/hooks/useAmbientSound";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface Props {
   room: Room;
@@ -45,6 +47,21 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
   const cooldownLeft  = Math.max(0, Math.ceil((lastVoteAt + VOTE_COOLDOWN_MS - Date.now()) / 1000));
   const canCreateVote = !hasActiveVote && cooldownLeft === 0;
 
+  // ── Sync totalParticipants on active votes when people join/leave ─────────
+  // Without this, a vote created with 3 participants would still require
+  // 2/3 majority even after someone left — making it impossible to pass.
+  useEffect(() => {
+    if (participantCount <= 0 || votes.length === 0) return;
+    for (const vote of votes) {
+      if (vote.status !== "active") continue;
+      if (vote.totalParticipants !== participantCount) {
+        updateDoc(doc(db, "studyRooms", room.id, "votes", vote.id), {
+          totalParticipants: participantCount,
+        }).catch(() => {});
+      }
+    }
+  }, [participantCount, votes, room.id]);
+
   // ── Auto-resolve votes ────────────────────────────────────────────────────
   useEffect(() => {
     if (votes.length === 0) return;
@@ -55,14 +72,19 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
         if (resolvingRef.current.has(vote.id)) continue;
         const yes = vote.yesVoters.length;
         const no  = vote.noVoters.length;
-        const totalVoted = yes + no;
         const isExpired  = vote.expiresAt && vote.expiresAt.toMillis() < now;
-        const allVoted   = totalVoted >= Math.max(participantCount, 1);
-        if (isExpired || allVoted) {
+        const allVoted   = (yes + no) >= Math.max(participantCount, 1);
+        // Resolve early if YES already has a strict majority (no need to wait)
+        const effectiveTotal = Math.max(vote.totalParticipants, yes + no, 1);
+        const majorityAchieved = yes * 2 > effectiveTotal;
+        // Resolve early if defeat is certain (even if all remaining vote YES, can't win)
+        const remaining = Math.max(0, participantCount - yes - no);
+        const defeatCertain = no * 2 >= effectiveTotal + remaining;
+        if (isExpired || allVoted || majorityAchieved || defeatCertain) {
           resolvingRef.current.add(vote.id);
           resolveVote(room.id, vote.id, room)
             .then(() => {
-              if (yes > no) playBell("vote");
+              if (yes * 2 > effectiveTotal) playBell("vote");
             })
             .catch((err) => console.warn("[Vote] resolve failed:", err))
             .finally(() => resolvingRef.current.delete(vote.id));
@@ -208,6 +230,10 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
             ? Math.max(0, Math.ceil((vote.expiresAt.toMillis() - Date.now()) / 1000))
             : null;
 
+          const effectiveTotal = Math.max(participantCount, vote.totalParticipants, yes + no, 1);
+          const majorityNeeded = Math.floor(effectiveTotal / 2) + 1;
+          const majorityPct    = Math.round((majorityNeeded / effectiveTotal) * 100);
+
           return (
             <motion.div
               key={vote.id}
@@ -237,18 +263,28 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
                 </div>
               </div>
 
-              <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mb-2">
+              {/* Progress bar with majority threshold marker */}
+              <div className="relative h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mb-1">
                 <motion.div
                   className="h-full bg-green-500 rounded-full"
                   initial={{ width: 0 }}
                   animate={{ width: `${yesPct}%` }}
                   transition={{ duration: 0.4 }}
                 />
+                {/* Majority threshold line */}
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-amber-400/80"
+                  style={{ left: `${majorityPct}%` }}
+                  title={`Needs ${majorityNeeded} yes votes to pass`}
+                />
               </div>
+              <p className="text-[10px] text-amber-600 dark:text-amber-500 text-right mb-2">
+                needs {majorityNeeded}/{effectiveTotal} yes to pass
+              </p>
 
               <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-3">
                 <span>✅ {yes} yes</span>
-                <span className="font-medium text-gray-700 dark:text-gray-300">{yes + no}/{total} voted</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">{yes + no}/{effectiveTotal} voted</span>
                 <span>❌ {no} no</span>
               </div>
 
@@ -271,7 +307,7 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
 
               {hasVoted && (
                 <p className="text-center text-xs text-gray-500 dark:text-gray-400 py-1">
-                  You voted {hasVotedYes ? "✅ yes" : "❌ no"} — waiting for others…
+                  You voted {hasVotedYes ? "✅ yes" : "❌ no"} — need {majorityNeeded} yes to pass
                 </p>
               )}
             </motion.div>

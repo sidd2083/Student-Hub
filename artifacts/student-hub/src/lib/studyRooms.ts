@@ -472,8 +472,15 @@ export async function resolveVote(roomId: string, voteId: string, room: Room): P
   const no  = vote.noVoters.length;
   const isExpired = vote.expiresAt && vote.expiresAt.toMillis() < Date.now();
 
-  // A vote passes if yes > no, OR was already marked "passed" by another client
-  const passed = vote.status === "passed" || yes > no;
+  // ── DEMOCRATIC MAJORITY CHECK ─────────────────────────────────────────────
+  // A vote passes only if YES has a STRICT majority of all active participants
+  // (i.e. more than half). Using max(totalParticipants, yes+no) prevents the
+  // count from going stale when participants leave mid-vote — whoever already
+  // voted is always included in the denominator.
+  // Example: 2 participants, 1 YES → 1*2=2 > max(2,1)=2 → FALSE. Correct.
+  // Example: 3 participants, 2 YES → 2*2=4 > max(3,2)=3 → TRUE.  Correct.
+  const effectiveTotal = Math.max(vote.totalParticipants, yes + no);
+  const passed = vote.status === "passed" || yes * 2 > effectiveTotal;
 
   if (!passed) {
     // Vote did not pass — mark it resolved (failed or expired)
@@ -548,6 +555,14 @@ export async function kickParticipant(roomId: string, targetUid: string, room: R
   } catch (err) {
     console.warn("[Room] kickParticipant error:", err);
   }
+}
+
+/** Correct the stored participantCount field when it drifts from reality.
+ * Any active participant may call this — writes are idempotent and cheap. */
+export async function syncParticipantCount(roomId: string, count: number): Promise<void> {
+  try {
+    await updateDoc(doc(db, "studyRooms", roomId), { participantCount: count });
+  } catch { /* non-critical — host purge will also correct on next tick */ }
 }
 
 // ── Chat / Reactions ──────────────────────────────────────────────────────────

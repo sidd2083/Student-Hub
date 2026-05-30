@@ -120,17 +120,40 @@ export async function uploadProfilePhoto(
 
     // ── Backend unavailable (503 = no service account) → client-side fallback ─
     // Upload directly to Firebase Storage using the client SDK.
-    // Requires Firebase Storage rules to allow authenticated users to write
-    // avatars/{uid}.jpg — this works on all Replit domains without CORS issues.
+    // Firebase Storage rules allow any authenticated user to write to
+    // avatars/{uid}.jpg — the SDK includes the user's auth token automatically.
     if (res.status === 503) {
-      console.info("[PhotoUpload] Backend unavailable — using client-side Firebase Storage fallback");
+      console.info("[PhotoUpload] Backend unavailable — using client-side Firebase Storage");
       onProgress?.(50);
 
-      const sRef = storageRef(storage, `avatars/${uid}.jpg`);
-      const snap = await uploadBytes(sRef, blob, { contentType: "image/jpeg" });
+      let snap;
+      try {
+        const sRef = storageRef(storage, `avatars/${uid}.jpg`);
+        console.info("[PhotoUpload] Uploading blob to avatars/%s.jpg (%d KB)", uid, Math.round(blob.size / 1024));
+        snap = await uploadBytes(sRef, blob, { contentType: "image/jpeg" });
+        console.info("[PhotoUpload] Storage upload succeeded — fetching download URL");
+      } catch (storageErr) {
+        const msg = (storageErr as Error).message ?? "unknown";
+        console.error("[PhotoUpload] Firebase Storage upload failed:", storageErr);
+        // Surface a clear message — the most common cause is unauthenticated
+        // or Storage rules rejecting the write.
+        if (msg.includes("unauthorized") || msg.includes("403")) {
+          throw new Error("Photo upload blocked by Storage rules — make sure you are signed in and try again.");
+        }
+        throw new Error(`Photo upload failed: ${msg}`);
+      }
+
       onProgress?.(85);
 
-      const url = await getDownloadURL(snap.ref);
+      let url: string;
+      try {
+        url = await getDownloadURL(snap.ref);
+        console.info("[PhotoUpload] Got download URL — updating Firestore profile");
+      } catch (urlErr) {
+        console.error("[PhotoUpload] getDownloadURL failed:", urlErr);
+        throw new Error("Photo saved but could not retrieve its URL — please try again.");
+      }
+
       onProgress?.(95);
 
       // Update Firestore photoURL so profile syncs everywhere

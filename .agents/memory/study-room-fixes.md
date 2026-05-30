@@ -1,9 +1,9 @@
 ---
 name: Study Room Bug Fixes
-description: Root causes and fixes for Virtual Study Room system issues (ghost rooms, ghost users, duplicate listeners, admin delete, reactions, profile cache, study tracking)
+description: Root causes and fixes for Virtual Study Room system issues (ghost rooms, ghost users, duplicate listeners, admin delete, reactions, profile cache, study tracking, voting, rejoin, member count)
 ---
 
-## Key fixes applied
+## Key fixes applied (earlier session)
 
 **Ghost rooms**: `leaveRoom` now reads the current `participantCount` before decrementing. If it's the last person (count ≤ 1), the batch also sets `status: "finished"` and `timerStartedAt: null` — making the room vanish from listings immediately.
 
@@ -27,3 +27,33 @@ description: Root causes and fixes for Virtual Study Room system issues (ghost r
 - Firestore Security Rules are the gating layer — client code silently fails when rules block writes, causing confusing "only host gets X" symptoms.
 - Duplicate onSnapshot listeners are the main performance killer in study rooms.
 - `FieldValue.increment()` in security rules: the rule engine evaluates `request.resource.data.field` as the resulting sum, not the delta.
+
+---
+
+## Production audit fixes (current session)
+
+### Voting — strict democratic majority
+**Root cause:** `resolveVote` used `yes > no` which passes with 1 yes vs 0 no (e.g. 2 users, only 1 votes yes → passes).
+**Fix:** Changed to `yes * 2 > Math.max(vote.totalParticipants, yes + no)` — strict majority of ALL active participants.
+Also: `VotingPanel` now has a `useEffect` that syncs `totalParticipants` on active votes when `participantCount` changes (people leaving mid-vote). Added early majority detection AND early defeat detection in auto-resolve interval. Progress bar now shows majority threshold marker + "needs N/M yes to pass" label.
+
+### Rejoin bug — wasKicked false positive race condition
+**Root cause:** Race in `leaveActiveRoom`. `leaveRoom()` deletes participant doc → Firestore snapshot fires BEFORE listeners unsubscribe → kick detection sees user missing → sets `wasKicked = true` → `StudyRoomLive` redirects away before `joinActiveRoom` resets `wasKicked`.
+**Fix (two defences in `ActiveRoomContext.leaveActiveRoom`):**
+1. `isLeavingRef.current = true` BEFORE any Firestore writes — kick detection returns early when this is set.
+2. Unsubscribe listeners BEFORE `leaveRoom()` (primary defence — no snapshot can fire during the leave).
+`isLeavingRef` cleared after all state is reset.
+
+### Member count drift
+**Root cause:** `participantCount` uses `increment(±1)` which drifts on crash/disconnect. Host purge corrects every 60s but not in real-time, and fails if host crashes.
+**Fix:** In `subscribeParticipants` callback, when `ps.length !== room.participantCount`, call `syncParticipantCount(roomId, ps.length)`. Any participant can correct it (writes are idempotent). Added `syncParticipantCount` helper to `studyRooms.ts`.
+
+### Profile photo upload
+**Root cause:** Backend `/api/upload/avatar` requires `FIREBASE_SERVICE_ACCOUNT_JSON` for `requireAuth`. Without it → 503. Client-side fallback uses Firebase Storage JS SDK (storage rules allow authenticated writes to `avatars/{uid}.jpg`).
+**Fix:** Added granular `try/catch` for each step (upload, getDownloadURL, Firestore update) with specific error messages. Detects `unauthorized/403` and surfaces a clear message. The proper fix for the backend path is setting the `FIREBASE_SERVICE_ACCOUNT_JSON` secret.
+
+### Classroom UI depth
+**Fix:** Student rows now use perspective depth scaling. Front row (highest array index, nearest viewer) at `scale(1.0)` full opacity. Back row (index 0, nearest blackboard) at `scale(0.82)` opacity `0.7`. `transformOrigin: "center bottom"` so seats appear to sit on the same floor plane.
+
+### Performance note
+Inner function components defined INSIDE `StudyRoomLive` (`ChatPanel`, `HostBar`, etc.) are called as functions `{ChatPanel()}` not as JSX `<ChatPanel />` — this avoids React unmounting them on every parent render but loses memoization. True fix would be to move them outside the component body and pass props. Not refactored in this session due to scope.

@@ -1,0 +1,275 @@
+# FINAL STUDY ROOM PRODUCTION AUDIT AND STABILIZATION
+
+Do NOT implement new features.
+
+Do NOT redesign random things.
+
+Your task is to audit the ENTIRE Study Room system and fix ALL remaining bugs until it behaves like a production-ready feature.
+
+The room system currently works partially, but many critical bugs still exist.
+
+========================================================
+
+1. VOTING SYSTEM IS NOT DEMOCRATIC
+   ========================================================
+
+Current issue:
+
+Example:
+
+* Room has 2 users.
+* User A starts vote.
+* User B votes YES.
+* User A does not vote.
+
+Result:
+Vote still passes.
+
+This is wrong.
+
+A vote must NEVER pass simply because one user voted.
+
+Fix:
+
+* Count all active room members.
+* Calculate required majority correctly.
+* Only active users count.
+* Users who did not vote must not automatically count as YES.
+* Users who leave during voting must be removed from vote calculation.
+* Vote result must recalculate in realtime.
+
+Audit every vote type:
+
+* extend timer
+* pause timer
+* unpause timer
+* kick user
+* end room
+* remove host
+
+Make all voting truly democratic.
+
+========================================================
+2. ROOM MEMBERS COUNT IS WRONG
+==============================
+
+Current issue:
+
+Browse rooms page shows:
+
+* 3 members
+* 2 members
+
+Even when users already left.
+
+Sometimes host leaves and count never updates.
+
+Fix:
+
+Use realtime presence tracking.
+
+Member count must always equal:
+
+actual active users currently inside room.
+
+Audit:
+
+* join room
+* leave room
+* disconnect
+* refresh page
+* mobile close
+* browser close
+* host leave
+
+No ghost users.
+
+No stale counts.
+
+========================================================
+3. REJOIN ROOM BUG
+==================
+
+Current issue:
+
+User leaves room.
+
+Then user clicks Join Room again.
+
+Nothing happens.
+
+Room becomes impossible to rejoin.
+
+Fix:
+
+Audit entire room leave flow.
+
+Ensure:
+
+* room session cleaned
+* listeners removed
+* membership removed correctly
+
+After leaving:
+
+User must always be able to rejoin.
+
+========================================================
+4. PROFILE PICTURE STILL BROKEN
+===============================
+
+Current issue:
+
+Upload reaches 100%.
+
+Then:
+
+"Avatar upload failed"
+
+Fix this completely.
+
+Add detailed logging for:
+
+1. image compression
+2. storage upload
+3. download URL generation
+4. firestore update
+5. profile refresh
+
+Find actual failing step.
+
+Fix actual root cause.
+
+Do not hide error.
+
+Fix it.
+
+========================================================
+5. APP FEELS SLOW
+=================
+
+This is currently the biggest user experience problem.
+
+Everything feels delayed:
+
+* opening profile popup
+* clicking avatars
+* opening room
+* switching pages
+* animations
+
+App does not feel production ready.
+
+Perform full performance audit.
+
+Check:
+
+* duplicate listeners
+* unnecessary rerenders
+* unnecessary firestore reads
+* excessive state updates
+* slow queries
+* repeated network requests
+
+Optimize entire app.
+
+Goal:
+
+Every interaction should feel instant.
+
+========================================================
+6. CLASSROOM UI IS STILL BAD
+============================
+
+Current classroom does not feel like a classroom.
+
+It feels like random boxes.
+
+Requirements:
+
+Make classroom visually resemble:
+
+* real classroom
+* study hall
+* productive environment
+
+Students should feel:
+
+"I am studying with others"
+
+Improve:
+
+* seating layout
+* classroom depth
+* classroom atmosphere
+* spacing
+* visual hierarchy
+
+Add:
+
+* subtle Student Hub branding
+* subtle Nepal classroom inspiration
+
+Do NOT make it heavy.
+
+Do NOT reduce performance.
+
+========================================================
+7. FULL SYSTEM AUDIT
+====================
+
+I do NOT want individual fixes anymore.
+
+Audit entire Study Room system.
+
+Test:
+
+* host transfer
+* voting
+* join room
+* leave room
+* room deletion
+* room presence
+* room timers
+* study tracking
+* leaderboard sync
+* report card sync
+* profile picture upload
+* room member count
+* mobile view
+* desktop view
+
+Find all remaining bugs.
+
+Fix all remaining bugs.
+
+========================================================
+FINAL GOAL
+==========
+
+The Study Room feature should feel like:
+
+* production ready
+* smooth
+* fast
+* reliable
+* realtime
+* accurate
+
+No ghost users.
+No broken votes.
+No wrong member counts.
+No failed profile uploads.
+No rejoin issues.
+No laggy interactions.
+
+Before finishing, provide a list of:
+
+* bugs found
+* root causes
+* fixes applied
+* remaining known issues (if any)
+
+Do not stop after fixing one issue.
+
+Complete the entire audit.
