@@ -346,7 +346,7 @@ export default function Dashboard() {
             </h1>
             {profile?.grade != null && profile.grade >= 9 && (
               <span className="px-2.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-                Grade {profile.grade}
+                {profile.grade === 13 ? "CEE" : profile.grade === 14 ? "IOE" : profile.grade === 15 ? "Bachelor's" : `Grade ${profile.grade}`}
               </span>
             )}
           </div>

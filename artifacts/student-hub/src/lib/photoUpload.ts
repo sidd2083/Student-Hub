@@ -114,28 +114,30 @@ export async function uploadProfilePhoto(
       catch { /* proceed without auth header */ }
     }
 
+    // .catch(()=>null) converts network errors (TypeError) into null so we
+    // can fall through to the Firestore data-URL path instead of crashing.
     const res = await fetch("/api/upload/avatar", {
       method: "POST",
       headers,
       body:   formData,
-    });
+    }).catch(() => null);
 
     if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
 
-    if (res.ok) {
+    if (res === null) {
+      // Network error (backend unreachable) — fall through to Firestore data-URL.
+    } else if (res.ok) {
       const data = await res.json();
       if (!data.url) throw new Error("Server did not return a download URL.");
       onProgress?.(100);
       return data.url as string;
-    }
-
-    // Backend not configured (503) or auth issue — fall through to Firestore data-URL.
-    // We skip the Firebase Storage client SDK path because it suffers CORS issues
-    // on Replit domains when the Admin SDK isn't available to set the token.
-    if (res.status !== 503 && res.status !== 401 && res.status !== 403) {
+    } else if (res.status !== 503 && res.status !== 401 && res.status !== 403) {
+      // Backend not configured (503) or auth issue — fall through.
+      // For other errors, surface the message to the user.
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.error || `Upload failed (HTTP ${res.status})`);
     }
+    // 503 / 401 / 403 → fall through to Firestore data-URL fallback.
 
   } finally {
     if (progressTimer) clearInterval(progressTimer);

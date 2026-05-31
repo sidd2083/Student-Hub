@@ -657,8 +657,11 @@ export function useDailyMissions() {
     if (!uid) return;
     const updated = missions.map(m => m.id === missionId ? {
       ...m,
-      // Only set startedAt if not already set — preserves auto-tracking from mission creation
-      startedAt: m.startedAt ?? savedMinutesToday,
+      // Always reset startedAt to NOW — this ensures we only count study time
+      // from the moment the student explicitly presses "Go to Pomodoro".
+      // Preserving a stale startedAt (e.g. from the start of the day) would
+      // cause the mission to complete much earlier than the student expects.
+      startedAt: savedMinutesToday,
     } : m);
 
     // Write cache SYNCHRONOUSLY before setMissions (async) so that if the user

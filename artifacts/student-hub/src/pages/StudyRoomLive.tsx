@@ -119,9 +119,12 @@ export default function StudyRoomLive() {
     return subscribeParticipants(roomId, setLocalPs);
   }, [roomId, alreadyIn]);
 
-  // Once context room arrives after joining, clear loading
+  // Once context room arrives after joining, clear loading.
+  // Also keep loading=true during the brief window where alreadyIn just became true
+  // but ctxRoom hasn't arrived yet — prevents null-room crashes in render.
   useEffect(() => {
     if (alreadyIn && ctxRoom) setLoading(false);
+    else if (alreadyIn && !ctxRoom) setLoading(true);
   }, [alreadyIn, ctxRoom]);
 
   // ── Kick redirect — when the context evicts us, navigate away immediately ──
@@ -587,10 +590,10 @@ export default function StudyRoomLive() {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-900 dark:text-white truncate flex items-center gap-1">
                 {p.name}
-                {p.uid === room.hostUid && <Crown className="w-3 h-3 text-yellow-500 shrink-0" />}
+                {p.uid === room?.hostUid && <Crown className="w-3 h-3 text-yellow-500 shrink-0" />}
                 {p.uid === user?.uid && <span className="text-[10px] text-gray-400 font-normal">(you)</span>}
               </p>
-              <p className="text-xs text-gray-400">Grade {p.grade}</p>
+              <p className="text-xs text-gray-400">{p.grade === 13 ? "CEE" : p.grade === 14 ? "IOE" : p.grade === 15 ? "Bachelor's" : `Grade ${p.grade}`}</p>
             </div>
             <div className="w-2 h-2 rounded-full bg-green-400" />
           </button>
