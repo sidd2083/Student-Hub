@@ -155,7 +155,6 @@ export default function Home() {
               <LogIn className="w-4 h-4" aria-hidden="true" /> Register — It's free
             </button>
           </div>
-          <p className="text-xs text-gray-400 mt-4">Free forever · No credit card required</p>
         </div>
       </section>
 

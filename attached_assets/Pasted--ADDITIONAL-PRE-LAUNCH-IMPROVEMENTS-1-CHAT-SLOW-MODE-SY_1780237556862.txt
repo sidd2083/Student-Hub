@@ -1,0 +1,193 @@
+# ADDITIONAL PRE-LAUNCH IMPROVEMENTS
+
+## 1. CHAT SLOW MODE SYSTEM
+
+The Study Room chat needs moderation tools.
+
+Add a default chat cooldown.
+
+Default:
+
+* 1 message every 10 seconds per user
+
+Purpose:
+
+* prevent spam
+* keep chat clean
+* keep study environment focused
+
+Users should see a cooldown indicator if they try to send messages too quickly.
+
+Example:
+
+"Please wait 8 seconds before sending another message."
+
+---
+
+## 2. CHAT VOTING CONTROLS
+
+Add new democratic voting options.
+
+### Enable Slow Mode
+
+Vote Type:
+
+Enable Slow Mode
+
+Options:
+
+* 10 sec
+* 20 sec
+* 30 sec
+* 60 sec
+
+If vote passes:
+
+Room chat cooldown updates.
+
+---
+
+### Disable Slow Mode
+
+Vote Type:
+
+Disable Slow Mode
+
+If vote passes:
+
+Chat returns to default behavior.
+
+---
+
+### Disable Chat
+
+Vote Type:
+
+Disable Chat
+
+If vote passes:
+
+Nobody can send messages.
+
+Existing messages remain visible.
+
+---
+
+### Enable Chat
+
+Vote Type:
+
+Enable Chat
+
+If vote passes:
+
+Chat becomes available again.
+
+---
+
+All chat controls must use the same democratic voting system as:
+
+* Extend Time
+* Pause Timer
+* Resume Timer
+* Kick User
+* Remove Host
+
+---
+
+## 3. HOMEPAGE TEXT FIX
+
+Remove this entire line:
+
+"Free Forever · No credit card required"
+
+Completely remove it.
+
+Do not replace it.
+
+---
+
+## 4. PERFORMANCE IS STILL NOT GOOD ENOUGH
+
+The website still feels slower than a production app.
+
+Perform another performance audit.
+
+Focus on:
+
+* button responsiveness
+* page transitions
+* popup opening speed
+* room loading speed
+* profile popup speed
+* voting speed
+* chat speed
+* animation smoothness
+
+---
+
+Target:
+
+Everything should feel instant.
+
+Examples:
+
+Click button
+→ instant feedback
+
+Open profile
+→ instant
+
+Join room
+→ instant
+
+Vote
+→ instant
+
+Send message
+→ instant
+
+Room updates
+→ instant
+
+---
+
+## 5. FINAL USER EXPERIENCE REQUIREMENT
+
+Student Hub should feel like a professional application.
+
+Not a prototype.
+
+Not a school project.
+
+Not a laggy web app.
+
+The experience should be:
+
+* fast
+* smooth
+* responsive
+* polished
+* reliable
+
+Every action should feel immediate.
+
+Remove unnecessary delays.
+
+Optimize rendering.
+
+Optimize Firestore usage.
+
+Optimize listeners.
+
+Optimize room synchronization.
+
+The final goal is a production-ready experience that remains smooth even with:
+
+* 200+ active study rooms
+* 2,000+ concurrent users
+* active chat
+* active voting
+* active timers
+
+without noticeable lag.

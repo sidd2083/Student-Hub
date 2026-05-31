@@ -38,6 +38,10 @@ export interface Room {
   ambientSound: string;
   inviteCode: string;
   theme: RoomTheme;
+  /** Seconds each user must wait between messages. 0 = no cooldown. Default: 10 */
+  chatCooldownSecs?: number;
+  /** Whether chat is enabled. Default: true */
+  chatEnabled?: boolean;
 }
 
 export interface RoomParticipant {
@@ -68,8 +72,10 @@ export function getLiveStudyMins(p: RoomParticipant): number {
 export interface Vote {
   id: string;
   description: string;
-  type: "extend" | "break" | "skip_break" | "end" | "custom" | "pause" | "unpause" | "kick" | "remove_host";
+  type: "extend" | "break" | "skip_break" | "end" | "custom" | "pause" | "unpause" | "kick" | "remove_host"
+      | "enable_slow_mode" | "disable_slow_mode" | "disable_chat" | "enable_chat";
   addMinutes?: number;
+  cooldownSecs?: number;
   targetUid?: string;
   targetName?: string;
   createdByUid: string;
@@ -439,6 +445,7 @@ export async function createVote(roomId: string, vote: {
   addMinutes?: number;
   targetUid?: string;
   targetName?: string;
+  cooldownSecs?: number;
   createdByUid: string;
   createdByName: string;
   totalParticipants: number;
@@ -450,6 +457,7 @@ export async function createVote(roomId: string, vote: {
     description: vote.description,
     type: vote.type,
     addMinutes: vote.addMinutes ?? null,
+    cooldownSecs: vote.cooldownSecs ?? null,
     targetUid: vote.targetUid ?? null,
     targetName: vote.targetName ?? null,
     createdByUid: vote.createdByUid,
@@ -547,6 +555,35 @@ export async function resolveVote(roomId: string, voteId: string, room: Room): P
     await skipPhase(roomId, room).catch(() => {});
   } else if (vote.type === "kick" && vote.targetUid) {
     await kickParticipant(roomId, vote.targetUid, room).catch(() => {});
+  } else if (vote.type === "enable_slow_mode") {
+    const secs = vote.cooldownSecs ?? 10;
+    await updateDoc(roomRef, { chatCooldownSecs: secs }).catch(() => {});
+    await setDoc(doc(collection(db, "studyRooms", roomId, "messages")), {
+      uid: "system", name: "System",
+      text: `🐌 Slow mode enabled: 1 message every ${secs} seconds.`,
+      type: "system", createdAt: serverTimestamp(),
+    }).catch(() => {});
+  } else if (vote.type === "disable_slow_mode") {
+    await updateDoc(roomRef, { chatCooldownSecs: 0 }).catch(() => {});
+    await setDoc(doc(collection(db, "studyRooms", roomId, "messages")), {
+      uid: "system", name: "System",
+      text: "💬 Slow mode disabled.",
+      type: "system", createdAt: serverTimestamp(),
+    }).catch(() => {});
+  } else if (vote.type === "disable_chat") {
+    await updateDoc(roomRef, { chatEnabled: false }).catch(() => {});
+    await setDoc(doc(collection(db, "studyRooms", roomId, "messages")), {
+      uid: "system", name: "System",
+      text: "🔇 Chat has been disabled by vote.",
+      type: "system", createdAt: serverTimestamp(),
+    }).catch(() => {});
+  } else if (vote.type === "enable_chat") {
+    await updateDoc(roomRef, { chatEnabled: true }).catch(() => {});
+    await setDoc(doc(collection(db, "studyRooms", roomId, "messages")), {
+      uid: "system", name: "System",
+      text: "💬 Chat has been re-enabled by vote.",
+      type: "system", createdAt: serverTimestamp(),
+    }).catch(() => {});
   } else if (vote.type === "remove_host") {
     const pSnap = await getDocs(collection(db, "studyRooms", roomId, "participants")).catch(() => null);
     if (pSnap) {

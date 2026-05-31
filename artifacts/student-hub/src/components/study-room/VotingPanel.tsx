@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Vote, RoomParticipant, createVote, castVote, resolveVote } from "@/lib/studyRooms";
 import type { Room } from "@/lib/studyRooms";
 import { useAuth } from "@/context/AuthContext";
-import { ThumbsUp, ThumbsDown, Plus, X as XIcon, UserX, Crown, Pause, Play } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Plus, X as XIcon, UserX, Crown, Pause, Play, MessageCircle, MessageSquareOff, Turtle, Rabbit } from "lucide-react";
 import { gradeLabel } from "@/lib/gradeUtils";
 import { playBell } from "@/hooks/useAmbientSound";
 import { doc, updateDoc } from "firebase/firestore";
@@ -23,21 +23,24 @@ const QUICK_VOTES = [
   { type: "end"         as const, label: "End session",    emoji: "🏁", addMinutes: 0,  desc: "End the study session?" },
 ];
 
-const VOTE_COOLDOWN_MS = 30_000; // 30 seconds between votes from same user
+const SLOW_MODE_OPTIONS = [10, 20, 30, 60] as const;
+
+const VOTE_COOLDOWN_MS = 30_000;
 
 export const VotingPanel = memo(function VotingPanel({ room, votes, participantCount, participants = [] }: Props) {
   const { user, profile } = useAuth();
-  const [showCreate,   setShowCreate]  = useState(false);
-  const [customDesc,   setCustomDesc]  = useState("");
-  const [customMins,   setCustomMins]  = useState(10);
-  const [customType,   setCustomType]  = useState<Vote["type"]>("extend");
-  const [loading,      setLoading]     = useState(false);
-  const [kickTarget,   setKickTarget]  = useState<RoomParticipant | null>(null);
-  const [showKickPick, setShowKickPick] = useState(false);
-  const [lastVoteAt,   setLastVoteAt]  = useState(0);
+  const [showCreate,     setShowCreate]     = useState(false);
+  const [customDesc,     setCustomDesc]     = useState("");
+  const [customMins,     setCustomMins]     = useState(10);
+  const [customType,     setCustomType]     = useState<Vote["type"]>("extend");
+  const [loading,        setLoading]        = useState(false);
+  const [kickTarget,     setKickTarget]     = useState<RoomParticipant | null>(null);
+  const [showKickPick,   setShowKickPick]   = useState(false);
+  const [showSlowPick,   setShowSlowPick]   = useState(false);
+  const [lastVoteAt,     setLastVoteAt]     = useState(0);
+  const [optimisticVotes, setOptimisticVotes] = useState<Record<string, "yes" | "no">>({});
   const resolvingRef = useRef<Set<string>>(new Set());
 
-  // Active votes that haven't expired yet (for display)
   const activeVotes = votes.filter(v => {
     if (v.status !== "active") return false;
     if (!v.expiresAt) return true;
@@ -48,9 +51,10 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
   const cooldownLeft  = Math.max(0, Math.ceil((lastVoteAt + VOTE_COOLDOWN_MS - Date.now()) / 1000));
   const canCreateVote = !hasActiveVote && cooldownLeft === 0;
 
+  const chatEnabled    = room.chatEnabled ?? true;
+  const chatCooldown   = room.chatCooldownSecs ?? 10;
+
   // ── Sync totalParticipants on active votes when people join/leave ─────────
-  // Without this, a vote created with 3 participants would still require
-  // 2/3 majority even after someone left — making it impossible to pass.
   useEffect(() => {
     if (participantCount <= 0 || votes.length === 0) return;
     for (const vote of votes) {
@@ -75,10 +79,8 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
         const no  = vote.noVoters.length;
         const isExpired  = vote.expiresAt && vote.expiresAt.toMillis() < now;
         const allVoted   = (yes + no) >= Math.max(participantCount, 1);
-        // Resolve early if YES already has a strict majority (no need to wait)
         const effectiveTotal = Math.max(vote.totalParticipants, yes + no, 1);
         const majorityAchieved = yes * 2 > effectiveTotal;
-        // Resolve early if defeat is certain (even if all remaining vote YES, can't win)
         const remaining = Math.max(0, participantCount - yes - no);
         const defeatCertain = no * 2 >= effectiveTotal + remaining;
         if (isExpired || allVoted || majorityAchieved || defeatCertain) {
@@ -101,6 +103,20 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
     const t = setInterval(() => forceUpdate(n => n + 1), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // Clear optimistic state once Firestore catches up
+  useEffect(() => {
+    if (!user) return;
+    setOptimisticVotes(prev => {
+      const next = { ...prev };
+      for (const vote of votes) {
+        if (vote.yesVoters.includes(user.uid) || vote.noVoters.includes(user.uid)) {
+          delete next[vote.id];
+        }
+      }
+      return next;
+    });
+  }, [votes, user]);
 
   async function startQuickVote(preset: typeof QUICK_VOTES[0]) {
     if (!user || !profile || !canCreateVote) return;
@@ -161,7 +177,7 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
 
   async function startKickVote(target: RoomParticipant) {
     if (!user || !profile || !canCreateVote) return;
-    if (target.uid === user.uid) return; // Can't kick yourself
+    if (target.uid === user.uid) return;
     setLoading(true);
     try {
       await createVote(room.id, {
@@ -179,6 +195,65 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
       setLastVoteAt(Date.now());
     } catch (err) {
       console.error("[Vote] kick vote failed:", err);
+    }
+    setLoading(false);
+  }
+
+  async function startSlowModeVote(secs: number) {
+    if (!user || !profile || !canCreateVote) return;
+    setLoading(true);
+    setShowSlowPick(false);
+    try {
+      await createVote(room.id, {
+        description: `🐌 Enable slow mode: 1 message every ${secs} seconds?`,
+        type: "enable_slow_mode",
+        cooldownSecs: secs,
+        createdByUid: user.uid,
+        createdByName: profile.name,
+        totalParticipants: participantCount,
+        expiresInSecs: 60,
+      });
+      setLastVoteAt(Date.now());
+    } catch (err) {
+      console.error("[Vote] slow mode vote failed:", err);
+    }
+    setLoading(false);
+  }
+
+  async function startDisableSlowModeVote() {
+    if (!user || !profile || !canCreateVote) return;
+    setLoading(true);
+    try {
+      await createVote(room.id, {
+        description: "💬 Disable slow mode?",
+        type: "disable_slow_mode",
+        createdByUid: user.uid,
+        createdByName: profile.name,
+        totalParticipants: participantCount,
+        expiresInSecs: 60,
+      });
+      setLastVoteAt(Date.now());
+    } catch (err) {
+      console.error("[Vote] disable slow mode vote failed:", err);
+    }
+    setLoading(false);
+  }
+
+  async function startChatToggleVote(enable: boolean) {
+    if (!user || !profile || !canCreateVote) return;
+    setLoading(true);
+    try {
+      await createVote(room.id, {
+        description: enable ? "💬 Re-enable chat?" : "🔇 Disable chat for everyone?",
+        type: enable ? "enable_chat" : "disable_chat",
+        createdByUid: user.uid,
+        createdByName: profile.name,
+        totalParticipants: participantCount,
+        expiresInSecs: 60,
+      });
+      setLastVoteAt(Date.now());
+    } catch (err) {
+      console.error("[Vote] chat toggle vote failed:", err);
     }
     setLoading(false);
   }
@@ -206,10 +281,13 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
 
   async function handleCastVote(voteId: string, choice: "yes" | "no") {
     if (!user) return;
+    // Optimistic: show vote immediately before Firestore responds
+    setOptimisticVotes(prev => ({ ...prev, [voteId]: choice }));
     try {
       await castVote(room.id, voteId, user.uid, choice);
     } catch (err) {
       console.error("[Vote] cast failed:", err);
+      setOptimisticVotes(prev => { const n = { ...prev }; delete n[voteId]; return n; });
     }
   }
 
@@ -224,8 +302,11 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
           const no  = vote.noVoters.length;
           const total = Math.max(participantCount, yes + no, 1);
           const yesPct = Math.round((yes / total) * 100);
-          const hasVotedYes = user ? vote.yesVoters.includes(user.uid) : false;
-          const hasVotedNo  = user ? vote.noVoters.includes(user.uid)  : false;
+          const fsVotedYes = user ? vote.yesVoters.includes(user.uid) : false;
+          const fsVotedNo  = user ? vote.noVoters.includes(user.uid)  : false;
+          const optimistic  = user ? optimisticVotes[vote.id] : undefined;
+          const hasVotedYes = fsVotedYes || optimistic === "yes";
+          const hasVotedNo  = fsVotedNo  || optimistic === "no";
           const hasVoted    = hasVotedYes || hasVotedNo;
           const secsLeft    = vote.expiresAt
             ? Math.max(0, Math.ceil((vote.expiresAt.toMillis() - Date.now()) / 1000))
@@ -241,6 +322,7 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.15 }}
               className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm p-4"
             >
               <div className="flex items-start justify-between gap-2 mb-3">
@@ -264,15 +346,13 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
                 </div>
               </div>
 
-              {/* Progress bar with majority threshold marker */}
               <div className="relative h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mb-1">
                 <motion.div
                   className="h-full bg-green-500 rounded-full"
                   initial={{ width: 0 }}
                   animate={{ width: `${yesPct}%` }}
-                  transition={{ duration: 0.4 }}
+                  transition={{ duration: 0.3 }}
                 />
-                {/* Majority threshold line */}
                 <div
                   className="absolute top-0 bottom-0 w-0.5 bg-amber-400/80"
                   style={{ left: `${majorityPct}%` }}
@@ -293,13 +373,13 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleCastVote(vote.id, "yes")}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 text-green-700 dark:text-green-400 text-sm font-semibold border border-green-200 dark:border-green-800 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 active:scale-95 text-green-700 dark:text-green-400 text-sm font-semibold border border-green-200 dark:border-green-800 transition-all"
                   >
                     <ThumbsUp className="w-3.5 h-3.5" /> Yes
                   </button>
                   <button
                     onClick={() => handleCastVote(vote.id, "no")}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 text-sm font-semibold border border-red-200 dark:border-red-800 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 active:scale-95 text-red-700 dark:text-red-400 text-sm font-semibold border border-red-200 dark:border-red-800 transition-all"
                   >
                     <ThumbsDown className="w-3.5 h-3.5" /> No
                   </button>
@@ -328,12 +408,44 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
         </p>
       )}
 
-      {/* No active votes placeholder */}
-      {activeVotes.length === 0 && !showCreate && !showKickPick && (
+      {activeVotes.length === 0 && !showCreate && !showKickPick && !showSlowPick && (
         <p className="text-center text-xs text-gray-400 dark:text-gray-500 py-2">
           No active votes. Start one below.
         </p>
       )}
+
+      {/* Slow mode speed picker */}
+      <AnimatePresence>
+        {showSlowPick && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.15 }}
+            className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 space-y-3 overflow-hidden"
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">🐌 Enable Slow Mode</p>
+              <button onClick={() => setShowSlowPick(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Choose cooldown duration — everyone votes first:</p>
+            <div className="grid grid-cols-2 gap-2">
+              {SLOW_MODE_OPTIONS.map(secs => (
+                <button
+                  key={secs}
+                  onClick={() => startSlowModeVote(secs)}
+                  disabled={loading || !canCreateVote}
+                  className="py-2.5 rounded-xl text-sm font-semibold bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 active:scale-95 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 transition-all disabled:opacity-40"
+                >
+                  {secs}s
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Kick user picker */}
       <AnimatePresence>
@@ -342,6 +454,7 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.15 }}
             className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 space-y-2 overflow-hidden"
           >
             <div className="flex items-center justify-between mb-1">
@@ -382,7 +495,7 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
               <button
                 onClick={() => startKickVote(kickTarget)}
                 disabled={loading || !canCreateVote}
-                className="w-full mt-1 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors disabled:opacity-50"
+                className="w-full mt-1 py-2 rounded-xl bg-red-600 hover:bg-red-700 active:scale-95 text-white text-sm font-semibold transition-all disabled:opacity-50"
               >
                 Start Vote to Remove {kickTarget.name.split(" ")[0]}
               </button>
@@ -392,67 +505,119 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
       </AnimatePresence>
 
       {/* Start new vote */}
-      {!showCreate && !showKickPick && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Start a vote</p>
+      {!showCreate && !showKickPick && !showSlowPick && (
+        <div className="space-y-3">
+          {/* Timer votes */}
+          <div>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Timer</p>
+            <div className="grid grid-cols-2 gap-2">
+              {QUICK_VOTES.map((preset) => (
+                <button
+                  key={preset.type}
+                  onClick={() => startQuickVote(preset)}
+                  disabled={loading || !canCreateVote}
+                  className="flex items-center gap-2 p-2.5 rounded-xl text-xs font-medium bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 transition-all disabled:opacity-40 text-left"
+                >
+                  <span className="text-base">{preset.emoji}</span>
+                  <span className="leading-tight">{preset.label}</span>
+                </button>
+              ))}
 
-          {/* Quick votes grid */}
-          <div className="grid grid-cols-2 gap-2">
-            {QUICK_VOTES.map((preset) => (
-              <button
-                key={preset.type}
-                onClick={() => startQuickVote(preset)}
-                disabled={loading || !canCreateVote}
-                className="flex items-center gap-2 p-2.5 rounded-xl text-xs font-medium bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 transition-colors disabled:opacity-40 text-left"
-              >
-                <span className="text-base">{preset.emoji}</span>
-                <span className="leading-tight">{preset.label}</span>
-              </button>
-            ))}
+              {(room.status === "active" || room.status === "paused") && (
+                <button
+                  onClick={startPauseVote}
+                  disabled={loading || !canCreateVote}
+                  className="flex items-center gap-2 p-2.5 rounded-xl text-xs font-medium bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 transition-all disabled:opacity-40 text-left"
+                >
+                  {room.status === "paused"
+                    ? <><Play className="w-4 h-4 text-green-500 shrink-0" /><span>Resume Timer</span></>
+                    : <><Pause className="w-4 h-4 text-orange-500 shrink-0" /><span>Pause Timer</span></>
+                  }
+                </button>
+              )}
+            </div>
+          </div>
 
-            {/* Pause/Resume timer vote */}
-            {(room.status === "active" || room.status === "paused") && (
-              <button
-                onClick={startPauseVote}
-                disabled={loading || !canCreateVote}
-                className="flex items-center gap-2 p-2.5 rounded-xl text-xs font-medium bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 transition-colors disabled:opacity-40 text-left"
-              >
-                {room.status === "paused"
-                  ? <><Play className="w-4 h-4 text-green-500 shrink-0" /><span>Resume Timer</span></>
-                  : <><Pause className="w-4 h-4 text-orange-500 shrink-0" /><span>Pause Timer</span></>
-                }
-              </button>
-            )}
+          {/* Chat control votes */}
+          <div>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Chat</p>
+            <div className="grid grid-cols-2 gap-2">
+              {/* Enable or disable slow mode depending on current state */}
+              {chatCooldown > 0 ? (
+                <button
+                  onClick={startDisableSlowModeVote}
+                  disabled={loading || !canCreateVote}
+                  className="flex items-center gap-2 p-2.5 rounded-xl text-xs font-medium bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400 transition-all disabled:opacity-40 text-left"
+                >
+                  <Rabbit className="w-4 h-4 shrink-0" />
+                  <span>Disable Slow Mode</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setShowSlowPick(true); setShowCreate(false); setShowKickPick(false); }}
+                  disabled={loading || !canCreateVote}
+                  className="flex items-center gap-2 p-2.5 rounded-xl text-xs font-medium bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400 transition-all disabled:opacity-40 text-left"
+                >
+                  <Turtle className="w-4 h-4 shrink-0" />
+                  <span>Enable Slow Mode</span>
+                </button>
+              )}
 
-            {/* Remove host vote (only non-hosts can start this) */}
-            {user && user.uid !== room.hostUid && (
-              <button
-                onClick={startRemoveHostVote}
-                disabled={loading || !canCreateVote}
-                className="flex items-center gap-2 p-2.5 rounded-xl text-xs font-medium bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 transition-colors disabled:opacity-40 text-left"
-              >
-                <Crown className="w-4 h-4 shrink-0" />
-                <span>Remove Host</span>
-              </button>
-            )}
+              {/* Disable or enable chat depending on current state */}
+              {chatEnabled ? (
+                <button
+                  onClick={() => startChatToggleVote(false)}
+                  disabled={loading || !canCreateVote}
+                  className="flex items-center gap-2 p-2.5 rounded-xl text-xs font-medium bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 transition-all disabled:opacity-40 text-left"
+                >
+                  <MessageSquareOff className="w-4 h-4 shrink-0" />
+                  <span>Disable Chat</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => startChatToggleVote(true)}
+                  disabled={loading || !canCreateVote}
+                  className="flex items-center gap-2 p-2.5 rounded-xl text-xs font-medium bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 transition-all disabled:opacity-40 text-left"
+                >
+                  <MessageCircle className="w-4 h-4 shrink-0" />
+                  <span>Enable Chat</span>
+                </button>
+              )}
+            </div>
+          </div>
 
-            {/* Kick user vote */}
-            {otherParticipants.length > 0 && (
-              <button
-                onClick={() => { setShowKickPick(true); setShowCreate(false); }}
-                disabled={loading || !canCreateVote}
-                className="flex items-center gap-2 p-2.5 rounded-xl text-xs font-medium bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 transition-colors disabled:opacity-40 text-left"
-              >
-                <UserX className="w-4 h-4 shrink-0" />
-                <span>Kick User</span>
-              </button>
-            )}
+          {/* People votes */}
+          <div>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">People</p>
+            <div className="grid grid-cols-2 gap-2">
+              {user && user.uid !== room.hostUid && (
+                <button
+                  onClick={startRemoveHostVote}
+                  disabled={loading || !canCreateVote}
+                  className="flex items-center gap-2 p-2.5 rounded-xl text-xs font-medium bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 transition-all disabled:opacity-40 text-left"
+                >
+                  <Crown className="w-4 h-4 shrink-0" />
+                  <span>Remove Host</span>
+                </button>
+              )}
+
+              {otherParticipants.length > 0 && (
+                <button
+                  onClick={() => { setShowKickPick(true); setShowCreate(false); setShowSlowPick(false); }}
+                  disabled={loading || !canCreateVote}
+                  className="flex items-center gap-2 p-2.5 rounded-xl text-xs font-medium bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 transition-all disabled:opacity-40 text-left"
+                >
+                  <UserX className="w-4 h-4 shrink-0" />
+                  <span>Kick User</span>
+                </button>
+              )}
+            </div>
           </div>
 
           <button
-            onClick={() => { setShowCreate(true); setShowKickPick(false); }}
+            onClick={() => { setShowCreate(true); setShowKickPick(false); setShowSlowPick(false); }}
             disabled={!canCreateVote}
-            className="w-full flex items-center justify-center gap-1.5 p-2.5 rounded-xl text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800 transition-colors disabled:opacity-40"
+            className="w-full flex items-center justify-center gap-1.5 p-2.5 rounded-xl text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 active:scale-95 border border-blue-200 dark:border-blue-800 transition-all disabled:opacity-40"
           >
             <Plus className="w-3.5 h-3.5" /> Custom Vote
           </button>
@@ -466,6 +631,7 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.15 }}
             className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 space-y-3 overflow-hidden"
           >
             <div className="flex items-center justify-between">
@@ -514,10 +680,13 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
 
             <button
               onClick={startCustomVote}
-              disabled={loading || !customDesc.trim() || !canCreateVote}
-              className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors disabled:opacity-50"
+              disabled={!customDesc.trim() || loading || !canCreateVote}
+              className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              Start Vote
+              {loading
+                ? <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Creating…</>
+                : "Start Vote 🗳️"
+              }
             </button>
           </motion.div>
         )}

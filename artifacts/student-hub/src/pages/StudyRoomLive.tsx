@@ -81,6 +81,9 @@ export default function StudyRoomLive() {
   const [showEndVote,     setShowEndVote] = useState(false);
   const [endVoteLoading,  setEndVoteLoading] = useState(false);
 
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const lastSentAtRef = useRef<number>(0);
+
   const chatRef      = useRef<HTMLDivElement>(null);
   const seenMsgIds   = useRef<Set<string>>(new Set());
   const emojiCounter = useRef(0);
@@ -160,6 +163,17 @@ export default function StudyRoomLive() {
       setMessages(msgs);
     });
   }, [roomId]);
+
+  // ── Chat slow mode countdown tick ──────────────────────────────────────────
+  useEffect(() => {
+    const id = setInterval(() => {
+      const cooldownSecs = room?.chatCooldownSecs ?? 10;
+      if (cooldownSecs <= 0) { setCooldownRemaining(0); return; }
+      const elapsed = (Date.now() - lastSentAtRef.current) / 1000;
+      setCooldownRemaining(Math.max(0, Math.ceil(cooldownSecs - elapsed)));
+    }, 250);
+    return () => clearInterval(id);
+  }, [room?.chatCooldownSecs]);
 
   // auto-scroll chat
   useEffect(() => { chatRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, optimisticMsgs]);
@@ -258,8 +272,21 @@ export default function StudyRoomLive() {
 
   async function handleSend() {
     if (!chatMsg.trim() || !user || !profile || !roomId) return;
+
+    // Chat disabled by vote
+    if (room?.chatEnabled === false) return;
+
+    // Slow mode cooldown enforcement
+    const cooldownSecs = room?.chatCooldownSecs ?? 10;
+    if (cooldownSecs > 0) {
+      const elapsed = (Date.now() - lastSentAtRef.current) / 1000;
+      if (elapsed < cooldownSecs) return;
+    }
+
     const txt = chatMsg.trim();
     setChatMsg("");
+    lastSentAtRef.current = Date.now();
+    setCooldownRemaining(cooldownSecs > 0 ? cooldownSecs : 0);
 
     // Optimistic: show message instantly, Firestore snapshot will replace it
     const tempId = `opt_${Date.now()}`;
@@ -562,21 +589,50 @@ export default function StudyRoomLive() {
           <div ref={chatRef} />
         </div>
         {/* Input */}
-        {user && (
-          <div className="flex gap-2 mt-auto">
-            <input
-              type="text" value={chatMsg}
-              onChange={e => setChatMsg(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSend()}
-              placeholder="Say something…" maxLength={200}
-              className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-400"
-            />
-            <button onClick={handleSend} disabled={!chatMsg.trim()}
-              className="p-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 transition-colors shrink-0">
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+        {user && (() => {
+          const chatEnabled  = room?.chatEnabled ?? true;
+          const cooldownSecs = room?.chatCooldownSecs ?? 10;
+          const isOnCooldown = cooldownRemaining > 0 && cooldownSecs > 0;
+          const isBlocked    = !chatEnabled || isOnCooldown;
+
+          if (!chatEnabled) {
+            return (
+              <div className="mt-auto text-center py-3 px-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                <p className="text-xs text-gray-500 dark:text-gray-400">🔇 Chat is disabled</p>
+              </div>
+            );
+          }
+
+          return (
+            <div className="mt-auto space-y-1.5">
+              {/* Slow mode indicator */}
+              {cooldownSecs > 0 && (
+                <div className={`flex items-center justify-between text-[10px] px-1 ${isOnCooldown ? "text-amber-500 dark:text-amber-400" : "text-gray-400 dark:text-gray-500"}`}>
+                  <span>🐌 Slow mode · {cooldownSecs}s</span>
+                  {isOnCooldown && <span className="font-mono font-bold">Wait {cooldownRemaining}s</span>}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="text" value={chatMsg}
+                  onChange={e => setChatMsg(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && !e.shiftKey && !isBlocked && handleSend()}
+                  placeholder={isOnCooldown ? `Wait ${cooldownRemaining}s…` : "Say something…"}
+                  maxLength={200}
+                  disabled={isOnCooldown}
+                  className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60 disabled:cursor-not-allowed"
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={!chatMsg.trim() || isBlocked}
+                  className="p-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white disabled:opacity-40 transition-all shrink-0"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   }
