@@ -7,7 +7,7 @@ import {
   Send, BookOpen, Coffee, Crown, CheckCircle, BarChart2,
   ChevronRight, ChevronDown, Maximize, Minimize, LogOut, X,
   MessageCircle, ListChecks, School, Volume2, VolumeX,
-  Lock, Eye, EyeOff,
+  Lock, Eye, EyeOff, RotateCcw, PlusCircle, DoorOpen,
 } from "lucide-react";
 import { useRoomSound } from "@/hooks/useAmbientSound";
 import {
@@ -46,7 +46,7 @@ export default function StudyRoomLive() {
   const { user, profile } = useAuth();
   const {
     joinActiveRoom, leaveActiveRoom, isHost, studyMinsInSession,
-    onHostStart, onHostPause, onHostResume, onHostSkip,
+    onHostStart, onHostPause, onHostResume, onHostSkip, onHostRestart,
     remainingSeconds, activeRoomId, wasKicked,
     room: ctxRoom, participants: ctxParticipants,
   } = useActiveRoom();
@@ -761,16 +761,72 @@ export default function StudyRoomLive() {
   // ── SESSION COMPLETE ──────────────────────────────────────────────────────────
   if (room.status === "finished") {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-10 text-center space-y-5">
+      <div className="max-w-md mx-auto px-4 py-12 text-center space-y-6">
         <div className="text-6xl">🎉</div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Session Complete!</h2>
-        <p className="text-gray-500 dark:text-gray-400">
-          Great work! You studied for <strong>{studyMinsInSession} minutes</strong> in this session.
-        </p>
-        <button onClick={() => setLocation("/study-rooms")}
-          className="px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm transition-all">
-          Browse Study Rooms
-        </button>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Session Complete!</h2>
+          {studyMinsInSession > 0 && (
+            <p className="text-gray-500 dark:text-gray-400 mt-2">
+              You studied for <strong className="text-gray-900 dark:text-white">{studyMinsInSession} minutes</strong> this session.
+            </p>
+          )}
+        </div>
+
+        {isHost ? (
+          <div className="space-y-3 pt-2">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">What would you like to do?</p>
+
+            {/* Option 1: Restart same session */}
+            <button
+              onClick={() => onHostRestart()}
+              className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm transition-all text-left"
+            >
+              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                <RotateCcw className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="font-bold">Restart Session</p>
+                <p className="text-xs text-white/70 font-normal">Repeat the same study plan</p>
+              </div>
+            </button>
+
+            {/* Option 2: New session */}
+            <button
+              onClick={() => setLocation("/study-rooms/create")}
+              className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 text-gray-900 dark:text-white font-semibold shadow-sm transition-all text-left"
+            >
+              <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                <PlusCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="font-bold">New Session</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-normal">Choose a new timer and study plan</p>
+              </div>
+            </button>
+
+            {/* Option 3: End session */}
+            <button
+              onClick={() => setLocation("/study-rooms")}
+              className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 font-semibold transition-all text-left"
+            >
+              <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
+                <DoorOpen className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+              </div>
+              <div>
+                <p className="font-bold">End Session</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 font-normal">Leave the room and browse other rooms</p>
+              </div>
+            </button>
+          </div>
+        ) : (
+          <div className="pt-2">
+            <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Great work today! The host will decide what happens next.</p>
+            <button onClick={() => setLocation("/study-rooms")}
+              className="px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm transition-all">
+              Browse Study Rooms
+            </button>
+          </div>
+        )}
       </div>
     );
   }

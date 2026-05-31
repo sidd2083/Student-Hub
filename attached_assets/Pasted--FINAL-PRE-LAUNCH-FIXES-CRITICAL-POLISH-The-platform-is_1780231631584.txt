@@ -1,0 +1,381 @@
+# FINAL PRE-LAUNCH FIXES (CRITICAL + POLISH)
+
+The platform is very close to launch.
+
+Do NOT add random new features.
+
+Focus on fixing the following issues properly and completely.
+
+---
+
+1. CRITICAL STUDY ROOM SESSION TRACKING BUG
+
+---
+
+I found a major bug.
+
+Example:
+
+Session Flow:
+
+15 min Focus
+5 min Break
+15 min Focus
+
+OR
+
+Quick Sprint
+
+Currently:
+
+The first focus session gets recorded correctly.
+
+Example:
+
+15 minutes studied.
+
+After the break finishes:
+
+The next focus session starts.
+
+BUT study time is no longer recorded correctly.
+
+The tracking either stops completely or becomes inconsistent.
+
+Required Fix:
+
+Study time tracking must continue across ALL focus sessions.
+
+Example:
+
+15 Focus
+5 Break
+15 Focus
+5 Break
+15 Focus
+
+Result:
+
+Total Study Time = 45 minutes
+
+Every focus phase must be counted.
+
+Break phases must NOT be counted.
+
+This must update correctly in:
+
+* Study Room
+* Avatar Popup
+* Report Card
+* Leaderboard
+* Daily Tasks
+* Streak System
+
+No focus session should ever stop being tracked after a break.
+
+---
+
+2. SESSION COMPLETION FLOW
+
+---
+
+When a study room session finishes completely:
+
+The host should see 3 options:
+
+OPTION 1:
+Restart Session
+
+Restart the exact same study plan.
+
+---
+
+OPTION 2:
+New Session
+
+Allow host to choose a completely new timer.
+
+Same interface as room creation.
+
+Examples:
+
+* Quick Sprint
+* Deep Work
+* Exam Prep
+* Custom Session
+
+Host selects new timing.
+
+Session starts immediately.
+
+---
+
+OPTION 3:
+End Session
+
+Completely finish the session.
+
+Room remains available.
+
+Timer stops.
+
+---
+
+3. PROFILE PICTURE STILL BROKEN
+
+---
+
+After security fixes:
+
+Profile picture upload stopped working again.
+
+Current behavior:
+
+Select image.
+
+Upload starts.
+
+Error appears.
+
+Avatar upload fails.
+
+Required:
+
+Find root cause.
+
+Fix upload completely.
+
+Verify:
+
+* Storage rules
+* Compression
+* Upload
+* URL generation
+* Firestore update
+
+Profile pictures must upload successfully.
+
+---
+
+4. BADGES INSIDE PROFILE POPUP
+
+---
+
+When clicking a user avatar inside Study Room:
+
+Profile popup opens.
+
+Add badge display.
+
+Show exactly the same badge system used in Leaderboard.
+
+Examples:
+
+* Creator Badge
+* Top Student Badge
+* Custom Badge
+
+Use same badge styling everywhere.
+
+Consistency is important.
+
+---
+
+5. PROFILE POPUP PERFORMANCE
+
+---
+
+Profile popup currently feels slow.
+
+When clicking avatar:
+
+Popup takes too long.
+
+Required:
+
+Make popup open instantly.
+
+Optimize:
+
+* queries
+* rendering
+* badge loading
+* profile loading
+
+No visible lag.
+
+---
+
+6. HOMEPAGE TEXT CHANGES
+
+---
+
+Current text:
+
+"Grades 9-12"
+
+Change this.
+
+Student Hub is no longer focused only on Grades 9-12.
+
+Replace with:
+
+"Built for Students of Nepal"
+
+or similar wording.
+
+---
+
+Homepage should highlight:
+
+* Study Rooms
+* Study Together
+* Pomodoro Timer
+* Leaderboards
+* Productivity
+
+These are the primary features.
+
+---
+
+Remove:
+
+"No credit card required"
+
+Remove:
+
+"Sign in with Google"
+
+from unnecessary marketing sections.
+
+---
+
+7. ABOUT PAGE IMPROVEMENTS
+
+---
+
+Current About Page focuses too much on me.
+
+Reduce personal focus.
+
+Keep it professional.
+
+Mention:
+
+Student Hub mission.
+
+Study Rooms.
+
+Productivity.
+
+Student community.
+
+Only briefly mention:
+
+"Created by Siddhant Lamichhane"
+
+Do not make the entire page about the creator.
+
+---
+
+8. CONTACT PAGE FIX
+
+---
+
+Current issue:
+
+Email address overflows outside container.
+
+Fix responsive layout.
+
+Email should:
+
+* wrap properly
+* stay inside container
+* work on mobile
+* work on desktop
+
+---
+
+9. PERFORMANCE IS NOW TOP PRIORITY
+
+---
+
+The platform still feels slower than it should.
+
+Examples:
+
+* buttons feel delayed
+* popups feel delayed
+* room actions feel delayed
+* animations feel delayed
+
+Required:
+
+Perform performance audit.
+
+Optimize:
+
+* Firestore reads
+* Firestore writes
+* listeners
+* state updates
+* rendering
+* animations
+* room synchronization
+
+---
+
+Goal:
+
+Every action should feel instant.
+
+---
+
+Examples:
+
+Click button
+→ immediate response
+
+Open popup
+→ immediate response
+
+Join room
+→ immediate response
+
+Vote
+→ immediate response
+
+Room updates
+→ immediate response
+
+---
+
+10. FINAL PRODUCTION REQUIREMENT
+
+---
+
+The platform should feel:
+
+* Fast
+* Smooth
+* Stable
+* Professional
+
+No lag.
+
+No crashes.
+
+No broken uploads.
+
+No broken tracking.
+
+No unfinished session flows.
+
+No inconsistent UI behavior.
+
+Audit everything before marking complete.
+
+Focus on production readiness.
+
+The site should be ready for real users and public launch.

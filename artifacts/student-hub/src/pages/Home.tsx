@@ -136,8 +136,8 @@ export default function Home() {
             <span className="text-blue-500">Rank higher.</span>
           </h1>
           <p className="text-lg text-gray-500 mb-8 max-w-xl mx-auto">
-            Notes, past papers, AI tutor and progress tracking — all in one place.
-            Built for Grade 9–12 students across Nepal.
+            Study Rooms, Leaderboards, Pomodoro Timer, and productivity tools — all in one place.
+            Built for students of Nepal.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
@@ -155,7 +155,7 @@ export default function Home() {
               <LogIn className="w-4 h-4" aria-hidden="true" /> Register — It's free
             </button>
           </div>
-          <p className="text-xs text-gray-400 mt-4">No credit card required · Sign in with Google</p>
+          <p className="text-xs text-gray-400 mt-4">Free forever · No credit card required</p>
         </div>
       </section>
 

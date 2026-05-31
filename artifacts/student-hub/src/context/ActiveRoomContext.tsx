@@ -7,7 +7,7 @@ import {
   Room, RoomParticipant, subscribeRoom, subscribeParticipants,
   leaveRoom, updatePresence, syncStudyTimeToLeaderboard, updateParticipantStudyMins,
   updateParticipantStudyStart, updateParticipantStudyEnd,
-  pauseTimer, resumeTimer, startTimer, skipPhase, endRoom,
+  pauseTimer, resumeTimer, startTimer, skipPhase, endRoom, restartRoom,
   advancePhase, getRemainingSeconds, transferHost, purgeStaleParticipants,
   getLiveStudyMins, isParticipantActive, syncParticipantCount,
 } from "@/lib/studyRooms";
@@ -28,6 +28,7 @@ interface ActiveRoomContextType {
   onHostResume: () => Promise<void>;
   onHostSkip: () => Promise<void>;
   onHostEnd: () => Promise<void>;
+  onHostRestart: () => Promise<void>;
 }
 
 const ActiveRoomContext = createContext<ActiveRoomContextType | null>(null);
@@ -224,7 +225,9 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
 
         // Push live study time to participant badge every 30 s so other
         // members see fresh minutes without waiting a full minute.
-        if (now - lastBadgeSyncRef.current >= 30_000 && user) {
+        // ONLY run during study phases — running during breaks would write
+        // studyStartedAt=now which makes getLiveStudyMins count break time as study time.
+        if (now - lastBadgeSyncRef.current >= 30_000 && user && isRoomStudying(r)) {
           const totalMins = Math.floor(getTotalStudySeconds() / 60);
           updateParticipantStudyMins(r.id, user.uid, totalMins).catch(() => {});
           lastBadgeSyncRef.current = now;
@@ -528,11 +531,27 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     if (activeRoomId) await endRoom(activeRoomId);
   }, [activeRoomId]);
 
+  const onHostRestart = useCallback(async () => {
+    if (!activeRoomId) return;
+    // Reset all local tracking refs so the restarted session starts clean
+    studyWallStartRef.current   = null;
+    studyAccumulatedRef.current = 0;
+    lastSyncedSecsRef.current   = 0;
+    lastSyncTimeRef.current     = Date.now();
+    lastBadgeSyncRef.current    = Date.now();
+    prevStudyingRef.current     = false;
+    advancingRef.current        = false;
+    prevPhaseRef.current        = null;
+    prevStatusRef.current       = null;
+    setStudyMinsInSession(0);
+    await restartRoom(activeRoomId);
+  }, [activeRoomId]);
+
   return (
     <ActiveRoomContext.Provider value={{
       activeRoomId, room, participants, isHost, remainingSeconds,
       studyMinsInSession, wasKicked, joinActiveRoom, leaveActiveRoom,
-      onHostStart, onHostPause, onHostResume, onHostSkip, onHostEnd,
+      onHostStart, onHostPause, onHostResume, onHostSkip, onHostEnd, onHostRestart,
     }}>
       {children}
     </ActiveRoomContext.Provider>

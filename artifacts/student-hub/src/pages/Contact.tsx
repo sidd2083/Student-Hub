@@ -101,14 +101,14 @@ export default function Contact() {
                 href={href}
                 target={href.startsWith("http") ? "_blank" : undefined}
                 rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4 hover:shadow-md transition-all"
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4 hover:shadow-md transition-all min-w-0"
               >
                 <div className={`w-10 h-10 ${color} rounded-xl flex items-center justify-center flex-shrink-0`}>
                   <Icon className="w-5 h-5" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-gray-400">{label}</p>
-                  <p className="font-medium text-gray-900 text-sm">{value}</p>
+                  <p className="font-medium text-gray-900 text-sm break-all">{value}</p>
                 </div>
               </a>
             ))}

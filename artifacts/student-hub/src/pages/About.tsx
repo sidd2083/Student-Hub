@@ -1,5 +1,5 @@
 import { Helmet } from "react-helmet-async";
-import { BookOpen, Users, Target, Mail, Instagram } from "lucide-react";
+import { BookOpen, Users, Target, Mail } from "lucide-react";
 
 export default function About() {
   return (
@@ -82,7 +82,7 @@ export default function About() {
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-3">About Student Hub</h1>
             <p className="text-gray-500 text-lg max-w-xl mx-auto">
-              A free, modern study platform built for Nepali students in Grades 9–12.
+              A free, modern study platform built for students across Nepal.
             </p>
           </div>
 
@@ -121,11 +121,13 @@ export default function About() {
             <h2 className="text-xl font-bold text-gray-900 mb-4">What We Offer</h2>
             <div className="space-y-3">
               {[
+                ["🏠", "Study Rooms", "Study together live with other students — synchronized timer, chat, and reactions."],
+                ["🏆", "Leaderboard", "Compete with students across Nepal on study time and daily streaks."],
+                ["⏱", "Pomodoro Timer", "Built-in focus timer to help you study smarter."],
                 ["📚", "Notes", "Study notes organized by grade, subject, and chapter — text, PDF, and image formats."],
                 ["📄", "Previous Year Questions (PYQ)", "Past exam papers from various provinces and boards."],
                 ["📊", "Report Card", "Track your study time, streak, and progress with daily analytics and badges."],
                 ["🤖", "Nep AI", "An AI study assistant that answers your academic questions in seconds."],
-                ["⏱", "Pomodoro Timer", "Built-in focus timer to help you study smarter."],
                 ["✅", "To-Do", "Task manager to keep your study schedule on track."],
               ].map(([emoji, feature, desc]) => (
                 <div key={feature as string} className="flex gap-3 py-2 border-b border-gray-50 last:border-0">
@@ -139,32 +141,14 @@ export default function About() {
             </div>
           </div>
 
-          {/* ── Founder section ──────────────────────────────────────────────── */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 mb-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-5">Meet the Founder</h2>
-            <div className="flex items-start gap-5">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md">
-                <span className="text-white text-2xl font-bold">S</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-lg font-bold text-gray-900">Siddhant Lamichhane</p>
-                <p className="text-sm text-blue-600 font-medium mb-3">Founder &amp; Developer, Student Hub Nepal</p>
-                <p className="text-sm text-gray-600 leading-relaxed mb-4">
-                  Siddhant Lamichhane is a passionate student and developer from Nepal who built Student Hub Nepal
-                  to give every Nepali student — regardless of their location or economic background — access to
-                  high-quality study materials, AI tutoring, and smart study tools, completely free.
-                </p>
-                <a
-                  href="https://www.instagram.com/lmc_siddhant.7/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white text-sm font-medium hover:opacity-90 transition-opacity"
-                >
-                  <Instagram className="w-4 h-4" />
-                  Follow on Instagram
-                </a>
-              </div>
+          {/* ── Creator note ─────────────────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+              <span className="text-white text-base font-bold">S</span>
             </div>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              Created by <span className="font-semibold text-gray-900">Siddhant Lamichhane</span> — a student from Nepal passionate about making quality study tools free and accessible for everyone.
+            </p>
           </div>
 
           {/* ── Contact CTA ──────────────────────────────────────────────────── */}

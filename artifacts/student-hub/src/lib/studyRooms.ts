@@ -418,6 +418,15 @@ export async function endRoom(roomId: string): Promise<void> {
   });
 }
 
+export async function restartRoom(roomId: string): Promise<void> {
+  await updateDoc(doc(db, "studyRooms", roomId), {
+    status: "waiting",
+    currentPhaseIndex: 0,
+    timerStartedAt: null,
+    pausedRemaining: null,
+  });
+}
+
 export async function advancePhase(roomId: string, room: Room): Promise<void> {
   await skipPhase(roomId, room);
 }
