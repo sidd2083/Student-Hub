@@ -1,4 +1,4 @@
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 const MAX_PX   = 512;
@@ -67,8 +67,7 @@ async function compressToDataURL(file: File): Promise<string> {
  *
  * Strategy (in order):
  *   1. POST /api/upload/avatar  — Express + Firebase Admin SDK (best: works on any domain)
- *   2. Firebase Storage client SDK  — if backend returns 503 (no service account)
- *   3. Firestore data-URL  — if Storage is also unavailable/blocked
+ *   2. Firestore data-URL  — if backend returns 503/401/403 or is unreachable
  *      (220 px JPEG ~8-20 KB, well within Firestore's 1 MB document limit)
  */
 export async function uploadProfilePhoto(
@@ -84,13 +83,16 @@ export async function uploadProfilePhoto(
     throw new Error("File too large — maximum 20 MB.");
   }
 
+  console.log("[PhotoUpload] Starting upload for uid:", uid, "file:", file.name, file.size, "bytes");
   onProgress?.(5);
 
-  // ── 1. Compress for backend / Storage upload ────────────────────────────────
+  // ── 1. Compress for backend upload ─────────────────────────────────────────
   let blob: Blob;
   try {
     blob = await compressImage(file);
+    console.log("[PhotoUpload] Compressed to", blob.size, "bytes (512px JPEG)");
   } catch (err) {
+    console.error("[PhotoUpload] Compression failed:", err);
     throw new Error((err as Error).message || "Compression failed");
   }
   onProgress?.(15);
@@ -110,53 +112,72 @@ export async function uploadProfilePhoto(
 
     let headers: Record<string, string> = {};
     if (getIdToken) {
-      try { headers = { Authorization: `Bearer ${await getIdToken()}` }; }
-      catch { /* proceed without auth header */ }
+      try {
+        const token = await getIdToken();
+        headers = { Authorization: `Bearer ${token}` };
+        console.log("[PhotoUpload] Got ID token, trying backend upload");
+      } catch (tokenErr) {
+        console.warn("[PhotoUpload] Could not get ID token:", tokenErr);
+      }
     }
 
-    // .catch(()=>null) converts network errors (TypeError) into null so we
-    // can fall through to the Firestore data-URL path instead of crashing.
     const res = await fetch("/api/upload/avatar", {
       method: "POST",
       headers,
       body:   formData,
-    }).catch(() => null);
+    }).catch((networkErr) => {
+      console.warn("[PhotoUpload] Backend network error:", networkErr);
+      return null;
+    });
 
     if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
 
     if (res === null) {
-      // Network error (backend unreachable) — fall through to Firestore data-URL.
+      console.warn("[PhotoUpload] Backend unreachable — falling through to Firestore data-URL");
     } else if (res.ok) {
       const data = await res.json();
       if (!data.url) throw new Error("Server did not return a download URL.");
+      console.log("[PhotoUpload] Backend upload succeeded:", data.url.slice(0, 60) + "…");
       onProgress?.(100);
       return data.url as string;
-    } else if (res.status !== 503 && res.status !== 401 && res.status !== 403) {
-      // Backend not configured (503) or auth issue — fall through.
-      // For other errors, surface the message to the user.
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || `Upload failed (HTTP ${res.status})`);
+    } else {
+      const errData = await res.json().catch(() => ({})) as { error?: string };
+      console.warn(`[PhotoUpload] Backend returned HTTP ${res.status}:`, errData.error ?? "(no error body)");
+
+      if (res.status !== 503 && res.status !== 401 && res.status !== 403) {
+        // 400 = bad request (validation), 500 = server crash — surface these to user.
+        // For 503 (no service account), 401/403 (auth issue) → fall through to Firestore.
+        throw new Error(errData.error || `Upload failed (HTTP ${res.status})`);
+      }
+
+      console.warn("[PhotoUpload] Falling through to Firestore data-URL (backend returned", res.status, ")");
     }
-    // 503 / 401 / 403 → fall through to Firestore data-URL fallback.
 
   } finally {
     if (progressTimer) clearInterval(progressTimer);
   }
 
   // ── 3. Firestore data-URL fallback (always works if user is authenticated) ──
-  // Skips Firebase Storage client SDK to avoid CORS failures on Replit domains.
+  console.log("[PhotoUpload] Compressing to data-URL (220px JPEG) for Firestore fallback");
   onProgress?.(60);
+
   let dataURL: string;
   try {
     dataURL = await compressToDataURL(file);
+    console.log("[PhotoUpload] data-URL ready, length:", dataURL.length);
   } catch (err) {
+    console.error("[PhotoUpload] compressToDataURL failed:", err);
     throw new Error("Could not compress image for upload. Try a different photo.");
   }
 
   onProgress?.(80);
+  console.log("[PhotoUpload] Writing data-URL to Firestore users/", uid);
+
   try {
-    await updateDoc(doc(db, "users", uid), { photoURL: dataURL });
+    await setDoc(doc(db, "users", uid), { photoURL: dataURL }, { merge: true });
+    console.log("[PhotoUpload] Firestore write succeeded");
   } catch (err) {
+    console.error("[PhotoUpload] Firestore write failed:", err);
     throw new Error("Profile update failed — make sure you are signed in and try again.");
   }
 
@@ -167,7 +188,7 @@ export async function uploadProfilePhoto(
 /** Delete photo from Storage + clear Firestore field. */
 export async function removeProfilePhoto(uid: string): Promise<void> {
   try {
-    await updateDoc(doc(db, "users", uid), { photoURL: null });
+    await setDoc(doc(db, "users", uid), { photoURL: null }, { merge: true });
   } catch (err) {
     console.warn("[Photo] removeProfilePhoto:", err);
   }

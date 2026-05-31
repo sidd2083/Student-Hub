@@ -4,3 +4,4 @@
 - [Pomodoro Mission Fix](pomodoro-mission.md) — removed auto-start (startedAt) from Mission 1; both pomodoro missions now require explicit "Start This Mission" press so they track and complete independently; MISSION_VERSION bumped to 6.
 - [Photo Upload Fix](photo-upload.md) — when backend returns 503 (no FIREBASE_SERVICE_ACCOUNT_JSON), skip Firebase Storage client SDK (CORS fails on Replit domains), go straight to Firestore data-URL fallback (220px JPEG ~10-20KB, always works if authenticated).
 - [Chat Duplicate Fix](chat-duplicate.md) — optimistic messages filtered by uid+text match (not ID) since Firestore assigns its own IDs; both setOptimistic calls and allMessages memo updated.
+- [Pre-launch Bug Fixes](pre-launch-fixes.md) — 8 critical bugs resolved: ghost rooms, host-transfer on tab-close, double timer exploit, photo upload logging, grade label consistency, gradeUtils.ts utility, studyRoomState.ts anti-exploit flag.

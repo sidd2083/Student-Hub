@@ -1,6 +1,7 @@
 import {
   createContext, useContext, useEffect, useRef, useState, useCallback,
 } from "react";
+import { setInActiveRoom } from "@/lib/studyRoomState";
 import { useAuth } from "@/context/AuthContext";
 import {
   Room, RoomParticipant, subscribeRoom, subscribeParticipants,
@@ -335,6 +336,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
       lastSyncedSecsRef.current   = 0;
 
       // Signal the UI to redirect and clear room state
+      setInActiveRoom(false);
       setStudyMinsInSession(0);
       setWasKicked(true);
       setActiveRoomId(null);
@@ -430,6 +432,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     prevStatusRef.current       = null;
     setStudyMinsInSession(0);
     setWasKicked(false);
+    setInActiveRoom(true);
     setActiveRoomId(roomId);
   }, []);
 
@@ -493,6 +496,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     studyWallStartRef.current   = null;
     studyAccumulatedRef.current = 0;
     lastSyncedSecsRef.current   = 0;
+    setInActiveRoom(false);
     setStudyMinsInSession(0);
     setActiveRoomId(null);
     setRoom(null);

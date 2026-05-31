@@ -1,0 +1,351 @@
+# CRITICAL STUDY ROOM + TIMER + PROFILE SYSTEM FIX
+
+The platform is close to launch, but there are still several critical logic bugs that must be fixed before production.
+
+Do NOT add new features until these bugs are solved.
+
+========================================================
+
+1. ROOM CAN EXIST WITHOUT HOST (CRITICAL)
+   ========================================================
+
+Current bug:
+
+Host creates room.
+
+For some reason host never successfully joins.
+
+Room still appears active.
+
+Room shows:
+
+* 1 member
+* active room
+
+But actually:
+
+* no host exists
+* no real member exists
+
+Result:
+
+Users can enter a room that has no host.
+
+Voting becomes broken.
+
+Room logic becomes broken.
+
+Required fix:
+
+A room must NEVER exist without a valid host.
+
+Validation:
+
+If room creator fails to join:
+
+* delete room automatically
+  OR
+* do not create room until creator joins successfully
+
+Room must always have:
+
+* valid host
+* valid member count
+
+No ghost rooms.
+
+========================================================
+2. HOST TRANSFER SYSTEM IS BROKEN
+=================================
+
+Current bug:
+
+Host leaves room.
+
+Host closes tab.
+
+Host disconnects.
+
+Host exits app.
+
+Result:
+
+No host transfer occurs.
+
+Room becomes hostless.
+
+Voting breaks.
+
+Room management breaks.
+
+Required fix:
+
+Whenever host leaves:
+
+1. Find oldest active room member.
+2. Transfer host role instantly.
+3. Update Firestore.
+4. Sync to all clients.
+
+If no members remain:
+
+Delete room automatically.
+
+Room must NEVER remain hostless.
+
+========================================================
+3. VOTING SYSTEM FAILS WHEN HOST IS MISSING
+===========================================
+
+Current bug:
+
+Room shows:
+
+* 2 members
+
+But host already left.
+
+Voting no longer works.
+
+Votes do not count.
+
+Room becomes stuck.
+
+Required fix:
+
+Voting system must only count:
+
+* real active members
+
+Never:
+
+* ghost users
+* disconnected users
+* stale room members
+
+Audit all vote types:
+
+* extend timer
+* pause timer
+* resume timer
+* kick user
+* remove host
+* end room
+
+========================================================
+4. PROFILE PICTURE STILL BROKEN
+===============================
+
+This issue has already been attempted many times.
+
+Current result:
+
+Upload avatar
+→ upload progress completes
+→ avatar upload failed
+
+Required:
+
+Add logging to:
+
+* image compression
+* upload
+* storage response
+* download URL
+* firestore update
+* profile refresh
+
+Identify exact failing step.
+
+Fix root cause.
+
+Do NOT apply another temporary workaround.
+
+Profile picture upload must work before launch.
+
+========================================================
+5. POMODORO ANTI-CHEAT SYSTEM
+=============================
+
+Anti-cheat must function correctly.
+
+Required:
+
+If anti-cheat popup appears:
+
+* timer pauses immediately
+
+User must respond before timer continues.
+
+No study time should be counted while popup is waiting.
+
+Ensure:
+
+* popup detection works
+* timer pause works
+* timer resume works
+
+========================================================
+6. DOUBLE TIMER EXPLOIT PREVENTION
+==================================
+
+Critical issue.
+
+Current possibility:
+
+User enters Study Room.
+
+User also starts personal Pomodoro timer.
+
+Result:
+
+Same study session can be counted twice.
+
+This can break:
+
+* leaderboard
+* report card
+* daily tasks
+* achievements
+* streaks
+
+Required:
+
+Only ONE study source can count at a time.
+
+Example:
+
+If user is inside active Study Room:
+
+* room timer counts
+* personal pomodoro timer does NOT count
+
+If user is using personal pomodoro:
+
+* pomodoro counts
+* room timer does NOT count
+
+Prevent double counting everywhere.
+
+========================================================
+7. GRADE SYSTEM CONSISTENCY
+===========================
+
+Current issue:
+
+User selects:
+
+* CEE
+* IOE
+* Bachelors
+
+But system sometimes shows:
+
+Grade 13
+Grade 14
+Grade 15
+
+This is incorrect.
+
+Required:
+
+Display exactly what user selected.
+
+Examples:
+
+Grade 9
+Grade 10
+Grade 11
+Grade 12
+
+CEE
+
+IOE
+
+Bachelors
+
+Use same label everywhere:
+
+* profile
+* leaderboard
+* room
+* report card
+* study room
+* rankings
+* daily tasks
+
+========================================================
+8. PERSONALIZED DAILY TASKS
+===========================
+
+Daily tasks should adapt based on study level.
+
+School Students:
+
+* Grade 9
+* Grade 10
+* Grade 11
+* Grade 12
+
+Examples:
+
+* study 60 minutes
+* complete math session
+* complete science session
+
+========================================================
+
+CEE Students:
+
+Examples:
+
+* study Physics
+* study Chemistry
+* solve MCQs
+* complete mock session
+
+========================================================
+
+IOE Students:
+
+Examples:
+
+* Engineering preparation tasks
+* numerical practice
+* mock tests
+
+========================================================
+
+Bachelors:
+
+Use generic university tasks.
+
+Examples:
+
+* study 90 minutes
+* complete lecture review
+* complete assignment session
+
+Tasks must feel relevant.
+
+========================================================
+FINAL REQUIREMENT
+=================
+
+Before marking complete:
+
+Verify:
+
+✔ room always has host
+✔ host transfer works
+✔ room deletes correctly
+✔ voting works
+✔ profile picture works
+✔ anti-cheat works
+✔ double timer exploit blocked
+✔ grade labels consistent
+✔ daily tasks personalized
+
+Do not stop after fixing one bug.
+
+Audit the entire system and fix all related issues.

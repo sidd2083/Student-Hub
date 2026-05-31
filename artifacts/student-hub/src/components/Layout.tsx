@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { useTimer } from "@/context/TimerContext";
 import { useActiveRoom } from "@/context/ActiveRoomContext";
+import { gradeLabel } from "@/lib/gradeUtils";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 import {
   BookOpen, FileText, CheckSquare, Timer,
@@ -187,7 +188,7 @@ export function Layout({ children }: LayoutProps) {
                     📚 {fmtStudyMins(studyMinsInSession)} studied
                   </p>
                 ) : (
-                  <p className="text-xs text-gray-500 dark:text-gray-500">Grade {profile?.grade}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-500">{profile?.grade ? gradeLabel(profile.grade) : ""}</p>
                 )}
               </div>
               <Settings className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 flex-shrink-0" />

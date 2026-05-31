@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Lock, Unlock, Users, Music, ChevronRight, Volume2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { StudyFlowBuilder } from "@/components/study-room/StudyFlowBuilder";
-import { createRoom, joinRoom, StudyPhase, SUBJECTS, AMBIENT_SOUNDS, RoomTheme } from "@/lib/studyRooms";
+import { createRoom, joinRoom, deleteRoomCascade, StudyPhase, SUBJECTS, AMBIENT_SOUNDS, RoomTheme } from "@/lib/studyRooms";
 import { useAmbientSound } from "@/hooks/useAmbientSound";
 
 const DEFAULT_FLOW: StudyPhase[] = [
@@ -76,8 +76,12 @@ export default function StudyRoomCreate() {
     if (!validateStep2()) return;
     stopPreview();
     setLoading(true);
+
+    // Track the created roomId so we can clean it up if joinRoom fails,
+    // preventing ghost rooms (room exists in Firestore but has no participants).
+    let roomId: string | null = null;
     try {
-      const roomId = await createRoom({
+      roomId = await createRoom({
         title: title.trim(),
         subject,
         description: description.trim(),
@@ -102,6 +106,13 @@ export default function StudyRoomCreate() {
       setLocation(`/study-rooms/${roomId}`);
     } catch (err: unknown) {
       console.error("createRoom error:", err);
+      // If the room was created but joining failed, delete the ghost room
+      // so it doesn't linger in the public listing with 0 participants.
+      if (roomId) {
+        deleteRoomCascade(roomId).catch((e) =>
+          console.warn("[Create] Ghost room cleanup failed:", e)
+        );
+      }
       const msg = err instanceof Error ? err.message : String(err);
       setErrors({ submit: `Failed to create room: ${msg}` });
       setLoading(false);

@@ -6,6 +6,7 @@ import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Trophy, Flame, Clock, Sun, RefreshCw } from "lucide-react";
 import { getNepaliDate, getNepaliYesterday } from "@/lib/nepaliDate";
+import { gradeLabel } from "@/lib/gradeUtils";
 
 const SELECTED_BADGE_KEY = "studenthub_selected_leaderboard_badge";
 
@@ -245,12 +246,12 @@ function LeaderboardContent() {
           {tabBtn("todayStudyTime", "Today",    <Sun   className="w-3.5 h-3.5" />, "bg-green-500 text-white shadow-sm", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
           {tabBtn("streak",         "Streak",   <Flame className="w-3.5 h-3.5" />, "bg-orange-500 text-white shadow-sm", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
           <div className="w-px bg-gray-200" />
-          {(["all", 9, 10, 11, 12, 0] as const).map(g => (
-            <button key={g} onClick={() => setGradeFilter(g)}
+          {(["all", 9, 10, 11, 12, 13, 14, 15, 0] as (number | "all")[]).map(g => (
+            <button key={g} onClick={() => setGradeFilter(g as number | "all")}
               className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                 gradeFilter === g ? "bg-indigo-500 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}>
-              {g === "all" ? "All Grades" : g === 0 ? "Others" : `Grade ${g}`}
+              {g === "all" ? "All Grades" : gradeLabel(g as number)}
             </button>
           ))}
         </div>
@@ -259,7 +260,7 @@ function LeaderboardContent() {
           {sortBy === "totalStudyTime" && "📚 All-time study time"}
           {sortBy === "todayStudyTime" && "☀️ Today's study time (NPT)"}
           {sortBy === "streak"         && "🔥 Study streak (days)"}
-          {gradeFilter !== "all" && ` · ${gradeFilter === 0 ? "Others" : `Grade ${gradeFilter}`} only`}
+          {gradeFilter !== "all" && ` · ${gradeLabel(gradeFilter as number)} only`}
         </div>
 
         {/* Legend for mission glow */}
@@ -270,7 +271,7 @@ function LeaderboardContent() {
 
         {!loading && myRank >= 0 && (
           <div className="mb-4 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700 font-medium">
-            You are ranked #{myRank + 1} {gradeFilter !== "all" ? `in ${gradeFilter === 0 ? "Others" : `Grade ${gradeFilter}`}` : "overall"} 🎯
+            You are ranked #{myRank + 1} {gradeFilter !== "all" ? `in ${gradeLabel(gradeFilter as number)}` : "overall"} 🎯
           </div>
         )}
 
@@ -323,7 +324,7 @@ function LeaderboardContent() {
                       </p>
                       {hasBadge && <RowBadge badge={topBadge} custom={custom} />}
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">{entry.grade === 0 ? "Others" : `Grade ${entry.grade}`}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{gradeLabel(entry.grade)}</p>
                   </div>
                   <div className="flex-shrink-0 text-right min-w-[60px]">
                     {sortBy === "totalStudyTime" && (

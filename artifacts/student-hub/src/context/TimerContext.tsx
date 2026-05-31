@@ -5,6 +5,7 @@ import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useAuth } from "./AuthContext";
 import { getNepaliDate } from "@/lib/nepaliDate";
+import { isInActiveRoom } from "@/lib/studyRoomState";
 
 export type Phase = "work" | "shortBreak" | "longBreak";
 
@@ -235,10 +236,17 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
    * IMPORTANT: savedMinutesRef is updated IMMEDIATELY (before the async calls)
    * to prevent race conditions where two ticks fire before the first API call
    * responds, causing the same minutes to be sent twice.
+   *
+   * Minutes are NOT saved when the user is inside an active Study Room —
+   * ActiveRoomContext already tracks and saves those minutes via /api/study/save.
+   * Counting them here too would double-credit the session.
    */
   const saveMinutes = useCallback(async (mins: number) => {
     const uid = userRef.current;
     if (!uid || mins < 1) return;
+
+    // Skip when in a study room — ActiveRoomContext owns that accounting
+    if (isInActiveRoom()) return;
 
     // Update immediately — prevents double-counting if ticks fire before API responds
     savedMinutesRef.current += mins;

@@ -141,24 +141,21 @@ router.post("/study/leave", async (req: Request, res: Response) => {
     const db = getAdminDb();
     if (!db) return res.json({ ok: false });
 
-    // Delete the participant doc (scoped to the sender's uid — cannot abuse)
-    const pRef = db
-      .collection("studyRooms")
-      .doc(roomId)
-      .collection("participants")
-      .doc(uid);
+    const roomRef = db.collection("studyRooms").doc(roomId);
 
+    // Read room doc BEFORE deleting participant so we can check if the
+    // leaving user is the host and transfer host rights if needed.
+    const roomSnap = await roomRef.get();
+    const roomData = roomSnap.exists ? roomSnap.data()! : null;
+    const leaverIsHost = roomData?.hostUid === uid;
+
+    // Delete the participant doc (scoped to the sender's uid — cannot abuse)
+    const pRef = roomRef.collection("participants").doc(uid);
     await pRef.delete();
 
     // Correct participantCount to match the real remaining participants
-    const snap = await db
-      .collection("studyRooms")
-      .doc(roomId)
-      .collection("participants")
-      .get();
-
+    const snap = await roomRef.collection("participants").get();
     const activeCount = snap.size;
-    const roomRef = db.collection("studyRooms").doc(roomId);
 
     if (activeCount === 0) {
       await roomRef.update({
@@ -168,6 +165,43 @@ router.post("/study/leave", async (req: Request, res: Response) => {
       }).catch(() => {});
     } else {
       await roomRef.update({ participantCount: activeCount }).catch(() => {});
+
+      // ── Host transfer ──────────────────────────────────────────────────────
+      // If the leaving user was the host and the room is still active,
+      // immediately promote the longest-standing remaining participant.
+      // This prevents the 30-second gap that existed with the claim-host
+      // polling approach when a host closes their tab.
+      if (leaverIsHost && roomData?.status !== "finished") {
+        const remaining = snap.docs
+          .map(d => ({
+            uid:      d.id,
+            name:     (d.data().name as string | undefined) ?? "Unknown",
+            joinedAt: d.data().joinedAt as { toMillis(): number } | undefined,
+          }))
+          .sort((a, b) => (a.joinedAt?.toMillis() ?? 0) - (b.joinedAt?.toMillis() ?? 0));
+
+        const next = remaining[0];
+        if (next) {
+          const { FieldValue } = await import("firebase-admin/firestore");
+          const batch = db.batch();
+          batch.update(roomRef, { hostUid: next.uid, hostName: next.name });
+          batch.update(roomRef.collection("participants").doc(next.uid), { isHost: true });
+          await batch.commit().catch(() => {});
+
+          // Post system message
+          await roomRef.collection("messages").add({
+            uid: "system", name: "System",
+            text: `${next.name} is now the host (previous host disconnected).`,
+            type: "system",
+            createdAt: FieldValue.serverTimestamp(),
+          }).catch(() => {});
+
+          logger.info(
+            { roomId, prevHost: uid, newHost: next.uid },
+            "[Study] Host transferred on leave",
+          );
+        }
+      }
     }
 
     logger.info({ roomId, uid, remaining: activeCount }, "[Study] Participant left");

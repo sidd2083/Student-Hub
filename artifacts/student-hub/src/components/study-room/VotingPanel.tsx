@@ -4,6 +4,7 @@ import { Vote, RoomParticipant, createVote, castVote, resolveVote } from "@/lib/
 import type { Room } from "@/lib/studyRooms";
 import { useAuth } from "@/context/AuthContext";
 import { ThumbsUp, ThumbsDown, Plus, X as XIcon, UserX, Crown, Pause, Play } from "lucide-react";
+import { gradeLabel } from "@/lib/gradeUtils";
 import { playBell } from "@/hooks/useAmbientSound";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -370,7 +371,7 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
                     {p.name}
                     {p.uid === room.hostUid && <Crown className="inline w-3 h-3 text-yellow-500 ml-1" />}
                   </p>
-                  <p className="text-xs text-gray-400">Grade {p.grade}</p>
+                  <p className="text-xs text-gray-400">{gradeLabel(p.grade)}</p>
                 </div>
                 {kickTarget?.uid === p.uid && (
                   <span className="text-xs text-red-600 dark:text-red-400 font-semibold">Selected</span>

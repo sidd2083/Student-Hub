@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Users, Lock, Unlock, BookOpen, Coffee, Timer } from "lucide-react";
 import { Room, getRemainingSeconds, formatTime } from "@/lib/studyRooms";
+import { gradeLabel } from "@/lib/gradeUtils";
 
 interface Props {
   room: Room;
@@ -82,7 +83,7 @@ export function RoomCard({ room, onJoin }: Props) {
               {room.title}
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
-              by {room.hostName} · Grade {room.hostGrade}
+              by {room.hostName} · {gradeLabel(room.hostGrade)}
             </p>
           </div>
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${subjectColor}`}>

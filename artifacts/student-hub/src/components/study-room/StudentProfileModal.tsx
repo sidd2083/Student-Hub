@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { onSnapshot, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { RoomParticipant, getLiveStudyMins } from "@/lib/studyRooms";
+import { gradeLabel } from "@/lib/gradeUtils";
 import { X, Flame, Trophy, Clock, Calendar, BookOpen } from "lucide-react";
 
 interface UserStats {
@@ -137,7 +138,7 @@ export function StudentProfileModal({ participant, onClose }: Props) {
 
                   <div className="text-center">
                     <h2 className="text-xl font-bold text-white">{participant.name}</h2>
-                    <p className="text-white/70 text-sm mt-0.5">Grade {participant.grade}</p>
+                    <p className="text-white/70 text-sm mt-0.5">{gradeLabel(participant.grade)}</p>
                   </div>
                 </div>
               </div>
