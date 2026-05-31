@@ -230,6 +230,11 @@ export default function StudyRoomLive() {
     };
   }, []);
 
+  // ── All chat messages (must be before render guards — hook cannot be conditional) ──
+  const allMessages = useMemo(() =>
+    [...messages, ...optimisticMsgs.filter(o => !messages.some(m => m.uid === o.uid && m.text === o.text))],
+  [messages, optimisticMsgs]);
+
   // ── Emoji float ───────────────────────────────────────────────────────────────
   const spawnEmoji = useCallback((emoji: string) => {
     const id = `e${emojiCounter.current++}`;
@@ -435,12 +440,6 @@ export default function StudyRoomLive() {
   const timerFmt   = formatTime(remaining);
   const showTimer  = phase && room.status !== "waiting" && room.status !== "finished";
   const activeVoteCount = votes.filter(v => v.status === "active").length;
-
-  // All messages for the chat: confirmed from Firestore + pending optimistic ones.
-  // Filter optimistic messages by uid+text match (Firestore IDs differ from opt_${Date.now()}).
-  const allMessages = useMemo(() =>
-    [...messages, ...optimisticMsgs.filter(o => !messages.some(m => m.uid === o.uid && m.text === o.text))],
-  [messages, optimisticMsgs]);
 
   // ── SHARED COMPONENTS ──────────────────────────────────────────────────────────
   function StudyFlow() {
