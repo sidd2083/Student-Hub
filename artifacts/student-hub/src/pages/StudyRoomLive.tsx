@@ -294,9 +294,13 @@ export default function StudyRoomLive() {
     });
   }
 
-  function handlePasswordSubmit() {
+  async function handlePasswordSubmit() {
     if (!room) return;
-    if (passwordInput.trim() === (room.password ?? "").trim()) {
+    // Passwords are stored as SHA-256 hashes in Firestore — never plaintext.
+    // Hash the user's input and compare to the stored hash.
+    const { hashRoomPassword } = await import("@/lib/studyRooms");
+    const inputHash = await hashRoomPassword(passwordInput);
+    if (inputHash === (room.password ?? "")) {
       try { sessionStorage.setItem(`vrm_${room.id}`, "1"); } catch {}
       setPwVerified(true);
       setPwError("");

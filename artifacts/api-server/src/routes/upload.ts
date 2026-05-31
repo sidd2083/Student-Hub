@@ -19,13 +19,14 @@ const multerUpload = multer({
 
 const STORAGE_BUCKET = process.env.VITE_FIREBASE_STORAGE_BUCKET;
 
+// Only safe, non-executable image formats + PDF.
+// GIF, HEIC, HEIF, SVG, BMP deliberately excluded:
+//   - SVG can embed JavaScript (XSS vector)
+//   - GIF/HEIC/HEIF not needed and increase attack surface
 const ALLOWED_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
-  "image/gif",
-  "image/heic",
-  "image/heif",
   "application/pdf",
 ];
 
@@ -134,8 +135,11 @@ router.post(
       const file = req.file;
       if (!file) return res.status(400).json({ error: "No file provided." });
 
-      if (!file.mimetype.startsWith("image/")) {
-        return res.status(400).json({ error: "Only image files are allowed." });
+      // Only allow safe, non-executable image types for avatars.
+      // Rejects SVG (XSS), GIF, HEIC, executables, PDFs, video, audio.
+      const ALLOWED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
+      if (!ALLOWED_AVATAR_TYPES.includes(file.mimetype)) {
+        return res.status(400).json({ error: "Only JPEG, PNG, and WebP images are allowed for avatars." });
       }
 
       const storage = getAdminStorage();

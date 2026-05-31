@@ -37,7 +37,10 @@ service cloud.firestore {
           && (!('totalStudyTime' in request.resource.data)
               || (request.resource.data.totalStudyTime is int
                   && request.resource.data.totalStudyTime >= resource.data.get('totalStudyTime', 0)
-                  && request.resource.data.totalStudyTime <= resource.data.get('totalStudyTime', 0) + 480))
+                  // Cap per-write increment at 60 min (1 hour) — prevents looping scripts
+                  // from inflating leaderboard totalStudyTime via direct Firestore writes.
+                  // The secure /api/study/save endpoint is the canonical write path.
+                  && request.resource.data.totalStudyTime <= resource.data.get('totalStudyTime', 0) + 60))
 
           && (!('streak' in request.resource.data)
               || (request.resource.data.streak is int
@@ -90,8 +93,10 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.studyMinutes is int
-        && request.resource.data.studyMinutes >= 0
-        && request.resource.data.studyMinutes <= 1440;
+        // Non-decreasing: can never lower study minutes for a given day log.
+        && request.resource.data.studyMinutes >= resource.data.get('studyMinutes', 0)
+        // Cap per-write increment at 60 min — prevents inflating report card data directly.
+        && request.resource.data.studyMinutes <= resource.data.get('studyMinutes', 0) + 60;
     }
 
     // ── Notes — public read, admin write ─────────────────────────────────────
@@ -201,9 +206,17 @@ service cloud.firestore {
           && request.resource.data.status == 'active'
           && request.resource.data.yesVoters.size() == 0
           && request.resource.data.noVoters.size() == 0;
-        allow update: if isSignedIn()
-          && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['yesVoters', 'noVoters', 'status']);
+        allow update: if isSignedIn() && (
+          // Any participant may cast/change their own vote (voter arrays only)
+          request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['yesVoters', 'noVoters'])
+          // Only the room host may resolve a vote (change status field)
+          // Prevents any user from forging a passed/failed/expired outcome.
+          || (request.resource.data.diff(resource.data).affectedKeys()
+                  .hasOnly(['yesVoters', 'noVoters', 'status'])
+              && get(/databases/$(database)/documents/studyRooms/$(roomId)).data.hostUid
+                   == request.auth.uid)
+        );
         allow delete: if isAdmin();
       }
 
@@ -224,8 +237,10 @@ service cloud.firestore {
               && request.resource.data.emoji is string
               && request.resource.data.emoji.size() > 0
               && request.resource.data.emoji.size() <= 10)
-            // System messages (host/server generated)
-            || request.resource.data.type == 'system'
+            // 'system' type intentionally excluded — only the backend (Admin SDK)
+            // may post system messages (host-transfer, kick notices, etc.).
+            // Allowing clients to create system messages would let users forge
+            // official-looking announcements inside any room.
           );
         allow delete: if isAdmin();
       }

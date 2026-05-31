@@ -129,6 +129,21 @@ export function generateInviteCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
+// ── Password hashing ──────────────────────────────────────────────────────────
+// Private room passwords are never stored in plaintext.
+// We hash with SHA-256 via the Web Crypto API (available in all modern browsers
+// and Node 16+). The hash is stored in Firestore; the plaintext never leaves
+// the client. Because studyRooms are public-read in Firestore rules (needed so
+// the lobby can list rooms), any plaintext password would be trivially visible
+// to anyone querying the collection directly — the hash prevents that.
+export async function hashRoomPassword(plain: string): Promise<string> {
+  const data = new TextEncoder().encode(plain.trim());
+  const buf  = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buf))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 // ── Room CRUD ─────────────────────────────────────────────────────────────────
 
 export async function createRoom(data: {
@@ -151,7 +166,7 @@ export async function createRoom(data: {
     subject: data.subject,
     description: data.description,
     isPrivate: data.isPrivate,
-    password: (data.isPrivate && data.password) ? data.password : null,
+    password: (data.isPrivate && data.password) ? await hashRoomPassword(data.password) : null,
     hostUid: data.hostUid,
     hostName: data.hostName,
     hostGrade: data.hostGrade,

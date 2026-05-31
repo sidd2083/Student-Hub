@@ -2,35 +2,53 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Shared helper — must be signed in, file ≤ 5 MB, only images or PDF
-    function isValidUpload() {
-      return request.auth != null
-        && request.resource.size <= 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.+|application/pdf');
+    // ── Profile avatars ────────────────────────────────────────────────────────
+    // Strict: only jpeg/png/webp, max 2 MB, authenticated owner only.
+    // Prevents SVG (XSS), executable, video or oversized uploads for avatars.
+    match /avatars/{uid} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null
+        && request.auth.uid == uid.replace('.jpg', '').replace('.jpeg', '').replace('.png', '').replace('.webp', '')
+        && request.resource.size <= 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/jpeg|image/png|image/webp');
+    }
+
+    // General avatar fallback path (uid subdirectory pattern)
+    match /avatars/{allPaths=**} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size <= 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/jpeg|image/png|image/webp');
     }
 
     // ── Content files (notes / PYQs) ─────────────────────────────────────────
     // Public read so students can view without signing in.
     // Write requires authentication, max 5 MB, images + PDF only.
-    // NOTE: Admin SDK uploads (from the backend) bypass these rules entirely,
-    //       so the admin upload flow is unaffected.
+    // Restricted to specific safe formats — SVG/GIF/HEIC excluded.
+    // NOTE: Admin SDK uploads (from the backend) bypass these rules entirely.
     match /notes/{allPaths=**} {
       allow read: if true;
-      allow write: if isValidUpload();
+      allow write: if request.auth != null
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/jpeg|image/png|image/webp|application/pdf');
     }
 
     match /pyqs/{allPaths=**} {
       allow read: if true;
-      allow write: if isValidUpload();
+      allow write: if request.auth != null
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/jpeg|image/png|image/webp|application/pdf');
     }
 
-    // ── All other paths ───────────────────────────────────────────────────────
+    // ── All other authenticated paths ─────────────────────────────────────────
     // Requires authentication for both read and write.
-    // Write additionally enforces size limit AND content-type restriction
-    // to prevent arbitrary file uploads (scripts, executables, etc.)
+    // Restricts to specific safe image formats + PDF.
+    // Blocks: SVG (XSS), GIF, HEIC, executables, scripts, videos, audio.
     match /{allPaths=**} {
       allow read:  if request.auth != null;
-      allow write: if isValidUpload();
+      allow write: if request.auth != null
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/jpeg|image/png|image/webp|application/pdf');
     }
   }
 }

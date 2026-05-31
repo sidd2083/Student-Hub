@@ -73,10 +73,13 @@ export default function StudyRooms() {
     }
   }
 
-  function handlePasswordSubmit() {
+  async function handlePasswordSubmit() {
     if (!pendingRoom) return;
-    // Trim both sides to avoid whitespace mismatches
-    if (pwInput.trim() === (pendingRoom.password ?? "").trim()) {
+    // Passwords are stored as SHA-256 hashes in Firestore — never plaintext.
+    // Hash the user's input and compare to the stored hash.
+    const { hashRoomPassword } = await import("@/lib/studyRooms");
+    const inputHash = await hashRoomPassword(pwInput);
+    if (inputHash === (pendingRoom.password ?? "")) {
       setLocation(`/study-rooms/${pendingRoom.id}`);
       setPendingRoom(null);
     } else {
