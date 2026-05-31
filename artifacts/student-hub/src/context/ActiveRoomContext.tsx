@@ -230,8 +230,13 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
           lastBadgeSyncRef.current = now;
         }
 
-        // Sync study minutes to backend leaderboard every 60 s
-        if (now - lastSyncTimeRef.current >= 60_000 && user) {
+        // Sync study minutes to backend as soon as each full minute is earned.
+        // No 60-second time gate — minsToSync can only be ≥ 1 once per 60 s of
+        // actual study (lastSyncedSecsRef is bumped to minsEarned*60 on each sync),
+        // so the API is naturally throttled to at most one call per study-minute.
+        // Removing the time gate eliminates the 1-minute lag where the leaderboard
+        // showed 0 min after the first minute and 1 min after the second.
+        if (user) {
           const totalSecs  = getTotalStudySeconds();
           const minsEarned = Math.floor(totalSecs / 60);
           const minsToSync = minsEarned - Math.floor(lastSyncedSecsRef.current / 60);
@@ -239,7 +244,6 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
             lastSyncedSecsRef.current = minsEarned * 60;
             saveStudyMinutes(user.uid, () => user.getIdToken(), minsToSync).catch(() => {});
           }
-          lastSyncTimeRef.current = now;
         }
 
         // Only the current host auto-advances the phase at 0
