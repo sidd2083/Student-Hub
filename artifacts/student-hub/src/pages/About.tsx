@@ -1,28 +1,28 @@
 import { Helmet } from "react-helmet-async";
-import { BookOpen, Users, Target, Mail } from "lucide-react";
+import { BookOpen, Users, Target, Mail, Instagram } from "lucide-react";
 
 export default function About() {
   return (
     <>
       <Helmet>
         <title>About Student Hub Nepal — Nepal's #1 Free Study Platform</title>
-        <meta name="description" content="Student Hub Nepal is 100% free — notes, past papers, AI tutor &amp; Pomodoro for Grade 9–12 SEE &amp; NEB students. Built by Nepali students, for Nepali students. No fees, ever." />
-        <meta name="keywords" content="about student hub nepal, student hub nepal, free study platform nepal, best study platform nepal, NEB study platform, SEE preparation nepal, free education nepal, nepal study app, study platform grade 9 10 11 12, free learning nepal, Nep AI tutor, pomodoro study nepal, student hub mission, free notes nepal, free PYQ nepal, student hub features" />
+        <meta name="description" content="Student Hub Nepal is 100% free — notes, past papers, AI tutor &amp; Pomodoro for Grade 9–12 SEE &amp; NEB students. Built by Siddhant Lamichhane. No fees, ever." />
+        <meta name="keywords" content="about student hub nepal, siddhant lamichhane student hub, student hub nepal founder, student hub nepal, free study platform nepal, best study platform nepal, NEB study platform, SEE preparation nepal, free education nepal, nepal study app, study platform grade 9 10 11 12, free learning nepal, Nep AI tutor, pomodoro study nepal, student hub mission, free notes nepal, free PYQ nepal, student hub features" />
         <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
-        <meta name="author" content="Student Hub Nepal" />
+        <meta name="author" content="Siddhant Lamichhane" />
         <meta name="geo.region" content="NP" />
         <meta name="geo.placename" content="Nepal" />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.studenthubnp.com/about" />
         <meta property="og:title" content="About Student Hub Nepal — Nepal's #1 Free Study Platform" />
-        <meta property="og:description" content="Student Hub Nepal is 100% free — notes, past papers, AI tutor &amp; Pomodoro for Grade 9–12 SEE &amp; NEB students. Built for Nepali students." />
+        <meta property="og:description" content="Student Hub Nepal is 100% free — notes, past papers, AI tutor &amp; Pomodoro for Grade 9–12 SEE &amp; NEB students. Built by Siddhant Lamichhane." />
         <meta property="og:image" content="https://www.studenthubnp.com/opengraph.jpg" />
         <meta property="og:image:alt" content="Student Hub Nepal — Free Study Platform for Grade 9 to 12" />
         <meta property="og:site_name" content="Student Hub Nepal" />
         <meta property="og:locale" content="en_NP" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="About Student Hub Nepal — Nepal's #1 Free Study Platform" />
-        <meta name="twitter:description" content="Student Hub Nepal is 100% free — notes, past papers, AI tutor &amp; Pomodoro for Grade 9–12 SEE &amp; NEB students. No fees, ever." />
+        <meta name="twitter:description" content="Student Hub Nepal is 100% free — notes, past papers, AI tutor &amp; Pomodoro for Grade 9–12 SEE &amp; NEB students. Built by Siddhant Lamichhane." />
         <meta name="twitter:image" content="https://www.studenthubnp.com/opengraph.jpg" />
         <link rel="canonical" href="https://www.studenthubnp.com/about" />
         <script type="application/ld+json">{JSON.stringify({
@@ -34,13 +34,35 @@ export default function About() {
           "description": "Student Hub Nepal is a free study platform for Grade 9–12 students preparing for SEE and NEB exams in Nepal. Offers notes, past papers, AI tutor (Nep AI), Pomodoro timer, and progress tracking.",
           "areaServed": "NP",
           "foundingDate": "2024",
-          "sameAs": [],
+          "founder": {
+            "@type": "Person",
+            "name": "Siddhant Lamichhane",
+            "jobTitle": "Founder & Developer",
+            "url": "https://www.studenthubnp.com/about",
+            "sameAs": ["https://www.instagram.com/lmc_siddhant.7/"]
+          },
+          "sameAs": ["https://www.instagram.com/lmc_siddhant.7/"],
           "contactPoint": {
             "@type": "ContactPoint",
             "contactType": "customer support",
-            "email": "info@studenthubnp.com",
+            "email": "contact@studenthubnp.com",
             "availableLanguage": ["English", "Nepali"]
           }
+        })}</script>
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Person",
+          "name": "Siddhant Lamichhane",
+          "jobTitle": "Founder & Developer",
+          "description": "Siddhant Lamichhane is the founder and developer of Student Hub Nepal — Nepal's leading free study platform for Grade 9–12 students preparing for SEE and NEB exams.",
+          "url": "https://www.studenthubnp.com/about",
+          "sameAs": ["https://www.instagram.com/lmc_siddhant.7/"],
+          "worksFor": {
+            "@type": "Organization",
+            "name": "Student Hub Nepal",
+            "url": "https://www.studenthubnp.com"
+          },
+          "nationality": { "@type": "Country", "name": "Nepal" }
         })}</script>
         <script type="application/ld+json">{JSON.stringify({
           "@context": "https://schema.org",
@@ -117,16 +139,49 @@ export default function About() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-2">About Us</h2>
-            <p className="text-gray-600">
-              Student Hub is a product of <strong>Tufan Production</strong>, built to help Nepali students access
-              quality study materials without any barriers.
-            </p>
+          {/* ── Founder section ──────────────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 mb-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-5">Meet the Founder</h2>
+            <div className="flex items-start gap-5">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                <span className="text-white text-2xl font-bold">S</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-lg font-bold text-gray-900">Siddhant Lamichhane</p>
+                <p className="text-sm text-blue-600 font-medium mb-3">Founder &amp; Developer, Student Hub Nepal</p>
+                <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                  Siddhant Lamichhane is a passionate student and developer from Nepal who built Student Hub Nepal
+                  to give every Nepali student — regardless of their location or economic background — access to
+                  high-quality study materials, AI tutoring, and smart study tools, completely free.
+                </p>
+                <a
+                  href="https://www.instagram.com/lmc_siddhant.7/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white text-sm font-medium hover:opacity-90 transition-opacity"
+                >
+                  <Instagram className="w-4 h-4" />
+                  Follow on Instagram
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Contact CTA ──────────────────────────────────────────────────── */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-6 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1">
+              <p className="font-semibold text-gray-900 mb-1">Got a suggestion or bug to report?</p>
+              <p className="text-sm text-gray-500">Reach us at <a href="mailto:contact@studenthubnp.com" className="text-blue-600 font-medium hover:underline">contact@studenthubnp.com</a> or DM on Instagram.</p>
+            </div>
+            <a
+              href="/contact"
+              className="flex-shrink-0 px-5 py-2.5 bg-blue-500 text-white text-sm font-semibold rounded-xl hover:bg-blue-600 transition-all text-center"
+            >
+              Contact Us
+            </a>
           </div>
         </main>
       </div>
     </>
   );
 }
-

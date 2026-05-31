@@ -140,7 +140,8 @@ router.post(
 
       const storage = getAdminStorage();
       const db      = getAdminDb();
-      if (!storage || !STORAGE_BUCKET) {
+      if (!storage || !STORAGE_BUCKET || !db) {
+        // Return 503 so the client falls through to the Firestore data-URL fallback.
         return res.status(503).json({
           error: "Storage not available — FIREBASE_SERVICE_ACCOUNT_JSON required.",
         });

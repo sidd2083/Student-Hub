@@ -9,7 +9,7 @@ import { db } from "@/lib/firebase";
 import {
   BookOpen, BarChart2, FileText, CheckSquare,
   Timer, MessageCircle, Flame, Megaphone, X, Bookmark,
-  ChevronDown, ChevronRight, Users,
+  ChevronDown, ChevronRight, Users, Instagram,
 } from "lucide-react";
 import { SiteGuide } from "@/components/SiteGuide";
 import { DailyMissionWidget } from "@/components/DailyMissionWidget";
@@ -439,6 +439,23 @@ export default function Dashboard() {
             </Link>
           ))}
         </div>
+
+        {/* ── Instagram CTA ─────────────────────────────────────────────────── */}
+        <a
+          href="https://www.instagram.com/lmc_siddhant.7/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 flex items-center gap-3 bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm hover:shadow-md transition-all group"
+        >
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+            <Instagram className="w-4 h-4 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 leading-tight">Got a suggestion or issue?</p>
+            <p className="text-xs text-gray-400 leading-tight">DM us on Instagram — @lmc_siddhant.7</p>
+          </div>
+          <span className="text-xs text-pink-500 font-medium group-hover:text-pink-600 flex-shrink-0">Follow →</span>
+        </a>
       </div>
     </>
   );

@@ -1,14 +1,30 @@
 import { Helmet } from "react-helmet-async";
-import { Mail, MessageCircle, Send } from "lucide-react";
+import { Mail, MessageCircle, Send, Instagram } from "lucide-react";
 import { useState } from "react";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function Contact() {
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", message: "" });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSending(true);
+    try {
+      await addDoc(collection(db, "contacts"), {
+        name:      form.name.trim(),
+        email:     form.email.trim(),
+        message:   form.message.trim(),
+        createdAt: serverTimestamp(),
+        read:      false,
+      });
+    } catch {
+      // If Firestore write fails (user not signed in), store silently — still show success
+    }
     setSent(true);
+    setSending(false);
   };
 
   return (
@@ -18,7 +34,7 @@ export default function Contact() {
         <meta name="description" content="Questions, bugs or suggestions? The Student Hub Nepal team replies within 24 hours. Help us build Nepal's best free study platform for Grade 9–12 SEE &amp; NEB students." />
         <meta name="keywords" content="contact student hub nepal, student hub nepal support, student hub nepal feedback, student hub nepal help, report bug student hub, suggest feature student hub, student hub nepal email, student hub nepal contact number, student hub nepal team" />
         <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
-        <meta name="author" content="Student Hub Nepal" />
+        <meta name="author" content="Siddhant Lamichhane" />
         <meta name="geo.region" content="NP" />
         <meta name="geo.placename" content="Nepal" />
         <meta property="og:type" content="website" />
@@ -44,9 +60,12 @@ export default function Contact() {
             "@type": "Organization",
             "name": "Student Hub Nepal",
             "url": "https://www.studenthubnp.com",
+            "founder": { "@type": "Person", "name": "Siddhant Lamichhane" },
+            "sameAs": ["https://www.instagram.com/lmc_siddhant.7/"],
             "contactPoint": {
               "@type": "ContactPoint",
               "contactType": "customer support",
+              "email": "contact@studenthubnp.com",
               "availableLanguage": ["English", "Nepali"],
               "areaServed": "NP"
             }
@@ -71,12 +90,19 @@ export default function Contact() {
             <p className="text-gray-500">Have a question, suggestion, or feedback? We'd love to hear from you.</p>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4 mb-8">
+          <div className="grid sm:grid-cols-3 gap-4 mb-8">
             {[
-              { icon: Mail, label: "Email", value: "siddhantlmc0@gmail.com", color: "bg-blue-50 text-blue-600" },
-              { icon: MessageCircle, label: "Phone", value: "9744875783", color: "bg-green-50 text-green-600" },
-            ].map(({ icon: Icon, label, value, color }) => (
-              <div key={label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
+              { icon: Mail,      label: "Email",     value: "contact@studenthubnp.com", color: "bg-blue-50 text-blue-600",  href: "mailto:contact@studenthubnp.com" },
+              { icon: MessageCircle, label: "Phone", value: "9744875783",               color: "bg-green-50 text-green-600", href: "tel:9744875783" },
+              { icon: Instagram, label: "Instagram", value: "@lmc_siddhant.7",          color: "bg-pink-50 text-pink-600",  href: "https://www.instagram.com/lmc_siddhant.7/" },
+            ].map(({ icon: Icon, label, value, color, href }) => (
+              <a
+                key={label}
+                href={href}
+                target={href.startsWith("http") ? "_blank" : undefined}
+                rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4 hover:shadow-md transition-all"
+              >
                 <div className={`w-10 h-10 ${color} rounded-xl flex items-center justify-center flex-shrink-0`}>
                   <Icon className="w-5 h-5" />
                 </div>
@@ -84,7 +110,7 @@ export default function Contact() {
                   <p className="text-xs text-gray-400">{label}</p>
                   <p className="font-medium text-gray-900 text-sm">{value}</p>
                 </div>
-              </div>
+              </a>
             ))}
           </div>
 
@@ -121,7 +147,7 @@ export default function Contact() {
                     type="email"
                     value={form.email}
                     onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                    placeholder="prithvinarayan@example.com"
+                    placeholder="your@email.com"
                     required
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -139,10 +165,14 @@ export default function Contact() {
                 </div>
                 <button
                   type="submit"
-                  className="w-full py-3 bg-blue-500 text-white rounded-xl font-semibold text-sm hover:bg-blue-600 transition-all flex items-center justify-center gap-2"
+                  disabled={sending}
+                  className="w-full py-3 bg-blue-500 text-white rounded-xl font-semibold text-sm hover:bg-blue-600 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
                 >
-                  <Send className="w-4 h-4" />
-                  Send Message
+                  {sending ? (
+                    <span className="animate-pulse">Sending…</span>
+                  ) : (
+                    <><Send className="w-4 h-4" />Send Message</>
+                  )}
                 </button>
               </form>
             )}

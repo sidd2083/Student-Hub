@@ -144,9 +144,10 @@ export async function uploadProfilePhoto(
       const errData = await res.json().catch(() => ({})) as { error?: string };
       console.warn(`[PhotoUpload] Backend returned HTTP ${res.status}:`, errData.error ?? "(no error body)");
 
-      if (res.status !== 503 && res.status !== 401 && res.status !== 403) {
-        // 400 = bad request (validation), 500 = server crash — surface these to user.
-        // For 503 (no service account), 401/403 (auth issue) → fall through to Firestore.
+      if (res.status >= 400 && res.status < 500 && res.status !== 401 && res.status !== 403) {
+        // 4xx client errors (except auth issues) are real validation errors — surface to user.
+        // e.g. 400 = bad request, 413 = too large.
+        // For 401/403 (auth/config) and all 5xx (server errors) → fall through to Firestore.
         throw new Error(errData.error || `Upload failed (HTTP ${res.status})`);
       }
 
