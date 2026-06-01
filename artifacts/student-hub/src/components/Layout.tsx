@@ -8,7 +8,7 @@ import {
   BookOpen, FileText, CheckSquare, Timer,
   MessageCircle, Trophy, LayoutDashboard, LogOut,
   Shield, Settings, User, Home, Wrench, ArrowLeft, X, BarChart2,
-  Pause, Play, Bookmark, Download, Calculator, Zap, Users,
+  Pause, Play, Bookmark, Download, Calculator, Zap, Users, Star,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { ActiveRoomBar } from "@/components/study-room/ActiveRoomBar";
@@ -21,17 +21,18 @@ function fmtStudyMins(m: number): string {
 }
 
 const sidebarNav = [
-  { href: "/dashboard",    icon: LayoutDashboard, label: "Dashboard"       },
-  { href: "/missions",     icon: Zap,             label: "Daily Missions"  },
-  { href: "/study-rooms",  icon: Users,           label: "Study Rooms"     },
-  { href: "/notes",        icon: BookOpen,        label: "Notes"           },
-  { href: "/pyqs",         icon: FileText,        label: "Imp Questions"   },
-  { href: "/saved",        icon: Bookmark,        label: "Saved"           },
-  { href: "/ai",           icon: MessageCircle,   label: "Nep AI"          },
-  { href: "/pomodoro",     icon: Timer,           label: "Pomodoro"        },
-  { href: "/todo",         icon: CheckSquare,     label: "To-do"           },
-  { href: "/report",       icon: BarChart2,       label: "Report Card"     },
-  { href: "/leaderboard",  icon: Trophy,          label: "Leaderboard"     },
+  { href: "/dashboard",    icon: LayoutDashboard, label: "Dashboard"        },
+  { href: "/missions",     icon: Zap,             label: "Daily Missions"   },
+  { href: "/study-rooms",  icon: Users,           label: "Study Rooms"      },
+  { href: "/notes",        icon: BookOpen,        label: "Notes"            },
+  { href: "/pyqs",         icon: FileText,        label: "Imp Questions"    },
+  { href: "/saved",        icon: Bookmark,        label: "Saved"            },
+  { href: "/ai",           icon: MessageCircle,   label: "Nep AI"           },
+  { href: "/pomodoro",     icon: Timer,           label: "Pomodoro"         },
+  { href: "/todo",         icon: CheckSquare,     label: "To-do"            },
+  { href: "/report",       icon: BarChart2,       label: "Report Card"      },
+  { href: "/leaderboard",  icon: Trophy,          label: "Leaderboard"      },
+  { href: "/creators",     icon: Star,            label: "Partner Creators" },
 ];
 
 const bottomNavItems = [

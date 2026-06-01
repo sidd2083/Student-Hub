@@ -57,12 +57,13 @@ export function PublicLayout({ children }: PublicLayoutProps) {
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
-            <Link href="/"        className="hover:text-blue-600 transition-colors">Home</Link>
-            <Link href="/notes"   className="hover:text-blue-600 transition-colors">Notes</Link>
-            <Link href="/pyqs"    className="hover:text-blue-600 transition-colors">PYQ</Link>
-            <Link href="/tools"   className={`hover:text-blue-600 transition-colors ${location.startsWith("/tools") ? "text-blue-600 font-semibold" : ""}`}>Tools</Link>
-            <Link href="/about"   className="hover:text-blue-600 transition-colors">About</Link>
-            <Link href="/contact" className="hover:text-blue-600 transition-colors">Contact</Link>
+            <Link href="/"          className="hover:text-blue-600 transition-colors">Home</Link>
+            <Link href="/notes"     className="hover:text-blue-600 transition-colors">Notes</Link>
+            <Link href="/pyqs"      className="hover:text-blue-600 transition-colors">PYQ</Link>
+            <Link href="/tools"     className={`hover:text-blue-600 transition-colors ${location.startsWith("/tools") ? "text-blue-600 font-semibold" : ""}`}>Tools</Link>
+            <Link href="/creators"  className={`hover:text-blue-600 transition-colors ${location.startsWith("/creators") ? "text-blue-600 font-semibold" : ""}`}>Partner Creators</Link>
+            <Link href="/about"     className="hover:text-blue-600 transition-colors">About</Link>
+            <Link href="/contact"   className="hover:text-blue-600 transition-colors">Contact</Link>
           </nav>
 
           <div className="flex items-center gap-2">
@@ -86,12 +87,13 @@ export function PublicLayout({ children }: PublicLayoutProps) {
         {menuOpen && (
           <div className="md:hidden bg-white border-t border-gray-100 px-4 py-3 space-y-1">
             {[
-              { href: "/",        label: "Home"    },
-              { href: "/notes",   label: "Notes"   },
-              { href: "/pyqs",    label: "PYQ"     },
-              { href: "/tools",   label: "Tools"   },
-              { href: "/about",   label: "About"   },
-              { href: "/contact", label: "Contact" },
+              { href: "/",         label: "Home"             },
+              { href: "/notes",    label: "Notes"            },
+              { href: "/pyqs",     label: "PYQ"              },
+              { href: "/tools",    label: "Tools"            },
+              { href: "/creators", label: "Partner Creators" },
+              { href: "/about",    label: "About"            },
+              { href: "/contact",  label: "Contact"          },
             ].map(({ href, label }) => (
               <Link
                 key={href}
@@ -192,10 +194,11 @@ export function PublicLayout({ children }: PublicLayoutProps) {
               <h4 className="text-white text-xs font-semibold uppercase tracking-wider mb-3">Company</h4>
               <ul className="space-y-2">
                 {[
-                  { href: "/about",   label: "About Us" },
-                  { href: "/contact", label: "Contact"  },
-                  { href: "/privacy", label: "Privacy Policy" },
-                  { href: "/terms",   label: "Terms of Service" },
+                  { href: "/about",    label: "About Us"         },
+                  { href: "/creators", label: "Partner Creators" },
+                  { href: "/contact",  label: "Contact"          },
+                  { href: "/privacy",  label: "Privacy Policy"   },
+                  { href: "/terms",    label: "Terms of Service" },
                 ].map(({ href, label }) => (
                   <li key={href}>
                     <Link href={href} className="text-gray-400 text-xs hover:text-white transition-colors">

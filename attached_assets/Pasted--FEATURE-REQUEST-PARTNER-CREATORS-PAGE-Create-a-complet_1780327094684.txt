@@ -1,0 +1,255 @@
+# FEATURE REQUEST: PARTNER CREATORS PAGE
+
+Create a completely new page called **Partner Creators**.
+
+This page should be professional, modern, mobile-friendly, and designed to give real value to creators who partner with Student Hub.
+
+The page must be visible to both logged-in and non-logged-in users.
+
+---
+
+## Navigation Placement
+
+### Desktop (Logged Out)
+
+Show "Partner Creators" in the main header navigation.
+
+Example:
+
+Home | Study Rooms | Notes | Tools | Partner Creators | Login
+
+### Desktop (Logged In)
+
+Show:
+
+* In sidebar navigation
+* In Quick Access section
+* In header navigation if applicable
+
+### Mobile
+
+Show:
+
+* In mobile navigation menu
+* In quick access area
+* Easy to find without scrolling too much
+
+The page should be accessible from everywhere.
+
+---
+
+# Page Design
+
+This should NOT look like a boring list.
+
+This should look like a professional creator showcase.
+
+Page title:
+
+Partner Creators
+
+Subtitle:
+
+Meet the creators helping students across Nepal learn, study, prepare for exams, and achieve their goals.
+
+---
+
+# Featured Creator Section
+
+At the top of the page create a large Featured Creator section.
+
+Only one creator can be featured.
+
+Display:
+
+* Large profile image/logo
+* Creator name
+* Verified Partner badge
+* Description
+* Instagram button
+* TikTok button
+* YouTube button
+
+Featured card should look premium.
+
+Use larger size than normal cards.
+
+---
+
+# Creator Cards
+
+Below the featured creator section display all partner creators.
+
+Each creator card should contain:
+
+* Creator image/logo
+* Creator name
+* Partner Creator badge
+* Short description
+* Social buttons
+
+Buttons:
+
+Instagram
+
+TikTok
+
+YouTube
+
+Clicking any button should open the creator's profile in a new tab.
+
+If a creator does not provide a social link, hide that button.
+
+---
+
+# Creator Card Design
+
+Requirements:
+
+* Rounded corners
+* Beautiful shadows
+* Modern design
+* Smooth hover effects
+* Professional spacing
+* Consistent layout
+
+Cards must look premium.
+
+Avoid boring table layouts.
+
+Avoid plain text lists.
+
+---
+
+# Admin Panel Management
+
+Create a full admin management section.
+
+Admin must be able to:
+
+Add Creator
+
+Edit Creator
+
+Delete Creator
+
+Feature Creator
+
+Hide Creator
+
+Show Creator
+
+Reorder Creator Position
+
+Everything must be manageable without touching code.
+
+---
+
+# Creator Fields
+
+For each creator:
+
+Creator Name
+
+Creator Image / Logo
+
+Short Description
+
+Instagram URL
+
+TikTok URL
+
+YouTube URL
+
+Featured (Yes/No)
+
+Visible (Yes/No)
+
+Display Order
+
+Created Date
+
+---
+
+# Image Upload
+
+Creator images should:
+
+* Be compressed automatically
+* Maintain quality
+* Load fast
+* Not slow down website performance
+
+Use optimized image loading.
+
+Lazy load images when possible.
+
+---
+
+# SEO
+
+Create proper SEO for the page.
+
+Meta Title:
+
+Partner Creators | Student Hub Nepal
+
+Meta Description:
+
+Meet Student Hub's official partner creators helping students across Nepal with study tips, exam preparation, and educational content.
+
+Add proper Open Graph metadata.
+
+Add structured data where appropriate.
+
+---
+
+# Performance Requirements
+
+This page must load instantly.
+
+Requirements:
+
+* Optimized images
+* Lazy loading
+* Minimal JavaScript
+* No unnecessary requests
+* Mobile optimized
+
+Page should not slow down the website.
+
+---
+
+# Mobile Design
+
+Mobile design is extremely important.
+
+Requirements:
+
+* Beautiful card layout
+* Proper spacing
+* Easy button tapping
+* Fast loading
+* No overflow issues
+
+Cards should stack vertically and look clean.
+
+---
+
+---About us page----
+
+ssmall upgrade in about s page therefor me siddhant lamichhane make it owner there and add little discrition there 
+and below add another persion Aarogya Sapkota write him as Founder and add this insta going button his insta (https://www.instagram.com/sapkota_aarogya/)
+and my siddhant lamichhane insta is (https://www.instagram.com/lmc_siddhant.7/)
+
+# Visual Goal
+
+The page should make creators feel proud to be listed.
+
+When a creator visits the page, they should feel:
+
+"Student Hub is promoting me professionally."
+
+The page should increase creator trust and make partnership requests easier.
+
+Create a polished, production-ready Partner Creators page with excellent UI, excellent performance, and complete admin control.

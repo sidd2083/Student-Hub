@@ -14,11 +14,12 @@ import {
   LayoutDashboard, BookOpen, FileText, Users,
   Shield, Plus, Trash2, LogOut, Megaphone, Upload, X, Image,
   CheckCircle, AlertCircle, Award, Search, Type, Pencil, Globe,
-  RefreshCw, Clock, Link2, School, Square, Lock, Unlock,
+  RefreshCw, Clock, Link2, School, Square, Lock, Unlock, Star,
+  Eye, EyeOff, ArrowUp, ArrowDown, Instagram, Youtube,
 } from "lucide-react";
 
 const ADMIN_SESSION = "admin_session_v1";
-type Section = "dashboard" | "notes" | "pyqs" | "announcements" | "users" | "reports" | "seo" | "sitemap" | "rooms";
+type Section = "dashboard" | "notes" | "pyqs" | "announcements" | "users" | "reports" | "seo" | "sitemap" | "rooms" | "creators";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -2137,6 +2138,335 @@ function ManageRooms() {
   );
 }
 
+// ─── Manage Creators ─────────────────────────────────────────────────────────
+
+interface FireCreator {
+  id: string;
+  name: string;
+  image: string;
+  description: string;
+  instagram?: string;
+  tiktok?: string;
+  youtube?: string;
+  featured: boolean;
+  visible: boolean;
+  order: number;
+  createdAt: string;
+}
+
+function TikTokIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.32 6.32 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.75a4.85 4.85 0 0 1-1.01-.06z" />
+    </svg>
+  );
+}
+
+const emptyCreator = (): Omit<FireCreator, "id"> => ({
+  name: "",
+  image: "",
+  description: "",
+  instagram: "",
+  tiktok: "",
+  youtube: "",
+  featured: false,
+  visible: true,
+  order: 0,
+  createdAt: new Date().toISOString().slice(0, 10),
+});
+
+function ManageCreators() {
+  const [creators, setCreators] = useState<FireCreator[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState<Omit<FireCreator, "id">>(emptyCreator());
+  const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadError, setUploadError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchCreators = useCallback(async () => {
+    setLoading(true);
+    try {
+      const q = query(collection(db, "creators"), orderBy("order", "asc"));
+      const snap = await getDocs(q);
+      setCreators(snap.docs.map(d => ({ id: d.id, ...d.data() } as FireCreator)));
+    } catch { setCreators([]); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchCreators(); }, [fetchCreators]);
+
+  const flash = (type: "success" | "error", text: string) => {
+    setMsg({ type, text });
+    setTimeout(() => setMsg(null), 3500);
+  };
+
+  const openAdd = () => {
+    setEditId(null);
+    setForm({ ...emptyCreator(), order: creators.length });
+    setShowForm(true);
+    setUploadError("");
+  };
+
+  const openEdit = (c: FireCreator) => {
+    setEditId(c.id);
+    setForm({ name: c.name, image: c.image, description: c.description, instagram: c.instagram ?? "", tiktok: c.tiktok ?? "", youtube: c.youtube ?? "", featured: c.featured, visible: c.visible, order: c.order, createdAt: c.createdAt });
+    setShowForm(true);
+    setUploadError("");
+  };
+
+  const handleImageUpload = async (file: File) => {
+    setUploadError("");
+    if (!file.type.startsWith("image/")) { setUploadError("Please upload an image file."); return; }
+    setUploadProgress(10);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("folder", "creators");
+      const resp = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await resp.json() as { url?: string; error?: string };
+      if (!resp.ok || !data.url) { setUploadError(data.error ?? "Upload failed."); setUploadProgress(null); return; }
+      setForm(f => ({ ...f, image: data.url! }));
+      setUploadProgress(null);
+    } catch { setUploadError("Upload failed. Check connection."); setUploadProgress(null); }
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { flash("error", "Creator name is required."); return; }
+    if (!form.description.trim()) { flash("error", "Description is required."); return; }
+    setSaving(true);
+    try {
+      const data = {
+        name: form.name.trim(),
+        image: form.image.trim(),
+        description: form.description.trim(),
+        instagram: form.instagram?.trim() || null,
+        tiktok: form.tiktok?.trim() || null,
+        youtube: form.youtube?.trim() || null,
+        featured: form.featured,
+        visible: form.visible,
+        order: Number(form.order) || 0,
+        createdAt: form.createdAt || new Date().toISOString().slice(0, 10),
+      };
+      if (editId) {
+        await updateDoc(doc(db, "creators", editId), data);
+        flash("success", "Creator updated!");
+      } else {
+        await addDoc(collection(db, "creators"), data);
+        flash("success", "Creator added!");
+      }
+      setShowForm(false);
+      await fetchCreators();
+    } catch { flash("error", "Failed to save. Please try again."); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    try {
+      await deleteDoc(doc(db, "creators", id));
+      flash("success", "Creator deleted.");
+      await fetchCreators();
+    } catch { flash("error", "Delete failed."); }
+  };
+
+  const toggleField = async (id: string, field: "visible" | "featured", current: boolean) => {
+    try {
+      const update: Record<string, boolean> = { [field]: !current };
+      if (field === "featured" && !current) {
+        for (const c of creators) {
+          if (c.id !== id && c.featured) await updateDoc(doc(db, "creators", c.id), { featured: false });
+        }
+      }
+      await updateDoc(doc(db, "creators", id), update);
+      await fetchCreators();
+    } catch { flash("error", "Failed to update."); }
+  };
+
+  const moveOrder = async (id: string, dir: -1 | 1) => {
+    const idx = creators.findIndex(c => c.id === id);
+    if (idx < 0) return;
+    const swapIdx = idx + dir;
+    if (swapIdx < 0 || swapIdx >= creators.length) return;
+    try {
+      const a = creators[idx], b = creators[swapIdx];
+      await updateDoc(doc(db, "creators", a.id), { order: b.order });
+      await updateDoc(doc(db, "creators", b.id), { order: a.order });
+      await fetchCreators();
+    } catch { flash("error", "Reorder failed."); }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-bold text-gray-900">Partner Creators</h2>
+        <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white text-sm font-semibold rounded-xl hover:bg-blue-600 transition-all">
+          <Plus className="w-4 h-4" /> Add Creator
+        </button>
+      </div>
+
+      {msg && (
+        <div className={`mb-4 px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2 ${msg.type === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+          {msg.type === "success" ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {msg.text}
+        </div>
+      )}
+
+      {/* Add / Edit Form */}
+      {showForm && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-base font-bold text-gray-900">{editId ? "Edit Creator" : "Add Creator"}</h3>
+            <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-all">
+              <X className="w-4 h-4 text-gray-500" />
+            </button>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Creator Name *</label>
+              <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Shreyash Shrestha" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            </div>
+
+            {/* Image upload */}
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Creator Image / Logo</label>
+              <div className="flex gap-3 items-start">
+                {form.image && (
+                  <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 border border-gray-100">
+                    <img src={form.image} alt="preview" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50/50 rounded-xl p-4 text-center cursor-pointer transition-all"
+                  >
+                    <Upload className="w-5 h-5 mx-auto mb-1 text-gray-400" />
+                    {uploadProgress !== null ? (
+                      <p className="text-xs text-blue-600 font-medium">Uploading… {uploadProgress}%</p>
+                    ) : (
+                      <p className="text-xs text-gray-500">Click to upload image</p>
+                    )}
+                  </div>
+                  {uploadError && <p className="text-red-500 text-xs mt-1">{uploadError}</p>}
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); }} />
+                  <p className="text-xs text-gray-400 mt-1">Or paste a URL:</p>
+                  <input value={form.image} onChange={e => setForm(f => ({ ...f, image: e.target.value }))} placeholder="https://..." className="w-full border border-gray-200 rounded-xl px-3 py-1.5 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                </div>
+              </div>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Short Description *</label>
+              <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Describe what this creator does for students…" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Instagram URL</label>
+              <input value={form.instagram} onChange={e => setForm(f => ({ ...f, instagram: e.target.value }))} placeholder="https://instagram.com/..." className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">TikTok URL</label>
+              <input value={form.tiktok} onChange={e => setForm(f => ({ ...f, tiktok: e.target.value }))} placeholder="https://tiktok.com/@..." className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">YouTube URL</label>
+              <input value={form.youtube} onChange={e => setForm(f => ({ ...f, youtube: e.target.value }))} placeholder="https://youtube.com/@..." className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Display Order</label>
+              <input type="number" value={form.order} onChange={e => setForm(f => ({ ...f, order: Number(e.target.value) }))} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" min={0} />
+            </div>
+
+            <div className="flex items-center gap-6 sm:col-span-2 pt-1">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={form.visible} onChange={e => setForm(f => ({ ...f, visible: e.target.checked }))} className="w-4 h-4 rounded accent-blue-500" />
+                <span className="text-sm text-gray-700 font-medium">Visible on page</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={form.featured} onChange={e => setForm(f => ({ ...f, featured: e.target.checked }))} className="w-4 h-4 rounded accent-yellow-500" />
+                <span className="text-sm text-gray-700 font-medium">⭐ Featured creator</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="flex gap-3 mt-5 pt-4 border-t border-gray-100">
+            <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-5 py-2 bg-blue-500 text-white text-sm font-semibold rounded-xl hover:bg-blue-600 transition-all disabled:opacity-60">
+              {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+              {saving ? "Saving…" : editId ? "Update Creator" : "Add Creator"}
+            </button>
+            <button onClick={() => setShowForm(false)} className="px-5 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-200 transition-all">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Creators list */}
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 h-20 animate-pulse" />)}
+        </div>
+      ) : creators.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center text-gray-400 text-sm">
+          No creators yet. Click "Add Creator" to get started.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {creators.map((c, idx) => (
+            <div key={c.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4">
+              {/* Image */}
+              <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-gradient-to-br from-blue-100 to-indigo-100">
+                {c.image
+                  ? <img src={c.image} alt={c.name} className="w-full h-full object-cover" />
+                  : <div className="w-full h-full flex items-center justify-center text-blue-600 font-bold text-lg">{c.name[0]}</div>
+                }
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-gray-900 text-sm truncate">{c.name}</p>
+                  {c.featured && <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-yellow-100 text-yellow-700 text-[10px] font-bold rounded-full"><Star className="w-2.5 h-2.5" /> Featured</span>}
+                  {!c.visible && <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-semibold rounded-full">Hidden</span>}
+                </div>
+                <p className="text-xs text-gray-500 truncate mt-0.5">{c.description}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  {c.instagram && <span className="text-[10px] text-pink-500 font-medium">IG</span>}
+                  {c.tiktok    && <span className="text-[10px] text-gray-700 font-medium">TT</span>}
+                  {c.youtube   && <span className="text-[10px] text-red-500 font-medium">YT</span>}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+                <button onClick={() => moveOrder(c.id, -1)} disabled={idx === 0} title="Move up" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 disabled:opacity-30 transition-all"><ArrowUp className="w-4 h-4" /></button>
+                <button onClick={() => moveOrder(c.id, 1)} disabled={idx === creators.length - 1} title="Move down" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 disabled:opacity-30 transition-all"><ArrowDown className="w-4 h-4" /></button>
+                <button onClick={() => toggleField(c.id, "visible", c.visible)} title={c.visible ? "Hide" : "Show"} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-all">
+                  {c.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                </button>
+                <button onClick={() => toggleField(c.id, "featured", c.featured)} title={c.featured ? "Unfeature" : "Set as featured"} className={`p-1.5 rounded-lg transition-all ${c.featured ? "text-yellow-500 hover:bg-yellow-50" : "text-gray-400 hover:bg-gray-100"}`}>
+                  <Star className="w-4 h-4" />
+                </button>
+                <button onClick={() => openEdit(c)} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 text-xs font-semibold hover:bg-blue-100 transition-all">
+                  <Pencil className="w-3 h-3" /> Edit
+                </button>
+                <button onClick={() => handleDelete(c.id, c.name)} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition-all">
+                  <Trash2 className="w-3 h-3" /> Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Admin Shell ─────────────────────────────────────────────────────────────
 
 export default function Admin() {
@@ -2151,15 +2481,16 @@ export default function Admin() {
   };
 
   const navItems: { key: Section; icon: typeof LayoutDashboard; label: string }[] = [
-    { key: "dashboard",     icon: LayoutDashboard, label: "Dashboard"     },
-    { key: "rooms",         icon: School,          label: "Study Rooms"   },
-    { key: "notes",         icon: BookOpen,        label: "Manage Notes"  },
-    { key: "pyqs",          icon: FileText,        label: "Manage PYQs"   },
-    { key: "announcements", icon: Megaphone,       label: "Announcements" },
-    { key: "users",         icon: Users,           label: "Manage Users"  },
-    { key: "reports",       icon: Award,           label: "Badges"        },
-    { key: "seo",           icon: Shield,          label: "SEO Panel"     },
-    { key: "sitemap",       icon: Globe,           label: "Sitemap"       },
+    { key: "dashboard",     icon: LayoutDashboard, label: "Dashboard"        },
+    { key: "rooms",         icon: School,          label: "Study Rooms"      },
+    { key: "notes",         icon: BookOpen,        label: "Manage Notes"     },
+    { key: "pyqs",          icon: FileText,        label: "Manage PYQs"      },
+    { key: "creators",      icon: Star,            label: "Partner Creators" },
+    { key: "announcements", icon: Megaphone,       label: "Announcements"    },
+    { key: "users",         icon: Users,           label: "Manage Users"     },
+    { key: "reports",       icon: Award,           label: "Badges"           },
+    { key: "seo",           icon: Shield,          label: "SEO Panel"        },
+    { key: "sitemap",       icon: Globe,           label: "Sitemap"          },
   ];
 
   return (
@@ -2202,6 +2533,7 @@ export default function Admin() {
         {section === "rooms"         && <ManageRooms />}
         {section === "notes"         && <ManageNotes />}
         {section === "pyqs"          && <ManagePyqs />}
+        {section === "creators"      && <ManageCreators />}
         {section === "announcements" && <ManageAnnouncements />}
         {section === "users"         && <ManageUsers />}
         {section === "reports"       && <BadgeManager />}

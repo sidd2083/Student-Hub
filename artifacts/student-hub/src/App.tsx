@@ -45,6 +45,7 @@ const Tools               = lazy(() => import("@/pages/Tools"));
 const GpaCalculator       = lazy(() => import("@/pages/GpaCalculator"));
 const AttendanceCalculator = lazy(() => import("@/pages/AttendanceCalculator"));
 const Badges              = lazy(() => import("@/pages/Badges"));
+const PartnerCreators     = lazy(() => import("@/pages/PartnerCreators"));
 const DailyMissions       = lazy(() => import("@/pages/DailyMissions"));
 const StudyRooms          = lazy(() => import("@/pages/StudyRooms"));
 const StudyRoomCreate     = lazy(() => import("@/pages/StudyRoomCreate"));
@@ -165,6 +166,7 @@ function AppRoutes() {
         <Route path="/contact"   component={Contact} />
         <Route path="/privacy"   component={PrivacyPolicy} />
         <Route path="/terms"     component={Terms} />
+        <Route path="/creators"  component={PartnerCreators} />
 
         <Route path="/ai"          component={NepAi} />
         <Route path="/report"      component={ReportCard} />
