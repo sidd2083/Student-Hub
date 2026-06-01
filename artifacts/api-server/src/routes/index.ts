@@ -11,6 +11,7 @@ import studyRouter from "./study";
 import announcementsRouter from "./announcements";
 import savedRouter from "./saved";
 import uploadRouter from "./upload";
+import creatorsRouter from "./creators";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(studyRouter);
 router.use(announcementsRouter);
 router.use(savedRouter);
 router.use(uploadRouter);
+router.use(creatorsRouter);
 
 export default router;

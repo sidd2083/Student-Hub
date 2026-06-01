@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
-import { db, isConfigured } from "@/lib/firebase";
 import { Instagram, Youtube, Star, Users } from "lucide-react";
 
 interface Creator {
@@ -230,18 +228,10 @@ export default function PartnerCreators() {
 
   useEffect(() => {
     async function fetchCreators() {
-      if (!isConfigured) {
-        setLoading(false);
-        return;
-      }
       try {
-        const q = query(
-          collection(db, "creators"),
-          where("visible", "==", true),
-          orderBy("order", "asc")
-        );
-        const snap = await getDocs(q);
-        const data = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Creator));
+        const resp = await fetch("/api/creators");
+        if (!resp.ok) throw new Error("Fetch failed");
+        const data = await resp.json() as Creator[];
         setCreators(data);
       } catch {
         setCreators([]);

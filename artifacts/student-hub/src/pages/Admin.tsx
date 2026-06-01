@@ -2180,6 +2180,8 @@ const emptyCreator = (): Omit<FireCreator, "id"> => ({
   createdAt: new Date().toISOString().slice(0, 10),
 });
 
+const ADMIN_KEY = "siddhant2078";
+
 function ManageCreators() {
   const [creators, setCreators] = useState<FireCreator[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2195,9 +2197,10 @@ function ManageCreators() {
   const fetchCreators = useCallback(async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, "creators"), orderBy("order", "asc"));
-      const snap = await getDocs(q);
-      setCreators(snap.docs.map(d => ({ id: d.id, ...d.data() } as FireCreator)));
+      const resp = await fetch("/api/creators/all", { headers: { "X-Admin-Key": ADMIN_KEY } });
+      if (!resp.ok) throw new Error("Fetch failed");
+      const data = await resp.json() as FireCreator[];
+      setCreators(data);
     } catch { setCreators([]); }
     finally { setLoading(false); }
   }, []);
@@ -2223,25 +2226,31 @@ function ManageCreators() {
     setUploadError("");
   };
 
-  const handleImageUpload = async (file: File) => {
+  const handleImageUpload = (file: File) => {
     setUploadError("");
     if (!file.type.startsWith("image/")) { setUploadError("Please upload an image file."); return; }
-    setUploadProgress(10);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("folder", "creators");
-      const idToken = await auth.currentUser?.getIdToken().catch(() => null);
-      const resp = await fetch("/api/upload", {
-        method: "POST",
-        body: fd,
-        headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
-      });
-      const data = await resp.json() as { url?: string; error?: string };
-      if (!resp.ok || !data.url) { setUploadError(data.error ?? "Upload failed."); setUploadProgress(null); return; }
-      setForm(f => ({ ...f, image: data.url! }));
-      setUploadProgress(null);
-    } catch { setUploadError("Upload failed. Check connection."); setUploadProgress(null); }
+    setUploadProgress(30);
+    const reader = new FileReader();
+    reader.onerror = () => { setUploadError("Failed to read file."); setUploadProgress(null); };
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = () => { setUploadError("Failed to load image."); setUploadProgress(null); };
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const maxDim = 400;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        canvas.width  = Math.round(img.width  * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { setUploadError("Browser canvas unavailable."); setUploadProgress(null); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
+        setForm(f => ({ ...f, image: dataUrl }));
+        setUploadProgress(null);
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSave = async () => {
@@ -2261,13 +2270,16 @@ function ManageCreators() {
         order: Number(form.order) || 0,
         createdAt: form.createdAt || new Date().toISOString().slice(0, 10),
       };
-      if (editId) {
-        await updateDoc(doc(db, "creators", editId), data);
-        flash("success", "Creator updated!");
-      } else {
-        await addDoc(collection(db, "creators"), data);
-        flash("success", "Creator added!");
-      }
+      const url    = editId ? `/api/creators/${editId}` : "/api/creators";
+      const method = editId ? "PUT" : "POST";
+      const resp   = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", "X-Admin-Key": ADMIN_KEY },
+        body: JSON.stringify(data),
+      });
+      const result = await resp.json() as { id?: string; ok?: boolean; error?: string };
+      if (!resp.ok) { flash("error", result.error ?? "Failed to save. Please try again."); return; }
+      flash("success", editId ? "Creator updated!" : "Creator added!");
       setShowForm(false);
       await fetchCreators();
     } catch { flash("error", "Failed to save. Please try again."); }
@@ -2277,7 +2289,11 @@ function ManageCreators() {
   const handleDelete = async (id: string, name: string) => {
     if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
     try {
-      await deleteDoc(doc(db, "creators", id));
+      const resp = await fetch(`/api/creators/${id}`, {
+        method: "DELETE",
+        headers: { "X-Admin-Key": ADMIN_KEY },
+      });
+      if (!resp.ok) { const d = await resp.json() as { error?: string }; flash("error", d.error ?? "Delete failed."); return; }
       flash("success", "Creator deleted.");
       await fetchCreators();
     } catch { flash("error", "Delete failed."); }
@@ -2285,13 +2301,22 @@ function ManageCreators() {
 
   const toggleField = async (id: string, field: "visible" | "featured", current: boolean) => {
     try {
-      const update: Record<string, boolean> = { [field]: !current };
       if (field === "featured" && !current) {
         for (const c of creators) {
-          if (c.id !== id && c.featured) await updateDoc(doc(db, "creators", c.id), { featured: false });
+          if (c.id !== id && c.featured) {
+            await fetch(`/api/creators/${c.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json", "X-Admin-Key": ADMIN_KEY },
+              body: JSON.stringify({ featured: false }),
+            });
+          }
         }
       }
-      await updateDoc(doc(db, "creators", id), update);
+      await fetch(`/api/creators/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "X-Admin-Key": ADMIN_KEY },
+        body: JSON.stringify({ [field]: !current }),
+      });
       await fetchCreators();
     } catch { flash("error", "Failed to update."); }
   };
@@ -2303,8 +2328,16 @@ function ManageCreators() {
     if (swapIdx < 0 || swapIdx >= creators.length) return;
     try {
       const a = creators[idx], b = creators[swapIdx];
-      await updateDoc(doc(db, "creators", a.id), { order: b.order });
-      await updateDoc(doc(db, "creators", b.id), { order: a.order });
+      await fetch(`/api/creators/${a.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "X-Admin-Key": ADMIN_KEY },
+        body: JSON.stringify({ order: b.order }),
+      });
+      await fetch(`/api/creators/${b.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "X-Admin-Key": ADMIN_KEY },
+        body: JSON.stringify({ order: a.order }),
+      });
       await fetchCreators();
     } catch { flash("error", "Reorder failed."); }
   };
