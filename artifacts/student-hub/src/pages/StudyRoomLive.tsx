@@ -8,7 +8,7 @@ import {
   ChevronRight, ChevronDown, Maximize, Minimize, LogOut, X,
   MessageCircle, ListChecks, School, Volume2, VolumeX,
   Lock, Eye, EyeOff, RotateCcw, PlusCircle, DoorOpen,
-  Pin, Pencil, Check,
+  Pin, Pencil, Check, Megaphone,
 } from "lucide-react";
 import { useRoomSound } from "@/hooks/useAmbientSound";
 import {
@@ -89,6 +89,10 @@ export default function StudyRoomLive() {
   // ── Pinned announcement ─────────────────────────────────────────────────────
   const [editingAnnouncement, setEditingAnnouncement] = useState(false);
   const [announcementDraft,   setAnnouncementDraft]   = useState("");
+
+  // ── Unread chat messages (mobile only — increments when not on chat tab) ────
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const prevMsgCountRef = useRef(0);
 
   const chatRef      = useRef<HTMLDivElement>(null);
   const seenMsgIds   = useRef<Set<string>>(new Set());
@@ -254,6 +258,20 @@ export default function StudyRoomLive() {
   const allMessages = useMemo(() =>
     [...messages, ...optimisticMsgs.filter(o => !messages.some(m => m.uid === o.uid && m.text === o.text))],
   [messages, optimisticMsgs]);
+
+  // ── Track unread chat messages on mobile when user is not on chat tab ────────
+  useEffect(() => {
+    const newCount = allMessages.filter(m => m.type === "message").length;
+    const prevCount = prevMsgCountRef.current;
+    if (newCount > prevCount && mobileTab !== "chat") {
+      setUnreadChatCount(prev => prev + (newCount - prevCount));
+    }
+    prevMsgCountRef.current = newCount;
+  }, [allMessages, mobileTab]);
+
+  useEffect(() => {
+    if (mobileTab === "chat") setUnreadChatCount(0);
+  }, [mobileTab]);
 
   // ── Memoised messages JSX — prevents re-render on every 1-second timer tick ──
   const messagesJSX = useMemo(() =>
@@ -593,8 +611,6 @@ export default function StudyRoomLive() {
   }
 
   function ChatPanel() {
-    const pinned = room?.pinnedAnnouncement;
-
     return (
       <div className="flex flex-col h-full">
         {/* Emoji row */}
@@ -606,68 +622,6 @@ export default function StudyRoomLive() {
             </button>
           ))}
         </div>
-
-        {/* ── Pinned announcement banner ─────────────────────────────────────── */}
-        <AnimatePresence>
-          {(pinned || (isHost && editingAnnouncement)) && (
-            <motion.div
-              key="announcement"
-              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-              animate={{ opacity: 1, height: "auto", marginBottom: 8 }}
-              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-              transition={{ duration: 0.18 }}
-              className="overflow-hidden"
-            >
-              {editingAnnouncement && isHost ? (
-                <div className="rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-2.5 space-y-2">
-                  <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
-                    <Pin className="w-3 h-3" />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider">Pinned Announcement</span>
-                  </div>
-                  <textarea
-                    autoFocus
-                    value={announcementDraft}
-                    onChange={e => setAnnouncementDraft(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSaveAnnouncement(); } }}
-                    placeholder="Type your announcement…"
-                    maxLength={200}
-                    rows={2}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 dark:border-amber-600 bg-white dark:bg-gray-800 text-xs text-gray-800 dark:text-gray-200 placeholder-gray-400 outline-none focus:ring-2 focus:ring-amber-400 resize-none"
-                  />
-                  <div className="flex gap-2">
-                    <button onClick={handleSaveAnnouncement}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-semibold transition-all">
-                      <Check className="w-3 h-3" /> Pin
-                    </button>
-                    {pinned && (
-                      <button onClick={handleClearAnnouncement}
-                        className="px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-700 text-red-500 dark:text-red-400 text-xs font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 active:scale-95 transition-all">
-                        Clear
-                      </button>
-                    )}
-                    <button onClick={() => setEditingAnnouncement(false)}
-                      className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 transition-all">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : pinned ? (
-                <div className="flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
-                  <Pin className="w-3 h-3 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed flex-1">{pinned}</p>
-                  {isHost && (
-                    <button
-                      onClick={() => { setAnnouncementDraft(pinned ?? ""); setEditingAnnouncement(true); }}
-                      className="shrink-0 p-1 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-800/40 text-amber-600 dark:text-amber-400 transition-colors"
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              ) : null}
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Messages */}
         <div className="flex-1 space-y-2 overflow-y-auto overscroll-contain pr-0.5 mb-2" style={{ maxHeight: 320 }}>
@@ -747,6 +701,90 @@ export default function StudyRoomLive() {
           </button>
         ))}
       </div>
+    );
+  }
+
+  // ── Announcement Banner — shown above main content on both mobile and desktop ──
+  function AnnouncementBanner() {
+    const pinned = room?.pinnedAnnouncement;
+    const LIMIT = 150;
+
+    if (!pinned && !isHost) return null;
+
+    return (
+      <AnimatePresence>
+        <motion.div
+          key="ann-banner"
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.18 }}
+        >
+          {editingAnnouncement && isHost ? (
+            // ── Host edit mode ────────────────────────────────────────────────
+            <div className="rounded-2xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 space-y-2.5">
+              <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                <Megaphone className="w-4 h-4 shrink-0" />
+                <span className="text-xs font-bold uppercase tracking-wider">Room Announcement</span>
+              </div>
+              <textarea
+                autoFocus
+                value={announcementDraft}
+                onChange={e => setAnnouncementDraft(e.target.value.slice(0, LIMIT))}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSaveAnnouncement(); } }}
+                placeholder="Type your announcement for everyone in this room…"
+                rows={2}
+                className="w-full px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-200 placeholder-gray-400 outline-none focus:ring-2 focus:ring-amber-400 resize-none"
+              />
+              <div className="flex items-center justify-between gap-2">
+                <span className={`text-[10px] ${announcementDraft.length >= LIMIT ? "text-red-500" : "text-gray-400"}`}>
+                  {announcementDraft.length}/{LIMIT}
+                </span>
+                <div className="flex gap-2">
+                  {pinned && (
+                    <button onClick={handleClearAnnouncement}
+                      className="px-3 py-1.5 rounded-xl border border-red-300 dark:border-red-700 text-red-500 dark:text-red-400 text-xs font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 active:scale-95 transition-all">
+                      Remove
+                    </button>
+                  )}
+                  <button onClick={() => setEditingAnnouncement(false)}
+                    className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-500 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 transition-all">
+                    Cancel
+                  </button>
+                  <button onClick={handleSaveAnnouncement}
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-bold transition-all shadow-sm">
+                    <Check className="w-3.5 h-3.5" /> Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : pinned ? (
+            // ── Display mode ──────────────────────────────────────────────────
+            <div className="flex items-start gap-3 rounded-2xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
+              <Megaphone className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-800 dark:text-amber-200 leading-relaxed flex-1 font-medium">{pinned}</p>
+              {isHost && (
+                <button
+                  onClick={() => { setAnnouncementDraft(pinned ?? ""); setEditingAnnouncement(true); }}
+                  className="shrink-0 p-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-800/40 text-amber-600 dark:text-amber-400 transition-colors"
+                  title="Edit announcement"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          ) : isHost ? (
+            // ── Host prompt to add announcement ───────────────────────────────
+            <button
+              onClick={() => { setAnnouncementDraft(""); setEditingAnnouncement(true); }}
+              className="w-full flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-dashed border-amber-300 dark:border-amber-700/60 hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-600 dark:text-amber-400 text-sm font-medium transition-colors group"
+            >
+              <Megaphone className="w-4 h-4 shrink-0 group-hover:scale-110 transition-transform" />
+              <span>Add announcement for the room</span>
+            </button>
+          ) : null}
+        </motion.div>
+      </AnimatePresence>
     );
   }
 
@@ -877,7 +915,7 @@ export default function StudyRoomLive() {
     const tabs: { id: MobileTab; label: string; icon: React.ReactNode; badge?: number }[] = [
       { id: "class", label: "Classroom", icon: <School className="w-4 h-4" /> },
       { id: "vote",  label: "Vote",      icon: <ListChecks className="w-4 h-4" />, badge: activeVoteCount || undefined },
-      { id: "chat",  label: "Chat",      icon: <MessageCircle className="w-4 h-4" /> },
+      { id: "chat",  label: "Chat",      icon: <MessageCircle className="w-4 h-4" />, badge: unreadChatCount || undefined },
     ];
     return (
       <div className="flex bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 lg:hidden">
@@ -985,6 +1023,7 @@ export default function StudyRoomLive() {
       >
         {HeaderBar()}
         {HostBar()}
+        {AnnouncementBanner()}
 
         {/* ── MOBILE LAYOUT ──────────────────────────────────────────────────── */}
         <div className="lg:hidden flex flex-col gap-3 pb-16">
@@ -1132,25 +1171,8 @@ export default function StudyRoomLive() {
             </div>
 
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800">
-              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
                 <span className="text-sm font-bold text-gray-900 dark:text-white">💬 Chat</span>
-                {isHost && (
-                  <button
-                    onClick={() => {
-                      setAnnouncementDraft(room?.pinnedAnnouncement ?? "");
-                      setEditingAnnouncement(v => !v);
-                    }}
-                    title={room?.pinnedAnnouncement ? "Edit pinned announcement" : "Pin an announcement"}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all active:scale-95 ${
-                      room?.pinnedAnnouncement
-                        ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50"
-                        : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                    }`}
-                  >
-                    <Pin className="w-3.5 h-3.5" />
-                    {room?.pinnedAnnouncement ? "Pinned" : "Pin"}
-                  </button>
-                )}
               </div>
               <div className="p-3">
                 {ChatPanel()}
