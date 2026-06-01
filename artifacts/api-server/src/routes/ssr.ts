@@ -210,17 +210,30 @@ router.get("/notes/:slug", async (req: Request, res: Response, next: NextFunctio
 
   const ld = JSON.stringify({
     "@context": "https://schema.org",
-    "@type": "Article",
-    headline: pageTitle,
-    description: desc,
-    url: canonical,
-    mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
-    author: { "@type": "Organization", name: "Student Hub Nepal", url: SITE_URL },
-    publisher: { "@type": "Organization", name: "Student Hub Nepal", url: SITE_URL },
-    educationalLevel: `Grade ${grade}`,
-    about: { "@type": "Thing", name: `${subject} Grade ${grade}` },
-    inLanguage: "en-NP",
-    isAccessibleForFree: true,
+    "@graph": [
+      {
+        "@type": "Article",
+        headline: pageTitle,
+        description: desc,
+        url: canonical,
+        mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
+        author: { "@type": "Organization", name: "Student Hub Nepal", url: SITE_URL },
+        publisher: { "@type": "Organization", name: "Student Hub Nepal", url: SITE_URL },
+        educationalLevel: `Grade ${grade}`,
+        about: { "@type": "Thing", name: `${subject} Grade ${grade}` },
+        inLanguage: "en-NP",
+        isAccessibleForFree: true,
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+          { "@type": "ListItem", position: 2, name: "Notes", item: `${SITE_URL}/notes` },
+          { "@type": "ListItem", position: 3, name: `${subject} Grade ${grade}`, item: `${SITE_URL}/notes?subject=${encodeURIComponent(subject)}&grade=${grade}` },
+          { "@type": "ListItem", position: 4, name: title, item: canonical },
+        ],
+      },
+    ],
   });
 
   const html = injectMeta(tpl, { title: pageTitle, description: desc, canonical, keywords: kw, ogType: "article", structuredData: ld });
@@ -258,17 +271,30 @@ router.get("/pyq/:slug", async (req: Request, res: Response, next: NextFunction)
 
   const ld = JSON.stringify({
     "@context": "https://schema.org",
-    "@type": "Article",
-    headline: pageTitle,
-    description: desc,
-    url: canonical,
-    mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
-    author: { "@type": "Organization", name: "Student Hub Nepal", url: SITE_URL },
-    publisher: { "@type": "Organization", name: "Student Hub Nepal", url: SITE_URL },
-    educationalLevel: `Grade ${grade}`,
-    about: { "@type": "Thing", name: `${subject} Past Year Questions ${year}` },
-    inLanguage: "en-NP",
-    isAccessibleForFree: true,
+    "@graph": [
+      {
+        "@type": "Article",
+        headline: pageTitle,
+        description: desc,
+        url: canonical,
+        mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
+        author: { "@type": "Organization", name: "Student Hub Nepal", url: SITE_URL },
+        publisher: { "@type": "Organization", name: "Student Hub Nepal", url: SITE_URL },
+        educationalLevel: `Grade ${grade}`,
+        about: { "@type": "Thing", name: `${subject} Past Year Questions ${year}` },
+        inLanguage: "en-NP",
+        isAccessibleForFree: true,
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+          { "@type": "ListItem", position: 2, name: "Past Papers (PYQ)", item: `${SITE_URL}/pyqs` },
+          { "@type": "ListItem", position: 3, name: `${subject} Grade ${grade}`, item: `${SITE_URL}/pyqs` },
+          { "@type": "ListItem", position: 4, name: `${title} (${year})`, item: canonical },
+        ],
+      },
+    ],
   });
 
   const html = injectMeta(tpl, { title: pageTitle, description: desc, canonical, keywords: kw, ogType: "article", structuredData: ld });
@@ -277,6 +303,269 @@ router.get("/pyq/:slug", async (req: Request, res: Response, next: NextFunction)
   res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=3600");
   res.send(html);
 });
+
+// ── Static page SSR routes ─────────────────────────────────────────────────────
+// Each public static page gets its own unique title, description, canonical URL,
+// and structured data. Without this every page inherits homepage metadata from
+// index.html and Googlebot sees them all as identical/duplicate content.
+
+interface StaticPageMeta {
+  title:           string;
+  description:     string;
+  canonical:       string;
+  keywords:        string;
+  ogType?:         string;
+  structuredData?: object;
+}
+
+const STATIC_META: Record<string, StaticPageMeta> = {
+  "/notes": {
+    title: "Free Study Notes for Grade 9–12 Nepal — NEB & SEE | Student Hub",
+    description: "Browse free study notes for Grade 9, 10, 11 and 12 students in Nepal. Mathematics, Science, English, Social Studies and more. Download or read online. Prepared for NEB and SEE exams.",
+    canonical: `${SITE_URL}/notes`,
+    keywords: "grade 9 notes nepal, grade 10 notes, grade 11 notes nepal, grade 12 notes, NEB notes, SEE notes, free notes nepal, mathematics notes, science notes nepal",
+    ogType: "website",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "CollectionPage",
+          "@id": `${SITE_URL}/notes`,
+          name: "Free Study Notes for Grade 9–12 Nepal",
+          description: "Browse free study notes for Grade 9–12 students in Nepal. NEB and SEE exam preparation.",
+          url: `${SITE_URL}/notes`,
+          isPartOf: { "@id": `${SITE_URL}/#website` },
+          inLanguage: "en-NP",
+        },
+        {
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+            { "@type": "ListItem", position: 2, name: "Notes", item: `${SITE_URL}/notes` },
+          ],
+        },
+      ],
+    },
+  },
+  "/pyqs": {
+    title: "Past Year Question Papers (PYQ) Nepal — NEB & SEE | Student Hub",
+    description: "Download free NEB and SEE past year question papers (PYQs) for Grade 9–12. Province-wise papers for Koshi, Bagmati, Gandaki and all provinces. Prepared for exam practice.",
+    canonical: `${SITE_URL}/pyqs`,
+    keywords: "NEB PYQ nepal, SEE past papers, grade 12 past questions, grade 11 PYQ, previous year questions nepal, SEE 2081 question paper, NEB 2081 question paper",
+    ogType: "website",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "CollectionPage",
+          "@id": `${SITE_URL}/pyqs`,
+          name: "Past Year Question Papers (PYQ) Nepal — NEB & SEE",
+          description: "Download free NEB and SEE past year question papers for Grade 9–12.",
+          url: `${SITE_URL}/pyqs`,
+          isPartOf: { "@id": `${SITE_URL}/#website` },
+          inLanguage: "en-NP",
+        },
+        {
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+            { "@type": "ListItem", position: 2, name: "Past Papers (PYQ)", item: `${SITE_URL}/pyqs` },
+          ],
+        },
+      ],
+    },
+  },
+  "/mcq": {
+    title: "MCQ Practice for Grade 9–12 Nepal — NEB & SEE | Student Hub",
+    description: "Practice multiple-choice questions (MCQs) for NEB Grade 11 & 12 and SEE Grade 9 & 10 exams. Chapter-wise MCQ sets for Mathematics, Science, English and all subjects. Free, instant feedback.",
+    canonical: `${SITE_URL}/mcq`,
+    keywords: "MCQ practice nepal, NEB MCQ, SEE MCQ, grade 10 MCQ, grade 12 MCQ, multiple choice questions nepal, chapter wise MCQ nepal",
+    ogType: "website",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebPage",
+          "@id": `${SITE_URL}/mcq`,
+          name: "MCQ Practice for Grade 9–12 Nepal",
+          description: "Free MCQ practice for NEB and SEE exams. Chapter-wise questions for all subjects.",
+          url: `${SITE_URL}/mcq`,
+          isPartOf: { "@id": `${SITE_URL}/#website` },
+          inLanguage: "en-NP",
+        },
+        {
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+            { "@type": "ListItem", position: 2, name: "MCQ Practice", item: `${SITE_URL}/mcq` },
+          ],
+        },
+      ],
+    },
+  },
+  "/tools": {
+    title: "Free Study Tools for Students Nepal — GPA & Attendance Calculator | Student Hub",
+    description: "Free online study tools for students in Nepal and worldwide. NEB GPA Calculator and Bunk/Attendance Calculator. Calculate your GPA or find how many classes you can miss instantly.",
+    canonical: `${SITE_URL}/tools`,
+    keywords: "student tools nepal, NEB GPA calculator, bunk calculator, attendance calculator nepal, free tools students nepal",
+    ogType: "website",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "ItemList",
+          "@id": `${SITE_URL}/tools`,
+          name: "Free Study Tools for Students",
+          description: "Free GPA Calculator and Attendance/Bunk Calculator for students.",
+          url: `${SITE_URL}/tools`,
+          itemListElement: [
+            { "@type": "ListItem", position: 1, item: { "@type": "SoftwareApplication", name: "NEB GPA Calculator Nepal", url: `${SITE_URL}/tools/gpa-calculator`, applicationCategory: "EducationApplication" } },
+            { "@type": "ListItem", position: 2, item: { "@type": "SoftwareApplication", name: "Bunk Calculator & Attendance Calculator", url: `${SITE_URL}/tools/attendance-calculator`, applicationCategory: "EducationApplication" } },
+          ],
+        },
+        {
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+            { "@type": "ListItem", position: 2, name: "Tools", item: `${SITE_URL}/tools` },
+          ],
+        },
+      ],
+    },
+  },
+  "/tools/gpa-calculator": {
+    title: "GPA Calculator Nepal — NEB Class 11 & 12 GPA Calculator (Free) | Student Hub",
+    description: "Free NEB GPA Calculator for Grade 11 and Grade 12 students in Nepal. Calculate your GPA instantly using the official NEB formula (75% theory + 25% practical). Supports Science and Management streams.",
+    canonical: `${SITE_URL}/tools/gpa-calculator`,
+    keywords: "NEB GPA calculator, grade 12 GPA nepal, class 11 GPA calculator, NEB grade calculator, GPA calculator nepal 2082, grade 11 GPA calculator nepal",
+    ogType: "website",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "SoftwareApplication",
+          "@id": `${SITE_URL}/tools/gpa-calculator`,
+          name: "NEB GPA Calculator Nepal — Grade 11 & 12",
+          applicationCategory: "EducationApplication",
+          operatingSystem: "Web Browser",
+          url: `${SITE_URL}/tools/gpa-calculator`,
+          description: "Free NEB GPA Calculator for Grade 11 and Grade 12. Uses official NEB formula with 75% theory and 25% practical marks.",
+          offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+          featureList: ["NEB Grade 11 & 12 GPA calculation", "Science and Management stream support", "75% theory + 25% practical formula", "Free, no sign-up"],
+        },
+        {
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+            { "@type": "ListItem", position: 2, name: "Tools", item: `${SITE_URL}/tools` },
+            { "@type": "ListItem", position: 3, name: "GPA Calculator", item: `${SITE_URL}/tools/gpa-calculator` },
+          ],
+        },
+      ],
+    },
+  },
+  "/tools/attendance-calculator": {
+    title: "Bunk Calculator & Attendance Calculator — How Many Classes Can I Miss? | Student Hub",
+    description: "Free bunk calculator and attendance calculator. Find exactly how many classes you can miss while staying above 75%, 80%, or 85%. Works for India (UGC), Nepal, USA, UK, Australia. No sign-up needed.",
+    canonical: `${SITE_URL}/tools/attendance-calculator`,
+    keywords: "bunk calculator, attendance calculator, how many classes can i miss, 75% attendance rule, UGC attendance india, attendance calculator india, bunk calculator college",
+    ogType: "website",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "SoftwareApplication",
+          "@id": `${SITE_URL}/tools/attendance-calculator`,
+          name: "Bunk Calculator & Attendance Calculator",
+          applicationCategory: "EducationApplication",
+          operatingSystem: "Web Browser",
+          url: `${SITE_URL}/tools/attendance-calculator`,
+          description: "Free bunk calculator to find how many classes you can miss. Works for 75%, 80%, 85% or any attendance requirement.",
+          offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+          featureList: ["Bunk calculator — exactly how many classes you can miss", "Instant attendance percentage", "Recovery calculator", "Works for India, Nepal, USA, UK, Australia"],
+        },
+        {
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+            { "@type": "ListItem", position: 2, name: "Tools", item: `${SITE_URL}/tools` },
+            { "@type": "ListItem", position: 3, name: "Attendance Calculator", item: `${SITE_URL}/tools/attendance-calculator` },
+          ],
+        },
+      ],
+    },
+  },
+  "/about": {
+    title: "About Student Hub Nepal — Free Study Platform for Grade 9–12",
+    description: "Learn about Student Hub Nepal, a free online study platform built for Grade 9–12 students in Nepal. Notes, PYQs, MCQ practice, GPA calculator and AI tutor for NEB and SEE exam preparation.",
+    canonical: `${SITE_URL}/about`,
+    keywords: "about student hub nepal, student hub nepal team, free study platform nepal",
+    ogType: "website",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "AboutPage",
+      "@id": `${SITE_URL}/about`,
+      name: "About Student Hub Nepal",
+      description: "Free study platform for Grade 9–12 students in Nepal.",
+      url: `${SITE_URL}/about`,
+      breadcrumb: { "@type": "BreadcrumbList", itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+        { "@type": "ListItem", position: 2, name: "About", item: `${SITE_URL}/about` },
+      ]},
+    },
+  },
+  "/contact": {
+    title: "Contact Student Hub Nepal | Support & Feedback",
+    description: "Get in touch with the Student Hub Nepal team. Send feedback, report issues, or reach out for support. We're here to help Grade 9–12 students across Nepal.",
+    canonical: `${SITE_URL}/contact`,
+    keywords: "contact student hub nepal, student hub support, student hub feedback",
+    ogType: "website",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "ContactPage",
+      "@id": `${SITE_URL}/contact`,
+      name: "Contact Student Hub Nepal",
+      url: `${SITE_URL}/contact`,
+      breadcrumb: { "@type": "BreadcrumbList", itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+        { "@type": "ListItem", position: 2, name: "Contact", item: `${SITE_URL}/contact` },
+      ]},
+    },
+  },
+  "/privacy": {
+    title: "Privacy Policy | Student Hub Nepal",
+    description: "Read the Student Hub Nepal privacy policy. Learn how we collect, use and protect your data.",
+    canonical: `${SITE_URL}/privacy`,
+    keywords: "student hub privacy policy, student hub nepal data policy",
+    ogType: "website",
+  },
+  "/terms": {
+    title: "Terms of Service | Student Hub Nepal",
+    description: "Read the Student Hub Nepal terms of service and usage policy.",
+    canonical: `${SITE_URL}/terms`,
+    keywords: "student hub terms of service, student hub nepal terms",
+    ogType: "website",
+  },
+};
+
+// Register SSR handler for every static page
+for (const [path, meta] of Object.entries(STATIC_META)) {
+  router.get(path, (req: Request, res: Response, next: NextFunction) => {
+    const tpl = getTemplate();
+    if (!tpl) return next();
+    const html = injectMeta(tpl, {
+      title:           meta.title,
+      description:     meta.description,
+      canonical:       meta.canonical,
+      keywords:        meta.keywords,
+      ogType:          meta.ogType,
+      structuredData:  meta.structuredData ? JSON.stringify(meta.structuredData) : undefined,
+    });
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+    res.send(html);
+  });
+}
 
 // ── Static assets + SPA fallback (production only) ────────────────────────────
 if (BUILD_EXISTS) {

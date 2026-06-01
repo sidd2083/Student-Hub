@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { noteUrl } from "@/lib/slugs";
@@ -257,15 +257,24 @@ const notesCache = new Map<number, NoteView[]>();
 
 function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   const { user, profile } = useAuth();
-  const initGrade = typeof profile?.grade === "number" ? profile.grade : 10;
+  const search = useSearch();
+  const urlParams = new URLSearchParams(search);
+  const urlGrade = urlParams.get("grade") ? Number(urlParams.get("grade")) : null;
+  const urlSubject = urlParams.get("subject") ?? "";
+  const initGrade = urlGrade ?? (typeof profile?.grade === "number" ? profile.grade : 10);
   const [grade, setGrade] = useState<number>(initGrade);
-  const [subject, setSubject] = useState<string>("");
+  const [subject, setSubject] = useState<string>(urlSubject);
   const [selectedNote, setSelectedNote] = useState<NoteView | null>(null);
   const [notes, setNotes] = useState<NoteView[]>(() => notesCache.get(initGrade) ?? []);
   const [loading, setLoading] = useState(() => !notesCache.has(initGrade));
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
-    setSubject("");
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+    } else {
+      setSubject("");
+    }
     const cached = notesCache.get(grade);
     if (cached) {
       setNotes(cached);

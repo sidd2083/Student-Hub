@@ -1,0 +1,200 @@
+# CRITICAL SEO AUDIT AND INDEXING FIX
+
+The website has severe SEO issues that must be fixed before launch.
+
+## PROBLEM 1: WRONG META TITLES
+
+Many note pages are showing the homepage title instead of the actual note title.
+
+Current:
+
+All pages may inherit the homepage metadata.
+
+This is incorrect.
+
+Required:
+
+Every page must generate unique SEO metadata.
+
+Example:
+
+Page:
+"Trigonometry Notes Class 10"
+
+Meta Title:
+"Trigonometry Notes Class 10 | Student Hub"
+
+NOT:
+
+"Student Hub - Study Together"
+
+---
+
+## PROBLEM 2: WRONG META DESCRIPTIONS
+
+Each page must generate its own description.
+
+Example:
+
+"Complete Trigonometry Notes for Class 10 students in Nepal with formulas, examples and practice questions."
+
+Every article needs unique metadata.
+
+---
+
+## PROBLEM 3: CANONICAL URLS
+
+Add proper canonical URLs.
+
+Every note page.
+
+Every tool page.
+
+Every blog page.
+
+Every question page.
+
+Must have self-referencing canonical tags.
+
+---
+
+## PROBLEM 4: INDEXABILITY AUDIT
+
+Audit entire website.
+
+Check:
+
+* robots.txt
+* sitemap.xml
+* canonical tags
+* noindex tags
+* duplicate URLs
+* duplicate metadata
+* crawl errors
+
+Ensure every public page is indexable.
+
+---
+
+## PROBLEM 5: STRUCTURED DATA
+
+Add schema markup.
+
+Notes:
+Article schema
+
+Tools:
+SoftwareApplication schema
+
+FAQ sections:
+FAQ schema
+
+Breadcrumbs:
+Breadcrumb schema
+
+---
+
+## PROBLEM 6: TOOL PAGE SEO
+
+Tool pages are the highest priority.
+
+Audit both tools completely.
+
+Improve:
+
+* title
+* meta description
+* heading structure
+* internal links
+* schema
+* page speed
+
+Every tool page must target a specific search keyword.
+
+---
+
+## PROBLEM 7: INTERNAL LINKING
+
+Build strong internal linking.
+
+Every note should link to:
+
+* related notes
+* related questions
+* related tools
+
+Every tool should link to:
+
+* relevant notes
+* relevant resources
+
+---
+
+## PROBLEM 8: PAGE SPEED
+
+SEO and speed are connected.
+
+Audit:
+
+* JavaScript bundles
+* images
+* unnecessary renders
+* Firebase calls
+* network requests
+
+Optimize everything.
+
+---
+
+## PROBLEM 9: SITEMAP
+
+Generate a complete sitemap automatically.
+
+Include:
+
+* notes
+* tools
+* question banks
+* blogs
+* public pages
+
+Exclude:
+
+* admin pages
+* private pages
+* auth pages
+
+---
+
+## PROBLEM 10: GOOGLE INDEXING READINESS
+
+Provide a report showing:
+
+* pages with missing title
+* pages with missing description
+* pages with duplicate metadata
+* pages with no canonical
+* pages blocked from indexing
+* pages excluded from sitemap
+
+Fix every issue found.
+
+---
+
+## FINAL GOAL
+
+The website must be technically SEO-ready.
+
+Every note page must have:
+
+* unique title
+* unique description
+* proper heading structure
+* canonical URL
+* schema markup
+
+Every tool page must be fully optimized.
+
+After fixes are complete:
+
+Generate a full SEO audit report and list all changes made.

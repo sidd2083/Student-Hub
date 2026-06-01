@@ -431,8 +431,11 @@ export default function NotePage() {
                   <ArrowLeft className="w-3 h-3" /> All Notes
                 </Link>
                 <span className="text-gray-200">·</span>
-                <Link href="/notes" className="text-xs text-gray-400 hover:text-blue-600 transition-colors">
-                  More {note.subject} notes
+                <Link
+                  href={`/notes?subject=${encodeURIComponent(note.subject)}&grade=${note.grade}`}
+                  className="text-xs text-gray-400 hover:text-blue-600 transition-colors"
+                >
+                  More {note.subject} Grade {note.grade} notes
                 </Link>
                 <span className="text-gray-200">·</span>
                 <a href={note.contentType !== "text" ? note.content : undefined}
