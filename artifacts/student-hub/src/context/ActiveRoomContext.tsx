@@ -249,8 +249,12 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
           }
         }
 
-        // Only the current host auto-advances the phase at 0
-        if (rem <= 0 && r.currentPhaseIndex < r.studyFlow.length - 1 && !advancingRef.current) {
+        // Only the current host auto-advances the phase at 0.
+        // This also fires on the LAST phase — skipPhase() handles it by
+        // setting status: "finished" when nextIndex >= studyFlow.length.
+        // Previously had `r.currentPhaseIndex < r.studyFlow.length - 1` here
+        // which prevented the final phase from ever completing (critical bug).
+        if (rem <= 0 && !advancingRef.current) {
           if (user && r.hostUid === user.uid) {
             advancingRef.current = true;
             advancePhase(r.id, r).catch(() => {}).finally(() => { advancingRef.current = false; });
