@@ -8,12 +8,14 @@ import {
   ChevronRight, ChevronDown, Maximize, Minimize, LogOut, X,
   MessageCircle, ListChecks, School, Volume2, VolumeX,
   Lock, Eye, EyeOff, RotateCcw, PlusCircle, DoorOpen,
+  Pin, Pencil, Check,
 } from "lucide-react";
 import { useRoomSound } from "@/hooks/useAmbientSound";
 import {
   Room, RoomParticipant, Vote, RoomMessage,
   subscribeRoom, subscribeParticipants, subscribeActiveVotes, subscribeMessages,
   joinRoom, sendMessage, getRemainingSeconds, formatTime, createVote,
+  setPinnedAnnouncement,
 } from "@/lib/studyRooms";
 import { useActiveRoom } from "@/context/ActiveRoomContext";
 import { useAuth } from "@/context/AuthContext";
@@ -83,6 +85,10 @@ export default function StudyRoomLive() {
 
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const lastSentAtRef = useRef<number>(0);
+
+  // ── Pinned announcement ─────────────────────────────────────────────────────
+  const [editingAnnouncement, setEditingAnnouncement] = useState(false);
+  const [announcementDraft,   setAnnouncementDraft]   = useState("");
 
   const chatRef      = useRef<HTMLDivElement>(null);
   const seenMsgIds   = useRef<Set<string>>(new Set());
@@ -248,6 +254,66 @@ export default function StudyRoomLive() {
   const allMessages = useMemo(() =>
     [...messages, ...optimisticMsgs.filter(o => !messages.some(m => m.uid === o.uid && m.text === o.text))],
   [messages, optimisticMsgs]);
+
+  // ── Memoised messages JSX — prevents re-render on every 1-second timer tick ──
+  const messagesJSX = useMemo(() =>
+    allMessages.map((msg, idx) => {
+      const prev = allMessages[idx - 1];
+      const isContinuation =
+        msg.type === "message" &&
+        prev?.type === "message" &&
+        prev?.uid === msg.uid;
+      const isMine = msg.uid === user?.uid;
+      return (
+        <div key={msg.id} className={isContinuation ? "mt-0.5" : idx > 0 ? "mt-2" : ""}>
+          {msg.type === "reaction" ? (
+            <div className="text-center text-base">
+              {msg.emoji}
+              <span className="text-[10px] text-gray-400 ml-1">{msg.name.split(" ")[0]}</span>
+            </div>
+          ) : msg.type === "system" ? (
+            <p className="text-center text-xs italic text-gray-400 py-0.5">{msg.text}</p>
+          ) : (
+            <div className={`flex gap-1.5 items-end ${isMine ? "flex-row-reverse" : ""}`}>
+              {!isContinuation ? (
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                  {msg.name.charAt(0)}
+                </div>
+              ) : (
+                <div className="w-6 shrink-0" />
+              )}
+              <div className={`max-w-[78%] flex flex-col gap-0.5 ${isMine ? "items-end" : "items-start"}`}>
+                {!isContinuation && (
+                  <p className="text-[10px] text-gray-400 px-1">{msg.name.split(" ")[0]}</p>
+                )}
+                <div className={`px-3 py-1.5 rounded-2xl text-xs leading-relaxed ${
+                  isMine
+                    ? `bg-blue-500 text-white ${isContinuation ? "rounded-tr-2xl" : "rounded-tr-sm"} ${!msg.createdAt ? "opacity-70" : ""}`
+                    : `bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 ${isContinuation ? "rounded-tl-2xl" : "rounded-tl-sm"}`
+                }`}>
+                  {msg.text}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }),
+  [allMessages, user?.uid]);
+
+  // ── Announcement callbacks ────────────────────────────────────────────────────
+  const handleSaveAnnouncement = useCallback(async () => {
+    if (!roomId) return;
+    await setPinnedAnnouncement(roomId, announcementDraft.trim() || null);
+    setEditingAnnouncement(false);
+  }, [roomId, announcementDraft]);
+
+  const handleClearAnnouncement = useCallback(async () => {
+    if (!roomId) return;
+    await setPinnedAnnouncement(roomId, null);
+    setEditingAnnouncement(false);
+    setAnnouncementDraft("");
+  }, [roomId]);
 
   // ── Emoji float ───────────────────────────────────────────────────────────────
   const spawnEmoji = useCallback((emoji: string) => {
@@ -527,6 +593,8 @@ export default function StudyRoomLive() {
   }
 
   function ChatPanel() {
+    const pinned = room?.pinnedAnnouncement;
+
     return (
       <div className="flex flex-col h-full">
         {/* Emoji row */}
@@ -538,54 +606,75 @@ export default function StudyRoomLive() {
             </button>
           ))}
         </div>
+
+        {/* ── Pinned announcement banner ─────────────────────────────────────── */}
+        <AnimatePresence>
+          {(pinned || (isHost && editingAnnouncement)) && (
+            <motion.div
+              key="announcement"
+              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+              animate={{ opacity: 1, height: "auto", marginBottom: 8 }}
+              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+              transition={{ duration: 0.18 }}
+              className="overflow-hidden"
+            >
+              {editingAnnouncement && isHost ? (
+                <div className="rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-2.5 space-y-2">
+                  <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                    <Pin className="w-3 h-3" />
+                    <span className="text-[10px] font-semibold uppercase tracking-wider">Pinned Announcement</span>
+                  </div>
+                  <textarea
+                    autoFocus
+                    value={announcementDraft}
+                    onChange={e => setAnnouncementDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSaveAnnouncement(); } }}
+                    placeholder="Type your announcement…"
+                    maxLength={200}
+                    rows={2}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 dark:border-amber-600 bg-white dark:bg-gray-800 text-xs text-gray-800 dark:text-gray-200 placeholder-gray-400 outline-none focus:ring-2 focus:ring-amber-400 resize-none"
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={handleSaveAnnouncement}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-semibold transition-all">
+                      <Check className="w-3 h-3" /> Pin
+                    </button>
+                    {pinned && (
+                      <button onClick={handleClearAnnouncement}
+                        className="px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-700 text-red-500 dark:text-red-400 text-xs font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 active:scale-95 transition-all">
+                        Clear
+                      </button>
+                    )}
+                    <button onClick={() => setEditingAnnouncement(false)}
+                      className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 transition-all">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : pinned ? (
+                <div className="flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
+                  <Pin className="w-3 h-3 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed flex-1">{pinned}</p>
+                  {isHost && (
+                    <button
+                      onClick={() => { setAnnouncementDraft(pinned ?? ""); setEditingAnnouncement(true); }}
+                      className="shrink-0 p-1 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-800/40 text-amber-600 dark:text-amber-400 transition-colors"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              ) : null}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Messages */}
-        <div className="flex-1 space-y-2 overflow-y-auto pr-0.5 mb-2" style={{ maxHeight: 320 }}>
+        <div className="flex-1 space-y-2 overflow-y-auto overscroll-contain pr-0.5 mb-2" style={{ maxHeight: 320 }}>
           {allMessages.length === 0 && (
             <p className="text-center text-xs text-gray-400 dark:text-gray-500 py-6">No messages yet — say something!</p>
           )}
-          {allMessages.map((msg, idx) => {
-            const prev = allMessages[idx - 1];
-            const isContinuation =
-              msg.type === "message" &&
-              prev?.type === "message" &&
-              prev?.uid === msg.uid;
-            const isMine = msg.uid === user?.uid;
-            return (
-              <div key={msg.id} className={isContinuation ? "mt-0.5" : idx > 0 ? "mt-2" : ""}>
-                {msg.type === "reaction" ? (
-                  <div className="text-center text-base">
-                    {msg.emoji}
-                    <span className="text-[10px] text-gray-400 ml-1">{msg.name.split(" ")[0]}</span>
-                  </div>
-                ) : msg.type === "system" ? (
-                  <p className="text-center text-xs italic text-gray-400 py-0.5">{msg.text}</p>
-                ) : (
-                  <div className={`flex gap-1.5 items-end ${isMine ? "flex-row-reverse" : ""}`}>
-                    {/* Avatar — only shown for first message in a consecutive group */}
-                    {!isContinuation ? (
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
-                        {msg.name.charAt(0)}
-                      </div>
-                    ) : (
-                      <div className="w-6 shrink-0" />
-                    )}
-                    <div className={`max-w-[78%] flex flex-col gap-0.5 ${isMine ? "items-end" : "items-start"}`}>
-                      {!isContinuation && (
-                        <p className="text-[10px] text-gray-400 px-1">{msg.name.split(" ")[0]}</p>
-                      )}
-                      <div className={`px-3 py-1.5 rounded-2xl text-xs leading-relaxed ${
-                        isMine
-                          ? `bg-blue-500 text-white ${isContinuation ? "rounded-tr-2xl" : "rounded-tr-sm"} ${!msg.createdAt ? "opacity-70" : ""}`
-                          : `bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 ${isContinuation ? "rounded-tl-2xl" : "rounded-tl-sm"}`
-                      }`}>
-                        {msg.text}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {messagesJSX}
           <div ref={chatRef} />
         </div>
         {/* Input */}
@@ -774,10 +863,9 @@ export default function StudyRoomLive() {
 
         {showTimer && (
           <div className="mt-2 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-            <motion.div
-              className={`h-full rounded-full ${isStudying ? "bg-blue-500" : "bg-green-500"}`}
+            <div
+              className={`h-full rounded-full transition-[width] duration-1000 ease-linear ${isStudying ? "bg-blue-500" : "bg-green-500"}`}
               style={{ width: `${pctDone}%` }}
-              transition={{ duration: 1, ease: "linear" }}
             />
           </div>
         )}
@@ -1044,8 +1132,25 @@ export default function StudyRoomLive() {
             </div>
 
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800">
-              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
                 <span className="text-sm font-bold text-gray-900 dark:text-white">💬 Chat</span>
+                {isHost && (
+                  <button
+                    onClick={() => {
+                      setAnnouncementDraft(room?.pinnedAnnouncement ?? "");
+                      setEditingAnnouncement(v => !v);
+                    }}
+                    title={room?.pinnedAnnouncement ? "Edit pinned announcement" : "Pin an announcement"}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all active:scale-95 ${
+                      room?.pinnedAnnouncement
+                        ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50"
+                        : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    }`}
+                  >
+                    <Pin className="w-3.5 h-3.5" />
+                    {room?.pinnedAnnouncement ? "Pinned" : "Pin"}
+                  </button>
+                )}
               </div>
               <div className="p-3">
                 {ChatPanel()}

@@ -42,6 +42,8 @@ export interface Room {
   chatCooldownSecs?: number;
   /** Whether chat is enabled. Default: true */
   chatEnabled?: boolean;
+  /** Host-pinned announcement shown at the top of chat for all participants. */
+  pinnedAnnouncement?: string | null;
 }
 
 export interface RoomParticipant {
@@ -421,6 +423,12 @@ export async function skipPhase(roomId: string, room: Room): Promise<void> {
 export async function endRoom(roomId: string): Promise<void> {
   await updateDoc(doc(db, "studyRooms", roomId), {
     status: "finished", timerStartedAt: null,
+  });
+}
+
+export async function setPinnedAnnouncement(roomId: string, text: string | null): Promise<void> {
+  await updateDoc(doc(db, "studyRooms", roomId), {
+    pinnedAnnouncement: text ?? null,
   });
 }
 
