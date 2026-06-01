@@ -97,7 +97,12 @@ function FileUpload({ accept, label, storagePath, onUploaded, disabled }: FileUp
       form.append("file", file);
       form.append("folder", storagePath);
 
-      const resp = await fetch("/api/upload", { method: "POST", body: form });
+      const idToken = await auth.currentUser?.getIdToken().catch(() => null);
+      const resp = await fetch("/api/upload", {
+        method: "POST",
+        body: form,
+        headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
+      });
       const data = await resp.json() as { url?: string; error?: string };
 
       if (!resp.ok || !data.url) {
@@ -2226,7 +2231,12 @@ function ManageCreators() {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("folder", "creators");
-      const resp = await fetch("/api/upload", { method: "POST", body: fd });
+      const idToken = await auth.currentUser?.getIdToken().catch(() => null);
+      const resp = await fetch("/api/upload", {
+        method: "POST",
+        body: fd,
+        headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
+      });
       const data = await resp.json() as { url?: string; error?: string };
       if (!resp.ok || !data.url) { setUploadError(data.error ?? "Upload failed."); setUploadProgress(null); return; }
       setForm(f => ({ ...f, image: data.url! }));
