@@ -9,7 +9,7 @@ import { db } from "@/lib/firebase";
 import {
   BookOpen, BarChart2, FileText, CheckSquare,
   Timer, MessageCircle, Flame, Megaphone, X, Bookmark,
-  ChevronDown, ChevronRight, Users, Instagram,
+  ChevronDown, ChevronRight, Users, Instagram, Star,
 } from "lucide-react";
 import { SiteGuide } from "@/components/SiteGuide";
 import { DailyMissionWidget } from "@/components/DailyMissionWidget";
@@ -24,6 +24,7 @@ const sections = [
   { href: "/pomodoro",   icon: Timer,         label: "Pomodoro Timer",     desc: "Focus and study",             color: "bg-red-50 text-red-600"       },
   { href: "/ai",         icon: MessageCircle, label: "Nep AI",             desc: "AI study assistant",          color: "bg-indigo-50 text-indigo-600" },
   { href: "/saved",      icon: Bookmark,      label: "Saved",              desc: "Your bookmarked items",       color: "bg-teal-50 text-teal-600"     },
+  { href: "/creators",   icon: Star,          label: "Partner Creators",   desc: "Nepal's top student creators", color: "bg-yellow-50 text-yellow-600" },
 ];
 
 interface Announcement { id: string; title: string; body: string; createdAt: string }
