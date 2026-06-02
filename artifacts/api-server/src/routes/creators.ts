@@ -8,6 +8,8 @@ const router = Router();
 
 const ADMIN_KEY      = process.env.ADMIN_KEY ?? "siddhant2078";
 const CREATORS_FILE  = resolve(process.cwd(), "creators.json");
+const PROJECT_ID     = process.env.VITE_FIREBASE_PROJECT_ID ?? "studenthub-6bcc5";
+const API_KEY        = process.env.VITE_FIREBASE_API_KEY ?? "";
 
 interface Creator {
   id: string;
@@ -17,6 +19,7 @@ interface Creator {
   instagram?: string | null;
   tiktok?: string | null;
   youtube?: string | null;
+  uid?: string | null;
   featured: boolean;
   visible: boolean;
   order: number;
@@ -40,6 +43,41 @@ function newId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+// ── Firestore REST API fetch (no Admin SDK needed) ────────────────────────────
+type FSField = { stringValue?: string; booleanValue?: boolean; integerValue?: string; doubleValue?: number; nullValue?: string };
+type FSFields = Record<string, FSField>;
+interface FSDoc { name: string; fields: FSFields; }
+
+function parseCreatorDoc(d: FSDoc): Creator {
+  const f = d.fields;
+  const id = d.name.split("/").pop() ?? "";
+  return {
+    id,
+    name:        f.name?.stringValue        ?? "",
+    image:       f.image?.stringValue       ?? "",
+    description: f.description?.stringValue ?? "",
+    instagram:   f.instagram?.stringValue   ?? null,
+    tiktok:      f.tiktok?.stringValue      ?? null,
+    youtube:     f.youtube?.stringValue     ?? null,
+    uid:         f.uid?.stringValue         ?? null,
+    featured:    f.featured?.booleanValue   ?? false,
+    visible:     f.visible?.booleanValue    ?? true,
+    order:       Number(f.order?.integerValue ?? f.order?.doubleValue ?? 0),
+    createdAt:   f.createdAt?.stringValue   ?? "",
+  };
+}
+
+async function fetchCreatorsRest(): Promise<Creator[]> {
+  const url =
+    `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/creators` +
+    `?pageSize=300` +
+    (API_KEY ? `&key=${encodeURIComponent(API_KEY)}` : "");
+  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+  if (!res.ok) throw new Error(`Firestore REST error: ${res.status}`);
+  const data = await res.json() as { documents?: FSDoc[] };
+  return (data.documents ?? []).map(parseCreatorDoc);
+}
+
 // ── Auth middleware ───────────────────────────────────────────────────────────
 function requireAdminKey(req: Request, res: Response, next: NextFunction): void {
   if (req.headers["x-admin-key"] !== ADMIN_KEY) {
@@ -60,7 +98,14 @@ router.get("/creators", async (_req: Request, res: Response) => {
         .get();
       return res.json(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }
-    // ── Fallback: local JSON file ─────────────────────────────────────────────
+    // ── Fallback 1: Firestore REST API ────────────────────────────────────────
+    try {
+      const all = await fetchCreatorsRest();
+      return res.json(all.filter(c => c.visible).sort((a, b) => a.order - b.order));
+    } catch (restErr) {
+      logger.warn(restErr, "[Creators] REST API fallback failed, using local file");
+    }
+    // ── Fallback 2: local JSON file ───────────────────────────────────────────
     const all = fileRead();
     return res.json(all.filter(c => c.visible).sort((a, b) => a.order - b.order));
   } catch (err) {
@@ -77,6 +122,14 @@ router.get("/creators/all", requireAdminKey, async (_req: Request, res: Response
       const snap = await db.collection("creators").orderBy("order", "asc").get();
       return res.json(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }
+    // ── Fallback 1: Firestore REST API ────────────────────────────────────────
+    try {
+      const all = await fetchCreatorsRest();
+      return res.json(all.sort((a, b) => a.order - b.order));
+    } catch (restErr) {
+      logger.warn(restErr, "[Creators] REST API fallback failed, using local file");
+    }
+    // ── Fallback 2: local JSON file ───────────────────────────────────────────
     return res.json(fileRead().sort((a, b) => a.order - b.order));
   } catch (err) {
     logger.error(err, "[Creators] GET /creators/all");
