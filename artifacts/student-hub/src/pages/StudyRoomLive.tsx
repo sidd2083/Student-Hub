@@ -14,9 +14,11 @@ import { useRoomSound } from "@/hooks/useAmbientSound";
 import {
   Room, RoomParticipant, Vote, RoomMessage,
   subscribeRoom, subscribeParticipants, subscribeActiveVotes, subscribeMessages,
-  joinRoom, sendMessage, getRemainingSeconds, formatTime, createVote,
+  getRecentMessages, sendMessage,
+  joinRoom, getRemainingSeconds, formatTime, createVote,
   setPinnedAnnouncement,
 } from "@/lib/studyRooms";
+import { getSocket, isSocketConnected, type WsChatMessage } from "@/lib/socket";
 import { useActiveRoom, useRoomTimer } from "@/context/ActiveRoomContext";
 import { useAuth } from "@/context/AuthContext";
 import { ClassroomView } from "@/components/study-room/ClassroomView";
@@ -24,6 +26,15 @@ import { VotingPanel } from "@/components/study-room/VotingPanel";
 import { StudentProfileModal } from "@/components/study-room/StudentProfileModal";
 
 const EMOJI_REACTIONS = ["👍", "🔥", "💪", "🎯", "⚡", "🙏", "😎", "🥳"];
+
+// Convert a WebSocket chat payload into the RoomMessage shape used by the renderer.
+// We provide a toMillis()-compatible createdAt so age checks work identically.
+function wsToRoomMessage(d: WsChatMessage): RoomMessage {
+  return {
+    id: d.id, uid: d.uid, name: d.name, text: d.text, type: "message",
+    createdAt: { toMillis: () => d.createdAtMs, toDate: () => new Date(d.createdAtMs) } as any,
+  };
+}
 
 interface FloatingEmoji { id: string; emoji: string; x: number }
 
@@ -94,6 +105,9 @@ export default function StudyRoomLive() {
   // ── Unread chat messages (mobile only — increments when not on chat tab) ────
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const prevMsgCountRef = useRef(0);
+  // Becomes true when socket.io can't connect (Vercel serverless etc.) — triggers Firestore fallback
+  const [wsUnavailable,   setWsUnavailable]   = useState(false);
+  const wsFallbackTimer                        = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const chatRef      = useRef<HTMLDivElement>(null);
   const seenMsgIds   = useRef<Set<string>>(new Set());
@@ -154,14 +168,62 @@ export default function StudyRoomLive() {
     return subscribeActiveVotes(roomId, setVotes);
   }, [roomId]);
 
+  // ── WebSocket chat (primary path) ─────────────────────────────────────────
+  // On join: load history once via getDocs (1 read, not a live listener).
+  // Real-time messages arrive via socket event — zero Firestore reads after that.
+  // Falls back to onSnapshot if the socket doesn't connect within 3 s (e.g. Vercel).
   useEffect(() => {
-    if (!roomId) return;
-    return subscribeMessages(roomId, (msgs) => {
-      // Merge optimistic messages that haven't landed yet
-      // Clear optimistic messages matched by uid+text (Firestore assigns its own IDs,
-      // so matching by optimistic ID `opt_${Date.now()}` never removes them)
-      setOptimistic(prev => prev.filter(o => !msgs.some(m => m.uid === o.uid && m.text === o.text)));
+    if (!joined || !roomId || !user || !profile) return;
+    const sock = getSocket();
 
+    // Load chat history once (one-time read — NOT an ongoing listener)
+    getRecentMessages(roomId).then(msgs => {
+      msgs.forEach(m => seenMsgIds.current.add(m.id));
+      setMessages(msgs);
+    }).catch(() => {});
+
+    // Start 3 s fallback timer — if socket hasn't connected by then, use Firestore
+    if (wsFallbackTimer.current) clearTimeout(wsFallbackTimer.current);
+    wsFallbackTimer.current = setTimeout(() => {
+      if (!sock.connected) setWsUnavailable(true);
+    }, 3_000);
+
+    const onChatMsg = (data: WsChatMessage) => {
+      if (seenMsgIds.current.has(data.id)) return;
+      seenMsgIds.current.add(data.id);
+      setOptimistic(prev => prev.filter(o => !(o.uid === data.uid && o.text === data.text)));
+      setMessages(prev => [...prev, wsToRoomMessage(data)]);
+    };
+
+    const onReaction = (data: { emoji: string }) => { spawnEmoji(data.emoji); };
+
+    const onConnect = () => {
+      if (wsFallbackTimer.current) { clearTimeout(wsFallbackTimer.current); wsFallbackTimer.current = null; }
+      setWsUnavailable(false);
+      sock.emit("join-room", { roomId, uid: user.uid, name: profile.name });
+    };
+
+    sock.on("chat-message", onChatMsg);
+    sock.on("reaction",     onReaction);
+
+    if (sock.connected) { onConnect(); }
+    else                { sock.once("connect", onConnect); }
+
+    return () => {
+      if (wsFallbackTimer.current) { clearTimeout(wsFallbackTimer.current); wsFallbackTimer.current = null; }
+      sock.off("chat-message", onChatMsg);
+      sock.off("reaction",     onReaction);
+      sock.off("connect",      onConnect);
+      sock.emit("leave-room");
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joined, roomId, user?.uid, profile?.name]);
+
+  // ── Firestore fallback for chat (when WS unavailable — e.g. Vercel) ─────────
+  useEffect(() => {
+    if (!joined || !roomId || !wsUnavailable) return;
+    return subscribeMessages(roomId, (msgs) => {
+      setOptimistic(prev => prev.filter(o => !msgs.some(m => m.uid === o.uid && m.text === o.text)));
       for (const msg of msgs) {
         if (msg.type === "reaction" && msg.emoji && !seenMsgIds.current.has(msg.id)) {
           seenMsgIds.current.add(msg.id);
@@ -173,7 +235,7 @@ export default function StudyRoomLive() {
       }
       setMessages(msgs);
     });
-  }, [roomId]);
+  }, [roomId, joined, wsUnavailable]);
 
   // ── Chat slow mode countdown tick ──────────────────────────────────────────
   useEffect(() => {
@@ -373,7 +435,7 @@ export default function StudyRoomLive() {
     lastSentAtRef.current = Date.now();
     setCooldownRemaining(cooldownSecs > 0 ? cooldownSecs : 0);
 
-    // Optimistic: show message instantly, Firestore snapshot will replace it
+    // Optimistic: show instantly while the server relays / Firestore confirms
     const tempId = `opt_${Date.now()}`;
     const optimistic: RoomMessage = {
       id: tempId, uid: user.uid, name: profile.name,
@@ -381,21 +443,29 @@ export default function StudyRoomLive() {
     };
     setOptimistic(prev => [...prev, optimistic]);
 
-    try {
-      await sendMessage(roomId, { uid: user.uid, name: profile.name, text: txt, type: "message" });
-    } catch (e) {
-      console.error("[Chat] send failed:", e);
-      setOptimistic(prev => prev.filter(m => m.id !== tempId));
+    if (isSocketConnected()) {
+      // WS path: server relays to room + persists to Firestore — no client write
+      getSocket().emit("send-message", { text: txt });
+    } else {
+      // Firestore fallback (WS unavailable — e.g. Vercel serverless)
+      try {
+        await sendMessage(roomId, { uid: user.uid, name: profile.name, text: txt, type: "message" });
+      } catch (e) {
+        console.error("[Chat] send failed:", e);
+        setOptimistic(prev => prev.filter(m => m.id !== tempId));
+      }
     }
   }
 
   async function handleReaction(emoji: string) {
     if (!user || !profile || !roomId) return;
-    spawnEmoji(emoji);
-    try {
-      await sendMessage(roomId, { uid: user.uid, name: profile.name, emoji, type: "reaction" });
-    } catch (e) {
-      console.error("[Reaction] send failed:", e);
+    spawnEmoji(emoji); // immediate local feedback regardless of transport
+    if (isSocketConnected()) {
+      // WS path: ephemeral relay only — zero Firestore writes
+      getSocket().emit("send-reaction", { emoji });
+    } else {
+      // Firestore fallback
+      sendMessage(roomId, { uid: user.uid, name: profile.name, emoji, type: "reaction" }).catch(() => {});
     }
   }
 

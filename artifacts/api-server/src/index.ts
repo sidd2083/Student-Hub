@@ -1,4 +1,6 @@
+import { createServer } from "http";
 import app from "./app";
+import { initSocketServer } from "./lib/socket";
 import { logger } from "./lib/logger";
 
 const rawPort = process.env["PORT"];
@@ -21,11 +23,19 @@ async function start() {
     return;
   }
 
-  app.listen(port, (err) => {
-    if (err) {
-      logger.error({ err }, "Error listening on port");
-      process.exit(1);
-    }
+  // Create an explicit HTTP server so Socket.io can attach to it.
+  // (app.listen() creates one internally, but we can't get a reference to it.)
+  const httpServer = createServer(app);
+
+  httpServer.on("error", (err) => {
+    logger.error({ err }, "Error listening on port");
+    process.exit(1);
+  });
+
+  // Attach Socket.io — must happen before httpServer.listen()
+  initSocketServer(httpServer);
+
+  httpServer.listen(port, () => {
     logger.info({ port }, "Server listening");
   });
 }

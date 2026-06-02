@@ -12,6 +12,7 @@ import {
   getLiveStudyMins, isParticipantActive, syncParticipantCount,
 } from "@/lib/studyRooms";
 import { playBell } from "@/hooks/useAmbientSound";
+import { getSocket } from "@/lib/socket";
 
 interface ActiveRoomContextType {
   activeRoomId: string | null;
@@ -274,13 +275,20 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     return () => clearInterval(interval);
   }, [user, getTotalStudySeconds]);
 
-  // ── Presence heartbeat — every 15 s ──────────────────────────────────────
+  // ── Presence heartbeat ─────────────────────────────────────────────────────
+  // WS ping every 15 s → zero Firestore cost, just a tiny socket payload.
+  // Firestore write every 60 s keeps lastSeen fresh for the 90 s stale-check
+  // (4× fewer writes vs the old 15 s interval).
   useEffect(() => {
     if (!activeRoomId || !user) return;
-    const interval = setInterval(() => {
-      updatePresence(activeRoomId, user.uid).catch(() => {});
+    const sock = getSocket();
+    const wsInterval = setInterval(() => {
+      sock.emit("heartbeat");
     }, 15_000);
-    return () => clearInterval(interval);
+    const fsInterval = setInterval(() => {
+      updatePresence(activeRoomId, user.uid).catch(() => {});
+    }, 60_000);
+    return () => { clearInterval(wsInterval); clearInterval(fsInterval); };
   }, [activeRoomId, user]);
 
   // ── Host: purge stale participants every 60 s ─────────────────────────────

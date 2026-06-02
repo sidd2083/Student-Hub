@@ -712,6 +712,22 @@ export function subscribeMessages(roomId: string, cb: (msgs: RoomMessage[]) => v
   );
 }
 
+/**
+ * One-time fetch of the most recent 50 chat messages.
+ * Used on room join to populate history — WebSocket delivers everything
+ * after that, so we don't need an ongoing onSnapshot listener.
+ */
+export async function getRecentMessages(roomId: string): Promise<RoomMessage[]> {
+  try {
+    const snap = await getDocs(
+      query(collection(db, "studyRooms", roomId, "messages"), orderBy("createdAt", "asc"), limit(50))
+    );
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as RoomMessage));
+  } catch {
+    return [];
+  }
+}
+
 export async function isParticipant(roomId: string, uid: string): Promise<boolean> {
   try {
     const snap = await getDoc(doc(db, "studyRooms", roomId, "participants", uid));

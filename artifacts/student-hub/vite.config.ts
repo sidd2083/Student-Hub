@@ -117,6 +117,15 @@ export default defineConfig({
       ],
     },
     proxy: {
+      // WebSocket proxy — must be listed before /api so Vite matches it first.
+      // ws:true tells Vite to also upgrade the HTTP→WS handshake for Socket.io.
+      "/socket.io": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+        ws: true,
+        proxyTimeout: 60_000,
+        timeout: 60_000,
+      },
       "/api": {
         target: "http://localhost:8080",
         changeOrigin: true,
