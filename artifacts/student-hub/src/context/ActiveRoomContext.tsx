@@ -90,6 +90,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   const lastSyncedSecsRef   = useRef(0);
   const lastSyncTimeRef     = useRef(Date.now());
   const lastBadgeSyncRef    = useRef(Date.now());
+  const lastFsBadgeSyncRef  = useRef(0); // Firestore-only persistence (every 5 min)
   const prevStudyingRef     = useRef(false);
 
   const remainingSecsRef   = useRef(0);  // always fresh for onHostPause
@@ -158,20 +159,36 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     });
 
     unsubPartsRef.current = subscribeParticipants(activeRoomId, (ps) => {
-      setParticipants(ps);
-      // ── Member count correction ────────────────────────────────────────────
-      // participantCount on the room doc drifts when tabs crash or network
-      // cuts — subscribeParticipants already filters stale docs, so ps.length
-      // is always accurate. Any participant can safely correct the count.
+      // Merge Firestore data with in-memory WS study mins.
+      // Badge writes were reduced 30 s → 5 min, so Firestore can lag.
+      // "Keep the higher value" is safe: study mins only ever increase.
+      setParticipants(prev => ps.map(p => {
+        const mem = prev.find(e => e.uid === p.uid);
+        return mem && (mem.studyMinsInRoom ?? 0) > (p.studyMinsInRoom ?? 0)
+          ? { ...p, studyMinsInRoom: mem.studyMinsInRoom }
+          : p;
+      }));
       const r = roomRef.current;
       if (r && r.id === activeRoomId && ps.length > 0 && r.participantCount !== ps.length) {
         syncParticipantCount(activeRoomId, ps.length).catch(() => {});
       }
     });
 
+    // WS: receive live badge updates from other room members (zero Firestore reads).
+    // Updates participant state in-memory so ClassroomView shows fresh study mins
+    // without waiting for a Firestore onSnapshot.
+    const sock = getSocket();
+    const onMinsUpdate = ({ uid: pUid, mins }: { uid: string; mins: number }) => {
+      setParticipants(prev => prev.map(p =>
+        p.uid === pUid ? { ...p, studyMinsInRoom: mins } : p
+      ));
+    };
+    sock.on("participant-mins-update", onMinsUpdate);
+
     return () => {
       unsubRoomRef.current?.();
       unsubPartsRef.current?.();
+      sock.off("participant-mins-update", onMinsUpdate);
     };
   }, [activeRoomId]);
 
@@ -238,7 +255,14 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
         // studyStartedAt=now which makes getLiveStudyMins count break time as study time.
         if (now - lastBadgeSyncRef.current >= 30_000 && user && isRoomStudying(r)) {
           const totalMins = Math.floor(getTotalStudySeconds() / 60);
-          updateParticipantStudyMins(r.id, user.uid, totalMins).catch(() => {});
+          // WS: broadcast live badge to room (zero Firestore cost)
+          getSocket().emit("update-study-mins", { mins: totalMins });
+          // Firestore: persist + reset studyStartedAt every 5 min to prevent
+          // double-counting on page refresh (studyStartedAt must stay current)
+          if (now - lastFsBadgeSyncRef.current >= 5 * 60_000) {
+            updateParticipantStudyMins(r.id, user.uid, totalMins).catch(() => {});
+            lastFsBadgeSyncRef.current = now;
+          }
           lastBadgeSyncRef.current = now;
         }
 
@@ -559,6 +583,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     lastSyncedSecsRef.current   = 0;
     lastSyncTimeRef.current     = Date.now();
     lastBadgeSyncRef.current    = Date.now();
+    lastFsBadgeSyncRef.current  = 0; // force Firestore write within first 5 min of restarted session
     prevStudyingRef.current     = false;
     advancingRef.current        = false;
     prevPhaseRef.current        = null;

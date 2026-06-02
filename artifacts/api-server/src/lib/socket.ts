@@ -102,6 +102,15 @@ export function initSocketServer(httpServer: HTTPServer): SocketServer {
       }
     });
 
+    // ── Live study-min badge (relay only — replaces 30s Firestore write) ─────────
+    // Each client emits every 30 s while studying; server broadcasts to the room.
+    // Eliminates onSnapshot cascade: 10 users × 100 rooms × 9 reads/write → 0.
+    socket.on("update-study-mins", (data: { mins?: number }) => {
+      if (!roomId || !uid) return;
+      const mins = Math.max(0, Math.round(Number(data?.mins ?? 0)));
+      io.to(roomId).emit("participant-mins-update", { uid, mins });
+    });
+
     // ── Emoji reaction (ephemeral — no Firestore write) ────────────────────────
     socket.on("send-reaction", (data: { emoji?: string }) => {
       if (!roomId || !uid || !displayName) return;
