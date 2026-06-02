@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { Instagram, Youtube, Star, Users, X, Flame, Clock, Trophy, Award } from "lucide-react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface Creator {
   id: string;
@@ -253,11 +255,18 @@ export default function PartnerCreators() {
   const [profileFor, setProfileFor]   = useState<Creator | null>(null);
 
   useEffect(() => {
-    fetch("/api/creators")
-      .then(r => r.ok ? r.json() as Promise<Creator[]> : Promise.reject())
-      .then(data => setCreators(data))
-      .catch(() => setCreators([]))
-      .finally(() => setLoading(false));
+    const load = async () => {
+      try {
+        const snap = await getDocs(collection(db, "creators"));
+        const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as Creator));
+        setCreators(all.filter(c => c.visible).sort((a, b) => a.order - b.order));
+      } catch {
+        setCreators([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
 
   const featured = creators.find(c => c.featured);

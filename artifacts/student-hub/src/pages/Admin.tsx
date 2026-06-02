@@ -2204,10 +2204,8 @@ function ManageCreators() {
   const fetchCreators = useCallback(async () => {
     setLoading(true);
     try {
-      const resp = await fetch("/api/creators/all", { headers: { "X-Admin-Key": ADMIN_KEY } });
-      if (!resp.ok) throw new Error("Fetch failed");
-      const data = await resp.json() as FireCreator[];
-      setCreators(data);
+      const snap = await getDocs(query(collection(db, "creators"), orderBy("order", "asc")));
+      setCreators(snap.docs.map(d => ({ id: d.id, ...d.data() } as FireCreator)));
     } catch { setCreators([]); }
     finally { setLoading(false); }
   }, []);
@@ -2284,7 +2282,7 @@ function ManageCreators() {
     setFieldErrors({});
     setSaving(true);
     try {
-      const data: Record<string, unknown> = {
+      const data = {
         name: form.name.trim(),
         image: form.image.trim(),
         description: form.description.trim(),
@@ -2295,17 +2293,13 @@ function ManageCreators() {
         visible: form.visible,
         order: Number(form.order) || 0,
         createdAt: form.createdAt || new Date().toISOString().slice(0, 10),
+        uid: form.uid || null,
       };
-      if (form.uid) data.uid = form.uid; else data.uid = null;
-      const url    = editId ? `/api/creators/${editId}` : "/api/creators";
-      const method = editId ? "PUT" : "POST";
-      const resp   = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json", "X-Admin-Key": ADMIN_KEY },
-        body: JSON.stringify(data),
-      });
-      const result = await resp.json() as { id?: string; ok?: boolean; error?: string };
-      if (!resp.ok) { flash("error", result.error ?? "Failed to save. Please try again."); return; }
+      if (editId) {
+        await updateDoc(doc(db, "creators", editId), data);
+      } else {
+        await addDoc(collection(db, "creators"), data);
+      }
       flash(
         "success",
         editId ? `"${form.name.trim()}" updated successfully!` : `"${form.name.trim()}" added successfully!`,
@@ -2322,11 +2316,7 @@ function ManageCreators() {
   const handleDelete = async (id: string, name: string) => {
     if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
     try {
-      const resp = await fetch(`/api/creators/${id}`, {
-        method: "DELETE",
-        headers: { "X-Admin-Key": ADMIN_KEY },
-      });
-      if (!resp.ok) { const d = await resp.json() as { error?: string }; flash("error", d.error ?? "Delete failed."); return; }
+      await deleteDoc(doc(db, "creators", id));
       flash("success", "Creator deleted.");
       await fetchCreators();
     } catch { flash("error", "Delete failed."); }
@@ -2337,19 +2327,11 @@ function ManageCreators() {
       if (field === "featured" && !current) {
         for (const c of creators) {
           if (c.id !== id && c.featured) {
-            await fetch(`/api/creators/${c.id}`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json", "X-Admin-Key": ADMIN_KEY },
-              body: JSON.stringify({ featured: false }),
-            });
+            await updateDoc(doc(db, "creators", c.id), { featured: false });
           }
         }
       }
-      await fetch(`/api/creators/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "X-Admin-Key": ADMIN_KEY },
-        body: JSON.stringify({ [field]: !current }),
-      });
+      await updateDoc(doc(db, "creators", id), { [field]: !current });
       await fetchCreators();
     } catch { flash("error", "Failed to update."); }
   };
@@ -2361,16 +2343,8 @@ function ManageCreators() {
     if (swapIdx < 0 || swapIdx >= creators.length) return;
     try {
       const a = creators[idx], b = creators[swapIdx];
-      await fetch(`/api/creators/${a.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "X-Admin-Key": ADMIN_KEY },
-        body: JSON.stringify({ order: b.order }),
-      });
-      await fetch(`/api/creators/${b.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "X-Admin-Key": ADMIN_KEY },
-        body: JSON.stringify({ order: a.order }),
-      });
+      await updateDoc(doc(db, "creators", a.id), { order: b.order });
+      await updateDoc(doc(db, "creators", b.id), { order: a.order });
       await fetchCreators();
     } catch { flash("error", "Reorder failed."); }
   };
