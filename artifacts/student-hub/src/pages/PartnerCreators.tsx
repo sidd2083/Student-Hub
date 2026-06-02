@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Helmet } from "react-helmet-async";
 import { Instagram, Youtube, Star, Users, X, Flame, Clock, Trophy, Award, ExternalLink } from "lucide-react";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+
+/* ─── Types ────────────────────────────────────────────────────── */
 
 interface Creator {
   id: string;
@@ -15,7 +17,6 @@ interface Creator {
   featured: boolean;
   visible: boolean;
   order: number;
-  createdAt: string;
   uid?: string;
 }
 
@@ -25,10 +26,12 @@ interface UserProfile {
   grade: number | null;
   photoURL: string | null;
   streak: number;
-  totalStudyTime: number;
-  badges: string[] | { id: string; text: string; emoji: string; color: string }[];
-  missionCompletedDays: number;
+  totalStudyMins: number;
+  badges: ({ text: string; emoji: string; color: string } | string)[];
+  missionDays: number;
 }
+
+/* ─── Tiny helpers ──────────────────────────────────────────────── */
 
 function TikTokIcon({ className }: { className?: string }) {
   return (
@@ -38,29 +41,25 @@ function TikTokIcon({ className }: { className?: string }) {
   );
 }
 
-function Avatar({ src, name, size = "md" }: { src?: string | null; name: string; size?: "sm" | "md" | "lg" | "xl" }) {
-  const [err, setErr] = useState(false);
-  const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-  const sizeClass = { sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-16 h-16 text-xl", xl: "w-24 h-24 text-3xl" }[size];
-  if (src && !err) {
-    return <img src={src} alt={name} onError={() => setErr(true)} className={`${sizeClass} rounded-full object-cover`} />;
-  }
+function Initials({ name, className }: { name: string; className?: string }) {
+  const init = name.split(" ").map(w => w[0] ?? "").join("").slice(0, 2).toUpperCase();
   return (
-    <div className={`${sizeClass} rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-white flex-shrink-0`}>
-      {initials}
-    </div>
+    <span className={`font-bold tracking-wide ${className ?? ""}`}>{init}</span>
   );
 }
+
+/* ─── Profile Modal ─────────────────────────────────────────────── */
 
 function ProfileModal({ creator, onClose }: { creator: Creator; onClose: () => void }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(!!creator.uid);
+  const [imgErr, setImgErr] = useState(false);
 
   useEffect(() => {
     if (!creator.uid) { setLoading(false); return; }
     getDoc(doc(db, "users", creator.uid))
       .then(snap => {
-        if (!snap.exists()) { setProfile(null); return; }
+        if (!snap.exists()) return;
         const d = snap.data();
         setProfile({
           uid: creator.uid!,
@@ -68,76 +67,110 @@ function ProfileModal({ creator, onClose }: { creator: Creator; onClose: () => v
           grade: d.grade ?? null,
           photoURL: d.photoURL ?? null,
           streak: d.streak ?? 0,
-          totalStudyTime: d.totalStudyTime ?? 0,
+          totalStudyMins: d.totalStudyTime ?? 0,
           badges: d.badges ?? [],
-          missionCompletedDays: d.missionCompletedDays ?? 0,
+          missionDays: d.missionCompletedDays ?? 0,
         });
       })
-      .catch(() => setProfile(null))
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [creator.uid, creator.name]);
 
   const displayName = profile?.name ?? creator.name;
-  const photo = profile?.photoURL ?? creator.image;
+  const photoSrc = profile?.photoURL ?? null;
+  const hours = Math.floor((profile?.totalStudyMins ?? 0) / 60);
 
-  const badgeList = (profile?.badges ?? []).map(b =>
-    typeof b === "string" ? { text: b, emoji: "🏅", color: "bg-purple-50 text-purple-600 border-purple-100" } :
-    { text: b.text, emoji: b.emoji, color: `${b.color} border-transparent` }
+  const badges = (profile?.badges ?? []).map(b =>
+    typeof b === "string"
+      ? { text: b, emoji: "🏅", color: "bg-indigo-50 text-indigo-600 border-indigo-100" }
+      : { text: b.text, emoji: b.emoji, color: `${b.color} border-transparent` }
   );
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+    /* Backdrop */
+    <div
+      className="fixed inset-0 z-50 flex flex-col items-center justify-end sm:justify-center"
+      style={{ backgroundColor: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
+      onClick={onClose}
+    >
+      {/* Sheet */}
       <div
-        className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] overflow-y-auto"
+        className="relative bg-white w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl shadow-2xl flex flex-col"
+        style={{ maxHeight: "92dvh" }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Header banner */}
-        <div className="relative bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 pt-10 pb-14 px-6">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-all"
-          >
-            <X className="w-4 h-4" />
-          </button>
-          <div className="flex items-center gap-1.5 mb-1">
-            <Star className="w-3.5 h-3.5 text-yellow-300 fill-yellow-300" />
-            <span className="text-xs font-semibold text-blue-100 uppercase tracking-wide">Verified Partner Creator</span>
+        {/* Close btn */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/15 hover:bg-black/25 transition-colors text-white"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        {/* Gradient header — avatar lives INSIDE it */}
+        <div className="rounded-t-3xl sm:rounded-t-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 px-6 pt-8 pb-6 flex-shrink-0">
+          <div className="flex items-center gap-4">
+            {/* Avatar */}
+            <div className="w-20 h-20 rounded-2xl overflow-hidden ring-4 ring-white/30 shadow-xl flex-shrink-0 bg-white/20">
+              {photoSrc && !imgErr ? (
+                <img
+                  src={photoSrc}
+                  alt={displayName}
+                  onError={() => setImgErr(true)}
+                  className="w-full h-full object-cover"
+                  decoding="async"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Initials name={displayName} className="text-3xl text-white" />
+                </div>
+              )}
+            </div>
+
+            {/* Name / grade / partner tag */}
+            <div className="flex-1 min-w-0">
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-400/90 rounded-full mb-1.5">
+                <Star className="w-2.5 h-2.5 text-yellow-900 fill-yellow-900" />
+                <span className="text-[9px] font-extrabold text-yellow-900 uppercase tracking-wider">Verified Partner</span>
+              </div>
+              <h2 className="text-xl font-extrabold text-white leading-tight truncate">{displayName}</h2>
+              {profile?.grade && (
+                <p className="text-blue-200 text-xs mt-0.5">Grade {profile.grade}</p>
+              )}
+            </div>
           </div>
-          <h2 className="text-2xl font-bold text-white leading-tight">{displayName}</h2>
-          {profile?.grade && <p className="text-blue-200 text-sm mt-0.5">Grade {profile.grade}</p>}
+
+          {/* Social links inside header */}
+          {(creator.instagram || creator.tiktok || creator.youtube) && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {creator.instagram && (
+                <a href={creator.instagram} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition-all">
+                  <Instagram className="w-3.5 h-3.5" /> Instagram
+                </a>
+              )}
+              {creator.tiktok && (
+                <a href={creator.tiktok} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition-all">
+                  <TikTokIcon className="w-3.5 h-3.5" /> TikTok
+                </a>
+              )}
+              {creator.youtube && (
+                <a href={creator.youtube} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition-all">
+                  <Youtube className="w-3.5 h-3.5" /> YouTube
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Avatar overlapping banner */}
-        <div className="px-6 -mt-10 mb-4 flex items-end gap-4">
-          <div className="ring-4 ring-white rounded-full shadow-xl">
-            <Avatar src={photo} name={displayName} size="xl" />
-          </div>
-          {/* Social links */}
-          <div className="pb-2 flex flex-wrap gap-2">
-            {creator.instagram && (
-              <a href={creator.instagram} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs font-semibold hover:opacity-90 transition-all">
-                <Instagram className="w-3 h-3" />Instagram
-              </a>
-            )}
-            {creator.tiktok && (
-              <a href={creator.tiktok} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gray-900 text-white text-xs font-semibold hover:opacity-90 transition-all">
-                <TikTokIcon className="w-3 h-3" />TikTok
-              </a>
-            )}
-            {creator.youtube && (
-              <a href={creator.youtube} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-500 text-white text-xs font-semibold hover:opacity-90 transition-all">
-                <Youtube className="w-3 h-3" />YouTube
-              </a>
-            )}
-          </div>
-        </div>
-
-        <div className="px-6 pb-8 space-y-5">
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-5 space-y-5">
           {/* Description */}
-          <p className="text-gray-600 text-sm leading-relaxed">{creator.description}</p>
+          {creator.description && (
+            <p className="text-gray-500 text-sm leading-relaxed">{creator.description}</p>
+          )}
 
           {/* Stats */}
           {loading ? (
@@ -147,29 +180,29 @@ function ProfileModal({ creator, onClose }: { creator: Creator; onClose: () => v
           ) : profile ? (
             <>
               <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Study Stats</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Study Stats</p>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { icon: <Flame className="w-5 h-5 text-orange-400" />, label: "Day Streak", value: `${profile.streak}`, sub: "days", bg: "bg-orange-50" },
-                    { icon: <Clock className="w-5 h-5 text-blue-400" />, label: "Total Study", value: `${Math.floor((profile.totalStudyTime || 0) / 60)}`, sub: "hours", bg: "bg-blue-50" },
-                    { icon: <Trophy className="w-5 h-5 text-yellow-500" />, label: "Mission Days", value: `${profile.missionCompletedDays || 0}`, sub: "days", bg: "bg-yellow-50" },
-                    { icon: <Award className="w-5 h-5 text-purple-500" />, label: "Badges", value: `${badgeList.length}`, sub: "earned", bg: "bg-purple-50" },
-                  ].map(({ icon, label, value, sub, bg }) => (
-                    <div key={label} className={`${bg} rounded-2xl p-4 flex flex-col items-center text-center`}>
-                      <div className="mb-2">{icon}</div>
-                      <p className="text-2xl font-bold text-gray-900 leading-none">{value}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{sub}</p>
-                      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mt-1">{label}</p>
+                    { icon: <Flame className="w-5 h-5 text-orange-500" />, value: String(profile.streak), unit: "days", label: "Day Streak", bg: "bg-orange-50" },
+                    { icon: <Clock className="w-5 h-5 text-blue-500" />, value: String(hours), unit: "hours", label: "Total Study", bg: "bg-blue-50" },
+                    { icon: <Trophy className="w-5 h-5 text-yellow-500" />, value: String(profile.missionDays), unit: "days", label: "Mission Days", bg: "bg-yellow-50" },
+                    { icon: <Award className="w-5 h-5 text-purple-500" />, value: String(badges.length), unit: "earned", label: "Badges", bg: "bg-purple-50" },
+                  ].map(({ icon, value, unit, label, bg }) => (
+                    <div key={label} className={`${bg} rounded-2xl p-4 text-center`}>
+                      <div className="flex justify-center mb-1.5">{icon}</div>
+                      <p className="text-2xl font-black text-gray-900 leading-none">{value}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">{unit}</p>
+                      <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mt-1">{label}</p>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {badgeList.length > 0 && (
+              {badges.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Badges</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Badges</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {badgeList.slice(0, 12).map((b, i) => (
+                    {badges.slice(0, 10).map((b, i) => (
                       <span key={i} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold ${b.color}`}>
                         {b.emoji} {b.text}
                       </span>
@@ -179,187 +212,218 @@ function ProfileModal({ creator, onClose }: { creator: Creator; onClose: () => v
               )}
             </>
           ) : (
-            <div className="bg-gray-50 rounded-2xl p-5 text-center">
+            <div className="bg-gray-50 rounded-2xl p-6 text-center">
               <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-gray-400 text-sm">Study stats not linked yet.</p>
+              <p className="text-gray-400 text-sm font-medium">Study stats not linked yet</p>
+              <p className="text-gray-300 text-xs mt-1">Follow this creator on their socials!</p>
             </div>
           )}
+
+          {/* Bottom safe area */}
+          <div className="h-2" />
         </div>
       </div>
     </div>
   );
 }
 
-function CreatorCard({ creator, onOpenProfile }: { creator: Creator; onOpenProfile: () => void }) {
+/* ─── Creator Card ──────────────────────────────────────────────── */
+
+function CreatorCard({ creator, onOpen }: { creator: Creator; onOpen: () => void }) {
   const [imgErr, setImgErr] = useState(false);
-  const initials = creator.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const init = creator.name.split(" ").map(w => w[0] ?? "").join("").slice(0, 2).toUpperCase();
 
   return (
-    <div className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col cursor-pointer"
-      onClick={onOpenProfile}
+    <button
+      className="group text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      onClick={onOpen}
     >
-      {/* Thumbnail */}
-      <div className="relative aspect-video bg-gradient-to-br from-blue-100 to-indigo-200 overflow-hidden flex-shrink-0">
+      {/* ── Thumbnail ─────────────────────────────────────────── */}
+      <div className="relative w-full overflow-hidden bg-gradient-to-br from-blue-100 to-indigo-200" style={{ aspectRatio: "16/9" }}>
         {creator.image && !imgErr ? (
           <img
             src={creator.image}
             alt={creator.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             onError={() => setImgErr(true)}
+            className="absolute inset-0 w-full h-full object-cover"
             loading="lazy"
+            decoding="async"
+            /* Never let the browser downscale quality */
+            style={{ imageRendering: "auto" }}
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-5xl font-bold text-white/80">
-            {initials}
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+            <span className="text-4xl font-black text-white/80">{init}</span>
           </div>
         )}
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-        {/* Featured badge */}
-        {creator.featured && (
-          <div className="absolute top-2.5 left-2.5 inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-400 text-yellow-900 text-[10px] font-bold rounded-full shadow">
-            <Star className="w-2.5 h-2.5 fill-current" /> Featured
-          </div>
-        )}
-        {/* Partner badge */}
-        <div className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 px-2 py-0.5 bg-white/90 backdrop-blur-sm text-blue-600 text-[10px] font-bold rounded-full shadow">
-          <Star className="w-2.5 h-2.5 fill-current" /> Partner
+
+        {/* Subtle gradient at bottom of thumbnail */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
+
+        {/* Badges */}
+        <div className="absolute top-2 left-2 flex gap-1.5">
+          {creator.featured && (
+            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-yellow-400 text-yellow-900 text-[9px] font-extrabold rounded-full shadow-sm">
+              <Star className="w-2 h-2 fill-current" /> Featured
+            </span>
+          )}
+        </div>
+        <div className="absolute top-2 right-2">
+          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-blue-600 text-white text-[9px] font-extrabold rounded-full shadow-sm">
+            Partner
+          </span>
         </div>
       </div>
 
-      {/* Card body */}
-      <div className="p-4 flex flex-col flex-1">
-        <div className="flex items-start gap-3 mb-3">
-          {/* Channel avatar */}
-          <div className="flex-shrink-0 w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shadow-sm ring-2 ring-white">
-            {initials}
+      {/* ── Card body ─────────────────────────────────────────── */}
+      <div className="p-3.5 flex flex-col flex-1 gap-2.5">
+        {/* Channel row */}
+        <div className="flex items-center gap-2.5">
+          {/* Small avatar */}
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+            <span className="text-white text-[10px] font-extrabold">{init}</span>
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-gray-900 text-sm leading-tight line-clamp-1">{creator.name}</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Partner Creator · Student Hub Nepal</p>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-gray-900 leading-tight truncate">{creator.name}</p>
+            <p className="text-[10px] text-gray-400">Partner Creator</p>
           </div>
         </div>
 
-        <p className="text-gray-500 text-xs leading-relaxed line-clamp-2 mb-3 flex-1">{creator.description}</p>
+        {/* Description */}
+        <p className="text-xs text-gray-500 leading-relaxed line-clamp-2 flex-1">{creator.description}</p>
 
-        {/* Social links */}
-        <div className="flex flex-wrap gap-1.5 mt-auto" onClick={e => e.stopPropagation()}>
+        {/* Social chips — stop propagation so clicking social link doesn't open modal */}
+        <div className="flex flex-wrap gap-1.5 items-center" onClick={e => e.stopPropagation()}>
           {creator.instagram && (
             <a href={creator.instagram} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 text-white text-[10px] font-semibold hover:opacity-90 transition-all">
-              <Instagram className="w-2.5 h-2.5" />IG
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white text-[10px] font-bold hover:opacity-90 transition-opacity">
+              <Instagram className="w-2.5 h-2.5" /> IG
             </a>
           )}
           {creator.tiktok && (
             <a href={creator.tiktok} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-900 text-white text-[10px] font-semibold hover:opacity-90 transition-all">
-              <TikTokIcon className="w-2.5 h-2.5" />TikTok
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-black text-white text-[10px] font-bold hover:opacity-90 transition-opacity">
+              <TikTokIcon className="w-2.5 h-2.5" /> TT
             </a>
           )}
           {creator.youtube && (
             <a href={creator.youtube} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500 text-white text-[10px] font-semibold hover:opacity-90 transition-all">
-              <Youtube className="w-2.5 h-2.5" />YT
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-red-500 text-white text-[10px] font-bold hover:opacity-90 transition-opacity">
+              <Youtube className="w-2.5 h-2.5" /> YT
             </a>
           )}
-          <button
-            onClick={e => { e.stopPropagation(); onOpenProfile(); }}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-semibold hover:bg-blue-100 transition-all ml-auto"
+          <span
+            onClick={e => { e.stopPropagation(); onOpen(); }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => e.key === "Enter" && onOpen()}
+            className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-100 text-gray-600 text-[10px] font-bold hover:bg-gray-200 transition-colors cursor-pointer"
           >
-            <ExternalLink className="w-2.5 h-2.5" />Profile
-          </button>
+            <ExternalLink className="w-2.5 h-2.5" /> View
+          </span>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
+
+/* ─── Skeleton ──────────────────────────────────────────────────── */
 
 function SkeletonCard() {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-pulse">
-      <div className="aspect-video bg-gray-100" />
-      <div className="p-4 space-y-3">
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-full bg-gray-100 flex-shrink-0" />
+      <div style={{ aspectRatio: "16/9" }} className="bg-gray-100 w-full" />
+      <div className="p-3.5 space-y-2.5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-gray-100" />
           <div className="flex-1 space-y-1.5">
-            <div className="h-3.5 bg-gray-100 rounded w-3/4" />
-            <div className="h-2.5 bg-gray-100 rounded w-1/2" />
+            <div className="h-3 bg-gray-100 rounded w-3/5" />
+            <div className="h-2 bg-gray-100 rounded w-2/5" />
           </div>
         </div>
-        <div className="h-2.5 bg-gray-100 rounded" />
-        <div className="h-2.5 bg-gray-100 rounded w-4/5" />
-        <div className="flex gap-2 mt-2">
-          <div className="h-6 bg-gray-100 rounded-lg w-10" />
-          <div className="h-6 bg-gray-100 rounded-lg w-12" />
+        <div className="space-y-1.5">
+          <div className="h-2.5 bg-gray-100 rounded" />
+          <div className="h-2.5 bg-gray-100 rounded w-4/5" />
+        </div>
+        <div className="flex gap-1.5">
+          <div className="h-6 w-8 bg-gray-100 rounded-lg" />
+          <div className="h-6 w-10 bg-gray-100 rounded-lg" />
         </div>
       </div>
     </div>
   );
 }
 
+/* ─── Page ──────────────────────────────────────────────────────── */
+
 export default function PartnerCreators() {
   const [creators, setCreators] = useState<Creator[]>([]);
   const [loading, setLoading]   = useState(true);
-  const [profileFor, setProfileFor] = useState<Creator | null>(null);
+  const [selected, setSelected] = useState<Creator | null>(null);
 
   useEffect(() => {
     getDocs(collection(db, "creators"))
       .then(snap => {
         const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as Creator));
-        setCreators(all.filter(c => c.visible).sort((a, b) => a.order - b.order));
+        setCreators(
+          all
+            .filter(c => c.visible)
+            .sort((a, b) => {
+              if (a.featured !== b.featured) return a.featured ? -1 : 1;
+              return a.order - b.order;
+            })
+        );
       })
       .catch(() => setCreators([]))
       .finally(() => setLoading(false));
   }, []);
 
-  const featured = creators.filter(c => c.featured);
-  const regular  = creators.filter(c => !c.featured);
-  const all      = [...featured, ...regular];
+  const openModal  = useCallback((c: Creator) => setSelected(c), []);
+  const closeModal = useCallback(() => setSelected(null), []);
 
   return (
     <>
       <Helmet>
         <title>Partner Creators | Student Hub Nepal</title>
-        <meta name="description" content="Meet Student Hub's official partner creators helping students across Nepal with study tips, exam preparation, and educational content." />
+        <meta name="description" content="Meet Student Hub's official partner creators helping students across Nepal with study tips, exam prep, and motivation." />
         <meta name="robots" content="index, follow" />
-        <meta property="og:url" content="https://www.studenthubnp.com/creators" />
         <meta property="og:title" content="Partner Creators | Student Hub Nepal" />
-        <meta property="og:image" content="https://www.studenthubnp.com/opengraph.jpg" />
         <link rel="canonical" href="https://www.studenthubnp.com/creators" />
       </Helmet>
 
-      {profileFor && <ProfileModal creator={profileFor} onClose={() => setProfileFor(null)} />}
+      {selected && <ProfileModal creator={selected} onClose={closeModal} />}
 
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+      <div className="min-h-screen bg-[#f7f8fa]">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
 
-          {/* Hero header */}
+          {/* Hero */}
           <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-50 text-blue-600 rounded-full text-sm font-semibold mb-4 border border-blue-100">
-              <Users className="w-4 h-4" /> Official Partner Creators
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-blue-50 border border-blue-100 text-blue-600 rounded-full text-xs font-bold mb-4 uppercase tracking-wide">
+              <Star className="w-3.5 h-3.5 fill-blue-400 text-blue-400" /> Official Partner Creators
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">Partner Creators</h1>
-            <p className="text-gray-500 text-base sm:text-lg max-w-xl mx-auto leading-relaxed">
-              Nepal's top student creators — study tips, exam prep, and motivation for Grade 9–12.
+            <h1 className="text-3xl sm:text-4xl font-black text-gray-900 mb-3 tracking-tight">Partner Creators</h1>
+            <p className="text-gray-500 text-sm sm:text-base max-w-lg mx-auto leading-relaxed">
+              Nepal's top student creators — study tips, exam prep, and motivation for Grade 9–12 students.
             </p>
           </div>
 
+          {/* Grid */}
           {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {[1, 2, 3, 4, 5, 6].map(i => <SkeletonCard key={i} />)}
             </div>
-          ) : all.length === 0 ? (
-            <div className="text-center py-24">
-              <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center mx-auto mb-5">
+          ) : creators.length === 0 ? (
+            <div className="text-center py-28">
+              <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-sm">
                 <Users className="w-10 h-10 text-blue-300" />
               </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">No creators yet</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-1">No creators yet</h2>
               <p className="text-gray-400 text-sm">Partner creators will appear here once they join.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {all.map(c => (
-                <CreatorCard key={c.id} creator={c} onOpenProfile={() => setProfileFor(c)} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+              {creators.map(c => (
+                <CreatorCard key={c.id} creator={c} onOpen={() => openModal(c)} />
               ))}
             </div>
           )}
