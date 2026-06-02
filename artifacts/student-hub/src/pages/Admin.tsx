@@ -2157,6 +2157,7 @@ interface FireCreator {
   visible: boolean;
   order: number;
   createdAt: string;
+  uid?: string;
 }
 
 function TikTokIcon({ className }: { className?: string }) {
@@ -2178,6 +2179,7 @@ const emptyCreator = (): Omit<FireCreator, "id"> => ({
   visible: true,
   order: 0,
   createdAt: new Date().toISOString().slice(0, 10),
+  uid: undefined,
 });
 
 const ADMIN_KEY = "siddhant2078";
@@ -2193,6 +2195,10 @@ function ManageCreators() {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [userSearch, setUserSearch]   = useState("");
+  const [userResults, setUserResults] = useState<{ uid: string; name: string; grade: number; photoURL: string | null }[]>([]);
+  const [userSearching, setUserSearching] = useState(false);
+  const userSearchTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const fetchCreators = useCallback(async () => {
     setLoading(true);
@@ -2212,18 +2218,37 @@ function ManageCreators() {
     setTimeout(() => setMsg(null), 3500);
   };
 
+  const debouncedUserSearch = useCallback((q: string) => {
+    clearTimeout(userSearchTimer.current);
+    if (!q.trim() || q.length < 2) { setUserResults([]); return; }
+    userSearchTimer.current = setTimeout(async () => {
+      setUserSearching(true);
+      try {
+        const resp = await fetch(`/api/users?q=${encodeURIComponent(q)}`, { headers: { "X-Admin-Key": ADMIN_KEY } });
+        if (!resp.ok) { setUserResults([]); return; }
+        const data = await resp.json() as { uid: string; name: string; grade: number; photoURL: string | null }[];
+        setUserResults(data);
+      } catch { setUserResults([]); }
+      finally { setUserSearching(false); }
+    }, 350);
+  }, []);
+
   const openAdd = () => {
     setEditId(null);
     setForm({ ...emptyCreator(), order: creators.length });
     setShowForm(true);
     setUploadError("");
+    setUserSearch("");
+    setUserResults([]);
   };
 
   const openEdit = (c: FireCreator) => {
     setEditId(c.id);
-    setForm({ name: c.name, image: c.image, description: c.description, instagram: c.instagram ?? "", tiktok: c.tiktok ?? "", youtube: c.youtube ?? "", featured: c.featured, visible: c.visible, order: c.order, createdAt: c.createdAt });
+    setForm({ name: c.name, image: c.image, description: c.description, instagram: c.instagram ?? "", tiktok: c.tiktok ?? "", youtube: c.youtube ?? "", featured: c.featured, visible: c.visible, order: c.order, createdAt: c.createdAt, uid: c.uid });
     setShowForm(true);
     setUploadError("");
+    setUserSearch(c.uid ? c.name : "");
+    setUserResults([]);
   };
 
   const handleImageUpload = (file: File) => {
@@ -2250,7 +2275,7 @@ function ManageCreators() {
     if (!form.description.trim()) { flash("error", "Description is required."); return; }
     setSaving(true);
     try {
-      const data = {
+      const data: Record<string, unknown> = {
         name: form.name.trim(),
         image: form.image.trim(),
         description: form.description.trim(),
@@ -2262,6 +2287,7 @@ function ManageCreators() {
         order: Number(form.order) || 0,
         createdAt: form.createdAt || new Date().toISOString().slice(0, 10),
       };
+      if (form.uid) data.uid = form.uid; else data.uid = null;
       const url    = editId ? `/api/creators/${editId}` : "/api/creators";
       const method = editId ? "PUT" : "POST";
       const resp   = await fetch(url, {
@@ -2360,6 +2386,63 @@ function ManageCreators() {
             </button>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
+
+            {/* ── Link to existing user ─────────────────────────────────────── */}
+            <div className="sm:col-span-2 bg-blue-50/60 rounded-xl p-4 border border-blue-100 relative">
+              <label className="block text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" />
+                Link to Student Hub User <span className="font-normal text-gray-400">(optional)</span>
+              </label>
+              {form.uid ? (
+                <div className="flex items-center gap-3 px-3 py-2.5 bg-white border border-blue-200 rounded-xl">
+                  <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  <span className="text-sm font-medium text-blue-700 flex-1 truncate">Linked: {form.name || form.uid}</span>
+                  <button onClick={() => { setForm(f => ({ ...f, uid: undefined })); setUserSearch(""); }} className="text-gray-400 hover:text-red-500 transition-all p-0.5">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      value={userSearch}
+                      onChange={e => { setUserSearch(e.target.value); debouncedUserSearch(e.target.value); }}
+                      placeholder="Search by name…"
+                      className="w-full border border-gray-200 bg-white rounded-xl pl-9 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    />
+                    {userSearching && <RefreshCw className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />}
+                  </div>
+                  {userResults.length > 0 && (
+                    <div className="mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-44 overflow-y-auto">
+                      {userResults.map(u => (
+                        <button key={u.uid} onClick={() => {
+                          setForm(f => ({ ...f, name: u.name || f.name, image: u.photoURL || f.image, uid: u.uid }));
+                          setUserSearch(u.name || "");
+                          setUserResults([]);
+                        }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 transition-all text-left border-b border-gray-50 last:border-0">
+                          <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-blue-100 to-indigo-100 flex-shrink-0">
+                            {u.photoURL
+                              ? <img src={u.photoURL} className="w-full h-full object-cover" alt={u.name} />
+                              : <div className="w-full h-full flex items-center justify-center text-blue-600 font-bold text-xs">{u.name?.[0]?.toUpperCase() ?? "?"}</div>
+                            }
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{u.name}</p>
+                            <p className="text-xs text-gray-400">Grade {u.grade}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {userSearch.length >= 2 && !userSearching && userResults.length === 0 && (
+                    <p className="text-xs text-gray-400 mt-1.5 px-1">No users found — you can still fill in the creator manually.</p>
+                  )}
+                </div>
+              )}
+              <p className="text-xs text-gray-400 mt-2">When linked, a "See Profile" button on the public card shows this user's study stats.</p>
+            </div>
+
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-gray-600 mb-1.5">Creator Name *</label>
               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Shreyash Shrestha" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
