@@ -2229,26 +2229,18 @@ function ManageCreators() {
   const handleImageUpload = (file: File) => {
     setUploadError("");
     if (!file.type.startsWith("image/")) { setUploadError("Please upload an image file."); return; }
-    setUploadProgress(30);
+    if (file.size > 1.5 * 1024 * 1024) {
+      setUploadError("Image is too large (max 1.5 MB). Please resize it first or paste a URL instead.");
+      return;
+    }
+    setUploadProgress(50);
     const reader = new FileReader();
-    reader.onerror = () => { setUploadError("Failed to read file."); setUploadProgress(null); };
+    reader.onerror = () => { setUploadError("Failed to read the file."); setUploadProgress(null); };
     reader.onload = (e) => {
-      const img = new Image();
-      img.onerror = () => { setUploadError("Failed to load image."); setUploadProgress(null); };
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const maxDim = 400;
-        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-        canvas.width  = Math.round(img.width  * scale);
-        canvas.height = Math.round(img.height * scale);
-        const ctx = canvas.getContext("2d");
-        if (!ctx) { setUploadError("Browser canvas unavailable."); setUploadProgress(null); return; }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
-        setForm(f => ({ ...f, image: dataUrl }));
-        setUploadProgress(null);
-      };
-      img.src = e.target?.result as string;
+      const result = e.target?.result;
+      if (typeof result !== "string") { setUploadError("Could not read image data."); setUploadProgress(null); return; }
+      setForm(f => ({ ...f, image: result }));
+      setUploadProgress(null);
     };
     reader.readAsDataURL(file);
   };
