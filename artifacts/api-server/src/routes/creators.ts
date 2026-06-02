@@ -87,6 +87,21 @@ function requireAdminKey(req: Request, res: Response, next: NextFunction): void 
   next();
 }
 
+// ── Merge Firestore REST creators with local file, local takes precedence ─────
+async function mergeCreators(): Promise<Creator[]> {
+  const local = fileRead();
+  const localIds = new Set(local.map(c => c.id));
+  let remote: Creator[] = [];
+  try {
+    remote = await fetchCreatorsRest();
+  } catch (restErr) {
+    logger.warn(restErr, "[Creators] REST API fetch failed, using local file only");
+  }
+  // Keep remote entries that aren't overridden locally
+  const remoteOnly = remote.filter(c => !localIds.has(c.id));
+  return [...remoteOnly, ...local];
+}
+
 // ── Public: visible creators ordered by display order ────────────────────────
 router.get("/creators", async (_req: Request, res: Response) => {
   try {
@@ -98,15 +113,7 @@ router.get("/creators", async (_req: Request, res: Response) => {
         .get();
       return res.json(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }
-    // ── Fallback 1: Firestore REST API ────────────────────────────────────────
-    try {
-      const all = await fetchCreatorsRest();
-      return res.json(all.filter(c => c.visible).sort((a, b) => a.order - b.order));
-    } catch (restErr) {
-      logger.warn(restErr, "[Creators] REST API fallback failed, using local file");
-    }
-    // ── Fallback 2: local JSON file ───────────────────────────────────────────
-    const all = fileRead();
+    const all = await mergeCreators();
     return res.json(all.filter(c => c.visible).sort((a, b) => a.order - b.order));
   } catch (err) {
     logger.error(err, "[Creators] GET /creators");
@@ -122,15 +129,8 @@ router.get("/creators/all", requireAdminKey, async (_req: Request, res: Response
       const snap = await db.collection("creators").orderBy("order", "asc").get();
       return res.json(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }
-    // ── Fallback 1: Firestore REST API ────────────────────────────────────────
-    try {
-      const all = await fetchCreatorsRest();
-      return res.json(all.sort((a, b) => a.order - b.order));
-    } catch (restErr) {
-      logger.warn(restErr, "[Creators] REST API fallback failed, using local file");
-    }
-    // ── Fallback 2: local JSON file ───────────────────────────────────────────
-    return res.json(fileRead().sort((a, b) => a.order - b.order));
+    const all = await mergeCreators();
+    return res.json(all.sort((a, b) => a.order - b.order));
   } catch (err) {
     logger.error(err, "[Creators] GET /creators/all");
     return res.status(500).json({ error: "Failed to fetch creators." });
