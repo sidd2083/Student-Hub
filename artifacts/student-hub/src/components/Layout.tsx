@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { useTimer } from "@/context/TimerContext";
-import { useActiveRoom } from "@/context/ActiveRoomContext";
+import { useActiveRoom, useRoomTimer } from "@/context/ActiveRoomContext";
 import { gradeLabel } from "@/lib/gradeUtils";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 import {
@@ -87,7 +87,8 @@ function FloatingTimerBar() {
 export function Layout({ children }: LayoutProps) {
   const [location, setLocation] = useLocation();
   const { user, profile, signOut } = useAuth();
-  const { activeRoomId, studyMinsInSession } = useActiveRoom();
+  const { activeRoomId } = useActiveRoom();
+  const { studyMinsInSession } = useRoomTimer();
   const [toolsOpen, setToolsOpen] = useState(false);
   const { isInstallable, installApp } = usePwaInstall();
 

@@ -17,7 +17,7 @@ import {
   joinRoom, sendMessage, getRemainingSeconds, formatTime, createVote,
   setPinnedAnnouncement,
 } from "@/lib/studyRooms";
-import { useActiveRoom } from "@/context/ActiveRoomContext";
+import { useActiveRoom, useRoomTimer } from "@/context/ActiveRoomContext";
 import { useAuth } from "@/context/AuthContext";
 import { ClassroomView } from "@/components/study-room/ClassroomView";
 import { VotingPanel } from "@/components/study-room/VotingPanel";
@@ -47,11 +47,12 @@ export default function StudyRoomLive() {
   const [, setLocation] = useLocation();
   const { user, profile } = useAuth();
   const {
-    joinActiveRoom, leaveActiveRoom, isHost, studyMinsInSession,
+    joinActiveRoom, leaveActiveRoom, isHost,
     onHostStart, onHostPause, onHostResume, onHostSkip, onHostRestart,
-    remainingSeconds, activeRoomId, wasKicked,
+    activeRoomId, wasKicked,
     room: ctxRoom, participants: ctxParticipants,
   } = useActiveRoom();
+  const { remainingSeconds, studyMinsInSession } = useRoomTimer();
 
   // alreadyIn: true once we've called joinActiveRoom for this room
   const alreadyIn = activeRoomId === roomId;
@@ -181,7 +182,7 @@ export default function StudyRoomLive() {
       if (cooldownSecs <= 0) { setCooldownRemaining(0); return; }
       const elapsed = (Date.now() - lastSentAtRef.current) / 1000;
       setCooldownRemaining(Math.max(0, Math.ceil(cooldownSecs - elapsed)));
-    }, 250);
+    }, 500);
     return () => clearInterval(id);
   }, [room?.chatCooldownSecs]);
 

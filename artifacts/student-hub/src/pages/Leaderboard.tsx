@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, orderBy, limit, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Trophy, Flame, Clock, Sun, RefreshCw } from "lucide-react";
 import { getNepaliDate, getNepaliYesterday } from "@/lib/nepaliDate";
@@ -137,7 +137,9 @@ function LeaderboardContent() {
     try {
       const today     = getNepaliDate();
       const yesterday = getNepaliYesterday();
-      const snap  = await getDocs(collection(db, "users"));
+      const snap  = await getDocs(
+        query(collection(db, "users"), orderBy("totalStudyTime", "desc"), limit(200)),
+      );
       const list: LeaderEntry[] = snap.docs.map(d => {
         const data = d.data();
         const lastActive: string = data.lastActiveDate ?? "";

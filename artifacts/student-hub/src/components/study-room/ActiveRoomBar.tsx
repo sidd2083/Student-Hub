@@ -1,12 +1,13 @@
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { useActiveRoom } from "@/context/ActiveRoomContext";
+import { useActiveRoom, useRoomTimer } from "@/context/ActiveRoomContext";
 import { formatTime } from "@/lib/studyRooms";
 import { BookOpen, Coffee, Users, Play, Pause, X } from "lucide-react";
 
 export function ActiveRoomBar() {
   const [location] = useLocation();
-  const { activeRoomId, room, participants, remainingSeconds, leaveActiveRoom } = useActiveRoom();
+  const { activeRoomId, room, participants, leaveActiveRoom } = useActiveRoom();
+  const { remainingSeconds } = useRoomTimer();
 
   // Don't show bar if no active room, or already on the room page
   if (!activeRoomId || !room || location.startsWith(`/study-rooms/${activeRoomId}`)) return null;

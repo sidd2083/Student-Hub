@@ -1,5 +1,5 @@
 import {
-  createContext, useContext, useEffect, useRef, useState, useCallback,
+  createContext, useContext, useEffect, useRef, useState, useCallback, useMemo,
 } from "react";
 import { setInActiveRoom } from "@/lib/studyRoomState";
 import { useAuth } from "@/context/AuthContext";
@@ -18,8 +18,6 @@ interface ActiveRoomContextType {
   room: Room | null;
   participants: RoomParticipant[];
   isHost: boolean;
-  remainingSeconds: number;
-  studyMinsInSession: number;
   wasKicked: boolean;
   joinActiveRoom: (roomId: string) => void;
   leaveActiveRoom: () => Promise<void>;
@@ -29,9 +27,19 @@ interface ActiveRoomContextType {
   onHostSkip: () => Promise<void>;
   onHostEnd: () => Promise<void>;
   onHostRestart: () => Promise<void>;
+  /** @deprecated use useRoomTimer() instead — avoids 1-second re-renders */
+  remainingSeconds: number;
+  /** @deprecated use useRoomTimer() instead — avoids 1-second re-renders */
+  studyMinsInSession: number;
+}
+
+interface RoomTimerContextType {
+  remainingSeconds: number;
+  studyMinsInSession: number;
 }
 
 const ActiveRoomContext = createContext<ActiveRoomContextType | null>(null);
+const RoomTimerContext  = createContext<RoomTimerContextType>({ remainingSeconds: 0, studyMinsInSession: 0 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -551,14 +559,35 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     await restartRoom(activeRoomId);
   }, [activeRoomId]);
 
+  // ── Stable context value — only recreates when non-timer fields change ──────
+  // remainingSeconds / studyMinsInSession update every second; keeping them out
+  // of this memo prevents every useActiveRoom() consumer from re-rendering on
+  // each tick.  Components that need the live timer should call useRoomTimer().
+  const ctxValue = useMemo<ActiveRoomContextType>(() => ({
+    activeRoomId, room, participants, isHost, wasKicked,
+    joinActiveRoom, leaveActiveRoom,
+    onHostStart, onHostPause, onHostResume, onHostSkip, onHostEnd, onHostRestart,
+    // Keep deprecated fields in the object so old call-sites don't break,
+    // but they won't cause re-renders on stable consumers.
+    remainingSeconds, studyMinsInSession,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [
+    activeRoomId, room, participants, isHost, wasKicked,
+    joinActiveRoom, leaveActiveRoom,
+    onHostStart, onHostPause, onHostResume, onHostSkip, onHostEnd, onHostRestart,
+  ]);
+
+  const timerValue = useMemo<RoomTimerContextType>(
+    () => ({ remainingSeconds, studyMinsInSession }),
+    [remainingSeconds, studyMinsInSession],
+  );
+
   return (
-    <ActiveRoomContext.Provider value={{
-      activeRoomId, room, participants, isHost, remainingSeconds,
-      studyMinsInSession, wasKicked, joinActiveRoom, leaveActiveRoom,
-      onHostStart, onHostPause, onHostResume, onHostSkip, onHostEnd, onHostRestart,
-    }}>
-      {children}
-    </ActiveRoomContext.Provider>
+    <RoomTimerContext.Provider value={timerValue}>
+      <ActiveRoomContext.Provider value={ctxValue}>
+        {children}
+      </ActiveRoomContext.Provider>
+    </RoomTimerContext.Provider>
   );
 }
 
@@ -566,4 +595,9 @@ export function useActiveRoom() {
   const ctx = useContext(ActiveRoomContext);
   if (!ctx) throw new Error("useActiveRoom must be used within ActiveRoomProvider");
   return ctx;
+}
+
+/** Subscribe only to per-second timer values — won't cause re-renders on room/participant changes. */
+export function useRoomTimer(): RoomTimerContextType {
+  return useContext(RoomTimerContext);
 }

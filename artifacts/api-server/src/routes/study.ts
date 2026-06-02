@@ -40,8 +40,12 @@ router.post(
       const yesterday = new Date(now - 86_400_000 + NPT_OFFSET_MS).toISOString().slice(0, 10);
       const userRef = db.collection("users").doc(uid);
 
+      const logId  = `${uid}_${today}`;
+      const logRef = db.collection("study_logs").doc(logId);
+
       const newTodayMinutes = await db.runTransaction(async (tx) => {
-        const snap = await tx.get(userRef);
+        // Read both docs in one round-trip — Firestore batches reads before writes
+        const [snap, logSnap] = await Promise.all([tx.get(userRef), tx.get(logRef)]);
         const data = snap.exists ? snap.data()! : {};
 
         const lastActive: string = data.lastActiveDate ?? "";
@@ -56,28 +60,23 @@ router.post(
 
         if (lastActive === today) {
           newToday = prevToday + clampedMinutes;
-          // Award streak only the FIRST time user crosses 5-min threshold today
           if (!earnedToday && prevToday < 5 && newToday >= 5) {
             newStreak = prevStreak + 1;
             earnedStreakToday = true;
           }
         } else {
-          // Day changed — reset today counter
           newToday = clampedMinutes;
           earnedStreakToday = false;
 
           if (lastActive === yesterday) {
-            // Consecutive day: streak maintained/extended when hitting 5 min
             if (newToday >= 5) {
               newStreak = prevStreak + 1;
               earnedStreakToday = true;
             }
           } else if (lastActive !== "") {
-            // Missed at least one day — reset streak
             newStreak = newToday >= 5 ? 1 : 0;
             if (newToday >= 5) earnedStreakToday = true;
           } else {
-            // First ever study session
             newStreak = newToday >= 5 ? 1 : 0;
             if (newToday >= 5) earnedStreakToday = true;
           }
@@ -97,27 +96,22 @@ router.post(
           tx.set(userRef, { uid, ...updates, badges: [] }, { merge: true });
         }
 
+        // ── Update study log inside the same transaction ──────────────────────
+        if (logSnap.exists) {
+          tx.update(logRef, {
+            studyMinutes: (logSnap.data()?.studyMinutes ?? 0) + clampedMinutes,
+          });
+        } else {
+          tx.set(logRef, {
+            uid, date: today,
+            studyMinutes: clampedMinutes,
+            tasksCompleted: 0,
+            notesViewed: 0,
+          });
+        }
+
         return newToday;
       });
-
-      // ── Update study log (per-day aggregate) ────────────────────────────────
-      const logId = `${uid}_${today}`;
-      const logRef = db.collection("study_logs").doc(logId);
-      const logSnap = await logRef.get();
-
-      if (logSnap.exists) {
-        await logRef.update({
-          studyMinutes: (logSnap.data()?.studyMinutes ?? 0) + clampedMinutes,
-        });
-      } else {
-        await logRef.set({
-          uid,
-          date: today,
-          studyMinutes: clampedMinutes,
-          tasksCompleted: 0,
-          notesViewed: 0,
-        });
-      }
 
       logger.info({ uid, minutes: clampedMinutes, newTodayMinutes }, "[Study] Session saved");
       return res.json({ ok: true, todayMinutes: newTodayMinutes });
