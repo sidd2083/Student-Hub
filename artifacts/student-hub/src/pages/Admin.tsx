@@ -2190,8 +2190,9 @@ function ManageCreators() {
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<Omit<FireCreator, "id">>(emptyCreator());
-  const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [msg, setMsg] = useState<{ type: "success" | "error"; text: string; link?: { href: string; label: string } } | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; description?: string }>({});
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2213,9 +2214,10 @@ function ManageCreators() {
 
   useEffect(() => { fetchCreators(); }, [fetchCreators]);
 
-  const flash = (type: "success" | "error", text: string) => {
-    setMsg({ type, text });
-    setTimeout(() => setMsg(null), 3500);
+  const flash = (type: "success" | "error", text: string, link?: { href: string; label: string }) => {
+    setMsg({ type, text, link });
+    if (type === "success") setTimeout(() => setMsg(null), 12000);
+    // errors are persistent — user must dismiss them manually
   };
 
   const debouncedUserSearch = useCallback((q: string) => {
@@ -2240,6 +2242,8 @@ function ManageCreators() {
     setUploadError("");
     setUserSearch("");
     setUserResults([]);
+    setFieldErrors({});
+    setMsg(null);
   };
 
   const openEdit = (c: FireCreator) => {
@@ -2249,6 +2253,8 @@ function ManageCreators() {
     setUploadError("");
     setUserSearch(c.uid ? c.name : "");
     setUserResults([]);
+    setFieldErrors({});
+    setMsg(null);
   };
 
   const handleImageUpload = (file: File) => {
@@ -2271,8 +2277,11 @@ function ManageCreators() {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim()) { flash("error", "Creator name is required."); return; }
-    if (!form.description.trim()) { flash("error", "Description is required."); return; }
+    const errors: { name?: string; description?: string } = {};
+    if (!form.name.trim()) errors.name = "Creator name is required";
+    if (!form.description.trim()) errors.description = "Description is required";
+    if (Object.keys(errors).length) { setFieldErrors(errors); return; }
+    setFieldErrors({});
     setSaving(true);
     try {
       const data: Record<string, unknown> = {
@@ -2297,10 +2306,16 @@ function ManageCreators() {
       });
       const result = await resp.json() as { id?: string; ok?: boolean; error?: string };
       if (!resp.ok) { flash("error", result.error ?? "Failed to save. Please try again."); return; }
-      flash("success", editId ? "Creator updated!" : "Creator added!");
+      flash(
+        "success",
+        editId ? `"${form.name.trim()}" updated successfully!` : `"${form.name.trim()}" added successfully!`,
+        { href: "/creators", label: "View Partner Creators page →" }
+      );
       setShowForm(false);
       await fetchCreators();
-    } catch { flash("error", "Failed to save. Please try again."); }
+    } catch (err) {
+      flash("error", `Save failed: ${err instanceof Error ? err.message : "Please try again."}`);
+    }
     finally { setSaving(false); }
   };
 
@@ -2370,9 +2385,17 @@ function ManageCreators() {
       </div>
 
       {msg && (
-        <div className={`mb-4 px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2 ${msg.type === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
-          {msg.type === "success" ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-          {msg.text}
+        <div className={`mb-4 px-4 py-3 rounded-xl text-sm font-medium flex items-start gap-2 ${msg.type === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+          {msg.type === "success" ? <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />}
+          <div className="flex-1 min-w-0">
+            <span>{msg.text}</span>
+            {msg.link && (
+              <Link href={msg.link.href} className="ml-2 font-bold underline hover:no-underline">{msg.link.label}</Link>
+            )}
+          </div>
+          <button onClick={() => setMsg(null)} className="ml-1 text-current opacity-50 hover:opacity-100 flex-shrink-0" title="Dismiss">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
@@ -2444,8 +2467,16 @@ function ManageCreators() {
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Creator Name *</label>
-              <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Shreyash Shrestha" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                Creator Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                value={form.name}
+                onChange={e => { setForm(f => ({ ...f, name: e.target.value })); if (fieldErrors.name) setFieldErrors(fe => ({ ...fe, name: undefined })); }}
+                placeholder="e.g. Shreyash Shrestha"
+                className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 ${fieldErrors.name ? "border-red-400 ring-2 ring-red-100 focus:ring-red-300" : "border-gray-200 focus:ring-blue-300"}`}
+              />
+              {fieldErrors.name && <p className="text-red-500 text-xs mt-1 font-medium">⚠ {fieldErrors.name}</p>}
             </div>
 
             {/* Image upload */}
@@ -2478,8 +2509,17 @@ function ManageCreators() {
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Short Description *</label>
-              <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Describe what this creator does for students…" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none" />
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                Short Description <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={form.description}
+                onChange={e => { setForm(f => ({ ...f, description: e.target.value })); if (fieldErrors.description) setFieldErrors(fe => ({ ...fe, description: undefined })); }}
+                rows={3}
+                placeholder="Describe what this creator does for students…"
+                className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 resize-none ${fieldErrors.description ? "border-red-400 ring-2 ring-red-100 focus:ring-red-300" : "border-gray-200 focus:ring-blue-300"}`}
+              />
+              {fieldErrors.description && <p className="text-red-500 text-xs mt-1 font-medium">⚠ {fieldErrors.description}</p>}
             </div>
 
             <div>
