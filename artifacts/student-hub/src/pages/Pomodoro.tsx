@@ -394,6 +394,17 @@ function PomodoroContent() {
         </p>
       </div>
 
+      {/* 5-min save hint — visible while work phase is running and < 5 min elapsed */}
+      {running && phase === "work" && (settings.workMins * 60 - seconds) < 300 && (
+        <div className="flex items-start gap-2.5 mb-4 px-4 py-3 bg-amber-50 border border-amber-100 rounded-2xl">
+          <span className="text-base shrink-0">⏱️</span>
+          <p className="text-xs text-amber-800 leading-relaxed">
+            Your study time starts saving after <strong>5 min</strong> of focus.
+            Stay on it — all the best for your studies! 🌟
+          </p>
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center mb-5">
         <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-6 ${
           phase === "work" ? "bg-blue-50 text-blue-600" :

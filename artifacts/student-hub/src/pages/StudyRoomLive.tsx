@@ -684,6 +684,15 @@ export default function StudyRoomLive() {
   function ChatPanel() {
     return (
       <div className="flex flex-col h-full">
+        {/* 5-min save hint — shown during study phase, fades once studyMinsInSession >= 5 */}
+        {isStudying && studyMinsInSession < 5 && (
+          <div className="mb-2 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 flex items-start gap-2">
+            <span className="text-sm shrink-0">⏱️</span>
+            <p className="text-[11px] text-blue-700 dark:text-blue-300 leading-tight">
+              Your study time starts saving after <strong>5 min</strong> of studying. Keep going — all the best! 🌟
+            </p>
+          </div>
+        )}
         {/* Emoji row */}
         <div className="flex gap-1.5 flex-wrap mb-2">
           {EMOJI_REACTIONS.map(e => (
@@ -910,6 +919,18 @@ export default function StudyRoomLive() {
             <div className="flex items-center gap-1.5 flex-wrap">
               <h1 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base truncate">{room.title}</h1>
               <StatusBadge status={room.status} />
+              {/* WebSocket connection indicator */}
+              {wsUnavailable ? (
+                <span className="hidden sm:inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                  Classic
+                </span>
+              ) : (
+                <span className="hidden sm:inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  Live
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-gray-400 truncate mt-0.5">{room.subject} · {room.hostName}</p>
           </div>
