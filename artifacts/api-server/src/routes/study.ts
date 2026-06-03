@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { getAdminDb } from "../lib/firebase-admin";
 import { logger } from "../lib/logger";
 import { requireAuth, perUserWriteLimit } from "../lib/auth-middleware";
+import { stats } from "../lib/stats";
 
 const router = Router();
 
@@ -114,6 +115,7 @@ router.post(
       });
 
       logger.info({ uid, minutes: clampedMinutes, newTodayMinutes }, "[Study] Session saved");
+      stats.incStudySaves();
       return res.json({ ok: true, todayMinutes: newTodayMinutes });
     } catch (err) {
       logger.error(err, "[Study] Save failed");

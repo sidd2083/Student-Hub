@@ -2,6 +2,7 @@ import type { Server as HTTPServer } from "http";
 import { Server as SocketServer } from "socket.io";
 import { getAdminDb } from "./firebase-admin";
 import { logger } from "./logger";
+import { stats } from "./stats";
 
 interface WsMember {
   uid: string;
@@ -28,6 +29,12 @@ function removeFromRoster(roomId: string, uid: string) {
   if (roster.size === 0) roomRoster.delete(roomId);
 }
 
+function pushLiveStats() {
+  let users = 0;
+  for (const r of roomRoster.values()) users += r.size;
+  stats.setLive(roomRoster.size, users);
+}
+
 export function initSocketServer(httpServer: HTTPServer): SocketServer {
   const io = new SocketServer(httpServer, {
     cors: { origin: "*", credentials: true },
@@ -43,6 +50,8 @@ export function initSocketServer(httpServer: HTTPServer): SocketServer {
     let uid: string | null = null;
     let displayName: string | null = null;
 
+    stats.incWsConnections();
+
     // ── Join ───────────────────────────────────────────────────────────────────
     socket.on("join-room", (data: { roomId?: string; uid?: string; name?: string }) => {
       if (!data?.roomId || !data?.uid || !data?.name) return;
@@ -53,6 +62,7 @@ export function initSocketServer(httpServer: HTTPServer): SocketServer {
       socket.join(roomId);
       const roster = getRoster(roomId);
       roster.set(uid, { uid, name: displayName, socketId: socket.id, lastSeen: Date.now() });
+      pushLiveStats();
 
       logger.info({ roomId, uid, members: roster.size }, "[WS] joined");
     });
@@ -86,6 +96,7 @@ export function initSocketServer(httpServer: HTTPServer): SocketServer {
 
       // Relay to everyone in the room immediately
       io.to(roomId).emit("chat-message", payload);
+      stats.incWsMessages();
 
       // Persist to Firestore for history — fire-and-forget, never blocks relay
       const db = getAdminDb();
@@ -117,12 +128,14 @@ export function initSocketServer(httpServer: HTTPServer): SocketServer {
       const emoji = String(data?.emoji ?? "").slice(0, 10).trim();
       if (!emoji) return;
       io.to(roomId).emit("reaction", { uid, name: displayName, emoji });
+      stats.incWsReactions();
     });
 
     // ── Leave / disconnect ─────────────────────────────────────────────────────
     function handleLeave() {
       if (!roomId || !uid) return;
       removeFromRoster(roomId, uid);
+      pushLiveStats();
       logger.info({ roomId, uid }, "[WS] left");
       roomId = null;
       uid = null;

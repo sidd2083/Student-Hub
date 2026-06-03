@@ -1,10 +1,17 @@
 import { Router, type IRouter } from "express";
 import type { Request, Response } from "express";
+import { stats } from "../lib/stats";
 
 const router: IRouter = Router();
 
 router.get("/healthz", (_req: Request, res: Response) => {
   res.json({ status: "ok" });
+});
+
+// ── Live server stats — no auth needed (aggregate counts, no PII) ─────────────
+// Mounted under /api in routes/index.ts, so this resolves to GET /api/stats.
+router.get("/stats", (_req: Request, res: Response) => {
+  res.json(stats.get());
 });
 
 router.get("/status", (_req: Request, res: Response) => {

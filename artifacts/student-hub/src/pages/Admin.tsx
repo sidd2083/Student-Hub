@@ -229,6 +229,116 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 
 // ─── Admin Overview ──────────────────────────────────────────────────────────
 
+// ─── Live Server Stats Widget ─────────────────────────────────────────────────
+
+interface ServerStats {
+  date: string;
+  studySaves: number;
+  wsConnections: number;
+  wsMessages: number;
+  wsReactions: number;
+  wsRoomsNow: number;
+  wsUsersNow: number;
+}
+
+const STAT_ITEMS: {
+  label: string;
+  key: keyof ServerStats;
+  bg: string;
+  ring: string;
+  text: string;
+  desc: string;
+}[] = [
+  { label: "Rooms Live",    key: "wsRoomsNow",    bg: "bg-emerald-50", ring: "ring-emerald-100", text: "text-emerald-600", desc: "Active WS rooms now"      },
+  { label: "Users Online",  key: "wsUsersNow",    bg: "bg-blue-50",    ring: "ring-blue-100",    text: "text-blue-600",    desc: "WS users connected now"   },
+  { label: "Study Saves",   key: "studySaves",    bg: "bg-purple-50",  ring: "ring-purple-100",  text: "text-purple-600",  desc: "Backend saves today"      },
+  { label: "WS Sessions",   key: "wsConnections", bg: "bg-orange-50",  ring: "ring-orange-100",  text: "text-orange-600",  desc: "New connections today"    },
+  { label: "Chat Messages", key: "wsMessages",    bg: "bg-pink-50",    ring: "ring-pink-100",    text: "text-pink-600",    desc: "Relayed via WS today"     },
+  { label: "Reactions",     key: "wsReactions",   bg: "bg-yellow-50",  ring: "ring-yellow-100",  text: "text-yellow-600",  desc: "Emoji reactions today"    },
+];
+
+function LiveStatsWidget() {
+  const [data, setData]         = useState<ServerStats | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [updatedAt, setUpdated] = useState<Date | null>(null);
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+    fetch("/api/stats")
+      .then(r => r.json())
+      .then((d: ServerStats) => { setData(d); setUpdated(new Date()); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    const id = setInterval(refresh, 30_000);
+    return () => clearInterval(id);
+  }, [refresh]);
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            Live Server Stats
+          </h3>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Backend operations · date (UTC): <span className="font-medium text-gray-500">{data?.date ?? "—"}</span> · resets at midnight
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {updatedAt && (
+            <span className="text-[11px] text-gray-400 hidden sm:block">
+              Updated {updatedAt.toLocaleTimeString()}
+            </span>
+          )}
+          <button
+            onClick={refresh}
+            title="Refresh stats"
+            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 text-gray-500 ${loading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+        {STAT_ITEMS.map(({ label, key, bg, ring, text, desc }) => (
+          <div key={key} className={`${bg} ring-1 ${ring} rounded-xl p-3 text-center`}>
+            <p className={`text-2xl font-bold tabular-nums ${text}`}>
+              {loading ? "…" : (data ? String(data[key]) : "—")}
+            </p>
+            <p className="text-xs font-medium text-gray-700 mt-1 leading-tight">{label}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{desc}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-3 border-t border-gray-50">
+        <p className="text-[11px] text-gray-400">
+          Client-side Firestore reads/writes → check{" "}
+          <a
+            href="https://console.firebase.google.com/project/_/firestore/usage"
+            target="_blank"
+            rel="noreferrer"
+            className="text-blue-500 underline hover:text-blue-700"
+          >
+            Firebase Console → Usage &amp; Billing
+          </a>
+        </p>
+        <p className="text-[11px] text-gray-300">
+          Stats reset on server restart
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Overview ─────────────────────────────────────────────────────────────────
+
 function AdminOverview() {
   const [users, setUsers] = useState<FireUser[]>([]);
   const [noteCount, setNoteCount] = useState(0);
@@ -253,6 +363,7 @@ function AdminOverview() {
   return (
     <div>
       <h2 className="text-xl font-bold text-gray-900 mb-6">Overview</h2>
+      <LiveStatsWidget />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <StatCard label="Total Users"  value={users.length} />
         <StatCard label="Admins"       value={admins}       />
