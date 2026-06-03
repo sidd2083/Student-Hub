@@ -23,8 +23,14 @@ export interface UserProfile {
   photoURL?: string;
 }
 
+interface StreakExtras {
+  lastActiveDate: string;
+  streak: number;
+  todayStudyTime: number;
+}
+
 type ProfileResult =
-  | { status: "found"; profile: UserProfile }
+  | { status: "found"; profile: UserProfile; extras: StreakExtras }
   | { status: "not_found" }
   | { status: "error"; code: string };
 
@@ -111,29 +117,34 @@ async function fetchProfile(uid: string): Promise<ProfileResult> {
       createdAt: d.createdAt ?? new Date().toISOString(),
       photoURL: d.photoURL ?? undefined,
     };
-    return { status: "found", profile };
+    const extras: StreakExtras = {
+      lastActiveDate: d.lastActiveDate ?? "",
+      streak: d.streak ?? 0,
+      todayStudyTime: d.todayStudyTime ?? 0,
+    };
+    return { status: "found", profile, extras };
   } catch (err) {
     console.error("[Auth] Firestore READ error:", err);
     return { status: "error", code: "firestore_error" };
   }
 }
 
-/** Reset streak if user missed a day — runs in background, non-blocking */
-async function checkAndBreakStreak(uid: string): Promise<void> {
+/**
+ * Reset streak if user missed a day.
+ * Accepts the already-fetched Firestore data so no extra getDoc is needed.
+ * Runs in background, non-blocking.
+ */
+async function checkAndBreakStreak(uid: string, extras: StreakExtras): Promise<void> {
   try {
     const today = getNepaliDate();
     const yesterday = getNepaliYesterday();
-    const snap = await getDoc(doc(db, "users", uid));
-    if (!snap.exists()) return;
-    const d = snap.data();
-    const lastActive: string = d.lastActiveDate ?? "";
-    const currentStreak: number = d.streak ?? 0;
+    const { lastActiveDate: lastActive, streak: currentStreak, todayStudyTime } = extras;
     const updates: Record<string, unknown> = {};
     if (currentStreak > 0 && lastActive !== today && lastActive !== yesterday) {
       updates.streak = 0;
       console.log("[Auth] Streak broken — missed a day. Was:", currentStreak);
     }
-    if (lastActive && lastActive !== today && (d.todayStudyTime ?? 0) > 0) {
+    if (lastActive && lastActive !== today && todayStudyTime > 0) {
       updates.todayStudyTime = 0;
     }
     if (Object.keys(updates).length > 0) {
