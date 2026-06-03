@@ -217,12 +217,30 @@ function Router() {
   );
 }
 
+// ── Backend keepalive ─────────────────────────────────────────────────────────
+// Pings the Express backend every 10 min while any user is on the site.
+// Prevents Render's free-tier from spinning down and causing a 30–60 s
+// cold-start delay for the next visitor. No-op when VITE_WS_URL is not set
+// (dev on Replit or same-origin deployment — backend is always up).
+const KEEPALIVE_URL = import.meta.env.VITE_WS_URL
+  ? `${import.meta.env.VITE_WS_URL}/health`
+  : null;
+
 function App() {
   useEffect(() => {
     const saved = localStorage.getItem("theme");
     if (saved === "dark") {
       document.documentElement.classList.add("dark");
     }
+  }, []);
+
+  // Render keepalive: fire immediately, then every 10 min
+  useEffect(() => {
+    if (!KEEPALIVE_URL) return;
+    const ping = () => fetch(KEEPALIVE_URL, { method: "GET", mode: "cors" }).catch(() => {});
+    ping(); // immediate on page load
+    const id = setInterval(ping, 10 * 60_000);
+    return () => clearInterval(id);
   }, []);
 
   return (

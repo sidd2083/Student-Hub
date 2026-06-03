@@ -69,6 +69,11 @@ app.use(cors({
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
+// ── Health / keepalive ────────────────────────────────────────────────────────
+// Lightweight endpoint polled every 10 min by the frontend to prevent
+// Render's free-tier from spinning down when users are active on the site.
+app.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
+
 app.use("/api/ai", aiLimiter);
 app.use("/api", limiter, router);
 

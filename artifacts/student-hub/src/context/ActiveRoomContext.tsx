@@ -266,17 +266,16 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
           lastBadgeSyncRef.current = now;
         }
 
-        // Sync study minutes to backend as soon as each full minute is earned.
-        // No 60-second time gate — minsToSync can only be ≥ 1 once per 60 s of
-        // actual study (lastSyncedSecsRef is bumped to minsEarned*60 on each sync),
-        // so the API is naturally throttled to at most one call per study-minute.
-        // Removing the time gate eliminates the 1-minute lag where the leaderboard
-        // showed 0 min after the first minute and 1 min after the second.
+        // Sync study minutes to backend in 5-minute batches (5× fewer API writes).
+        // Short sessions (< 5 min) are NOT lost — leaveActiveRoom() always saves
+        // whatever remainder wasn't flushed here, so 2 min or 7 min sessions are
+        // fully recorded on leave. The leaderboard updates within 5 min for long
+        // sessions; for short ones it updates the moment the user leaves the room.
         if (user) {
           const totalSecs  = getTotalStudySeconds();
           const minsEarned = Math.floor(totalSecs / 60);
           const minsToSync = minsEarned - Math.floor(lastSyncedSecsRef.current / 60);
-          if (minsToSync >= 1) {
+          if (minsToSync >= 5) {
             lastSyncedSecsRef.current = minsEarned * 60;
             saveStudyMinutes(user.uid, () => user.getIdToken(), minsToSync).catch(() => {});
           }
@@ -301,8 +300,8 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
 
   // ── Presence heartbeat ─────────────────────────────────────────────────────
   // WS ping every 15 s → zero Firestore cost, just a tiny socket payload.
-  // Firestore write every 60 s keeps lastSeen fresh for the 90 s stale-check
-  // (4× fewer writes vs the old 15 s interval).
+  // Firestore write every 2 min — stale threshold raised to 3 min in studyRooms.ts
+  // so this is safe. Net result: 2× fewer presence writes vs the old 60 s interval.
   useEffect(() => {
     if (!activeRoomId || !user) return;
     const sock = getSocket();
@@ -311,7 +310,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     }, 15_000);
     const fsInterval = setInterval(() => {
       updatePresence(activeRoomId, user.uid).catch(() => {});
-    }, 60_000);
+    }, 120_000);
     return () => { clearInterval(wsInterval); clearInterval(fsInterval); };
   }, [activeRoomId, user]);
 
@@ -332,7 +331,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   // calls the backend /api/study/claim-host endpoint (Admin SDK bypasses rules).
   useEffect(() => {
     if (!activeRoomId || !user || isHost) return;
-    const STALE_MS = 90_000;
+    const STALE_MS = 180_000; // must match STALE_THRESHOLD_MS in studyRooms.ts
 
     const interval = setInterval(async () => {
       const r    = roomRef.current;

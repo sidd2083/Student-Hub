@@ -102,7 +102,9 @@ export interface RoomMessage {
 
 // ── Presence constants ────────────────────────────────────────────────────────
 // A participant is considered "stale" if their lastSeen is older than this.
-const STALE_THRESHOLD_MS = 90_000; // 90 seconds
+// Raised to 3 min so Firestore presence writes can drop from 60 s → 2 min (2× savings).
+// Ghost-user window: a crashed/closed tab appears online for at most 3 min.
+const STALE_THRESHOLD_MS = 180_000; // 3 minutes
 
 export function isParticipantActive(p: RoomParticipant): boolean {
   if (!p.lastSeen) return true; // just joined, no lastSeen yet
