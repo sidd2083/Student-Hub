@@ -254,38 +254,62 @@ function getBadges(stats: StudyStats, logs: DailyLog[]) {
 
 interface CustomBadge { id: string; text: string; emoji: string; color: string }
 
+// ── Module-level cache — survives SPA navigation (component unmount/remount) ──
+// Prevents re-fetching Firestore on every back-navigation and every tab switch.
+// Each full load costs 2 Firestore reads; without cache, 10 navigations = 20 reads.
+interface RCCacheEntry {
+  uid: string;
+  at: number;
+  stats: StudyStats;
+  logs: DailyLog[];
+  badges: CustomBadge[];
+}
+let _rcCache: RCCacheEntry | null = null;
+const RC_CACHE_TTL = 90_000; // 90 s — refresh at most once per 1.5 min
+
+function isCacheFresh(uid: string): boolean {
+  return !!_rcCache && _rcCache.uid === uid && Date.now() - _rcCache.at < RC_CACHE_TTL;
+}
+
 function ReportContent() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const [stats, setStats] = useState<StudyStats | null>(null);
-  const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState<ViewPeriod>("week");
-  const [customBadges, setCustomBadges] = useState<CustomBadge[]>([]);
 
-  const load = useCallback(async () => {
+  // Pre-populate from cache immediately — no loading flash on back-navigation
+  const cached = _rcCache?.uid === user?.uid ? _rcCache : null;
+  const [stats, setStats]             = useState<StudyStats | null>(cached?.stats ?? null);
+  const [dailyLogs, setDailyLogs]     = useState<DailyLog[]>(cached?.logs ?? []);
+  const [loading, setLoading]         = useState(!cached);
+  const [period, setPeriod]           = useState<ViewPeriod>("week");
+  const [customBadges, setCustomBadges] = useState<CustomBadge[]>(cached?.badges ?? []);
+
+  // silent=true → don't show loading spinner (background refresh with cached data visible)
+  const load = useCallback(async (silent = false) => {
     if (!user) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const [userSnap, logsSnap] = await Promise.all([
         getDoc(doc(db, "users", user.uid)),
         getDocs(query(collection(db, "study_logs"), where("uid", "==", user.uid))),
       ]);
 
+      let newStats: StudyStats;
+      let newBadges: CustomBadge[];
       if (userSnap.exists()) {
         const d = userSnap.data();
-        setStats({
+        newStats = {
           streak: d.streak ?? 0,
           totalStudyTime: d.totalStudyTime ?? 0,
           todayStudyTime: d.todayStudyTime ?? 0,
           lastActiveDate: d.lastActiveDate ?? null,
-        });
-        setCustomBadges(d.badges ?? []);
+        };
+        newBadges = d.badges ?? [];
       } else {
-        setStats({ streak: 0, totalStudyTime: 0, todayStudyTime: 0, lastActiveDate: null });
+        newStats = { streak: 0, totalStudyTime: 0, todayStudyTime: 0, lastActiveDate: null };
+        newBadges = [];
       }
 
-      const logs: DailyLog[] = logsSnap.docs
+      const newLogs: DailyLog[] = logsSnap.docs
         .map(d => ({
           date: d.data().date,
           studyMinutes: d.data().studyMinutes ?? 0,
@@ -293,27 +317,43 @@ function ReportContent() {
           notesViewed: d.data().notesViewed ?? 0,
         }))
         .sort((a, b) => b.date.localeCompare(a.date));
-      setDailyLogs(logs);
+
+      setStats(newStats);
+      setCustomBadges(newBadges);
+      setDailyLogs(newLogs);
+
+      // Store in module-level cache for next navigation
+      _rcCache = { uid: user.uid, at: Date.now(), stats: newStats, logs: newLogs, badges: newBadges };
     } catch {
-      setStats({ streak: 0, totalStudyTime: 0, todayStudyTime: 0, lastActiveDate: null });
-      setDailyLogs([]);
+      if (!silent) {
+        setStats({ streak: 0, totalStudyTime: 0, todayStudyTime: 0, lastActiveDate: null });
+        setDailyLogs([]);
+      }
     } finally {
       setLoading(false);
     }
   }, [user]);
 
-  useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    // Auto-refresh every 60 s (was 120 s) and immediately on tab focus so
-    // study time from a just-left room is visible without manual refresh.
-    const id = setInterval(load, 60_000);
-    const onVisible = () => { if (document.visibilityState === "visible") load(); };
+    // Skip Firestore fetch entirely if cache is still fresh — use pre-populated state
+    if (user && isCacheFresh(user.uid)) return;
+    load();
+  }, [load, user]);
+
+  useEffect(() => {
+    // Auto-refresh every 90 s (silent — no spinner)
+    const id = setInterval(() => load(true), RC_CACHE_TTL);
+    // visibilitychange: only hit Firestore if cache has gone stale
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (user && !isCacheFresh(user.uid)) load(true);
+    };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [load]);
+  }, [load, user]);
 
   if (loading) {
     return (
