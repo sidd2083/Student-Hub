@@ -8,7 +8,7 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   Play, Pause, RotateCcw, Timer, CheckSquare,
-  SkipForward, Settings, X, Eye, Maximize2, Minimize2,
+  SkipForward, Settings, X, Maximize2, Minimize2,
 } from "lucide-react";
 import type { Phase } from "@/context/TimerContext";
 import { focusTracker } from "@/components/StudyGuardian";
@@ -175,21 +175,10 @@ function PomodoroContent() {
   }, []);
   const [pendingTasks, setPendingTasks] = useState<Array<{ id: string; text: string }>>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [focusScore, setFocusScore] = useState<{ score: number; mins: number } | null>(null);
 
-  // Poll focus tracker every 10 s — only show after 90 s of active session
-  useEffect(() => {
-    const update = () => {
-      if (focusTracker.active && focusTracker.elapsedMins() >= 2) {
-        setFocusScore({ score: focusTracker.score(), mins: focusTracker.elapsedMins() });
-      } else if (!focusTracker.active) {
-        setFocusScore(null);
-      }
-    };
-    update();
-    const id = setInterval(update, 10_000);
-    return () => clearInterval(id);
-  }, [running]);
+  // focusTracker still runs in StudyGuardian for absence detection.
+  // We just don't display the score card anymore.
+  void focusTracker;
 
 
   useEffect(() => {
@@ -358,7 +347,7 @@ function PomodoroContent() {
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Pomodoro Timer</h1>
-          <p className="text-gray-500 text-sm">Stay focused — time saves live as you study</p>
+          <p className="text-gray-500 text-sm">Stay focused — study time saves every 5 minutes</p>
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -387,23 +376,6 @@ function PomodoroContent() {
         </div>
       )}
 
-      <div className="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-2.5 mb-4 flex items-center gap-2">
-        <Eye className="w-4 h-4 text-gray-400 flex-shrink-0" />
-        <p className="text-xs text-gray-500">
-          Timer keeps running when you switch tabs. If you're away too long, we'll check in!
-        </p>
-      </div>
-
-      {/* Save hint — visible during first minute of a work session */}
-      {running && phase === "work" && (settings.workMins * 60 - seconds) < 60 && (
-        <div className="flex items-start gap-2.5 mb-4 px-4 py-3 bg-amber-50 border border-amber-100 rounded-2xl">
-          <span className="text-base shrink-0">⏱️</span>
-          <p className="text-xs text-amber-800 leading-relaxed">
-            Your study time starts saving after <strong>1 min</strong> of focus.
-            All the best for your studies! 🌟
-          </p>
-        </div>
-      )}
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center mb-5">
         <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-6 ${
@@ -491,46 +463,6 @@ function PomodoroContent() {
         </div>
       )}
 
-      {focusScore && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <Eye className="w-4 h-4 text-indigo-500" /> Focus Score
-            </h3>
-            <span className="text-xs text-gray-400">{focusScore.mins} min session</span>
-          </div>
-          <div className="flex items-end gap-3 mb-3">
-            <span className={`text-4xl font-bold tabular-nums leading-none ${
-              focusScore.score >= 90 ? "text-green-500"
-              : focusScore.score >= 70 ? "text-blue-500"
-              : focusScore.score >= 50 ? "text-orange-500"
-              : "text-red-500"
-            }`}>
-              {focusScore.score}%
-            </span>
-            <span className="text-sm text-gray-400 mb-1">
-              {focusScore.score >= 90 ? "Excellent focus! 🔥"
-               : focusScore.score >= 70 ? "Good focus 👍"
-               : focusScore.score >= 50 ? "Getting distracted 😐"
-               : "Very distracted 😅"}
-            </span>
-          </div>
-          <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${
-                focusScore.score >= 90 ? "bg-green-400"
-                : focusScore.score >= 70 ? "bg-blue-400"
-                : focusScore.score >= 50 ? "bg-orange-400"
-                : "bg-red-400"
-              }`}
-              style={{ width: `${focusScore.score}%` }}
-            />
-          </div>
-          <p className="text-[10px] text-gray-400 mt-2">
-            Based on time spent on this tab vs. away. Stay focused for a higher score!
-          </p>
-        </div>
-      )}
     </div>
     </>
   );

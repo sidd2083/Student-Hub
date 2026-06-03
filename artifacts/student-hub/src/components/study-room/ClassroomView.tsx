@@ -13,6 +13,8 @@ interface Props {
   roomStatus?: string;
   compact?: boolean;
   theme?: RoomTheme;
+  myUid?: string;
+  myStudyMins?: number;
 }
 
 const AVATAR_COLORS = [
@@ -293,7 +295,7 @@ const OccupiedSeat = memo(function OccupiedSeat({
 
 // ── Wooden desk bench ─────────────────────────────────────────────────────────
 const Bench = memo(function Bench({
-  left, right, hostUid, onSelect, compact, tc,
+  left, right, hostUid, onSelect, compact, tc, myUid, myStudyMins,
 }: {
   left: RoomParticipant | null;
   right: RoomParticipant | null;
@@ -301,19 +303,26 @@ const Bench = memo(function Bench({
   onSelect: (p: RoomParticipant) => void;
   compact: boolean;
   tc: ThemeConfig;
+  myUid?: string;
+  myStudyMins?: number;
 }) {
   const deskW = compact ? "w-36" : "w-48 sm:w-56";
   const gap   = compact ? "gap-4" : "gap-6 sm:gap-10";
+
+  // For the current user's avatar, use local wall-clock minutes (same source as the
+  // side panel) so the badge matches. For other participants use getLiveStudyMins.
+  const leftMins  = left  ? (left.uid  === myUid && myStudyMins !== undefined ? myStudyMins  : getLiveStudyMins(left))  : 0;
+  const rightMins = right ? (right.uid === myUid && myStudyMins !== undefined ? myStudyMins : getLiveStudyMins(right)) : 0;
 
   return (
     <div className="flex flex-col items-center" style={{ gap: 0 }}>
       <div className={`flex items-end ${gap} mb-1`}>
         <AnimatePresence mode="popLayout">
           {left
-            ? <OccupiedSeat key={left.uid}  p={left}  isHost={left.uid  === hostUid} onClick={() => onSelect(left)}  compact={compact} liveMins={getLiveStudyMins(left)}  tc={tc} />
+            ? <OccupiedSeat key={left.uid}  p={left}  isHost={left.uid  === hostUid} onClick={() => onSelect(left)}  compact={compact} liveMins={leftMins}  tc={tc} />
             : <EmptySeat key="el" compact={compact} tc={tc} />}
           {right
-            ? <OccupiedSeat key={right.uid} p={right} isHost={right.uid === hostUid} onClick={() => onSelect(right)} compact={compact} liveMins={getLiveStudyMins(right)} tc={tc} />
+            ? <OccupiedSeat key={right.uid} p={right} isHost={right.uid === hostUid} onClick={() => onSelect(right)} compact={compact} liveMins={rightMins} tc={tc} />
             : <EmptySeat key="er" compact={compact} tc={tc} />}
         </AnimatePresence>
       </div>
@@ -343,7 +352,7 @@ const Bench = memo(function Bench({
 export const ClassroomView = memo(function ClassroomView({
   participants, hostUid, onSelectStudent,
   timerDisplay, timerLabel, timerPhaseType, roomStatus, compact = false,
-  theme = "classic",
+  theme = "classic", myUid, myStudyMins,
 }: Props) {
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -494,7 +503,7 @@ export const ClassroomView = memo(function ClassroomView({
           return (
             <div key={row} className="flex justify-center"
               style={{ marginBottom: compact ? 12 : 16, transform: `scale(${scale})`, transformOrigin: "center bottom", opacity }}>
-              <Bench left={pair[0]} right={pair[1]} hostUid={hostUid} onSelect={handleSelect} compact={compact} tc={tc} />
+              <Bench left={pair[0]} right={pair[1]} hostUid={hostUid} onSelect={handleSelect} compact={compact} tc={tc} myUid={myUid} myStudyMins={myStudyMins} />
             </div>
           );
         })}

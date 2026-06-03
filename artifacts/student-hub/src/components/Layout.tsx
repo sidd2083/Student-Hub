@@ -187,7 +187,7 @@ export function Layout({ children }: LayoutProps) {
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{profile?.name || "Student"}</p>
                 {activeRoomId && studyMinsInSession > 0 ? (
                   <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                    📚 {fmtStudyMins(studyMinsInSession)} studied
+                    {fmtStudyMins(studyMinsInSession)} studied
                   </p>
                 ) : (
                   <p className="text-xs text-gray-500 dark:text-gray-500">{profile?.grade ? gradeLabel(profile.grade) : ""}</p>

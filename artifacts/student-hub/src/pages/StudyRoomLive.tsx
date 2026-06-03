@@ -1172,6 +1172,7 @@ export default function StudyRoomLive() {
                   timerLabel={phase?.label} timerPhaseType={phase?.type ?? null}
                   roomStatus={room.status}
                   theme={room.theme ?? "classic"}
+                  myUid={user?.uid} myStudyMins={studyMinsInSession}
                 />
                 <AnimatePresence>
                   {floatingEmojis.map(fe => (
@@ -1215,6 +1216,7 @@ export default function StudyRoomLive() {
               timerLabel={phase?.label} timerPhaseType={phase?.type ?? null}
               roomStatus={room.status}
               theme={room.theme ?? "classic"}
+              myUid={user?.uid} myStudyMins={studyMinsInSession}
             />
             <AnimatePresence>
               {floatingEmojis.map(fe => (
