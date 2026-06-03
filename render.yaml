@@ -2,9 +2,8 @@ services:
   - type: web
     name: student-hub-api
     runtime: node
-    rootDir: artifacts/api-server
-    buildCommand: npm install -g pnpm@10.26.1 && pnpm install && pnpm run build
-    startCommand: node --enable-source-maps ./dist/index.mjs
+    buildCommand: npm install -g pnpm@10.26.1 && pnpm install && pnpm --filter @workspace/student-hub run build && pnpm --filter @workspace/api-server run build
+    startCommand: node --enable-source-maps ./artifacts/api-server/dist/index.mjs
     healthCheckPath: /health
     autoDeploy: true
 
@@ -23,22 +22,27 @@ services:
       - key: FIREBASE_SERVICE_ACCOUNT_JSON
         sync: false
 
-      # OpenAI key for Nep AI (/api/ai/chat)
-      # Get it: platform.openai.com → API keys
-      - key: OPENAI_API_KEY
+      # Gemini API key for Nep AI (/api/ai/chat)
+      # Get it: aistudio.google.com → Get API Key
+      - key: GEMINI_API_KEY
         sync: false
 
       # ── Optional ─────────────────────────────────────────────────────────────
-      # Restrict CORS to your Vercel domain for extra security.
+      # Restrict CORS to your frontend domain for extra security.
       # Example: https://student-hub.vercel.app
       # Leave blank to allow all origins (fine for most setups).
       - key: CORS_ORIGIN
         sync: false
 
-      # Override OpenAI base URL if using a proxy / Azure OpenAI
-      - key: OPENAI_BASE_URL
-        sync: false
-
       # Log level: trace | debug | info | warn | error (default: info)
       - key: LOG_LEVEL
         value: info
+
+      # Firebase public config — needed by the SSR meta-injection route.
+      # Copy these from your Firebase project console (they are already public).
+      - key: VITE_FIREBASE_API_KEY
+        sync: false
+      - key: VITE_FIREBASE_PROJECT_ID
+        sync: false
+      - key: VITE_FIREBASE_STORAGE_BUCKET
+        sync: false

@@ -177,10 +177,14 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     // WS: receive live badge updates from other room members (zero Firestore reads).
     // Updates participant state in-memory so ClassroomView shows fresh study mins
     // without waiting for a Firestore onSnapshot.
+    // CRITICAL: also null out studyStartedAt in-memory. If we only update studyMinsInRoom
+    // but leave studyStartedAt pointing to the original phase start, getLiveStudyMins
+    // computes studyMinsInRoom (already includes elapsed) + elapsed_since_T0 = DOUBLED.
+    // Nulling studyStartedAt makes getLiveStudyMins return studyMinsInRoom directly.
     const sock = getSocket();
     const onMinsUpdate = ({ uid: pUid, mins }: { uid: string; mins: number }) => {
       setParticipants(prev => prev.map(p =>
-        p.uid === pUid ? { ...p, studyMinsInRoom: mins } : p
+        p.uid === pUid ? { ...p, studyMinsInRoom: mins, studyStartedAt: null } : p
       ));
     };
     sock.on("participant-mins-update", onMinsUpdate);
@@ -220,31 +224,15 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
       setRemainingSeconds(rem);
       remainingSecsRef.current = rem;
 
-      // ── Mathematically-exact study time display ─────────────────────────────
-      // Priority 1: participant's studyStartedAt (server timestamp) → exact, tab-safe,
-      //   cross-device consistent. This is the stable state for all mid-session ticks.
-      // Priority 2: room's timerStartedAt-derived elapsed → covers the ~1 s bootstrap
-      //   window before updateParticipantStudyStart has propagated to Firestore.
-      // Priority 3: banked studyMinsInRoom → accurate during break / paused states.
-      // We NEVER rely on local Date.now() differences for the display value.
-      const myParticipant = user ? participantsRef.current.find(p => p.uid === user.uid) : undefined;
-      let displayMins: number;
-      if (myParticipant?.studyStartedAt != null) {
-        // Server-timestamp-based: always exact, works across tab switches
-        displayMins = getLiveStudyMins(myParticipant);
-      } else if (isRoomStudying(r)) {
-        // Bootstrap: studyStartedAt not yet written — derive from room's timerStartedAt
-        const ph = r.studyFlow[r.currentPhaseIndex];
-        const phaseSecs = (ph?.durationMins ?? 0) * 60;
-        const phaseElapsed = Math.max(0, phaseSecs - rem);
-        displayMins = (myParticipant?.studyMinsInRoom ?? 0) + Math.floor(phaseElapsed / 60);
-      } else {
-        // Break / paused / waiting: show banked total (no active elapsed)
-        displayMins = myParticipant
-          ? getLiveStudyMins(myParticipant)   // studyStartedAt null → returns banked total
-          : Math.floor(getTotalStudySeconds() / 60);
-      }
-      setStudyMinsInSession(displayMins);
+      // ── Study time display — always use LOCAL wall-clock for self ───────────
+      // getLiveStudyMins(myParticipant) is designed for OTHER participants' badges.
+      // For the current user it causes doubling: after a WebSocket badge broadcast
+      // sets studyMinsInRoom = X (already includes elapsed), studyStartedAt is still
+      // the original T0, so getLiveStudyMins returns X + elapsed_since_T0 = 2X.
+      // getTotalStudySeconds() is immune: during study it accumulates wall-clock secs;
+      // during breaks studyWallStartRef is null so it returns the banked total.
+      // This is always correct regardless of Firestore/WS sync state.
+      setStudyMinsInSession(Math.floor(getTotalStudySeconds() / 60));
 
       if (r.status === "active") {
         const now = Date.now();
@@ -449,11 +437,14 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
           studyWallStartRef.current = Date.now();
         }
 
-        // Sync any outstanding whole minutes
+        // Sync any outstanding whole minutes on tab return.
+        // Use same 5-min batch threshold as the main interval — prevents a save
+        // every time the user switches tabs for a few minutes.
+        // Short sessions (< 5 min) are still captured by leaveActiveRoom() on exit.
         const totalSecs  = getTotalStudySeconds();
         const minsEarned = Math.floor(totalSecs / 60);
         const minsToSync = minsEarned - Math.floor(lastSyncedSecsRef.current / 60);
-        if (minsToSync >= 1 && user) {
+        if (minsToSync >= 5 && user) {
           lastSyncedSecsRef.current = minsEarned * 60;
           saveStudyMinutes(user.uid, () => user.getIdToken(), minsToSync).catch(() => {});
           lastSyncTimeRef.current = Date.now();

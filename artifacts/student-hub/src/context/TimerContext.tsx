@@ -387,11 +387,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         newDisplaySecs = Math.max(0, displayBaseSecsRef.current - wallElapsed);
       }
 
-      // ── Check if a new whole minute of work has been completed ───────────
+      // ── Save in 5-minute batches to reduce API usage ─────────────────────
+      // Short sessions (1-4 min) are NOT lost — the beforeunload + visibilitychange
+      // handlers below flush any pending whole minutes when the user leaves or hides
+      // the tab, so a 3-minute session is captured on exit.
       if (phaseRef.current === "work") {
         const earnedMinutes = Math.floor(totalWorkSecondsRef.current / 60);
         const toSave = earnedMinutes - savedMinutesRef.current;
-        if (toSave >= 1) {
+        if (toSave >= 5) {
           saveMinutes(toSave);
         }
       }
@@ -461,6 +464,55 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
     return () => clearInterval(interval);
   }, [running, saveMinutes, nextPhase]);
+
+  // ── Flush pending minutes on exit / tab hide ─────────────────────────────
+  // With the 5-min batch threshold, sessions < 5 min would be lost if the user
+  // closes the tab mid-session. This handler fires on:
+  //   1. beforeunload — browser/tab close; uses sendBeacon (fire-and-forget, no auth)
+  //   2. visibilitychange hidden — tab switch/minimize; triggers a normal API save
+  // Both paths check isInActiveRoom() to avoid double-counting with ActiveRoomContext.
+  useEffect(() => {
+    const getFlushMins = (): number => {
+      if (phaseRef.current !== "work") return 0;
+      // Snapshot wall-clock time
+      if (workWallStartRef.current !== null) {
+        const elapsed = (Date.now() - workWallStartRef.current) / 1000;
+        totalWorkSecondsRef.current = workBaseSecsRef.current + elapsed;
+      }
+      const earned = Math.floor(totalWorkSecondsRef.current / 60);
+      const frac   = totalWorkSecondsRef.current - savedMinutesRef.current * 60;
+      const whole  = earned - savedMinutesRef.current;
+      // Round up partial minute ≥ 30 s so a 90-second session still counts as 1 min
+      if (whole > 0) return whole;
+      if (frac >= 30) return 1;
+      return 0;
+    };
+
+    const handleBeforeUnload = () => {
+      if (isInActiveRoom()) return;
+      const mins = getFlushMins();
+      if (mins <= 0 || !userRef.current) return;
+      savedMinutesRef.current += mins;
+      navigator.sendBeacon?.("/api/study/sync-anon", JSON.stringify({ uid: userRef.current, mins }));
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") return;
+      if (!runningRef.current || isInActiveRoom()) return;
+      const mins = getFlushMins();
+      if (mins <= 0) return;
+      // Normal async save is fine here — tab is hidden but not closed yet
+      saveMinutes(mins);
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveMinutes]);
 
   // Timer keeps running when the user switches tabs.
   // StudyGuardian (mounted in App.tsx) handles smart absence detection,
