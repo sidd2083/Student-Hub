@@ -137,11 +137,30 @@ router.get("/creators/all", requireAdminKey, async (_req: Request, res: Response
   }
 });
 
+// ── Safe field extractor — prevents mass-assignment / prototype injection ──────
+function safeCreatorFields(body: Partial<Creator>): Omit<Creator, "id"> {
+  const str  = (v: unknown, max = 500) => typeof v === "string" ? v.slice(0, max) : "";
+  const strN = (v: unknown, max = 200) => (typeof v === "string" && v) ? v.slice(0, max) : null;
+  return {
+    name:        str(body.name, 200),
+    image:       str(body.image, 2000),
+    description: str(body.description, 1000),
+    instagram:   strN(body.instagram),
+    tiktok:      strN(body.tiktok),
+    youtube:     strN(body.youtube),
+    uid:         strN(body.uid, 128),
+    featured:    Boolean(body.featured),
+    visible:     body.visible !== false,
+    order:       Number.isFinite(Number(body.order)) ? Math.round(Number(body.order)) : 0,
+    createdAt:   typeof body.createdAt === "string" ? body.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
+  };
+}
+
 // ── Admin: create creator ─────────────────────────────────────────────────────
 router.post("/creators", requireAdminKey, async (req: Request, res: Response) => {
   try {
     const db   = getAdminDb();
-    const data = { ...req.body, createdAt: req.body.createdAt ?? new Date().toISOString().slice(0, 10) };
+    const data = safeCreatorFields(req.body as Partial<Creator>);
     if (db) {
       const ref = await db.collection("creators").add(data);
       return res.json({ id: ref.id });
@@ -161,14 +180,28 @@ router.post("/creators", requireAdminKey, async (req: Request, res: Response) =>
 router.put("/creators/:id", requireAdminKey, async (req: Request, res: Response) => {
   try {
     const db = getAdminDb();
+    // Build a partial update with only known, typed fields — no mass assignment
+    const body = req.body as Partial<Creator>;
+    const safe = safeCreatorFields(body);
+    const update: Partial<Omit<Creator, "id">> = {};
+    if (body.name       !== undefined) update.name        = safe.name;
+    if (body.image      !== undefined) update.image       = safe.image;
+    if (body.description!== undefined) update.description = safe.description;
+    if (body.instagram  !== undefined) update.instagram   = safe.instagram;
+    if (body.tiktok     !== undefined) update.tiktok      = safe.tiktok;
+    if (body.youtube    !== undefined) update.youtube     = safe.youtube;
+    if (body.uid        !== undefined) update.uid         = safe.uid;
+    if (body.featured   !== undefined) update.featured    = safe.featured;
+    if (body.visible    !== undefined) update.visible     = safe.visible;
+    if (body.order      !== undefined) update.order       = safe.order;
     if (db) {
-      await db.collection("creators").doc(req.params.id).update(req.body);
+      await db.collection("creators").doc(req.params.id).update(update);
       return res.json({ ok: true });
     }
     const list = fileRead();
     const idx  = list.findIndex(c => c.id === req.params.id);
     if (idx < 0) return res.status(404).json({ error: "Creator not found." });
-    list[idx] = { ...list[idx], ...req.body };
+    list[idx] = { ...list[idx], ...update };
     fileWrite(list);
     return res.json({ ok: true });
   } catch (err) {

@@ -1,19 +1,36 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import { getAdminDb } from "../lib/firebase-admin";
+import { getAdminDb, getAdminAuth } from "../lib/firebase-admin";
 
 const router = Router();
 
-const ADMIN_KEY = process.env.ADMIN_KEY;
-
-function isAdmin(req: Request): boolean {
-  if (!ADMIN_KEY) return false;
-  return req.headers["x-admin-key"] === ADMIN_KEY;
+// ── Admin verification ────────────────────────────────────────────────────────
+// Accepts a Firebase ID token (from signed-in admin users) or an env-based
+// ADMIN_KEY header (for server-to-server / CLI access). Never expose ADMIN_KEY
+// in frontend code — use Firebase token auth instead.
+async function isAdmin(req: Request): Promise<boolean> {
+  // Primary: Firebase ID token with role === "admin" in Firestore
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    try {
+      const adminAuth = getAdminAuth();
+      if (!adminAuth) return false;
+      const decoded = await adminAuth.verifyIdToken(authHeader.slice(7));
+      const db = getAdminDb();
+      if (!db) return false;
+      const snap = await db.collection("users").doc(decoded.uid).get();
+      return snap.data()?.role === "admin";
+    } catch { return false; }
+  }
+  // Fallback: env-based key for CLI/cron access only — never put this in frontend
+  const envKey = process.env.ADMIN_KEY;
+  if (envKey && req.headers["x-admin-key"] === envKey) return true;
+  return false;
 }
 
 // ── Admin: search users ───────────────────────────────────────────────────────
 router.get("/users", async (req: Request, res: Response) => {
-  if (!isAdmin(req)) return res.json([]);
+  if (!(await isAdmin(req))) return res.json([]);
   try {
     const db = getAdminDb();
     if (!db) return res.json([]);

@@ -47,3 +47,19 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# ── Secrets & credentials — NEVER commit these ───────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+serviceAccount*.json
+*service-account*.json
+*firebase-adminsdk*.json
+google-credentials*.json
+secrets.json
+secrets.*.json

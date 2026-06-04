@@ -2293,8 +2293,6 @@ const emptyCreator = (): Omit<FireCreator, "id"> => ({
   uid: undefined,
 });
 
-const ADMIN_KEY = "siddhant2078";
-
 function ManageCreators() {
   const [creators, setCreators] = useState<FireCreator[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2335,7 +2333,8 @@ function ManageCreators() {
     userSearchTimer.current = setTimeout(async () => {
       setUserSearching(true);
       try {
-        const resp = await fetch(`/api/users?q=${encodeURIComponent(q)}`, { headers: { "X-Admin-Key": ADMIN_KEY } });
+        const token = await auth.currentUser?.getIdToken() ?? "";
+        const resp = await fetch(`/api/users?q=${encodeURIComponent(q)}`, { headers: { "Authorization": `Bearer ${token}` } });
         if (!resp.ok) { setUserResults([]); return; }
         const data = await resp.json() as { uid: string; name: string; grade: number; photoURL: string | null }[];
         setUserResults(data);

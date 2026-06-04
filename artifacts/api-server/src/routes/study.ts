@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
+import { rateLimit } from "express-rate-limit";
 import { getAdminDb, getAdminAuth } from "../lib/firebase-admin";
 import { logger } from "../lib/logger";
 import { requireAuth, perUserWriteLimit } from "../lib/auth-middleware";
@@ -228,17 +229,29 @@ router.post("/study/leave", async (req: Request, res: Response) => {
 // ── Anonymous beacon sync — called via sendBeacon on tab close ────────────────
 // Cannot carry auth headers so uid comes from the body.
 // No streak update — just persists study time. Strict caps prevent abuse.
-const ANON_SYNC_LIMIT_MS = 60_000; // max one beacon per user per minute
+// Two-layer rate limiting: per-uid (in-memory) + per-IP (express-rate-limit).
+const ANON_SYNC_LIMIT_MS = 60_000; // max one beacon per uid per minute
 const anonSyncLastCall = new Map<string, number>();
 
-router.post("/study/sync-anon", async (req: Request, res: Response) => {
+// IP-level cap: 20 syncs per IP per minute — prevents one machine from
+// flooding the endpoint on behalf of many uids.
+const anonSyncIpLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false },
+});
+
+router.post("/study/sync-anon", anonSyncIpLimiter, async (req: Request, res: Response) => {
   try {
     const { uid, mins } = req.body as { uid?: string; mins?: number };
     if (!uid || typeof uid !== "string" || uid.length < 10 || uid.length > 128) {
       return res.status(400).json({ ok: false });
     }
+    // Cap at 3 min per beacon (honest max session between tab-close events)
     const cappedMins = typeof mins === "number" && Number.isFinite(mins)
-      ? Math.max(0, Math.min(Math.floor(mins), 5)) // max 5 min per beacon call
+      ? Math.max(0, Math.min(Math.floor(mins), 3))
       : 0;
     if (cappedMins === 0) return res.json({ ok: true });
 

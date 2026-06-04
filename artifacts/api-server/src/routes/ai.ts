@@ -211,7 +211,7 @@ router.post(
       const apiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
       if (!apiKey) {
         return res.status(503).json({
-          error: "Nep AI is not configured. Please set GEMINI_API_KEY in your environment.",
+          error: "Nep AI is not configured. Please contact the site admin to enable the AI service.",
         });
       }
 

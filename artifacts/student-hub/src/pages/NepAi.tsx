@@ -10,12 +10,20 @@ import { db, auth } from "@/lib/firebase";
 
 interface Message { role: "user" | "assistant"; content: string }
 
+// Escape raw HTML entities so AI-generated content cannot inject executable HTML.
+// Applied before markdown patterns so <, >, & in AI responses render as text.
+function escHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function markdownToHtml(text: string): string {
-  const renderInline = (s: string) =>
-    s.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
-     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-     .replace(/\*(.+?)\*/g, "<em>$1</em>")
-     .replace(/`(.+?)`/g, '<code style="background:#f3f4f6;padding:1px 6px;border-radius:4px;font-size:0.85em;font-family:monospace;color:#1e40af">$1</code>');
+  const renderInline = (s: string) => {
+    const e = escHtml(s);
+    return e.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
+            .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+            .replace(/\*(.+?)\*/g, "<em>$1</em>")
+            .replace(/`(.+?)`/g, '<code style="background:#f3f4f6;padding:1px 6px;border-radius:4px;font-size:0.85em;font-family:monospace;color:#1e40af">$1</code>');
+  };
 
   const lines = text.split("\n");
   const out: string[] = [];
@@ -446,7 +454,7 @@ function NepAiContent() {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.warn("[NepAI] stream failed:", errMsg);
       const isRateLimit = errMsg.includes("busy") || errMsg.includes("too many") || errMsg.includes("rate") || errMsg.includes("429");
-      const isConfig    = errMsg.includes("not configured") || errMsg.includes("GEMINI_API_KEY") || errMsg.includes("API key") || errMsg.includes("503");
+      const isConfig    = errMsg.includes("not configured") || errMsg.includes("contact the site admin") || errMsg.includes("503");
       const isUserFriendly = errMsg.length >= 10 && errMsg.length <= 300 && !errMsg.match(/^(AI service|status |fetch)/i);
       if (isRateLimit) startCooldown(20);
       const errorContent = isRateLimit
