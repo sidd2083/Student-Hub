@@ -387,15 +387,18 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         newDisplaySecs = Math.max(0, displayBaseSecsRef.current - wallElapsed);
       }
 
-      // ── Save in 5-minute batches to reduce API usage ─────────────────────
-      // Short sessions (1-4 min) are NOT lost — the beforeunload + visibilitychange
-      // handlers below flush any pending whole minutes when the user leaves or hides
-      // the tab, so a 3-minute session is captured on exit.
+      // ── Save in exact 5-minute boundary batches ──────────────────────────
+      // Always save exactly to the next 5-min mark (5, 10, 15, 20...) so
+      // that even after a partial flush (e.g. 2 min flushed on tab hide),
+      // the next save fires at the correct absolute boundary, not 5 mins later.
+      // Short sessions are NOT lost — beforeunload + visibilitychange handlers
+      // flush pending minutes when the user leaves or hides the tab.
       if (phaseRef.current === "work") {
         const earnedMinutes = Math.floor(totalWorkSecondsRef.current / 60);
-        const toSave = earnedMinutes - savedMinutesRef.current;
-        if (toSave >= 5) {
-          saveMinutes(toSave);
+        const nextMark = (Math.floor(savedMinutesRef.current / 5) + 1) * 5;
+        if (earnedMinutes >= nextMark) {
+          const toSave = nextMark - savedMinutesRef.current;
+          if (toSave > 0) saveMinutes(toSave);
         }
       }
 

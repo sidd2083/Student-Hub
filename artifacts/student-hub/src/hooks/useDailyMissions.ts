@@ -762,32 +762,34 @@ function _doComplete(
   setMissions: React.Dispatch<React.SetStateAction<Mission[]>>,
   setAllCompleted: React.Dispatch<React.SetStateAction<boolean>>,
 ) {
-  setMissions(prev => {
-    const updated = prev.map(m =>
-      m.id === missionId ? { ...m, completed: true, completedAt: new Date().toISOString() } : m,
-    );
-    const count  = updated.filter(m => m.completed).length;
-    const isDone = count === updated.length && updated.length > 0;
-    if (isDone) setAllCompleted(true);
+  // Compute updated missions from the snapshot passed in.
+  // completingRef prevents double-calling so using the snapshot directly is safe.
+  const updated = missions.map(m =>
+    m.id === missionId ? { ...m, completed: true, completedAt: new Date().toISOString() } : m,
+  );
+  const count  = updated.filter(m => m.completed).length;
+  const isDone = count === updated.length && updated.length > 0;
 
-    // Always write cache — even if no prior cache exists — so completions
-    // survive a page refresh even if the Firestore write hasn't landed yet.
-    const c = readCache(uid, date);
-    writeCache(uid, date, {
-      missions: updated,
-      allCompleted: isDone,
-      studyMinsAtStart: c?.studyMinsAtStart ?? 0,
-      level: c?.level ?? "beginner",
-      version: MISSION_VERSION,
-    });
+  // Set state WITHOUT nesting — calling setState inside a setState updater is
+  // illegal in React and triggers the error boundary. Call them sequentially.
+  setMissions(updated);
+  if (isDone) setAllCompleted(true);
 
-    // Use setDoc+merge so this works whether the Firestore doc exists or not.
-    setDoc(doc(db, "daily_missions", `${uid}_${date}`), {
-      missions: updated, completedCount: count, allCompleted: isDone,
-    }, { merge: true }).catch(() => {});
-    if (isDone) {
-      updateDoc(doc(db, "users", uid), { lastMissionsCompletedDate: date }).catch(() => {});
-    }
-    return updated;
+  // Always write cache so completions survive a refresh before Firestore confirms.
+  const c = readCache(uid, date);
+  writeCache(uid, date, {
+    missions: updated,
+    allCompleted: isDone,
+    studyMinsAtStart: c?.studyMinsAtStart ?? 0,
+    level: c?.level ?? "beginner",
+    version: MISSION_VERSION,
   });
+
+  // Use setDoc+merge so this works whether the Firestore doc exists or not.
+  setDoc(doc(db, "daily_missions", `${uid}_${date}`), {
+    missions: updated, completedCount: count, allCompleted: isDone,
+  }, { merge: true }).catch(() => {});
+  if (isDone) {
+    updateDoc(doc(db, "users", uid), { lastMissionsCompletedDate: date }).catch(() => {});
+  }
 }

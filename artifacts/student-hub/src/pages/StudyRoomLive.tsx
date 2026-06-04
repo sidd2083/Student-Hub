@@ -11,6 +11,7 @@ import {
   Pin, Pencil, Check, Megaphone,
 } from "lucide-react";
 import { useRoomSound } from "@/hooks/useAmbientSound";
+import { useWakeLock } from "@/hooks/useWakeLock";
 import {
   Room, RoomParticipant, Vote, RoomMessage,
   subscribeRoom, subscribeParticipants, subscribeActiveVotes, subscribeMessages,
@@ -133,6 +134,11 @@ export default function StudyRoomLive() {
   const { isMuted, volume, setMuted, setVolume } = useRoomSound(
     joined && room?.status === "active" ? roomSoundId : "none"
   );
+
+  // ── Wake Lock — prevents screen dimming/lock while actively studying ─────────
+  // Activates when the user is in an active study room; releases automatically
+  // on pause, break phase, or when the component unmounts (user leaves).
+  useWakeLock(joined && room?.status === "active");
 
   // ── PRE-JOIN: subscribe to room and participants ONLY while not yet joined ────
   // After join, the context already subscribes — subscribing again would create

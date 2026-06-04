@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Helmet } from "react-helmet-async";
 import { Instagram, Youtube, Star, Users, X, Flame, Clock, Trophy, Award, ExternalLink } from "lucide-react";
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, query, where, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 /* ─── Types ────────────────────────────────────────────────────── */
@@ -248,8 +248,8 @@ function CreatorCard({ creator, onOpen }: { creator: Creator; onOpen: () => void
             className="absolute inset-0 w-full h-full object-cover"
             loading="lazy"
             decoding="async"
-            /* Never let the browser downscale quality */
-            style={{ imageRendering: "auto" }}
+            fetchPriority={creator.featured ? "high" : "low"}
+            referrerPolicy="no-referrer-when-downgrade"
           />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
@@ -362,16 +362,15 @@ export default function PartnerCreators() {
   const [selected, setSelected] = useState<Creator | null>(null);
 
   useEffect(() => {
-    getDocs(collection(db, "creators"))
+    // Filter visible=true server-side to avoid fetching hidden creator docs.
+    getDocs(query(collection(db, "creators"), where("visible", "==", true)))
       .then(snap => {
         const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as Creator));
         setCreators(
-          all
-            .filter(c => c.visible)
-            .sort((a, b) => {
-              if (a.featured !== b.featured) return a.featured ? -1 : 1;
-              return a.order - b.order;
-            })
+          all.sort((a, b) => {
+            if (a.featured !== b.featured) return a.featured ? -1 : 1;
+            return (a.order ?? 0) - (b.order ?? 0);
+          })
         );
       })
       .catch(() => setCreators([]))

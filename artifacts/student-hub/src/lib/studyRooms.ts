@@ -763,7 +763,7 @@ export function subscribePublicRooms(cb: RoomsCb): () => void {
       query(
         collection(db, "studyRooms"),
         where("status", "in", ["waiting", "active", "paused"]),
-        limit(60),
+        limit(20),
       ),
       (snap) => {
         const now = Date.now();
