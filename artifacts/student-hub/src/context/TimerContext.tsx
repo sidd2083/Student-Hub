@@ -542,6 +542,17 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       const elapsed = (Date.now() - workWallStartRef.current) / 1000;
       totalWorkSecondsRef.current = workBaseSecsRef.current + elapsed;
     }
+    // ── Flush remaining unsaved minutes on explicit pause ─────────────────────
+    // Without this, pausing at 7 min (after the 5-min auto-save) discards the
+    // remaining 2 min — they are only recovered when the user resumes and crosses
+    // the next 5-min mark. Now every pause immediately saves what was earned.
+    if (phaseRef.current === "work") {
+      const earnedMins = Math.floor(totalWorkSecondsRef.current / 60);
+      const fracSecs   = totalWorkSecondsRef.current - savedMinutesRef.current * 60;
+      const wholeDiff  = earnedMins - savedMinutesRef.current;
+      const toSave     = wholeDiff > 0 ? wholeDiff : (fracSecs >= 30 ? 1 : 0);
+      if (toSave > 0) saveMinutes(toSave);
+    }
     if (displayWallStartRef.current !== null) {
       const elapsed = Math.floor((Date.now() - displayWallStartRef.current) / 1000);
       const newSecs = Math.max(0, displayBaseSecsRef.current - elapsed);
@@ -553,9 +564,23 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     runningRef.current = false;
     setRunning(false);
     persistState();
-  }, [persistState]);
+  }, [persistState, saveMinutes]);
 
   const reset = useCallback(() => {
+    // ── Flush unsaved work time before wiping the session ─────────────────────
+    // User at 7 min (5 already auto-saved) clicks Restart → save remaining 2 min
+    // so no earned time is silently discarded on reset.
+    if (phaseRef.current === "work") {
+      if (workWallStartRef.current !== null) {
+        const elapsed = (Date.now() - workWallStartRef.current) / 1000;
+        totalWorkSecondsRef.current = workBaseSecsRef.current + elapsed;
+      }
+      const earnedMins = Math.floor(totalWorkSecondsRef.current / 60);
+      const fracSecs   = totalWorkSecondsRef.current - savedMinutesRef.current * 60;
+      const wholeDiff  = earnedMins - savedMinutesRef.current;
+      const toSave     = wholeDiff > 0 ? wholeDiff : (fracSecs >= 30 ? 1 : 0);
+      if (toSave > 0) saveMinutes(toSave);
+    }
     workWallStartRef.current    = null;
     displayWallStartRef.current = null;
     runningRef.current = false;
@@ -583,7 +608,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       savedMinutes: 0,
       updatedAt: Date.now(),
     });
-  }, []);
+  }, [saveMinutes]);
 
   const skipPhase = useCallback(() => {
     if (phaseRef.current === "work") {

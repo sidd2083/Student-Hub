@@ -4,9 +4,10 @@ import { getAdminDb } from "../lib/firebase-admin";
 
 const router = Router();
 
-const ADMIN_KEY = process.env.ADMIN_KEY ?? "siddhant2078";
+const ADMIN_KEY = process.env.ADMIN_KEY;
 
 function isAdmin(req: Request): boolean {
+  if (!ADMIN_KEY) return false;
   return req.headers["x-admin-key"] === ADMIN_KEY;
 }
 

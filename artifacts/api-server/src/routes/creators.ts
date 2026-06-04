@@ -6,7 +6,7 @@ import { logger } from "../lib/logger";
 
 const router = Router();
 
-const ADMIN_KEY      = process.env.ADMIN_KEY ?? "siddhant2078";
+const ADMIN_KEY      = process.env.ADMIN_KEY;
 const CREATORS_FILE  = resolve(process.cwd(), "creators.json");
 const PROJECT_ID     = process.env.VITE_FIREBASE_PROJECT_ID ?? "studenthub-6bcc5";
 const API_KEY        = process.env.VITE_FIREBASE_API_KEY ?? "";
@@ -80,7 +80,7 @@ async function fetchCreatorsRest(): Promise<Creator[]> {
 
 // ── Auth middleware ───────────────────────────────────────────────────────────
 function requireAdminKey(req: Request, res: Response, next: NextFunction): void {
-  if (req.headers["x-admin-key"] !== ADMIN_KEY) {
+  if (!ADMIN_KEY || req.headers["x-admin-key"] !== ADMIN_KEY) {
     res.status(401).json({ error: "Unauthorized: invalid admin key." });
     return;
   }

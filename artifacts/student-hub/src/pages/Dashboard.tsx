@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import {
-  collection, query, where, getDocs, doc, getDoc, orderBy,
+  collection, query, where, getDocs, doc, getDoc, orderBy, limit,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -270,8 +270,8 @@ export default function Dashboard() {
           if (announcementsCache && Date.now() - announcementsCache.ts < ANN_CACHE_TTL) {
             return announcementsCache.data;
           }
-          const snap = await getDocs(query(collection(db, "announcements"), orderBy("createdAt", "desc")));
-          const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement)).slice(0, 3);
+          const snap = await getDocs(query(collection(db, "announcements"), orderBy("createdAt", "desc"), limit(3)));
+          const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
           announcementsCache = { data: list, ts: Date.now() };
           return list;
         };
@@ -279,7 +279,7 @@ export default function Dashboard() {
         if (uid) {
           const [userSnap, tasksSnap, annList] = await Promise.all([
             getDoc(doc(db, "users", uid)),
-            getDocs(query(collection(db, "tasks"), where("uid", "==", uid), where("completed", "==", false))),
+            getDocs(query(collection(db, "tasks"), where("uid", "==", uid), where("completed", "==", false), limit(50))),
             fetchAnnouncements(),
           ]);
 

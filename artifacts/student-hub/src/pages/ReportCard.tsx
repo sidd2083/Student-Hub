@@ -105,27 +105,37 @@ function StudyBar({ logs, period }: { logs: DailyLog[]; period: ViewPeriod }) {
   }, [logs, period]);
 
   const max = Math.max(...days.map(d => d.minutes), 1);
+  const isMonth = period === "month";
 
   return (
-    <div className="flex items-end gap-0.5 h-28">
-      {days.map(({ label, minutes, isToday }, idx) => {
-        const numLabel = Number(label);
-        const showLabel = period !== "month" || isToday || numLabel === 1 || numLabel % 5 === 0;
-        return (
-          <div key={idx} className="flex-1 flex flex-col items-center gap-0.5 min-w-0">
-            <div className="w-full flex flex-col justify-end" style={{ height: "80px" }}>
-              <div
-                className={`w-full rounded-t-sm transition-all ${isToday ? "bg-blue-500" : minutes > 0 ? "bg-blue-300" : "bg-gray-100"}`}
-                style={{ height: `${Math.max((minutes / max) * 80, minutes > 0 ? 3 : 1)}px` }}
-                title={`${label}: ${minutes} min`}
-              />
+    // Month view: scroll horizontally on narrow screens so bars never squish below ~16px
+    <div className={isMonth ? "overflow-x-auto -mx-5 px-5" : ""}>
+      <div
+        className="flex items-end gap-0.5"
+        style={{
+          height: "112px",
+          minWidth: isMonth ? `${30 * 20}px` : undefined,
+        }}
+      >
+        {days.map(({ label, minutes, isToday }, idx) => {
+          const numLabel = Number(label);
+          const showLabel = !isMonth || isToday || numLabel === 1 || numLabel % 5 === 0;
+          return (
+            <div key={idx} className="flex-1 flex flex-col items-center gap-0.5 min-w-0">
+              <div className="w-full flex flex-col justify-end" style={{ height: "92px" }}>
+                <div
+                  className={`w-full rounded-t-sm transition-all ${isToday ? "bg-blue-500" : minutes > 0 ? "bg-blue-300" : "bg-gray-100"}`}
+                  style={{ height: `${Math.max((minutes / max) * 92, minutes > 0 ? 3 : 1)}px` }}
+                  title={`${label}: ${minutes} min`}
+                />
+              </div>
+              <span className={`text-[8px] font-medium truncate w-full text-center leading-none ${isToday ? "text-blue-600" : "text-gray-400"}`}>
+                {showLabel ? label : ""}
+              </span>
             </div>
-            <span className={`text-[8px] font-medium truncate w-full text-center leading-none ${isToday ? "text-blue-600" : "text-gray-400"}`}>
-              {showLabel ? label : ""}
-            </span>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

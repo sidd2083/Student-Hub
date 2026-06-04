@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { BookOpen, FileText, BarChart2, MessageCircle, Timer, CheckSquare, Trophy, ArrowRight, LogIn, Calculator, CalendarCheck } from "lucide-react";
 import { noteUrl, pyqUrl } from "@/lib/slugs";
@@ -74,14 +74,16 @@ export default function Home() {
   const [pyqs, setPyqs] = useState<PreviewPyq[]>([]);
 
   useEffect(() => {
-    getDocs(query(collection(db, "notes"), where("grade", "==", 10)))
+    // limit(8): server-side cap — client sorts by createdAt and shows top 5.
+    // No orderBy here to avoid requiring a composite Firestore index.
+    getDocs(query(collection(db, "notes"), where("grade", "==", 10), limit(8)))
       .then(s => {
         const all = s.docs.map(d => ({ id: d.id, ...d.data() } as PreviewNote));
         all.sort((a: any, b: any) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
         setNotes(all.slice(0, 5));
       })
       .catch(console.error);
-    getDocs(query(collection(db, "pyqs"), where("grade", "==", 10)))
+    getDocs(query(collection(db, "pyqs"), where("grade", "==", 10), limit(8)))
       .then(s => {
         const all = s.docs.map(d => ({ id: d.id, ...d.data() } as PreviewPyq));
         all.sort((a: any, b: any) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));

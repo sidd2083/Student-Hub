@@ -37,7 +37,7 @@ function pushLiveStats() {
 
 export function initSocketServer(httpServer: HTTPServer): SocketServer {
   const io = new SocketServer(httpServer, {
-    cors: { origin: "*", credentials: true },
+    cors: { origin: process.env.CORS_ORIGIN ?? true, credentials: true },
     transports: ["websocket", "polling"],
     pingTimeout: 30_000,
     pingInterval: 10_000,
