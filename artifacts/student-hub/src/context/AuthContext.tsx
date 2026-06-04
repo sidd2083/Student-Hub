@@ -93,8 +93,18 @@ function getEarlyProfile(): UserProfile | null {
 
 function setCachedProfile(uid: string, profile: UserProfile) {
   try {
-    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ uid, profile }));
+    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ uid, profile, ts: Date.now() }));
   } catch {}
+}
+
+/** True if the cached profile is less than 5 minutes old — skip background re-fetch. */
+function isProfileCacheFresh(uid: string): boolean {
+  try {
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw) as { uid: string; ts?: number };
+    return data.uid === uid && !!data.ts && Date.now() - data.ts < 5 * 60 * 1000;
+  } catch { return false; }
 }
 
 function clearProfileCache() {
@@ -132,9 +142,10 @@ async function fetchProfile(uid: string): Promise<ProfileResult> {
 /**
  * Reset streak if user missed a day.
  * Accepts the already-fetched Firestore data so no extra getDoc is needed.
+ * Returns true if any Firestore updates were written (caller should re-fetch profile).
  * Runs in background, non-blocking.
  */
-async function checkAndBreakStreak(uid: string, extras: StreakExtras): Promise<void> {
+async function checkAndBreakStreak(uid: string, extras: StreakExtras): Promise<boolean> {
   try {
     const today = getNepaliDate();
     const yesterday = getNepaliYesterday();
@@ -149,9 +160,12 @@ async function checkAndBreakStreak(uid: string, extras: StreakExtras): Promise<v
     }
     if (Object.keys(updates).length > 0) {
       await updateDoc(doc(db, "users", uid), updates);
+      return true;
     }
+    return false;
   } catch (err) {
     console.warn("[Auth] checkAndBreakStreak failed:", err);
+    return false;
   }
 }
 
@@ -258,6 +272,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         setLoading(false);
 
+        // Skip background re-fetch if cache was written < 5 min ago — saves 1 Firestore
+        // read per page load for actively navigating users. Firebase Auth only fires
+        // onAuthStateChanged once per hard page load (not per SPA navigation), so this
+        // only skips re-fetches when the user hard-refreshes within a short window.
+        if (isProfileCacheFresh(firebaseUser.uid)) return;
+
         // Verify with Firestore in background (non-blocking)
         fetchProfile(firebaseUser.uid).then(async result => {
           if (!mounted) return;
@@ -265,9 +285,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const patched = await patchProfileFromFirebase(firebaseUser.uid, firebaseUser, result.profile);
             if (!mounted) return;
             applyProfile(patched);
-            // Run streak check in background — don't block UI
-            checkAndBreakStreak(firebaseUser.uid).then(async () => {
-              if (!mounted) return;
+            // Run streak check — pass already-fetched extras to avoid an extra getDoc.
+            // Only re-fetch profile if the check actually wrote changes (streak reset).
+            checkAndBreakStreak(firebaseUser.uid, result.extras).then(async (changed) => {
+              if (!changed || !mounted) return;
               const fresh = await fetchProfile(firebaseUser.uid);
               if (!mounted) return;
               if (fresh.status === "found") applyProfile(fresh.profile);
@@ -293,9 +314,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           window.location.replace("/dashboard");
         }
 
-        // Streak check runs in background after content is visible
-        checkAndBreakStreak(firebaseUser.uid).then(async () => {
-          if (!mounted) return;
+        // Streak check runs in background after content is visible.
+        // Pass already-fetched extras — no extra getDoc needed.
+        // Only re-fetch if the check actually wrote updates (streak/today reset).
+        checkAndBreakStreak(firebaseUser.uid, result.extras).then(async (changed) => {
+          if (!changed || !mounted) return;
           const fresh = await fetchProfile(firebaseUser.uid);
           if (!mounted) return;
           if (fresh.status === "found") applyProfile(fresh.profile);

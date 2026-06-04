@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import { getAdminDb } from "../lib/firebase-admin";
+import { getAdminDb, getAdminAuth } from "../lib/firebase-admin";
 import { logger } from "../lib/logger";
 import { requireAuth, perUserWriteLimit } from "../lib/auth-middleware";
 import { stats } from "../lib/stats";
@@ -132,6 +132,23 @@ router.post("/study/leave", async (req: Request, res: Response) => {
     const { roomId, uid } = req.body as { roomId?: string; uid?: string };
     if (!roomId || !uid || typeof roomId !== "string" || typeof uid !== "string") {
       return res.status(400).json({ ok: false, error: "roomId and uid required" });
+    }
+
+    // Security: if a Firebase ID token is supplied, verify the caller is only
+    // removing themselves — not kicking another participant from outside the app.
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      try {
+        const adminAuth = getAdminAuth();
+        if (adminAuth) {
+          const decoded = await adminAuth.verifyIdToken(authHeader.slice(7));
+          if (decoded.uid !== uid) {
+            return res.status(403).json({ ok: false, error: "Cannot remove another participant" });
+          }
+        }
+      } catch {
+        return res.status(401).json({ ok: false, error: "Invalid auth token" });
+      }
     }
 
     const db = getAdminDb();

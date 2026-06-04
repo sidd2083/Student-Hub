@@ -22,17 +22,66 @@ interface SavedItem {
   pdfUrl?: string;
 }
 
+// ── Two-level cache: L1 = in-memory Map (instant), L2 = localStorage (survives
+// page refreshes). Eliminates the N+1 Firestore reads on every /saved visit.
+// TTL = 15 min; invalidated immediately on item delete.
 const savedCache = new Map<string, SavedItem[]>();
+const SAVED_LS_KEY = "sh_saved_items_v1";
+const SAVED_LS_TTL = 15 * 60 * 1000;
+
+function getSavedFromStorage(uid: string): SavedItem[] | null {
+  try {
+    const raw = localStorage.getItem(SAVED_LS_KEY);
+    if (!raw) return null;
+    const { u, items, t } = JSON.parse(raw) as { u: string; items: SavedItem[]; t: number };
+    if (u !== uid || Date.now() - t > SAVED_LS_TTL) return null;
+    return items;
+  } catch { return null; }
+}
+
+function setSavedToStorage(uid: string, items: SavedItem[]) {
+  try {
+    localStorage.setItem(SAVED_LS_KEY, JSON.stringify({ u: uid, items, t: Date.now() }));
+  } catch {}
+}
+
+function clearSavedStorage() {
+  try { localStorage.removeItem(SAVED_LS_KEY); } catch {}
+}
 
 function SavedContent() {
   const { user } = useAuth();
   const uid = user?.uid ?? "";
-  const [items, setItems] = useState<SavedItem[]>(() => savedCache.get(uid) ?? []);
-  const [loading, setLoading] = useState(() => !savedCache.has(uid));
+  const [items, setItems] = useState<SavedItem[]>(() => {
+    const mem = savedCache.get(uid);
+    if (mem) return mem;
+    const ls = uid ? getSavedFromStorage(uid) : null;
+    if (ls) { savedCache.set(uid, ls); return ls; }
+    return [];
+  });
+  const [loading, setLoading] = useState(() => {
+    if (savedCache.has(uid)) return false;
+    if (uid && getSavedFromStorage(uid)) return false;
+    return true;
+  });
 
   const load = useCallback(async () => {
     if (!user?.uid) return;
-    if (!savedCache.has(user.uid)) setLoading(true);
+    // L1: in-memory hit
+    if (savedCache.has(user.uid)) {
+      setItems(savedCache.get(user.uid)!);
+      setLoading(false);
+      return;
+    }
+    // L2: localStorage hit — populate L1 and skip all Firestore reads
+    const lsCached = getSavedFromStorage(user.uid);
+    if (lsCached) {
+      savedCache.set(user.uid, lsCached);
+      setItems(lsCached);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
       const q = query(collection(db, "saved_items"), where("uid", "==", user.uid));
       const snap = await getDocs(q);
@@ -42,7 +91,7 @@ function SavedContent() {
         ...d.data(),
       } as { id: string; itemType: "note" | "pyq"; itemId: string; savedAt: string }));
 
-      // Fetch metadata for each saved item
+      // Fetch metadata for each saved item (N+1 — only runs on cache miss)
       const enriched: SavedItem[] = await Promise.all(rawItems.map(async (item) => {
         try {
           const collName = item.itemType === "note" ? "notes" : "pyqs";
@@ -50,24 +99,9 @@ function SavedContent() {
           if (docSnap.exists()) {
             const d = docSnap.data();
             if (item.itemType === "note") {
-              return {
-                ...item,
-                title: d.title,
-                subject: d.subject,
-                grade: d.grade,
-                contentType: d.contentType,
-                content: d.content,
-              };
+              return { ...item, title: d.title, subject: d.subject, grade: d.grade, contentType: d.contentType, content: d.content };
             } else {
-              return {
-                ...item,
-                title: d.title,
-                subject: d.subject,
-                grade: d.grade,
-                year: d.year,
-                fileType: d.fileType,
-                pdfUrl: d.pdfUrl,
-              };
+              return { ...item, title: d.title, subject: d.subject, grade: d.grade, year: d.year, fileType: d.fileType, pdfUrl: d.pdfUrl };
             }
           }
         } catch {}
@@ -76,6 +110,7 @@ function SavedContent() {
 
       const sorted = enriched.sort((a, b) => (b.savedAt || "").localeCompare(a.savedAt || ""));
       savedCache.set(user.uid, sorted);
+      setSavedToStorage(user.uid, sorted);
       setItems(sorted);
     } catch (e) {
       console.error("[Saved] Load failed:", e);
@@ -89,7 +124,13 @@ function SavedContent() {
   const remove = async (id: string) => {
     try {
       await deleteDoc(doc(db, "saved_items", id));
-      setItems(prev => prev.filter(i => i.id !== id));
+      const next = items.filter(i => i.id !== id);
+      setItems(next);
+      // Invalidate both cache levels so the next visit re-fetches correctly
+      if (user?.uid) {
+        savedCache.set(user.uid, next);
+        setSavedToStorage(user.uid, next);
+      }
     } catch (e) {
       console.error("[Saved] Delete failed:", e);
     }

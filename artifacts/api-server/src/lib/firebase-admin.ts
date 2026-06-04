@@ -1,12 +1,14 @@
 import { initializeApp, getApps, cert, App } from "firebase-admin/app";
 import { getFirestore, Firestore } from "firebase-admin/firestore";
 import { getStorage, Storage } from "firebase-admin/storage";
+import { getAuth, Auth } from "firebase-admin/auth";
 import pino from "pino";
 
 const log = pino({ level: process.env.LOG_LEVEL ?? "info" });
 
 let db: Firestore | null = null;
 let adminStorage: Storage | null = null;
+let adminAuth: Auth | null = null;
 let initialized = false;
 
 function init() {
@@ -36,6 +38,7 @@ function init() {
     app = initializeApp(appConfig);
     db = getFirestore(app);
     adminStorage = getStorage(app);
+    adminAuth = getAuth(app);
     log.info("[Firebase Admin] Initialized with service account");
   } catch (err) {
     log.error({ err }, "[Firebase Admin] Init failed");
@@ -50,6 +53,10 @@ export function getAdminDb(): Firestore | null {
 
 export function getAdminStorage(): Storage | null {
   return adminStorage;
+}
+
+export function getAdminAuth(): Auth | null {
+  return adminAuth;
 }
 
 export function isAdminAvailable(): boolean {

@@ -7,6 +7,31 @@ import { db } from "@/lib/firebase";
 import { BookOpen, FileText, BarChart2, MessageCircle, Timer, CheckSquare, Trophy, ArrowRight, LogIn, Calculator, CalendarCheck } from "lucide-react";
 import { noteUrl, pyqUrl } from "@/lib/slugs";
 
+// ── Home preview cache (sessionStorage, 30-min TTL) ──────────────────────────
+// Avoids 16 Firestore reads every time an unauthenticated user visits the home
+// page. Cache lives for the browser session + 30 min — refreshes if content is
+// likely to have changed.
+const HOME_CACHE_KEY = "sh_home_preview_v1";
+const HOME_CACHE_TTL = 30 * 60 * 1000;
+
+interface HomeCache { notes: PreviewNote[]; pyqs: PreviewPyq[]; t: number }
+
+function getHomeCache(): { notes: PreviewNote[]; pyqs: PreviewPyq[] } | null {
+  try {
+    const raw = sessionStorage.getItem(HOME_CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw) as HomeCache;
+    if (Date.now() - c.t > HOME_CACHE_TTL) return null;
+    return { notes: c.notes, pyqs: c.pyqs };
+  } catch { return null; }
+}
+
+function setHomeCache(notes: PreviewNote[], pyqs: PreviewPyq[]) {
+  try {
+    sessionStorage.setItem(HOME_CACHE_KEY, JSON.stringify({ notes, pyqs, t: Date.now() }));
+  } catch {}
+}
+
 const features = [
   { icon: BookOpen,      label: "Study Notes",           desc: "Notes by grade, subject & chapter",   href: "/notes",                      color: "bg-blue-50 text-blue-600",    public: true  },
   { icon: FileText,      label: "PYQ Papers",            desc: "Past exam papers with viewer",         href: "/pyqs",                       color: "bg-orange-50 text-orange-600", public: true  },
@@ -74,20 +99,36 @@ export default function Home() {
   const [pyqs, setPyqs] = useState<PreviewPyq[]>([]);
 
   useEffect(() => {
+    // Serve from sessionStorage cache first — avoids 16 Firestore reads per visit.
+    // Cache TTL is 30 min; a fresh browser session always fetches once.
+    const cached = getHomeCache();
+    if (cached) {
+      setNotes(cached.notes);
+      setPyqs(cached.pyqs);
+      return;
+    }
     // limit(8): server-side cap — client sorts by createdAt and shows top 5.
     // No orderBy here to avoid requiring a composite Firestore index.
+    let notesResult: PreviewNote[] = [];
+    let pyqsResult:  PreviewPyq[]  = [];
+    let done = 0;
+    const tryCache = () => { if (++done === 2) setHomeCache(notesResult, pyqsResult); };
     getDocs(query(collection(db, "notes"), where("grade", "==", 10), limit(8)))
       .then(s => {
         const all = s.docs.map(d => ({ id: d.id, ...d.data() } as PreviewNote));
         all.sort((a: any, b: any) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-        setNotes(all.slice(0, 5));
+        notesResult = all.slice(0, 5);
+        setNotes(notesResult);
+        tryCache();
       })
       .catch(console.error);
     getDocs(query(collection(db, "pyqs"), where("grade", "==", 10), limit(8)))
       .then(s => {
         const all = s.docs.map(d => ({ id: d.id, ...d.data() } as PreviewPyq));
         all.sort((a: any, b: any) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-        setPyqs(all.slice(0, 5));
+        pyqsResult = all.slice(0, 5);
+        setPyqs(pyqsResult);
+        tryCache();
       })
       .catch(console.error);
   }, []);

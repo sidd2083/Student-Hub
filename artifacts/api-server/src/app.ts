@@ -61,7 +61,23 @@ const aiLimiter = rateLimit({
 });
 
 app.use(cors({
-  origin: process.env.CORS_ORIGIN ?? true,
+  origin: (origin, callback) => {
+    // Allow server-to-server / curl / Postman (no Origin header)
+    if (!origin) return callback(null, true);
+    // Allow all Replit dev and deployment domains
+    if (origin.endsWith(".replit.dev") || origin.endsWith(".replit.app")) return callback(null, true);
+    // Allow explicit override (e.g. custom production domain)
+    const configured = process.env.CORS_ORIGIN;
+    if (configured) {
+      const allowed = configured.split(",").map(s => s.trim());
+      if (allowed.includes(origin)) return callback(null, true);
+    }
+    // Allow localhost in non-production environments only
+    if (process.env.NODE_ENV !== "production" && /^https?:\/\/localhost(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+    callback(null, false);
+  },
   credentials: true,
 }));
 // 5 MB to accommodate base64-encoded creator images stored inline in Firestore.
