@@ -424,16 +424,13 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
         // Re-ping presence immediately when tab comes back
         updatePresence(activeRoomId, user.uid).catch(() => {});
 
-        // If we were studying, reset the wall-clock start to now (avoids counting
-        // time when tab was in background and the browser might have throttled)
+        // If we were studying, bank the elapsed time and reset the wall-clock
+        // start to now. This prevents background-tab throttling from causing
+        // drift without losing any seconds that were genuinely accrued.
+        // NOTE: do NOT clamp against phaseTotal here — that would erase minutes
+        // banked from earlier phases, causing the "80 min → 50 min" drop bug.
         if (studyWallStartRef.current !== null && roomRef.current && isRoomStudying(roomRef.current)) {
-          // Bank time up to when tab was hidden
-          const r = roomRef.current;
-          const phaseTotal = (r.studyFlow[r.currentPhaseIndex]?.durationMins ?? 0) * 60;
-          const elapsed    = getRemainingSeconds(r);
-          // Clamp accumulated so it can't exceed the phase total
-          const maxAccum   = phaseTotal - elapsed;
-          studyAccumulatedRef.current = Math.min(getTotalStudySeconds(), Math.max(studyAccumulatedRef.current, maxAccum));
+          studyAccumulatedRef.current += Math.max(0, (Date.now() - studyWallStartRef.current) / 1000);
           studyWallStartRef.current = Date.now();
         }
 
