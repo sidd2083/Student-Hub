@@ -97,6 +97,7 @@ export default function StudyRoomLive() {
   const [endVoteLoading,  setEndVoteLoading] = useState(false);
   const [showSkipVote,    setShowSkipVote] = useState(false);
   const [skipVoteLoading, setSkipVoteLoading] = useState(false);
+  const [focusMode,       setFocusMode]    = useState(false);
 
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const lastSentAtRef = useRef<number>(0);
@@ -1014,6 +1015,16 @@ export default function StudyRoomLive() {
             </div>
           )}
 
+          {/* Focus Mode — desktop-only, hides chat/votes/participants */}
+          <button
+            onClick={() => setFocusMode(f => !f)}
+            title={focusMode ? "Exit Focus Mode" : "Focus Mode — hide distractions"}
+            className="hidden lg:flex p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
+            style={{ color: focusMode ? "#3b82f6" : undefined }}
+          >
+            {focusMode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-gray-400" />}
+          </button>
+
           <button onClick={toggleFullscreen}
             className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 transition-colors shrink-0">
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
@@ -1038,11 +1049,13 @@ export default function StudyRoomLive() {
   }
 
   function MobileTabs() {
-    const tabs: { id: MobileTab; label: string; icon: React.ReactNode; badge?: number }[] = [
+    const allTabs: { id: MobileTab; label: string; icon: React.ReactNode; badge?: number }[] = [
       { id: "class", label: "Classroom", icon: <School className="w-4 h-4" /> },
       { id: "vote",  label: "Vote",      icon: <ListChecks className="w-4 h-4" />, badge: activeVoteCount || undefined },
       { id: "chat",  label: "Chat",      icon: <MessageCircle className="w-4 h-4" />, badge: unreadChatCount || undefined },
     ];
+    // In focus mode only show the classroom tab — no distractions
+    const tabs = focusMode ? allTabs.slice(0, 1) : allTabs;
     return (
       <div className="flex bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 lg:hidden">
         {tabs.map(t => (
@@ -1241,7 +1254,7 @@ export default function StudyRoomLive() {
         </div>
 
         {/* ── DESKTOP LAYOUT ─────────────────────────────────────────────────── */}
-        <div className="hidden lg:grid lg:grid-cols-[1fr_48px_340px] gap-3">
+        <div className={`hidden lg:grid ${focusMode ? "lg:grid-cols-[1fr_48px]" : "lg:grid-cols-[1fr_48px_340px]"} gap-3`}>
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden relative">
             <ClassroomView
               participants={participants} hostUid={room.hostUid}
@@ -1276,7 +1289,8 @@ export default function StudyRoomLive() {
             ))}
           </div>
 
-          {/* Right panel */}
+          {/* Right panel — hidden in Focus Mode so the classroom fills the screen */}
+          {!focusMode && (
           <div className="flex flex-col gap-3 min-w-0 overflow-y-auto" style={{ maxHeight: "calc(100vh - 180px)" }}>
             {studyMinsInSession > 0 && (
               <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/30 px-4 py-3 flex items-center justify-between">
@@ -1317,6 +1331,7 @@ export default function StudyRoomLive() {
               </div>
             </div>
           </div>
+          )}
         </div>
 
         {/* Mobile bottom nav */}

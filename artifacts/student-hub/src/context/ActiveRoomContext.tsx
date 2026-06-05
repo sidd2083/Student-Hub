@@ -288,8 +288,9 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
 
   // ── Presence heartbeat ─────────────────────────────────────────────────────
   // WS ping every 15 s → zero Firestore cost, just a tiny socket payload.
-  // Firestore write every 2 min — stale threshold raised to 3 min in studyRooms.ts
-  // so this is safe. Net result: 2× fewer presence writes vs the old 60 s interval.
+  // Firestore write every 3 min (was 2 min) — stale threshold is 6 min so we have
+  // a full 3-min window before anyone is incorrectly purged. With 100 users in a
+  // room this cuts presence reads from ~83/s to ~55/s (33% Firestore reduction).
   useEffect(() => {
     if (!activeRoomId || !user) return;
     const sock = getSocket();
@@ -298,7 +299,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     }, 15_000);
     const fsInterval = setInterval(() => {
       updatePresence(activeRoomId, user.uid).catch(() => {});
-    }, 120_000);
+    }, 180_000);
     return () => { clearInterval(wsInterval); clearInterval(fsInterval); };
   }, [activeRoomId, user]);
 
@@ -319,7 +320,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   // calls the backend /api/study/claim-host endpoint (Admin SDK bypasses rules).
   useEffect(() => {
     if (!activeRoomId || !user || isHost) return;
-    const STALE_MS = 180_000; // must match STALE_THRESHOLD_MS in studyRooms.ts
+    const STALE_MS = 360_000; // must match STALE_THRESHOLD_MS in studyRooms.ts
 
     const interval = setInterval(async () => {
       const r    = roomRef.current;

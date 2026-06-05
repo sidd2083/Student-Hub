@@ -9,3 +9,4 @@
 - [Creators Feature](creators-feature.md) — creators stored in local JSON file fallback (artifacts/api-server/creators.json) when FIREBASE_SERVICE_ACCOUNT_JSON not set; admin uses X-Admin-Key header; uid field links creator to student user account for "See Profile" modal.
 - [WebSocket Layer](websocket-layer.md) — Socket.io replaces Firestore listeners for chat/reactions/presence; hybrid fallback to Firestore if WS unavailable (Vercel); key files and event contract documented.
 - [Firestore Optimization & Timer Fixes](firestore-optimization.md) — full read audit done; key limits added; timer flush-on-pause/reset fixed; admin key security hardened; 30-day graph responsive fixed.
+- [Study Room Scalability](study-room-scalability.md) — bench layout, presence intervals, room cap, focus mode — production decisions documented.

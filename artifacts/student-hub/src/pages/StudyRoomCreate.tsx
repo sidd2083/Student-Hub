@@ -224,7 +224,7 @@ export default function StudyRoomCreate() {
                   <input
                     type="range"
                     min={2}
-                    max={50}
+                    max={20}
                     value={maxParticipants}
                     onChange={(e) => setMaxParticipants(parseInt(e.target.value))}
                     className="flex-1 accent-blue-600"

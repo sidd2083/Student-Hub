@@ -369,9 +369,11 @@ export const ClassroomView = memo(function ClassroomView({
     for (let i = 0; i < participants.length; i += 2) {
       p.push([participants[i] ?? null, participants[i + 1] ?? null]);
     }
-    while (p.length < (compact ? 2 : 3)) p.push([null, null]);
+    // Always minimum 2 benches — consistent on every screen size.
+    // Same room → same layout on mobile and desktop.
+    while (p.length < 2) p.push([null, null]);
     return p;
-  }, [participants, compact]);
+  }, [participants]);
 
   const isStudying = timerPhaseType === "study" && roomStatus === "active";
   const isBreak    = timerPhaseType === "break"  && roomStatus === "active";
@@ -379,8 +381,14 @@ export const ClassroomView = memo(function ClassroomView({
   const isWaiting  = roomStatus === "waiting";
   const showTimer  = !!timerDisplay && roomStatus && roomStatus !== "waiting" && roomStatus !== "finished";
 
+  // Dynamic height: grows to accommodate all benches so every participant is visible.
+  // overflow-x-hidden clips decorative side elements (windows) without cutting off rows.
+  const minH = compact
+    ? 300 + pairs.length * 90
+    : 370 + pairs.length * 108;
+
   return (
-    <div className="relative w-full overflow-hidden select-none" style={{ minHeight: compact ? 310 : 420 }}>
+    <div className="relative w-full overflow-x-hidden select-none" style={{ minHeight: minH }}>
 
       {/* ── WALL BACKGROUND ──────────────────────────────────────────────── */}
       <div className={`absolute inset-0 bg-gradient-to-b ${tc.wallBg}`} />
@@ -401,9 +409,10 @@ export const ClassroomView = memo(function ClassroomView({
           style={{ background: "radial-gradient(ellipse 60% 60% at 50% 0%, rgba(254,243,199,0.55) 0%, transparent 100%)" }} />
       )}
 
-      {/* Wainscoting */}
-      <div className={`absolute inset-x-0 ${tc.wainscoteLine}`} style={{ top: "62%", height: 2 }} />
-      <div className={`absolute inset-x-0 bottom-0 ${tc.wainscotePanel}`} style={{ top: "62%" }} />
+      {/* Wainscoting — fixed pixel from top so it stays below the blackboard area
+           regardless of how many benches are rendered (not percentage-based). */}
+      <div className={`absolute inset-x-0 ${tc.wainscoteLine}`} style={{ top: compact ? 168 : 218, height: 2 }} />
+      <div className={`absolute inset-x-0 bottom-0 ${tc.wainscotePanel}`} style={{ top: compact ? 168 : 218 }} />
 
       {/* ── CEILING LIGHT ────────────────────────────────────────────────── */}
       {theme === "night"
