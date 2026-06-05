@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RoomParticipant, getLiveStudyMins, RoomTheme } from "@/lib/studyRooms";
 import { Crown, BookOpen, Coffee } from "lucide-react";
@@ -354,11 +354,9 @@ export const ClassroomView = memo(function ClassroomView({
   timerDisplay, timerLabel, timerPhaseType, roomStatus, compact = false,
   theme = "classic", myUid, myStudyMins,
 }: Props) {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 1_000);
-    return () => clearInterval(id);
-  }, []);
+  // No internal tick needed — the parent (StudyRoomLive) already re-renders every
+  // second via useRoomTimer(), passing a new timerDisplay prop each time. That
+  // prop change drives badge + blackboard updates without a separate interval here.
 
   const handleSelect = useCallback((p: RoomParticipant) => {
     onSelectStudent?.(p);

@@ -95,6 +95,8 @@ export default function StudyRoomLive() {
   const [showLeave,       setShowLeave]   = useState(false);
   const [showEndVote,     setShowEndVote] = useState(false);
   const [endVoteLoading,  setEndVoteLoading] = useState(false);
+  const [showSkipVote,    setShowSkipVote] = useState(false);
+  const [skipVoteLoading, setSkipVoteLoading] = useState(false);
 
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const lastSentAtRef = useRef<number>(0);
@@ -244,12 +246,16 @@ export default function StudyRoomLive() {
   }, [roomId, joined, wsUnavailable]);
 
   // ── Chat slow mode countdown tick ──────────────────────────────────────────
+  // Only updates state when the value actually changes — avoids re-renders
+  // every 500 ms when the cooldown is already at 0 (i.e. most of the time).
   useEffect(() => {
+    const cooldownSecs = room?.chatCooldownSecs ?? 10;
+    let prev = 0;
     const id = setInterval(() => {
-      const cooldownSecs = room?.chatCooldownSecs ?? 10;
-      if (cooldownSecs <= 0) { setCooldownRemaining(0); return; }
+      if (cooldownSecs <= 0) { if (prev !== 0) { setCooldownRemaining(0); prev = 0; } return; }
       const elapsed = (Date.now() - lastSentAtRef.current) / 1000;
-      setCooldownRemaining(Math.max(0, Math.ceil(cooldownSecs - elapsed)));
+      const next = Math.max(0, Math.ceil(cooldownSecs - elapsed));
+      if (next !== prev) { setCooldownRemaining(next); prev = next; }
     }, 500);
     return () => clearInterval(id);
   }, [room?.chatCooldownSecs]);
@@ -505,6 +511,28 @@ export default function StudyRoomLive() {
     } else {
       (document.exitFullscreen?.() ?? (document as any).webkitExitFullscreen?.())?.catch(() => {});
     }
+  }
+
+  async function handleHostSkipVote() {
+    if (!user || !profile || !roomId || !room) return;
+    setSkipVoteLoading(true);
+    try {
+      const currentPhase = room.studyFlow[room.currentPhaseIndex];
+      const isBreakPhase = currentPhase?.type === "break";
+      await createVote(roomId, {
+        description: isBreakPhase
+          ? "⏩ Skip the break and jump back to studying?"
+          : "⏩ Skip to the next phase early?",
+        type: "skip_break",
+        createdByUid: user.uid,
+        createdByName: profile.name,
+        totalParticipants: participants.length,
+        expiresInSecs: 60,
+      });
+      setShowSkipVote(false);
+      setMobileTab("vote");
+    } catch (e) { console.error("[Vote] skip vote failed", e); }
+    setSkipVoteLoading(false);
   }
 
   async function handleHostEndVote() {
@@ -901,7 +929,7 @@ export default function StudyRoomLive() {
             </button>
           )}
           {(room.status === "active" || room.status === "paused") && (
-            <button onClick={onHostSkip}
+            <button onClick={() => setShowSkipVote(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold transition-colors shadow-sm">
               <SkipForward className="w-3.5 h-3.5" /> Skip
             </button>
@@ -1394,6 +1422,62 @@ export default function StudyRoomLive() {
                     <button onClick={handleHostEndVote} disabled={endVoteLoading}
                       className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
                       {endVoteLoading
+                        ? <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Starting…</>
+                        : "Start Vote 🗳️"
+                      }
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── SKIP PHASE VOTE MODAL ─────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showSkipVote && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowSkipVote(false)}
+              className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm" />
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 16 }}
+                transition={{ type: "spring", damping: 26, stiffness: 320 }}
+                className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm pointer-events-auto overflow-hidden"
+              >
+                <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center text-xl">⏩</div>
+                    <div>
+                      <p className="font-bold text-white text-base">Skip Phase Vote</p>
+                      <p className="text-white/70 text-xs">Ask everyone to vote</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowSkipVote(false)} className="text-white/70 hover:text-white">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="p-5 space-y-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    A 60-second vote will be sent to all <strong>{participants.length} participants</strong>.
+                    If the majority vote <strong>Yes</strong>, the current phase is skipped immediately.
+                  </p>
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 text-xs text-blue-700 dark:text-blue-300">
+                    ⏭ Current phase: <strong>{room.studyFlow[room.currentPhaseIndex]?.label ?? "Phase"}</strong>
+                    {" · "}{room.studyFlow[room.currentPhaseIndex]?.durationMins}m
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowSkipVote(false)}
+                      className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                      Cancel
+                    </button>
+                    <button onClick={handleHostSkipVote} disabled={skipVoteLoading}
+                      className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
+                      {skipVoteLoading
                         ? <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Starting…</>
                         : "Start Vote 🗳️"
                       }
