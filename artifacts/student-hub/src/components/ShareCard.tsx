@@ -1,6 +1,6 @@
 import { forwardRef } from "react";
 
-interface ShareCardProps {
+export interface ShareCardProps {
   name: string;
   grade: string;
   period: "day" | "week" | "month";
@@ -27,115 +27,115 @@ const PERIOD_LABEL: Record<string, string> = {
 
 const THEMES = {
   day: {
-    bg: "linear-gradient(145deg, #0f0c29 0%, #302b63 50%, #24243e 100%)",
-    accent: "#7c6fff",
-    accentGlow: "rgba(124,111,255,0.35)",
-    pill: "rgba(124,111,255,0.22)",
-    pillText: "#c4baff",
-    bar: "#7c6fff",
-    barDim: "rgba(124,111,255,0.22)",
-    badge: "rgba(124,111,255,0.18)",
-    badgeText: "#c4baff",
-    statCard: "rgba(255,255,255,0.06)",
-    statBorder: "rgba(255,255,255,0.09)",
-    highlight: "#a78bfa",
+    bg: "linear-gradient(160deg, #0f0c29 0%, #302b63 55%, #24243e 100%)",
+    accent: "#a78bfa",
+    accentRgb: "167,139,250",
+    pill: "rgba(167,139,250,0.20)",
+    pillText: "#ddd6fe",
+    bar: "#a78bfa",
+    barActive: "#c4b5fd",
+    barDim: "rgba(167,139,250,0.18)",
+    statCard: "rgba(255,255,255,0.07)",
+    statBorder: "rgba(167,139,250,0.20)",
+    badgeBg: "rgba(167,139,250,0.16)",
+    badgeText: "#ddd6fe",
+    divider: "rgba(167,139,250,0.18)",
   },
   week: {
-    bg: "linear-gradient(145deg, #0a1628 0%, #0d2b4b 50%, #0a3d62 100%)",
+    bg: "linear-gradient(160deg, #071428 0%, #0c2444 55%, #0a3060 100%)",
     accent: "#38bdf8",
-    accentGlow: "rgba(56,189,248,0.35)",
+    accentRgb: "56,189,248",
     pill: "rgba(56,189,248,0.18)",
-    pillText: "#7dd3fc",
+    pillText: "#bae6fd",
     bar: "#38bdf8",
+    barActive: "#7dd3fc",
     barDim: "rgba(56,189,248,0.18)",
-    badge: "rgba(56,189,248,0.14)",
-    badgeText: "#7dd3fc",
-    statCard: "rgba(255,255,255,0.05)",
-    statBorder: "rgba(255,255,255,0.08)",
-    highlight: "#38bdf8",
+    statCard: "rgba(255,255,255,0.06)",
+    statBorder: "rgba(56,189,248,0.20)",
+    badgeBg: "rgba(56,189,248,0.14)",
+    badgeText: "#bae6fd",
+    divider: "rgba(56,189,248,0.18)",
   },
   month: {
-    bg: "linear-gradient(145deg, #1a0533 0%, #2d1b69 45%, #0f3460 100%)",
+    bg: "linear-gradient(160deg, #160524 0%, #2d1b69 50%, #0f3460 100%)",
     accent: "#f472b6",
-    accentGlow: "rgba(244,114,182,0.35)",
+    accentRgb: "244,114,182",
     pill: "rgba(244,114,182,0.18)",
-    pillText: "#f9a8d4",
+    pillText: "#fbcfe8",
     bar: "#f472b6",
-    barDim: "rgba(244,114,182,0.18)",
-    badge: "rgba(244,114,182,0.14)",
-    badgeText: "#f9a8d4",
-    statCard: "rgba(255,255,255,0.05)",
-    statBorder: "rgba(255,255,255,0.08)",
-    highlight: "#f472b6",
+    barActive: "#f9a8d4",
+    barDim: "rgba(244,114,182,0.15)",
+    statCard: "rgba(255,255,255,0.06)",
+    statBorder: "rgba(244,114,182,0.20)",
+    badgeBg: "rgba(244,114,182,0.14)",
+    badgeText: "#fbcfe8",
+    divider: "rgba(244,114,182,0.18)",
   },
 };
 
-function MiniBarChart({
-  logs,
-  period,
-  theme,
-}: {
-  logs: { date: string; studyMinutes: number }[];
-  period: "day" | "week" | "month";
-  theme: (typeof THEMES)["day"];
-}) {
-  const count = period === "day" ? 7 : period === "week" ? 7 : 30;
-  const DAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-
-  const days = Array.from({ length: count }, (_, i) => {
+/** Builds an array of {date, minutes, label, isToday} for the chart */
+function buildChartDays(
+  logs: { date: string; studyMinutes: number }[],
+  count: number
+) {
+  const SHORT_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return Array.from({ length: count }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (count - 1 - i));
     const key = d.toISOString().slice(0, 10);
     const log = logs.find((l) => l.date === key);
+    const dayNum = d.getDate();
     return {
-      label: period === "month" ? String(d.getDate()) : DAYS_SHORT[d.getDay()],
+      key,
       minutes: log?.studyMinutes ?? 0,
       isToday: i === count - 1,
+      dayNum,
+      dayName: SHORT_DAYS[d.getDay()],
     };
   });
+}
 
+function WeekChart({
+  logs,
+  theme,
+}: {
+  logs: { date: string; studyMinutes: number }[];
+  theme: (typeof THEMES)["day"];
+}) {
+  const days = buildChartDays(logs, 7);
   const max = Math.max(...days.map((d) => d.minutes), 1);
-  const chartH = 52;
+  const chartH = 72;
 
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: period === "month" ? 3 : 6, height: chartH + 18 }}>
-      {days.map(({ label, minutes, isToday }, idx) => {
-        const barH = Math.max((minutes / max) * chartH, minutes > 0 ? 4 : 2);
-        const showLabel = period !== "month" || isToday || Number(label) === 1 || Number(label) % 7 === 0;
+    <div style={{ display: "flex", gap: 8, alignItems: "flex-end", height: chartH + 20 }}>
+      {days.map(({ minutes, isToday, dayName }, i) => {
+        const barH = Math.max((minutes / max) * chartH, minutes > 0 ? 5 : 2);
         return (
-          <div
-            key={idx}
-            style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, gap: 3 }}
-          >
+          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
             <div style={{ width: "100%", height: chartH, display: "flex", alignItems: "flex-end" }}>
               <div
                 style={{
                   width: "100%",
                   height: barH,
-                  borderRadius: "3px 3px 0 0",
-                  background: isToday
-                    ? theme.accent
-                    : minutes > 0
-                    ? theme.bar
-                    : theme.barDim,
-                  opacity: isToday ? 1 : minutes > 0 ? 0.65 : 0.3,
-                  boxShadow: isToday ? `0 0 8px ${theme.accentGlow}` : "none",
-                  transition: "all 0.3s",
+                  borderRadius: "4px 4px 0 0",
+                  background: isToday ? theme.barActive : minutes > 0 ? theme.bar : theme.barDim,
+                  opacity: isToday ? 1 : minutes > 0 ? 0.75 : 0.3,
+                  boxShadow: isToday ? `0 -3px 12px rgba(${theme.accentRgb},0.5)` : "none",
+                  transition: "all 0.2s",
                 }}
               />
             </div>
-            {showLabel && (
-              <span
-                style={{
-                  fontSize: period === "month" ? 7 : 9,
-                  color: isToday ? theme.accent : "rgba(255,255,255,0.35)",
-                  fontWeight: isToday ? 700 : 400,
-                  lineHeight: 1,
-                }}
-              >
-                {label}
-              </span>
-            )}
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: isToday ? 700 : 500,
+                color: isToday ? theme.accent : "rgba(255,255,255,0.45)",
+                lineHeight: 1,
+                letterSpacing: 0.2,
+              }}
+            >
+              {dayName}
+            </span>
           </div>
         );
       })}
@@ -143,6 +143,106 @@ function MiniBarChart({
   );
 }
 
+function MonthChart({
+  logs,
+  theme,
+}: {
+  logs: { date: string; studyMinutes: number }[];
+  theme: (typeof THEMES)["day"];
+}) {
+  const days = buildChartDays(logs, 30);
+  const max = Math.max(...days.map((d) => d.minutes), 1);
+  const chartH = 64;
+  // show label only for day 1, 10, 20, and today
+  const showLabel = (dayNum: number, isToday: boolean) =>
+    isToday || dayNum === 1 || dayNum === 10 || dayNum === 20;
+
+  return (
+    <div style={{ display: "flex", gap: 2, alignItems: "flex-end", height: chartH + 18 }}>
+      {days.map(({ minutes, isToday, dayNum }, i) => {
+        const barH = Math.max((minutes / max) * chartH, minutes > 0 ? 4 : 1.5);
+        const show = showLabel(dayNum, isToday);
+        return (
+          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+            <div style={{ width: "100%", height: chartH, display: "flex", alignItems: "flex-end" }}>
+              <div
+                style={{
+                  width: "100%",
+                  height: barH,
+                  borderRadius: "2px 2px 0 0",
+                  background: isToday ? theme.barActive : minutes > 0 ? theme.bar : theme.barDim,
+                  opacity: isToday ? 1 : minutes > 0 ? 0.70 : 0.25,
+                  boxShadow: isToday ? `0 -2px 8px rgba(${theme.accentRgb},0.5)` : "none",
+                }}
+              />
+            </div>
+            <span
+              style={{
+                fontSize: 7.5,
+                fontWeight: isToday ? 700 : 400,
+                color: isToday ? theme.accent : show ? "rgba(255,255,255,0.45)" : "transparent",
+                lineHeight: 1,
+                letterSpacing: 0,
+              }}
+            >
+              {show ? (isToday ? "Now" : String(dayNum)) : "."}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DayChart({
+  logs,
+  theme,
+}: {
+  logs: { date: string; studyMinutes: number }[];
+  theme: (typeof THEMES)["day"];
+}) {
+  // For daily view, show last 7 days with today highlighted more
+  const days = buildChartDays(logs, 7);
+  const max = Math.max(...days.map((d) => d.minutes), 1);
+  const chartH = 72;
+  const SHORT_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "flex-end", height: chartH + 20 }}>
+      {days.map(({ minutes, isToday, dayName }, i) => {
+        const barH = Math.max((minutes / max) * chartH, minutes > 0 ? 5 : 2);
+        return (
+          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+            <div style={{ width: "100%", height: chartH, display: "flex", alignItems: "flex-end" }}>
+              <div
+                style={{
+                  width: "100%",
+                  height: barH,
+                  borderRadius: "4px 4px 0 0",
+                  background: isToday ? theme.barActive : minutes > 0 ? theme.bar : theme.barDim,
+                  opacity: isToday ? 1 : minutes > 0 ? 0.5 : 0.2,
+                  boxShadow: isToday ? `0 -3px 14px rgba(${theme.accentRgb},0.6)` : "none",
+                }}
+              />
+            </div>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: isToday ? 700 : 400,
+                color: isToday ? theme.accent : "rgba(255,255,255,0.35)",
+                lineHeight: 1,
+              }}
+            >
+              {isToday ? "Today" : dayName}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The actual card — rendered off-screen for html2canvas capture */
 const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
   (
     {
@@ -162,9 +262,16 @@ const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
   ) => {
     const theme = THEMES[period];
     const label = PERIOD_LABEL[period];
-    const showBars = period === "week" || period === "month";
     const today = new Date();
-    const dateStr = today.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+    const dateStr = today.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    const periodTitle =
+      period === "day" ? "Last 7 Days" : period === "week" ? "Last 7 Days" : "Last 30 Days";
 
     return (
       <div
@@ -176,120 +283,180 @@ const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
           borderRadius: 28,
           overflow: "hidden",
           position: "relative",
-          fontFamily: "'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif",
+          fontFamily:
+            "'Inter', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
           display: "flex",
           flexDirection: "column",
-          padding: "28px 28px 22px",
+          padding: "26px 26px 20px",
           boxSizing: "border-box",
+          color: "#fff",
         }}
       >
-        {/* Glow orb top-right */}
+        {/* Glow orbs */}
         <div
           style={{
             position: "absolute",
-            top: -60,
-            right: -60,
-            width: 220,
-            height: 220,
+            top: -80,
+            right: -80,
+            width: 260,
+            height: 260,
             borderRadius: "50%",
-            background: theme.accentGlow,
+            background: `rgba(${theme.accentRgb},0.22)`,
+            filter: "blur(70px)",
+            pointerEvents: "none",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            bottom: -60,
+            left: -60,
+            width: 200,
+            height: 200,
+            borderRadius: "50%",
+            background: `rgba(${theme.accentRgb},0.16)`,
             filter: "blur(60px)",
             pointerEvents: "none",
           }}
         />
-        {/* Glow orb bottom-left */}
+
+        {/* ── TOP: Brand + Period pill ── */}
         <div
           style={{
-            position: "absolute",
-            bottom: -40,
-            left: -40,
-            width: 160,
-            height: 160,
-            borderRadius: "50%",
-            background: theme.accentGlow,
-            filter: "blur(50px)",
-            pointerEvents: "none",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 18,
+            position: "relative",
+            zIndex: 1,
           }}
-        />
-
-        {/* ── TOP ROW: branding + period pill ── */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, position: "relative", zIndex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div
               style={{
-                width: 30,
-                height: 30,
-                borderRadius: 9,
+                width: 32,
+                height: 32,
+                borderRadius: 10,
                 background: theme.accent,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 16,
-                boxShadow: `0 0 12px ${theme.accentGlow}`,
+                fontSize: 17,
+                boxShadow: `0 0 16px rgba(${theme.accentRgb},0.5)`,
+                flexShrink: 0,
               }}
             >
               📘
             </div>
-            <span style={{ color: "rgba(255,255,255,0.8)", fontSize: 13, fontWeight: 700, letterSpacing: 0.2 }}>
+            <span
+              style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: "rgba(255,255,255,0.85)",
+                letterSpacing: 0.1,
+              }}
+            >
               Student Hub
             </span>
           </div>
           <div
             style={{
               background: theme.pill,
-              border: `1px solid ${theme.accent}40`,
+              border: `1px solid rgba(${theme.accentRgb},0.35)`,
               borderRadius: 20,
-              padding: "4px 12px",
+              padding: "5px 13px",
               fontSize: 10,
               fontWeight: 800,
               color: theme.pillText,
-              letterSpacing: 1.2,
+              letterSpacing: 1.4,
             }}
           >
             {label}
           </div>
         </div>
 
-        {/* ── STUDENT INFO ── */}
-        <div style={{ position: "relative", zIndex: 1, marginBottom: 18 }}>
-          <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, fontWeight: 500, margin: 0, marginBottom: 4, letterSpacing: 0.3 }}>
+        {/* ── Student info ── */}
+        <div style={{ position: "relative", zIndex: 1, marginBottom: 16 }}>
+          <p
+            style={{
+              color: "rgba(255,255,255,0.40)",
+              fontSize: 11,
+              fontWeight: 500,
+              margin: 0,
+              marginBottom: 5,
+              letterSpacing: 0.2,
+            }}
+          >
             Study Report · {dateStr}
           </p>
-          <h2 style={{ color: "#fff", fontSize: 26, fontWeight: 800, margin: 0, lineHeight: 1.15, letterSpacing: -0.5 }}>
+          <h2
+            style={{
+              color: "#fff",
+              fontSize: 28,
+              fontWeight: 800,
+              margin: 0,
+              lineHeight: 1.1,
+              letterSpacing: -0.6,
+            }}
+          >
             {name || "Student"}
           </h2>
           {grade && (
-            <p style={{ color: theme.accent, fontSize: 13, fontWeight: 600, margin: 0, marginTop: 3, letterSpacing: 0.2 }}>
+            <p
+              style={{
+                color: theme.accent,
+                fontSize: 13,
+                fontWeight: 600,
+                margin: 0,
+                marginTop: 4,
+              }}
+            >
               Grade {grade}
             </p>
           )}
         </div>
 
-        {/* ── HERO STAT: Study Time ── */}
+        {/* ── Hero Stat ── */}
         <div
           style={{
             position: "relative",
             zIndex: 1,
-            background: "rgba(255,255,255,0.06)",
-            border: `1px solid ${theme.accent}30`,
+            background: "rgba(255,255,255,0.07)",
+            border: `1px solid rgba(${theme.accentRgb},0.25)`,
             borderRadius: 20,
-            padding: "18px 22px",
-            marginBottom: 14,
-            backdropFilter: "blur(10px)",
+            padding: "16px 20px",
+            marginBottom: 12,
           }}
         >
-          <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 11, fontWeight: 600, margin: 0, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>
+          <p
+            style={{
+              color: "rgba(255,255,255,0.45)",
+              fontSize: 10,
+              fontWeight: 700,
+              margin: 0,
+              marginBottom: 6,
+              textTransform: "uppercase",
+              letterSpacing: 1.2,
+            }}
+          >
             ⏱ Study Time
           </p>
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "space-between",
+              gap: 8,
+            }}
+          >
             <span
               style={{
-                fontSize: 52,
+                fontSize: 50,
                 fontWeight: 900,
                 color: "#fff",
                 lineHeight: 1,
                 letterSpacing: -2,
-                textShadow: `0 0 30px ${theme.accentGlow}`,
+                textShadow: `0 0 40px rgba(${theme.accentRgb},0.5)`,
               }}
             >
               {fmtTime(studyMinutes)}
@@ -297,8 +464,15 @@ const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
             {improvePct !== 0 && (
               <div
                 style={{
-                  background: improvePct > 0 ? "rgba(52,211,153,0.15)" : "rgba(248,113,113,0.15)",
-                  border: `1px solid ${improvePct > 0 ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)"}`,
+                  background:
+                    improvePct > 0
+                      ? "rgba(52,211,153,0.15)"
+                      : "rgba(248,113,113,0.15)",
+                  border: `1px solid ${
+                    improvePct > 0
+                      ? "rgba(52,211,153,0.30)"
+                      : "rgba(248,113,113,0.30)"
+                  }`,
                   borderRadius: 12,
                   padding: "5px 10px",
                   fontSize: 13,
@@ -306,40 +480,70 @@ const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
                   color: improvePct > 0 ? "#34d399" : "#f87171",
                   display: "flex",
                   alignItems: "center",
-                  gap: 3,
+                  gap: 2,
+                  flexShrink: 0,
                 }}
               >
                 {improvePct > 0 ? "↑" : "↓"} {Math.abs(improvePct)}%
               </div>
             )}
           </div>
-          <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, margin: 0, marginTop: 4 }}>
+          <p
+            style={{
+              color: "rgba(255,255,255,0.30)",
+              fontSize: 11,
+              margin: 0,
+              marginTop: 5,
+            }}
+          >
             {fmtTime(totalStudyTime)} total all time
           </p>
         </div>
 
-        {/* ── BAR CHART (week/month) ── */}
-        {showBars && (
-          <div
+        {/* ── Bar Chart ── */}
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            background: "rgba(255,255,255,0.05)",
+            border: `1px solid rgba(255,255,255,0.07)`,
+            borderRadius: 16,
+            padding: "13px 15px 10px",
+            marginBottom: 12,
+          }}
+        >
+          <p
             style={{
-              position: "relative",
-              zIndex: 1,
-              background: "rgba(255,255,255,0.05)",
-              border: `1px solid rgba(255,255,255,0.07)`,
-              borderRadius: 16,
-              padding: "14px 16px",
-              marginBottom: 14,
+              color: "rgba(255,255,255,0.38)",
+              fontSize: 10,
+              fontWeight: 600,
+              margin: 0,
+              marginBottom: 10,
+              textTransform: "uppercase",
+              letterSpacing: 0.9,
             }}
           >
-            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: 600, margin: 0, marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.8 }}>
-              {period === "week" ? "Last 7 Days" : "Last 30 Days"}
-            </p>
-            <MiniBarChart logs={dailyLogs} period={period} theme={theme} />
-          </div>
-        )}
+            {periodTitle}
+          </p>
+          {period === "month" ? (
+            <MonthChart logs={dailyLogs} theme={theme} />
+          ) : period === "week" ? (
+            <WeekChart logs={dailyLogs} theme={theme} />
+          ) : (
+            <DayChart logs={dailyLogs} theme={theme} />
+          )}
+        </div>
 
-        {/* ── STATS ROW ── */}
-        <div style={{ position: "relative", zIndex: 1, display: "flex", gap: 10, marginBottom: 14 }}>
+        {/* ── Stats Row ── */}
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            gap: 10,
+            marginBottom: badges.length > 0 ? 12 : 0,
+          }}
+        >
           {[
             { icon: "🔥", value: `${streak}d`, label: "Streak" },
             { icon: "✅", value: String(tasksCompleted), label: "Tasks" },
@@ -352,26 +556,56 @@ const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
                 background: theme.statCard,
                 border: `1px solid ${theme.statBorder}`,
                 borderRadius: 14,
-                padding: "12px 8px",
+                padding: "11px 8px",
                 textAlign: "center",
               }}
             >
-              <div style={{ fontSize: 20, marginBottom: 4, lineHeight: 1 }}>{icon}</div>
-              <div style={{ color: "#fff", fontSize: 18, fontWeight: 800, lineHeight: 1, marginBottom: 3 }}>{value}</div>
-              <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 }}>{lbl}</div>
+              <div style={{ fontSize: 22, marginBottom: 4, lineHeight: 1 }}>
+                {icon}
+              </div>
+              <div
+                style={{
+                  color: "#fff",
+                  fontSize: 19,
+                  fontWeight: 800,
+                  lineHeight: 1,
+                  marginBottom: 3,
+                }}
+              >
+                {value}
+              </div>
+              <div
+                style={{
+                  color: "rgba(255,255,255,0.38)",
+                  fontSize: 9,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.7,
+                }}
+              >
+                {lbl}
+              </div>
             </div>
           ))}
         </div>
 
-        {/* ── BADGES ── */}
+        {/* ── Badges ── */}
         {badges.length > 0 && (
-          <div style={{ position: "relative", zIndex: 1, display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+          <div
+            style={{
+              position: "relative",
+              zIndex: 1,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 6,
+            }}
+          >
             {badges.slice(0, 4).map((b) => (
               <div
                 key={b.label}
                 style={{
-                  background: theme.badge,
-                  border: `1px solid ${theme.accent}30`,
+                  background: theme.badgeBg,
+                  border: `1px solid rgba(${theme.accentRgb},0.28)`,
                   borderRadius: 20,
                   padding: "4px 10px",
                   fontSize: 11,
@@ -388,10 +622,10 @@ const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
           </div>
         )}
 
-        {/* ── SPACER ── */}
+        {/* ── Spacer ── */}
         <div style={{ flex: 1 }} />
 
-        {/* ── BOTTOM: Branding ── */}
+        {/* ── Footer: Branding ── */}
         <div
           style={{
             position: "relative",
@@ -399,7 +633,7 @@ const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            borderTop: "1px solid rgba(255,255,255,0.08)",
+            borderTop: `1px solid ${theme.divider}`,
             paddingTop: 14,
           }}
         >
@@ -407,7 +641,7 @@ const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
             <p
               style={{
                 color: theme.accent,
-                fontSize: 14,
+                fontSize: 15,
                 fontWeight: 800,
                 margin: 0,
                 letterSpacing: -0.3,
@@ -415,20 +649,28 @@ const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
             >
               Student Hub Nepal
             </p>
-            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, margin: 0, marginTop: 1 }}>
+            <p
+              style={{
+                color: "rgba(255,255,255,0.38)",
+                fontSize: 11,
+                margin: 0,
+                marginTop: 1,
+                letterSpacing: 0.2,
+              }}
+            >
               studenthubnp.com
             </p>
           </div>
           <div
             style={{
-              background: theme.pill,
-              border: `1px solid ${theme.accent}35`,
+              background: `rgba(${theme.accentRgb},0.15)`,
+              border: `1px solid rgba(${theme.accentRgb},0.30)`,
               borderRadius: 10,
-              padding: "5px 12px",
+              padding: "6px 12px",
               fontSize: 10,
               fontWeight: 700,
               color: theme.pillText,
-              letterSpacing: 0.4,
+              letterSpacing: 0.3,
             }}
           >
             Study. Rank. Succeed. 🚀
