@@ -7,10 +7,11 @@ import { SoftGate } from "@/components/SoftGate";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getNepaliDate, getNepaliYesterday } from "@/lib/nepaliDate";
+import ShareCardModal from "@/components/ShareCardModal";
 import {
   BarChart2, Flame, Trophy, Star, TrendingUp,
   CheckSquare, Clock, Calendar, Award, BookOpen,
-  ChevronRight, TrendingDown, Minus, Sparkles, RefreshCw,
+  ChevronRight, TrendingDown, Minus, Sparkles, RefreshCw, Share2,
 } from "lucide-react";
 
 interface DailyLog {
@@ -282,7 +283,7 @@ function isCacheFresh(uid: string): boolean {
 }
 
 function ReportContent() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [, setLocation] = useLocation();
 
   // Pre-populate from cache immediately — no loading flash on back-navigation
@@ -292,6 +293,7 @@ function ReportContent() {
   const [loading, setLoading]         = useState(!cached);
   const [period, setPeriod]           = useState<ViewPeriod>("week");
   const [customBadges, setCustomBadges] = useState<CustomBadge[]>(cached?.badges ?? []);
+  const [shareOpen, setShareOpen]     = useState(false);
 
   // silent=true → don't show loading spinner (background refresh with cached data visible)
   const load = useCallback(async (silent = false) => {
@@ -435,6 +437,13 @@ Be real with me. Don't sugarcoat — but keep me motivated.`;
         <div className="flex items-center gap-2">
           <button onClick={load} className="p-2 text-gray-400 hover:text-blue-500 transition-colors">
             <RefreshCw className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setShareOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-sm hover:from-indigo-600 hover:to-purple-600 transition-all"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            Share
           </button>
           <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
             {(["day", "week", "month"] as const).map(p => (
@@ -594,6 +603,15 @@ Be real with me. Don't sugarcoat — but keep me motivated.`;
       <p className="text-center text-xs text-gray-400 mt-6">
         Data refreshes automatically · Daily report at 10:00 PM Nepal Time
       </p>
+
+      <ShareCardModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        userName={profile?.name ?? user?.displayName ?? "Student"}
+        userGrade={profile?.grade ? `${profile.grade}` : ""}
+        stats={stats}
+        dailyLogs={dailyLogs}
+      />
     </div>
   );
 }
