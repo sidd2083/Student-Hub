@@ -10,3 +10,4 @@
 - [WebSocket Layer](websocket-layer.md) — Socket.io replaces Firestore listeners for chat/reactions/presence; hybrid fallback to Firestore if WS unavailable (Vercel); key files and event contract documented.
 - [Firestore Optimization & Timer Fixes](firestore-optimization.md) — full read audit done; key limits added; timer flush-on-pause/reset fixed; admin key security hardened; 30-day graph responsive fixed.
 - [Study Room Scalability](study-room-scalability.md) — bench layout, presence intervals, room cap, focus mode — production decisions documented.
+- [Study Room Perf — Timer Context Split](study-room-perf.md) — fixed 60 re-renders/minute by splitting RoomTimerContext (1/min) from TimerDisplayContext (1/sec); profile cache removed.

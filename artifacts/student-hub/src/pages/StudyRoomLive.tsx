@@ -20,13 +20,45 @@ import {
   setPinnedAnnouncement,
 } from "@/lib/studyRooms";
 import { getSocket, isSocketConnected, type WsChatMessage } from "@/lib/socket";
-import { useActiveRoom, useRoomTimer } from "@/context/ActiveRoomContext";
+import { useActiveRoom, useRoomTimer, useTimerDisplay } from "@/context/ActiveRoomContext";
 import { useAuth } from "@/context/AuthContext";
 import { ClassroomView } from "@/components/study-room/ClassroomView";
 import { VotingPanel } from "@/components/study-room/VotingPanel";
 import { StudentProfileModal } from "@/components/study-room/StudentProfileModal";
 
 const EMOJI_REACTIONS = ["👍", "🔥", "💪", "🎯", "⚡", "🙏", "😎", "🥳"];
+
+// ── Isolated timer components — read from TimerDisplayContext directly so only
+// these tiny components re-render every second instead of all of StudyRoomLive.
+function RoomTimerBadge({ isStudying }: { isStudying: boolean }) {
+  const { remainingSeconds } = useTimerDisplay();
+  return (
+    <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl shrink-0 font-mono text-sm font-bold ${
+      isStudying ? "bg-blue-600 text-white" : "bg-green-600 text-white"
+    }`}>
+      {isStudying ? <BookOpen className="w-3.5 h-3.5" /> : <Coffee className="w-3.5 h-3.5" />}
+      {formatTime(remainingSeconds)}
+    </div>
+  );
+}
+
+function RoomProgressBar({ phaseMins, isStudying }: { phaseMins: number; isStudying: boolean }) {
+  const { remainingSeconds } = useTimerDisplay();
+  const pct = phaseMins > 0 ? Math.max(0, Math.min(100, 100 - (remainingSeconds / (phaseMins * 60)) * 100)) : 0;
+  return (
+    <div className="mt-2 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+      <div
+        className={`h-full rounded-full transition-[width] duration-1000 ease-linear ${isStudying ? "bg-blue-500" : "bg-green-500"}`}
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}
+
+function MobileTimerClock() {
+  const { remainingSeconds } = useTimerDisplay();
+  return <span className="font-mono text-2xl font-black tabular-nums">{formatTime(remainingSeconds)}</span>;
+}
 
 // Convert a WebSocket chat payload into the RoomMessage shape used by the renderer.
 // We provide a toMillis()-compatible createdAt so age checks work identically.
@@ -64,7 +96,7 @@ export default function StudyRoomLive() {
     activeRoomId, wasKicked,
     room: ctxRoom, participants: ctxParticipants,
   } = useActiveRoom();
-  const { remainingSeconds, studyMinsInSession } = useRoomTimer();
+  const { studyMinsInSession } = useRoomTimer();
 
   // alreadyIn: true once we've called joinActiveRoom for this room
   const alreadyIn = activeRoomId === roomId;
@@ -667,10 +699,7 @@ export default function StudyRoomLive() {
 
   const phase      = room.studyFlow[room.currentPhaseIndex];
   const isStudying = room.status === "active" && phase?.type === "study";
-  const remaining  = alreadyIn ? remainingSeconds : getRemainingSeconds(room);
-  const pctDone    = phase ? Math.max(0, Math.min(100, 100 - (remaining / (phase.durationMins * 60)) * 100)) : 0;
-  const timerFmt   = formatTime(remaining);
-  const showTimer  = phase && room.status !== "waiting" && room.status !== "finished";
+  const showTimer  = !!phase && room.status !== "waiting" && room.status !== "finished";
   const activeVoteCount = votes.filter(v => v.status === "active").length;
 
   // ── SHARED COMPONENTS ──────────────────────────────────────────────────────────
@@ -981,14 +1010,7 @@ export default function StudyRoomLive() {
             <p className="text-[11px] text-gray-400 truncate mt-0.5">{room.subject} · {room.hostName}</p>
           </div>
 
-          {showTimer && (
-            <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl shrink-0 font-mono text-sm font-bold ${
-              isStudying ? "bg-blue-600 text-white" : "bg-green-600 text-white"
-            }`}>
-              {isStudying ? <BookOpen className="w-3.5 h-3.5" /> : <Coffee className="w-3.5 h-3.5" />}
-              {timerFmt}
-            </div>
-          )}
+          {showTimer && <RoomTimerBadge isStudying={isStudying} />}
 
           <div className="hidden sm:flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 shrink-0">
             <Users className="w-4 h-4" /> {participants.length}
@@ -1047,14 +1069,7 @@ export default function StudyRoomLive() {
           </button>
         </div>
 
-        {showTimer && (
-          <div className="mt-2 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-[width] duration-1000 ease-linear ${isStudying ? "bg-blue-500" : "bg-green-500"}`}
-              style={{ width: `${pctDone}%` }}
-            />
-          </div>
-        )}
+        {showTimer && phase && <RoomProgressBar phaseMins={phase.durationMins} isStudying={isStudying} />}
       </div>
     );
   }
@@ -1188,7 +1203,7 @@ export default function StudyRoomLive() {
                   <span className="text-xs opacity-80 font-medium">{studyMinsInSession}m studied</span>
                 )}
               </div>
-              <span className="font-mono text-2xl font-black tabular-nums">{timerFmt}</span>
+              <MobileTimerClock />
               <div className="flex items-center gap-1 text-sm opacity-80">
                 <Users className="w-4 h-4" /> {participants.length}
               </div>
@@ -1226,7 +1241,6 @@ export default function StudyRoomLive() {
                 <ClassroomView
                   participants={participants} hostUid={room.hostUid}
                   onSelectStudent={setSel} compact
-                  timerDisplay={showTimer ? timerFmt : undefined}
                   timerLabel={phase?.label} timerPhaseType={phase?.type ?? null}
                   roomStatus={room.status}
                   theme={room.theme ?? "classic"}
@@ -1270,7 +1284,6 @@ export default function StudyRoomLive() {
             <ClassroomView
               participants={participants} hostUid={room.hostUid}
               onSelectStudent={setSel}
-              timerDisplay={showTimer ? timerFmt : undefined}
               timerLabel={phase?.label} timerPhaseType={phase?.type ?? null}
               roomStatus={room.status}
               theme={room.theme ?? "classic"}

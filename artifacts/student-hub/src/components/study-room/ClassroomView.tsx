@@ -1,13 +1,13 @@
 import { memo, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RoomParticipant, getLiveStudyMins, RoomTheme } from "@/lib/studyRooms";
+import { RoomParticipant, getLiveStudyMins, RoomTheme, formatTime } from "@/lib/studyRooms";
 import { Crown, BookOpen, Coffee } from "lucide-react";
+import { useTimerDisplay } from "@/context/ActiveRoomContext";
 
 interface Props {
   participants: RoomParticipant[];
   hostUid: string;
   onSelectStudent?: (p: RoomParticipant) => void;
-  timerDisplay?: string;
   timerLabel?: string;
   timerPhaseType?: "study" | "break" | null;
   roomStatus?: string;
@@ -351,12 +351,14 @@ const Bench = memo(function Bench({
 // ── Main ClassroomView ────────────────────────────────────────────────────────
 export const ClassroomView = memo(function ClassroomView({
   participants, hostUid, onSelectStudent,
-  timerDisplay, timerLabel, timerPhaseType, roomStatus, compact = false,
+  timerLabel, timerPhaseType, roomStatus, compact = false,
   theme = "classic", myUid, myStudyMins,
 }: Props) {
-  // No internal tick needed — the parent (StudyRoomLive) already re-renders every
-  // second via useRoomTimer(), passing a new timerDisplay prop each time. That
-  // prop change drives badge + blackboard updates without a separate interval here.
+  // Read the per-second countdown directly from context so StudyRoomLive parent
+  // doesn't need to pass a prop that changes every second (which caused the whole
+  // parent to re-render every second — the #1 performance bottleneck).
+  const { remainingSeconds } = useTimerDisplay();
+  const timerDisplay = formatTime(remainingSeconds);
 
   const handleSelect = useCallback((p: RoomParticipant) => {
     onSelectStudent?.(p);
@@ -379,7 +381,7 @@ export const ClassroomView = memo(function ClassroomView({
   const isBreak    = timerPhaseType === "break"  && roomStatus === "active";
   const isPaused   = roomStatus === "paused";
   const isWaiting  = roomStatus === "waiting";
-  const showTimer  = !!timerDisplay && roomStatus && roomStatus !== "waiting" && roomStatus !== "finished";
+  const showTimer  = roomStatus && roomStatus !== "waiting" && roomStatus !== "finished";
 
   // Dynamic height: grows to accommodate all benches so every participant is visible.
   // overflow-x-hidden clips decorative side elements (windows) without cutting off rows.

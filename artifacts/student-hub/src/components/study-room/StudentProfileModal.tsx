@@ -21,9 +21,6 @@ function getNptToday(): string {
   return new Date(Date.now() + NPT_OFFSET_MS).toISOString().slice(0, 10);
 }
 
-const profileCache = new Map<string, { stats: UserStats; fetchedAt: number }>();
-const CACHE_TTL_MS = 2 * 60 * 1000;
-
 interface Props {
   participant: RoomParticipant | null;
   onClose: () => void;
@@ -80,14 +77,6 @@ export function StudentProfileModal({ participant, onClose }: Props) {
   useEffect(() => {
     if (!participant) return;
     setPhotoBroken(false);
-
-    const cached = profileCache.get(participant.uid);
-    if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-      setStats(cached.stats);
-      setLoading(false);
-      return;
-    }
-
     setStats(null);
     setLoading(true);
 
@@ -104,7 +93,6 @@ export function StudentProfileModal({ participant, onClose }: Props) {
             photoURL:       d.photoURL ?? undefined,
             badges:         d.badges ?? [],
           };
-          profileCache.set(participant.uid, { stats: s, fetchedAt: Date.now() });
           setStats(s);
         }
         setLoading(false);

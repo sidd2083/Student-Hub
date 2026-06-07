@@ -35,12 +35,16 @@ interface ActiveRoomContextType {
 }
 
 interface RoomTimerContextType {
-  remainingSeconds: number;
   studyMinsInSession: number;
 }
 
-const ActiveRoomContext = createContext<ActiveRoomContextType | null>(null);
-const RoomTimerContext  = createContext<RoomTimerContextType>({ remainingSeconds: 0, studyMinsInSession: 0 });
+interface TimerDisplayContextType {
+  remainingSeconds: number;
+}
+
+const ActiveRoomContext    = createContext<ActiveRoomContextType | null>(null);
+const RoomTimerContext     = createContext<RoomTimerContextType>({ studyMinsInSession: 0 });
+const TimerDisplayContext  = createContext<TimerDisplayContextType>({ remainingSeconds: 0 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -79,6 +83,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   const [participants, setParticipants]  = useState<RoomParticipant[]>([]);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [studyMinsInSession, setStudyMinsInSession] = useState(0);
+  const prevStudyMinsRef = useRef(0);
   const [wasKicked, setWasKicked] = useState(false);
 
   // ── Wall-clock study tracking ─────────────────────────────────────────────
@@ -232,7 +237,13 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
       // getTotalStudySeconds() is immune: during study it accumulates wall-clock secs;
       // during breaks studyWallStartRef is null so it returns the banked total.
       // This is always correct regardless of Firestore/WS sync state.
-      setStudyMinsInSession(Math.floor(getTotalStudySeconds() / 60));
+      // Only update React state when the minute value actually changes — avoids
+      // re-rendering every StudyRoomLive consumer on every 1-second tick.
+      const newMins = Math.floor(getTotalStudySeconds() / 60);
+      if (newMins !== prevStudyMinsRef.current) {
+        prevStudyMinsRef.current = newMins;
+        setStudyMinsInSession(newMins);
+      }
 
       if (r.status === "active") {
         const now = Date.now();
@@ -598,17 +609,17 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
     onHostStart, onHostPause, onHostResume, onHostSkip, onHostEnd, onHostRestart,
   ]);
 
-  const timerValue = useMemo<RoomTimerContextType>(
-    () => ({ remainingSeconds, studyMinsInSession }),
-    [remainingSeconds, studyMinsInSession],
-  );
+  const timerValue        = useMemo<RoomTimerContextType>(() => ({ studyMinsInSession }), [studyMinsInSession]);
+  const timerDisplayValue = useMemo<TimerDisplayContextType>(() => ({ remainingSeconds }), [remainingSeconds]);
 
   return (
-    <RoomTimerContext.Provider value={timerValue}>
-      <ActiveRoomContext.Provider value={ctxValue}>
-        {children}
-      </ActiveRoomContext.Provider>
-    </RoomTimerContext.Provider>
+    <TimerDisplayContext.Provider value={timerDisplayValue}>
+      <RoomTimerContext.Provider value={timerValue}>
+        <ActiveRoomContext.Provider value={ctxValue}>
+          {children}
+        </ActiveRoomContext.Provider>
+      </RoomTimerContext.Provider>
+    </TimerDisplayContext.Provider>
   );
 }
 
@@ -618,7 +629,13 @@ export function useActiveRoom() {
   return ctx;
 }
 
-/** Subscribe only to per-second timer values — won't cause re-renders on room/participant changes. */
+/** Subscribe only to studyMinsInSession — re-renders at most once per minute. */
 export function useRoomTimer(): RoomTimerContextType {
   return useContext(RoomTimerContext);
+}
+
+/** Subscribe to the per-second countdown — use only in components that render the clock.
+ *  Keeps fast-ticking state isolated so the rest of the UI re-renders ≤ once/minute. */
+export function useTimerDisplay(): TimerDisplayContextType {
+  return useContext(TimerDisplayContext);
 }
