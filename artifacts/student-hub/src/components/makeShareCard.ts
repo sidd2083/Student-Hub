@@ -15,7 +15,6 @@ export interface MakeShareCardOptions {
   totalStudyTime: number;
   improvePct: number;
   dailyLogs: { date: string; studyMinutes: number }[];
-  badges: { label: string }[];
 }
 
 // ── Palettes ───────────────────────────────────────────────────────────────
@@ -452,37 +451,6 @@ export async function makeShareCard(opts: MakeShareCardOptions): Promise<Blob> {
   });
 
   y += STAT_H + 48;
-
-  // ── Badges ────────────────────────────────────────────────────────────────
-  if (opts.badges.length > 0) {
-    const BADGE_H = 58;
-    const BADGE_GAP = 16;
-    ctx.font = "600 26px Arial, Helvetica, sans-serif";
-
-    let bx = PAD;
-    let by = y;
-
-    opts.badges.slice(0, 6).forEach(({ label }) => {
-      const tw = ctx.measureText(label).width;
-      const bw = tw + 52;
-      if (bx + bw > W - PAD && bx > PAD) {
-        bx = PAD;
-        by += BADGE_H + 14;
-      }
-      rr(ctx, bx, by, bw, BADGE_H, BADGE_H / 2);
-      ctx.fillStyle = p.tagBg;
-      ctx.fill();
-      rr(ctx, bx, by, bw, BADGE_H, BADGE_H / 2);
-      ctx.strokeStyle = p.tagBorder;
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.fillStyle = p.accentBright;
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText(label, bx + 26, by + BADGE_H / 2);
-      bx += bw + BADGE_GAP;
-    });
-  }
 
   // ── Bottom accent line (6px) ─────────────────────────────────────────────
   const botLineGrad = ctx.createLinearGradient(0, 0, W, 0);

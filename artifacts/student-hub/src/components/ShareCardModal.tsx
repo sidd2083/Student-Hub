@@ -25,23 +25,6 @@ interface ShareCardModalProps {
 
 type Period = "day" | "week" | "month";
 
-// ── Data helpers ───────────────────────────────────────────────────────────
-function getBadges(stats: StudyStats, logs: DailyLog[]) {
-  const badges: { label: string }[] = [];
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const weekMins = logs.filter((l) => new Date(l.date) >= weekAgo).reduce((s, l) => s + l.studyMinutes, 0);
-  const totalTasks = logs.reduce((s, l) => s + l.tasksCompleted, 0);
-  if (stats.streak >= 3)            badges.push({ label: "3-Day Streak" });
-  if (stats.streak >= 7)            badges.push({ label: "Week Warrior" });
-  if (stats.streak >= 30)           badges.push({ label: "Month Master" });
-  if (stats.totalStudyTime >= 60)   badges.push({ label: "1 Hour Legend" });
-  if (stats.totalStudyTime >= 600)  badges.push({ label: "10 Hours Total" });
-  if (stats.totalStudyTime >= 3000) badges.push({ label: "50 Hours Club" });
-  if (totalTasks >= 5)              badges.push({ label: "Task Crusher" });
-  if (weekMins >= 120)              badges.push({ label: "Consistent Learner" });
-  return badges;
-}
 
 function getPeriodStats(period: Period, stats: StudyStats, dailyLogs: DailyLog[]) {
   const today = new Date().toISOString().slice(0, 10);
@@ -203,7 +186,6 @@ export default function ShareCardModal({ open, onClose, userName, userGrade, sta
   useEffect(() => { setToast(null); }, [period]);
 
   const { studyMinutes, tasksCompleted, notesRead, improvePct } = getPeriodStats(period, stats, dailyLogs);
-  const badges = getBadges(stats, dailyLogs);
   const t = THEMES[period];
 
   const showToast = useCallback((kind: "success" | "info" | "error", msg: string) => {
@@ -213,9 +195,9 @@ export default function ShareCardModal({ open, onClose, userName, userGrade, sta
 
   const generateBlob = useCallback(async (): Promise<Blob | null> => {
     try {
-      return await makeShareCard({ name: userName, grade: userGrade, period, studyMinutes, tasksCompleted, notesRead, streak: stats.streak, totalStudyTime: stats.totalStudyTime, improvePct, dailyLogs, badges });
+      return await makeShareCard({ name: userName, grade: userGrade, period, studyMinutes, tasksCompleted, notesRead, streak: stats.streak, totalStudyTime: stats.totalStudyTime, improvePct, dailyLogs });
     } catch (e) { console.error("makeShareCard:", e); return null; }
-  }, [userName, userGrade, period, studyMinutes, tasksCompleted, notesRead, stats, improvePct, dailyLogs, badges]);
+  }, [userName, userGrade, period, studyMinutes, tasksCompleted, notesRead, stats, improvePct, dailyLogs]);
 
   const doDownload = useCallback((blob: Blob) => {
     const url = URL.createObjectURL(blob);

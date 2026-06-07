@@ -556,8 +556,19 @@ export default function StudyRoomLive() {
 
   // ── Render guards ─────────────────────────────────────────────────────────────
   if (loading) return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="w-10 h-10 rounded-full border-3 border-blue-100 border-t-blue-600 animate-spin" />
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="relative">
+        <div className="w-14 h-14 rounded-full border-4 border-blue-100 dark:border-blue-900/40 border-t-blue-500 animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-900/30" />
+        </div>
+      </div>
+      {localRoom && (
+        <div className="text-center space-y-1 animate-pulse">
+          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">{localRoom.title}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Joining room…</p>
+        </div>
+      )}
     </div>
   );
 

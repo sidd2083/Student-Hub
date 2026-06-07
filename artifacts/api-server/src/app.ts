@@ -25,8 +25,21 @@ app.use(compression({
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "same-site" },
-  // Improve security headers for SEO and trust signals
-  contentSecurityPolicy: false, // Managed by Vite/Vercel
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc:     ["'self'"],
+      scriptSrc:      ["'self'", "'unsafe-inline'", "https://apis.google.com", "https://www.gstatic.com"],
+      styleSrc:       ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc:        ["'self'", "https://fonts.gstatic.com", "data:"],
+      imgSrc:         ["'self'", "data:", "blob:", "https:", "https://lh3.googleusercontent.com", "https://firebasestorage.googleapis.com"],
+      connectSrc:     ["'self'", "https://*.googleapis.com", "https://*.firebaseio.com", "wss://*.firebaseio.com", "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com"],
+      frameSrc:       ["'none'"],
+      objectSrc:      ["'none'"],
+      baseUri:        ["'self'"],
+      formAction:     ["'self'"],
+      upgradeInsecureRequests: [],
+    },
+  },
   referrerPolicy: { policy: "strict-origin-when-cross-origin" },
   hsts: {
     maxAge: 31536000,
@@ -46,10 +59,11 @@ app.use(pinoHttp({
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 1000,
+  max: 500,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please slow down." },
+  skip: (req) => req.path === "/health",
 });
 
 const aiLimiter = rateLimit({

@@ -11,9 +11,18 @@ interface UserStats {
   streak: number;
   createdAt: string;
   todayStudyTime: number;
+  lastActiveDate: string;
   photoURL?: string;
   badges?: { id: string; text: string; emoji: string; color: string }[];
 }
+
+const NPT_OFFSET_MS = (5 * 60 + 45) * 60 * 1000;
+function getNptToday(): string {
+  return new Date(Date.now() + NPT_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+const profileCache = new Map<string, { stats: UserStats; fetchedAt: number }>();
+const CACHE_TTL_MS = 2 * 60 * 1000;
 
 interface Props {
   participant: RoomParticipant | null;
@@ -71,22 +80,32 @@ export function StudentProfileModal({ participant, onClose }: Props) {
   useEffect(() => {
     if (!participant) return;
     setPhotoBroken(false);
+
+    const cached = profileCache.get(participant.uid);
+    if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+      setStats(cached.stats);
+      setLoading(false);
+      return;
+    }
+
     setStats(null);
     setLoading(true);
 
-    // Use getDoc for instant first load (no streaming overhead)
     getDoc(doc(db, "users", participant.uid))
       .then((snap) => {
         if (snap.exists()) {
           const d = snap.data();
-          setStats({
+          const s: UserStats = {
             totalStudyTime: d.totalStudyTime ?? 0,
             streak:         d.streak ?? 0,
             createdAt:      d.createdAt ?? "",
             todayStudyTime: d.todayStudyTime ?? 0,
+            lastActiveDate: d.lastActiveDate ?? "",
             photoURL:       d.photoURL ?? undefined,
             badges:         d.badges ?? [],
-          });
+          };
+          profileCache.set(participant.uid, { stats: s, fetchedAt: Date.now() });
+          setStats(s);
         }
         setLoading(false);
       })
@@ -106,7 +125,8 @@ export function StudentProfileModal({ participant, onClose }: Props) {
   const initial    = participant.name.charAt(0).toUpperCase();
   const gradient   = avatarGradient(participant.name);
   const totalHours = stats ? (stats.totalStudyTime / 60).toFixed(1) : null;
-  const todayMins  = stats?.todayStudyTime ?? null;
+  const todayNpt   = getNptToday();
+  const todayMins  = stats ? (stats.lastActiveDate === todayNpt ? stats.todayStudyTime : 0) : null;
   const joinedDate = stats?.createdAt
     ? new Date(stats.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })
     : null;

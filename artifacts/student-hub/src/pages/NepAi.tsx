@@ -261,11 +261,14 @@ async function loadStudyContext(uid: string): Promise<StudyContext> {
   let stats: StudyContext["stats"] | undefined;
   if (userSnap.exists()) {
     const d = userSnap.data();
+    const NPT_OFFSET_MS = (5 * 60 + 45) * 60 * 1000;
+    const todayNpt = new Date(Date.now() + NPT_OFFSET_MS).toISOString().slice(0, 10);
+    const lastActive = d.lastActiveDate ?? null;
     stats = {
       streak: d.streak ?? 0,
       totalStudyTime: d.totalStudyTime ?? 0,
-      todayStudyTime: d.todayStudyTime ?? 0,
-      lastActiveDate: d.lastActiveDate ?? null,
+      todayStudyTime: lastActive === todayNpt ? (d.todayStudyTime ?? 0) : 0,
+      lastActiveDate: lastActive,
     };
   }
 
@@ -524,7 +527,7 @@ function NepAiContent() {
             <div>
               <p className="font-semibold mb-0.5">Nep AI can now see your study data!</p>
               <p className="text-indigo-500 leading-relaxed">
-                {ctxStats && `Streak: ${ctxStats.streak}d · Today: ${ctxStats.todayStudyTime}min`}
+                {ctxStats && `Streak: ${ctxStats.streak}d · Today: ${ctxStats.todayStudyTime > 0 ? ctxStats.todayStudyTime + "min" : "0min"}`}
                 {pendingTasks.length > 0 && ` · ${pendingTasks.length} pending tasks`}
               </p>
             </div>
