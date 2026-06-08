@@ -208,6 +208,17 @@ export default function StudyRoomLive() {
   const [pukuMinimized, setPukuMinimized] = useState(false);
   const prevParticipantCount              = useRef<number>(0);
 
+  // Stable callbacks — never recreate so PukuPartner never re-renders due to prop churn
+  const pukuSpeechUpdate = useCallback((speech: string, speaking: boolean) => {
+    setPukuSpeech(speech);
+    setPukuSpeaking(speaking);
+  }, []);
+  const pukuLeave = useCallback(() => {
+    setShowPuku(false);
+    setPukuSpeech("");
+    setPukuSpeaking(false);
+  }, []);
+
   // ── AI chat state ─────────────────────────────────────────────────────────────
   const [aiChatLoading, setAiChatLoading]  = useState(false);
   const aiLastCalledRef = useRef<number>(0); // client-side rate limit (60s per room)
@@ -1778,8 +1789,8 @@ export default function StudyRoomLive() {
         isBreak={isBreak}
         studyMins={studyMinsInSession}
         visible={showPuku && joined}
-        onLeave={() => { setShowPuku(false); setPukuSpeech(""); setPukuSpeaking(false); }}
-        onSpeechUpdate={(speech, speaking) => { setPukuSpeech(speech); setPukuSpeaking(speaking); }}
+        onLeave={pukuLeave}
+        onSpeechUpdate={pukuSpeechUpdate}
         onMinimizeChange={setPukuMinimized}
       />
     </>
