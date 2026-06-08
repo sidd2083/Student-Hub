@@ -163,10 +163,30 @@ export function PukuPartner({
   const waterTimer       = useRef<ReturnType<typeof setInterval> | null>(null);
   const scheduleTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleCheckTimer   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cachedVoiceRef   = useRef<SpeechSynthesisVoice | null>(null);
+  const voicesReadyRef   = useRef(false);
 
   // Keep refs in sync — no render triggered
   useEffect(() => { muteRef.current = muted; }, [muted]);
   useEffect(() => { speechCbRef.current = onSpeechUpdate; }, [onSpeechUpdate]);
+
+  // ── Pre-warm TTS voices on mount ─────────────────────────────────────────
+  // Chrome returns an empty voices array on the very first getVoices() call.
+  // By listening to voiceschanged immediately, we cache the best voice before
+  // speak() is ever called — so the first greeting fires in sync with the bubble.
+  useEffect(() => {
+    if (!window.speechSynthesis) return;
+    const load = () => {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        cachedVoiceRef.current = pickVoice(voices);
+        voicesReadyRef.current = true;
+      }
+    };
+    load();
+    window.speechSynthesis.addEventListener("voiceschanged", load);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
+  }, []);
 
   // Anti-cheat refs
   const hasGreeted     = useRef(false);
@@ -184,38 +204,67 @@ export function PukuPartner({
     // Cancel any pending bubble-clear
     if (bubbleClearTimer.current) clearTimeout(bubbleClearTimer.current);
 
-    // Show bubble immediately. If TTS will be used, set isSpeaking=true right away
-    // so the avatar animation starts at the same time as the text bubble appears —
-    // not after a separate async round-trip to speechSynthesis.speak().
     const hasTTS = !muteRef.current && !!window.speechSynthesis;
+
+    // Show bubble + start animation immediately.
+    // The bubble stays open until TTS onend fires — NOT a fixed timer.
+    // This guarantees text, animation, and voice are always in sync.
     speechCbRef.current(text, hasTTS);
 
-    // Schedule bubble clear after 7 s
-    bubbleClearTimer.current = setTimeout(() => speechCbRef.current("", false), 7000);
+    if (!hasTTS) {
+      // No TTS — clear bubble after 7 s
+      bubbleClearTimer.current = setTimeout(() => speechCbRef.current("", false), 7_000);
+      return;
+    }
 
-    if (!hasTTS) return;
     window.speechSynthesis.cancel();
-
     const clean = stripForSpeech(text);
-    if (!clean) return;
+    if (!clean) {
+      bubbleClearTimer.current = setTimeout(() => speechCbRef.current("", false), 7_000);
+      return;
+    }
 
-    const utt    = new SpeechSynthesisUtterance(clean);
-    utt.rate     = 0.93;
-    utt.pitch    = 1.08;
-    utt.volume   = 0.9;
+    const utt = new SpeechSynthesisUtterance(clean);
+    // Slightly varied rate/pitch per utterance for a more natural, human feel
+    utt.rate   = 0.88 + Math.random() * 0.08; // 0.88–0.96
+    utt.pitch  = 1.0  + Math.random() * 0.10; // 1.00–1.10
+    utt.volume = 0.92;
 
-    const trySpeak = () => {
-      const v = pickVoice(window.speechSynthesis.getVoices());
+    const doSpeak = () => {
+      const v = cachedVoiceRef.current ?? pickVoice(window.speechSynthesis.getVoices());
       if (v) utt.voice = v;
-      speechCbRef.current(text, true);
-      utt.onend   = () => speechCbRef.current(text, false);
-      utt.onerror = () => speechCbRef.current(text, false);
+
+      // Bubble clears exactly when speech ends — perfect sync
+      utt.onend = () => {
+        if (bubbleClearTimer.current) clearTimeout(bubbleClearTimer.current);
+        speechCbRef.current("", false);
+      };
+      utt.onerror = () => {
+        if (bubbleClearTimer.current) clearTimeout(bubbleClearTimer.current);
+        // TTS failed — keep bubble visible (no animation) for 4 s
+        speechCbRef.current(text, false);
+        bubbleClearTimer.current = setTimeout(() => speechCbRef.current("", false), 4_000);
+      };
+
       window.speechSynthesis.speak(utt);
     };
 
-    window.speechSynthesis.getVoices().length > 0
-      ? trySpeak()
-      : window.speechSynthesis.addEventListener("voiceschanged", trySpeak, { once: true });
+    // Safety fallback: if TTS never fires onend (browser bug), clear after 20 s
+    bubbleClearTimer.current = setTimeout(() => {
+      window.speechSynthesis.cancel();
+      speechCbRef.current("", false);
+    }, 20_000);
+
+    if (voicesReadyRef.current || window.speechSynthesis.getVoices().length > 0) {
+      doSpeak();
+    } else {
+      // Voices not cached yet — wait for them, then speak
+      window.speechSynthesis.addEventListener("voiceschanged", () => {
+        cachedVoiceRef.current = pickVoice(window.speechSynthesis.getVoices());
+        voicesReadyRef.current = true;
+        doSpeak();
+      }, { once: true });
+    }
   }, []); // stable — no external deps, only refs
 
   // ── Greeting (once) ───────────────────────────────────────────────────────

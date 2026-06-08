@@ -1612,8 +1612,8 @@ export default function StudyRoomLive() {
           )}
         </div>
 
-        {/* Mobile bottom nav */}
-        <div className="fixed bottom-0 left-0 right-0 z-30 lg:hidden shadow-lg">
+        {/* Mobile bottom nav — z-50 so it stays above the app's layout nav (z-40) */}
+        <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden shadow-lg">
           {MobileTabs()}
         </div>
 
