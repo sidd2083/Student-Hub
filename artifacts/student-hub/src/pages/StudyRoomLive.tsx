@@ -819,8 +819,10 @@ export default function StudyRoomLive() {
     </div>
   );
 
-  // Private room password gate — shown when room is loaded but password not yet verified
-  if (!loading && !alreadyIn && room?.isPrivate && !passwordVerified) return (
+  // Private room password gate — shown when room is loaded but password not yet verified.
+  // Hosts bypass it: they created the room and set the password themselves.
+  const isRoomHost = user?.uid === room?.hostUid;
+  if (!loading && !alreadyIn && room?.isPrivate && !passwordVerified && !isRoomHost) return (
     <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4">
       <div className="w-16 h-16 mx-auto rounded-2xl bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center mb-2">
         <Lock className="w-8 h-8 text-orange-500" />

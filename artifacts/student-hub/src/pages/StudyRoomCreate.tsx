@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
-import { ArrowLeft, Lock, Unlock, Users, Music, ChevronRight, Volume2 } from "lucide-react";
+import { ArrowLeft, Lock, Unlock, Users, Music, ChevronRight, Volume2, Copy, Check } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { StudyFlowBuilder } from "@/components/study-room/StudyFlowBuilder";
 import { createRoom, joinRoom, deleteRoomCascade, StudyPhase, SUBJECTS, AMBIENT_SOUNDS, RoomTheme } from "@/lib/studyRooms";
@@ -36,6 +36,7 @@ export default function StudyRoomCreate() {
   const [errors,          setErrors]          = useState<Record<string, string>>({});
   const [previewing,      setPreviewing]      = useState<string | null>(null);
   const [pukuMode,        setPukuMode]        = useState(false);
+  const [pwCopied,        setPwCopied]        = useState(false);
 
   // Stop preview on unmount
   useEffect(() => () => stopPreview(), [stopPreview]);
@@ -303,14 +304,40 @@ export default function StudyRoomCreate() {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                   >
-                    <input
-                      type="text"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Room password"
-                      maxLength={20}
-                      className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-                    />
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Room password"
+                        maxLength={20}
+                        className="w-full px-3 py-2 pr-10 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                      />
+                      {password && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(password).then(() => {
+                              setPwCopied(true);
+                              setTimeout(() => setPwCopied(false), 2000);
+                            });
+                          }}
+                          className="absolute right-2.5 text-gray-400 hover:text-blue-500 transition-colors"
+                          title="Copy password"
+                        >
+                          {pwCopied
+                            ? <Check className="w-4 h-4 text-green-500" />
+                            : <Copy className="w-4 h-4" />
+                          }
+                        </button>
+                      )}
+                    </div>
+                    {password && (
+                      <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5" />
+                        Share this password with people you want to invite.
+                      </p>
+                    )}
                     {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
                   </motion.div>
                 )}
