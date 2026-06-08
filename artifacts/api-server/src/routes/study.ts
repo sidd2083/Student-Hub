@@ -226,63 +226,7 @@ router.post("/study/leave", async (req: Request, res: Response) => {
   }
 });
 
-// ── Anonymous beacon sync — called via sendBeacon on tab close ────────────────
-// Cannot carry auth headers so uid comes from the body.
-// No streak update — just persists study time. Strict caps prevent abuse.
-// Two-layer rate limiting: per-uid (in-memory) + per-IP (express-rate-limit).
-const ANON_SYNC_LIMIT_MS = 60_000; // max one beacon per uid per minute
-const anonSyncLastCall = new Map<string, number>();
-
-// IP-level cap: 20 syncs per IP per minute — prevents one machine from
-// flooding the endpoint on behalf of many uids.
-const anonSyncIpLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { ok: false },
-});
-
-router.post("/study/sync-anon", anonSyncIpLimiter, async (req: Request, res: Response) => {
-  try {
-    const { uid, mins } = req.body as { uid?: string; mins?: number };
-    if (!uid || typeof uid !== "string" || uid.length < 10 || uid.length > 128) {
-      return res.status(400).json({ ok: false });
-    }
-    // Cap at 3 min per beacon (honest max session between tab-close events)
-    const cappedMins = typeof mins === "number" && Number.isFinite(mins)
-      ? Math.max(0, Math.min(Math.floor(mins), 3))
-      : 0;
-    if (cappedMins === 0) return res.json({ ok: true });
-
-    // Rate-limit: one beacon per uid per minute
-    const now = Date.now();
-    const last = anonSyncLastCall.get(uid) ?? 0;
-    if (now - last < ANON_SYNC_LIMIT_MS) return res.json({ ok: true });
-    anonSyncLastCall.set(uid, now);
-
-    const db = getAdminDb();
-    if (!db) return res.json({ ok: false });
-
-    const NPT_OFFSET_MS = (5 * 60 + 45) * 60 * 1000;
-    const today = new Date(now + NPT_OFFSET_MS).toISOString().slice(0, 10);
-    const userRef = db.collection("users").doc(uid);
-    const FieldValue = (await import("firebase-admin/firestore")).FieldValue;
-
-    // Only increment totals — do NOT update streak (requires verified token)
-    await userRef.set({
-      totalStudyTime:  FieldValue.increment(cappedMins),
-      weeklyStudyTime: FieldValue.increment(cappedMins),
-      todayStudyTime:  FieldValue.increment(cappedMins),
-      lastActiveDate:  today,
-    }, { merge: true }).catch(() => {});
-
-    return res.json({ ok: true });
-  } catch (err) {
-    logger.warn(err, "[Study] sync-anon non-fatal");
-    return res.json({ ok: false });
-  }
-});
+// sync-anon endpoint removed — clients now use keepalive fetch with auth token to /study/save
 
 // ── Claim host when current host is stale ─────────────────────────────────────
 // Called by the oldest active non-host participant every 30 s when they detect

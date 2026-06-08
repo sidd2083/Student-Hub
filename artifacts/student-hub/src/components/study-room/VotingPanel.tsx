@@ -97,12 +97,16 @@ export const VotingPanel = memo(function VotingPanel({ room, votes, participantC
     return () => clearInterval(interval);
   }, [votes, room, participantCount]);
 
-  // ── Countdown tick ────────────────────────────────────────────────────────
+  // ── Countdown tick — only runs when a vote is active or cooldown is counting ──
+  // Without this guard, the interval would fire every second even with no active
+  // votes, causing unnecessary re-renders of the entire panel.
   const [, forceUpdate] = useState(0);
+  const needsTick = hasActiveVote || (lastVoteAt > 0 && Date.now() - lastVoteAt < VOTE_COOLDOWN_MS);
   useEffect(() => {
+    if (!needsTick) return;
     const t = setInterval(() => forceUpdate(n => n + 1), 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [needsTick]);
 
   // Clear optimistic state once Firestore catches up
   useEffect(() => {

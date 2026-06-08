@@ -1,6 +1,8 @@
 import {
   createContext, useContext, useEffect, useRef, useState, useCallback, useMemo,
 } from "react";
+import { onIdTokenChanged } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import { setInActiveRoom } from "@/lib/studyRoomState";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -101,6 +103,7 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   const remainingSecsRef   = useRef(0);  // always fresh for onHostPause
   const roomRef            = useRef<Room | null>(null);
   const participantsRef    = useRef<RoomParticipant[]>([]);
+  const tokenRef           = useRef<string | null>(null);
   const prevPhaseRef       = useRef<string | null>(null);
   const prevStatusRef      = useRef<string | null>(null);
   const advancingRef       = useRef(false);
@@ -117,6 +120,15 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
   participantsRef.current = participants;
 
   const isHost = !!(room && user && room.hostUid === user.uid);
+
+  // Cache the current Firebase ID token so beforeunload keepalive fetch can use it
+  useEffect(() => {
+    const unsub = onIdTokenChanged(auth, async (u) => {
+      if (u) tokenRef.current = await u.getIdToken(false).catch(() => null);
+      else tokenRef.current = null;
+    });
+    return unsub;
+  }, []);
 
   /** Total study seconds for the current session (live calculation). */
   const getTotalStudySeconds = useCallback((): number => {
@@ -416,15 +428,24 @@ export function ActiveRoomProvider({ children }: { children: React.ReactNode }) 
       const minsAlreadySynced = Math.floor(lastSyncedSecsRef.current / 60);
       const remainderMins = minsEarned - minsAlreadySynced;
 
-      if (remainderMins > 0) {
-        // Beacon can't carry auth headers — use client-side Firestore fallback
-        navigator.sendBeacon?.("/api/study/sync-anon", JSON.stringify({ uid: user.uid, mins: remainderMins }));
+      // Flush remaining study minutes via keepalive fetch with cached auth token
+      const token = tokenRef.current;
+      if (remainderMins > 0 && token) {
+        fetch("/api/study/save", {
+          method:    "POST",
+          keepalive: true,
+          headers:   { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+          body:      JSON.stringify({ minutes: remainderMins }),
+        }).catch(() => {});
       }
 
       try {
         fetch("/api/study/leave", {
           method:    "POST",
-          headers:   { "Content-Type": "application/json" },
+          headers:   {
+            "Content-Type":  "application/json",
+            ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+          },
           body:      JSON.stringify({ roomId: activeRoomId, uid: user.uid }),
           keepalive: true,
         }).catch(() => {});

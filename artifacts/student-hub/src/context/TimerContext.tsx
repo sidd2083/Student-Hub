@@ -2,6 +2,7 @@ import {
   createContext, useCallback, useContext, useEffect, useRef, useState,
 } from "react";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { onIdTokenChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { useAuth } from "./AuthContext";
 import { getNepaliDate } from "@/lib/nepaliDate";
@@ -185,6 +186,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const phaseRef    = useRef<Phase>(persisted?.phase ?? "work");
   const runningRef  = useRef(persisted?.running ?? false);
   const userRef     = useRef<string | null>(null);
+  const tokenRef    = useRef<string | null>(null);
   const settingsRef = useRef(persisted?.settings ?? DEFAULT_SETTINGS);
   const sessionsRef = useRef(persisted?.sessionsCompleted ?? 0);
   const naturalSessionsRef = useRef(persisted?.naturalSessionsCompleted ?? 0);
@@ -192,6 +194,15 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { userRef.current = user?.uid ?? null; }, [user]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
+
+  // Cache the Firebase ID token so beforeunload can use keepalive fetch (no auth in sendBeacon)
+  useEffect(() => {
+    const unsub = onIdTokenChanged(auth, async (u) => {
+      if (u) tokenRef.current = await u.getIdToken(false).catch(() => null);
+      else tokenRef.current = null;
+    });
+    return unsub;
+  }, []);
 
   const persistState = useCallback(() => {
     saveState({
@@ -496,7 +507,16 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       const mins = getFlushMins();
       if (mins <= 0 || !userRef.current) return;
       savedMinutesRef.current += mins;
-      navigator.sendBeacon?.("/api/study/sync-anon", JSON.stringify({ uid: userRef.current, mins }));
+      // Use keepalive fetch with cached auth token — safe alternative to sendBeacon
+      const token = tokenRef.current;
+      if (token) {
+        fetch("/api/study/save", {
+          method: "POST",
+          keepalive: true,
+          headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ minutes: mins }),
+        }).catch(() => {});
+      }
     };
 
     const handleVisibilityChange = () => {

@@ -27,7 +27,7 @@ service cloud.firestore {
         && request.resource.data.name.size() <= 100
         && request.resource.data.grade is int
         && request.resource.data.grade >= 9
-        && request.resource.data.grade <= 12;
+        && request.resource.data.grade <= 15;
 
       allow update: if isAdmin()
         || (isOwner(uid)

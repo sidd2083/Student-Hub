@@ -11,3 +11,4 @@
 - [Firestore Optimization & Timer Fixes](firestore-optimization.md) — full read audit done; key limits added; timer flush-on-pause/reset fixed; admin key security hardened; 30-day graph responsive fixed.
 - [Study Room Scalability](study-room-scalability.md) — bench layout, presence intervals, room cap, focus mode — production decisions documented.
 - [Study Room Perf — Timer Context Split](study-room-perf.md) — fixed 60 re-renders/minute by splitting RoomTimerContext (1/min) from TimerDisplayContext (1/sec); profile cache removed.
+- [Pre-Launch Security Fixes](pre-launch-security.md) — hardcoded admin creds removed, sync-anon deleted, keepalive token cache added, grade limit 9-15, VotingPanel conditional tick.
