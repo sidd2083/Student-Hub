@@ -22,9 +22,11 @@ import {
 import { getSocket, isSocketConnected, type WsChatMessage } from "@/lib/socket";
 import { useActiveRoom, useRoomTimer, useTimerDisplay } from "@/context/ActiveRoomContext";
 import { useAuth } from "@/context/AuthContext";
+import { auth } from "@/lib/firebase";
 import { ClassroomView } from "@/components/study-room/ClassroomView";
 import { VotingPanel } from "@/components/study-room/VotingPanel";
 import { StudentProfileModal } from "@/components/study-room/StudentProfileModal";
+import { StudyBuddyPanel } from "@/components/study-room/StudyBuddyPanel";
 
 const EMOJI_REACTIONS = ["👍", "🔥", "💪", "🎯", "⚡", "🙏", "😎", "🥳"];
 
@@ -194,6 +196,10 @@ export default function StudyRoomLive() {
 
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const lastSentAtRef = useRef<number>(0);
+
+  // ── AI chat state ─────────────────────────────────────────────────────────────
+  const [aiChatLoading, setAiChatLoading]  = useState(false);
+  const aiLastCalledRef = useRef<number>(0); // client-side rate limit (60s per room)
 
   // ── Pinned announcement ─────────────────────────────────────────────────────
   const [editingAnnouncement, setEditingAnnouncement] = useState(false);
@@ -458,6 +464,11 @@ export default function StudyRoomLive() {
               {msg.emoji}
               <span className="text-[10px] text-gray-400 ml-1">{msg.name.split(" ")[0]}</span>
             </div>
+          ) : msg.type === "system" && msg.uid === "nepai" ? (
+            <div className="mx-1 my-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/40 px-3 py-2">
+              <p className="text-[10px] font-bold text-indigo-500 mb-1">🤖 Nep AI</p>
+              <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+            </div>
           ) : msg.type === "system" ? (
             <p className="text-center text-xs italic text-gray-400 py-0.5">{msg.text}</p>
           ) : (
@@ -529,6 +540,85 @@ export default function StudyRoomLive() {
     // Chat disabled by vote
     if (room?.chatEnabled === false) return;
 
+    const txt = chatMsg.trim();
+
+    // ── @AI trigger — route to Nep AI instead of regular chat ────────────────
+    const aiMatch = txt.match(/^(?:@ai|\/ai)\s+(.+)/i);
+    if (aiMatch) {
+      const question = aiMatch[1].trim();
+      if (!question) return;
+
+      // Client-side rate limit: 60 seconds between AI calls per room
+      const elapsed = Date.now() - aiLastCalledRef.current;
+      if (elapsed < 60_000) {
+        const wait = Math.ceil((60_000 - elapsed) / 1000);
+        // Post an ephemeral error as a temp message
+        const errId = `ai_err_${Date.now()}`;
+        setOptimistic(prev => [...prev, {
+          id: errId, uid: "nepai", name: "🤖 Nep AI",
+          text: `Please wait ${wait}s before asking me again.`, type: "system", createdAt: null,
+        }]);
+        setTimeout(() => setOptimistic(prev => prev.filter(m => m.id !== errId)), 4000);
+        setChatMsg("");
+        return;
+      }
+
+      setChatMsg("");
+      aiLastCalledRef.current = Date.now();
+      setAiChatLoading(true);
+
+      // Show "thinking…" indicator
+      const thinkId = `ai_think_${Date.now()}`;
+      setOptimistic(prev => [...prev, {
+        id: thinkId, uid: "nepai", name: "🤖 Nep AI",
+        text: "🤔 Thinking…", type: "system", createdAt: null,
+      }]);
+
+      try {
+        let token: string | undefined;
+        try { token = await auth.currentUser?.getIdToken(); } catch { /* not authed */ }
+
+        const res = await fetch("/api/ai/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            message: question,
+            history: [],
+            context: null,
+            stream: false,
+            systemOverride: "study-room",
+          }),
+        });
+
+        const data = await res.json().catch(() => ({})) as { reply?: string; error?: string };
+        const reply = data.reply?.trim() || data.error || "I couldn't answer that. Try again!";
+
+        // Remove thinking indicator and post real answer to Firestore (visible to all)
+        setOptimistic(prev => prev.filter(m => m.id !== thinkId));
+        await sendMessage(roomId, {
+          uid: "nepai",
+          name: "🤖 Nep AI",
+          text: reply,
+          type: "system",
+        });
+      } catch {
+        setOptimistic(prev => prev.filter(m => m.id !== thinkId));
+        const errId2 = `ai_err2_${Date.now()}`;
+        setOptimistic(prev => [...prev, {
+          id: errId2, uid: "nepai", name: "🤖 Nep AI",
+          text: "Sorry, I had trouble connecting. Try again!", type: "system", createdAt: null,
+        }]);
+        setTimeout(() => setOptimistic(prev => prev.filter(m => m.id !== errId2)), 5000);
+      } finally {
+        setAiChatLoading(false);
+      }
+      return;
+    }
+
+    // ── Regular chat ──────────────────────────────────────────────────────────
     // Slow mode cooldown enforcement
     const cooldownSecs = room?.chatCooldownSecs ?? 10;
     if (cooldownSecs > 0) {
@@ -536,7 +626,6 @@ export default function StudyRoomLive() {
       if (elapsed < cooldownSecs) return;
     }
 
-    const txt = chatMsg.trim();
     setChatMsg("");
     lastSentAtRef.current = Date.now();
     setCooldownRemaining(cooldownSecs > 0 ? cooldownSecs : 0);
@@ -879,7 +968,7 @@ export default function StudyRoomLive() {
                   type="text" value={chatMsg}
                   onChange={e => setChatMsg(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && !e.shiftKey && !isBlocked && handleSend()}
-                  placeholder={isOnCooldown ? `Wait ${cooldownRemaining}s…` : "Say something…"}
+                  placeholder={isOnCooldown ? `Wait ${cooldownRemaining}s…` : aiChatLoading ? "🤖 AI thinking…" : "Say something… (or @AI <question>"}
                   maxLength={200}
                   disabled={isOnCooldown}
                   className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60 disabled:cursor-not-allowed"
@@ -1421,6 +1510,22 @@ export default function StudyRoomLive() {
                 {ParticipantsList()}
               </div>
             </div>
+
+            {user && roomId && (
+              <StudyBuddyPanel
+                myUid={user.uid}
+                roomId={roomId}
+                participants={participants}
+                onBuddyGoalCelebrate={(buddyName) => {
+                  sendMessage(roomId, {
+                    uid: "system",
+                    name: "System",
+                    text: `🎉 ${profile?.name ?? "Someone"} just completed their study goal with ${buddyName}! Amazing teamwork! 🏆`,
+                    type: "system",
+                  }).catch(() => {});
+                }}
+              />
+            )}
           </div>
           )}
         </div>

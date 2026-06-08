@@ -12,3 +12,5 @@
 - [Study Room Scalability](study-room-scalability.md) — bench layout, presence intervals, room cap, focus mode — production decisions documented.
 - [Study Room Perf — Timer Context Split](study-room-perf.md) — fixed 60 re-renders/minute by splitting RoomTimerContext (1/min) from TimerDisplayContext (1/sec); profile cache removed.
 - [Pre-Launch Security Fixes](pre-launch-security.md) — hardcoded admin creds removed, sync-anon deleted, keepalive token cache added, grade limit 9-15, VotingPanel conditional tick.
+- [AI Quality Fixes](ai-quality.md) — thinkingBudget:0 stops gemini-2.5-flash truncation; temp 0.65; "start content immediately" rule stops generic intro replies; @AI room chat trigger (60s rate limit, Firestore system message).
+- [Study Buddy Feature](study-buddy.md) — buddyUid/buddyGoal/myGoalDone piggyback on existing participant docs (zero extra Firestore reads); setBuddyPair/clearBuddy/toggleBuddyGoalDone in studyRooms.ts; StudyBuddyPanel.tsx in desktop right sidebar.

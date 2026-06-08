@@ -58,6 +58,10 @@ export interface RoomParticipant {
   /** Server timestamp written when this participant enters a study phase; cleared on pause/break/leave. */
   studyStartedAt: Timestamp | null;
   isActive: boolean;
+  /** Study Buddy fields — piggyback on existing participant doc reads (zero extra Firestore cost) */
+  buddyUid?: string;
+  buddyGoal?: string;
+  myGoalDone?: boolean;
 }
 
 /**
@@ -658,6 +662,63 @@ export async function sendMessage(roomId: string, msg: {
   if (msg.text !== undefined) payload.text = msg.text;
   if (msg.emoji !== undefined) payload.emoji = msg.emoji;
   await setDoc(doc(collection(db, "studyRooms", roomId, "messages")), payload);
+}
+
+// ── Study Buddy ───────────────────────────────────────────────────────────────
+
+/**
+ * Pair two participants as study buddies with an optional shared goal.
+ * Writes to BOTH participant docs in a single batch — zero extra reads
+ * (both docs are already subscribed via the participant listener).
+ */
+export async function setBuddyPair(
+  roomId: string,
+  uid1: string,
+  uid2: string,
+  goal?: string,
+): Promise<void> {
+  const fields: Record<string, unknown> = { buddyUid: uid2, myGoalDone: false };
+  if (goal) fields.buddyGoal = goal;
+  const fields2: Record<string, unknown> = { buddyUid: uid1, myGoalDone: false };
+  if (goal) fields2.buddyGoal = goal;
+  await Promise.all([
+    updateDoc(doc(db, "studyRooms", roomId, "participants", uid1), fields),
+    updateDoc(doc(db, "studyRooms", roomId, "participants", uid2), fields2),
+  ]);
+}
+
+/** Set or update the shared buddy goal for a participant. */
+export async function setBuddyGoalText(roomId: string, uid: string, goal: string): Promise<void> {
+  await updateDoc(doc(db, "studyRooms", roomId, "participants", uid), { buddyGoal: goal });
+}
+
+/** Toggle whether this user has completed their buddy goal. */
+export async function toggleBuddyGoalDone(roomId: string, uid: string, done: boolean): Promise<void> {
+  await updateDoc(doc(db, "studyRooms", roomId, "participants", uid), { myGoalDone: done });
+}
+
+/**
+ * Clear buddy pairing for a user.
+ * If the ex-buddy is still in the room they get un-paired too.
+ */
+export async function clearBuddy(
+  roomId: string,
+  myUid: string,
+  buddyUid?: string,
+): Promise<void> {
+  const clears = [
+    updateDoc(doc(db, "studyRooms", roomId, "participants", myUid), {
+      buddyUid: null, buddyGoal: null, myGoalDone: false,
+    }),
+  ];
+  if (buddyUid) {
+    clears.push(
+      updateDoc(doc(db, "studyRooms", roomId, "participants", buddyUid), {
+        buddyUid: null, buddyGoal: null, myGoalDone: false,
+      }).catch(() => {}),
+    );
+  }
+  await Promise.all(clears);
 }
 
 // ── Realtime Listeners ────────────────────────────────────────────────────────
