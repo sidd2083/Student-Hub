@@ -13,6 +13,7 @@ Allow: /tools/gpa-calculator
 Allow: /tools/attendance-calculator
 Allow: /about
 Allow: /creators
+Allow: /siddhant-lamichhane
 Allow: /creators/
 Allow: /contact
 Allow: /privacy
