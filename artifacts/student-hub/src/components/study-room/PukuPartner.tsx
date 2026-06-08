@@ -146,13 +146,33 @@ const MSG = {
   bye: (fn: string) => `${fn}, looks like someone joined. I'll give you your space. You've been great today.`,
 };
 
+// ── Send a browser OS notification (visible even in other tabs) ──────────────
+function sendOsNotif(title: string, body: string) {
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  try {
+    const n = new Notification(title, {
+      body,
+      icon: "/icons/icon-192.png",
+      tag:  "puku-anticheat",
+      renotify: true,
+      requireInteraction: false,
+      silent: false,
+    });
+    // Auto-close after 8 s
+    setTimeout(() => n.close(), 8_000);
+    // Click notification → focus the tab
+    n.onclick = () => { window.focus(); n.close(); };
+  } catch {}
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export function PukuPartner({
   firstName, isStudying, isBreak, studyMins, onLeave, visible,
   onSpeechUpdate, onMinimizeChange,
 }: Props) {
-  const [minimized, setMinimized] = useState(false);
-  const [muted,     setMuted]     = useState(false);
+  const [minimized,      setMinimized]      = useState(false);
+  const [muted,          setMuted]          = useState(false);
+  const [antiCheatPopup, setAntiCheatPopup] = useState<string | null>(null);
 
   const fn = firstName.split(" ")[0];
 
@@ -189,15 +209,19 @@ export function PukuPartner({
   }, []);
 
   // Anti-cheat refs
-  const hasGreeted     = useRef(false);
-  const prevStudying   = useRef(false);
-  const prevBreak      = useRef(false);
-  const milestones     = useRef<Set<number>>(new Set());
-  const tabHiddenAt    = useRef<number | null>(null);
-  const lastActivity   = useRef<number>(Date.now());
-  const distractCount  = useRef(0);
-  const lastIdleAlert  = useRef<number>(0);
-  const wasBye         = useRef(false);
+  const hasGreeted        = useRef(false);
+  const prevStudying      = useRef(false);
+  const prevBreak         = useRef(false);
+  const milestones        = useRef<Set<number>>(new Set());
+  const tabHiddenAt       = useRef<number | null>(null);
+  const lastActivity      = useRef<number>(Date.now());
+  const distractCount     = useRef(0);
+  const lastIdleAlert     = useRef<number>(0);
+  const wasBye            = useRef(false);
+  // timer that fires a browser OS notification while tab is hidden
+  const osNotifTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // timer that auto-dismisses the in-app anti-cheat popup
+  const popupDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── speak — stable (created once, uses only refs) ────────────────────────
   const speak = useCallback((text: string) => {
@@ -335,25 +359,74 @@ export function PukuPartner({
     return () => evts.forEach(e => window.removeEventListener(e, touch));
   }, []);
 
-  // ── Anti-cheat: tab-away ──────────────────────────────────────────────────
+  // ── Request browser notification permission once when Puku becomes visible ──
   useEffect(() => {
     if (!visible) return;
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, [visible]);
+
+  // ── Anti-cheat: tab-away ──────────────────────────────────────────────────
+  // Triggers after just 30 s away (was 1.5 min).
+  // While hidden: schedules a browser OS notification after 45 s so it
+  // appears in the user's OS tray even if they're in a completely different app.
+  // On return: shows a prominent in-app popup overlay + speaks the warning.
+  useEffect(() => {
+    if (!visible) return;
+
     const onVis = () => {
       if (document.hidden) {
-        if (isStudying) tabHiddenAt.current = Date.now();
+        // Tab just became hidden ─────────────────────────────────────────
+        if (!isStudying) return;
+        tabHiddenAt.current = Date.now();
+
+        // Schedule OS notification for 45 s from now (if still hidden)
+        if (osNotifTimer.current) clearTimeout(osNotifTimer.current);
+        osNotifTimer.current = setTimeout(() => {
+          if (!document.hidden) return; // user already came back
+          sendOsNotif(
+            `⚠️ Hey ${fn}! Your study timer is running…`,
+            `You've been away from your study session. Come back and stay focused!`,
+          );
+        }, 45_000);
+
       } else {
+        // Tab just became visible ────────────────────────────────────────
+        if (osNotifTimer.current) { clearTimeout(osNotifTimer.current); osNotifTimer.current = null; }
+
         const at = tabHiddenAt.current;
         tabHiddenAt.current = null;
         if (!at || !isStudying) return;
-        const mins = Math.max(1, Math.round((Date.now() - at) / 60_000));
-        if (mins < 1.5) return;
+
+        const secsAway = Math.round((Date.now() - at) / 1_000);
+        if (secsAway < 30) return; // ignore accidental quick switches < 30 s
+
+        const mins = Math.max(1, Math.round(secsAway / 60));
         distractCount.current += 1;
         const n = distractCount.current;
-        setTimeout(() => speak(n >= 3 ? MSG.tabAway3(fn, mins) : n === 2 ? MSG.tabAway2(fn, mins) : MSG.tabAway1(fn, mins)), 500);
+
+        const msg = n >= 3
+          ? MSG.tabAway3(fn, mins)
+          : n === 2
+          ? MSG.tabAway2(fn, mins)
+          : MSG.tabAway1(fn, mins);
+
+        // Show prominent popup overlay inside the room
+        if (popupDismissTimer.current) clearTimeout(popupDismissTimer.current);
+        setAntiCheatPopup(msg);
+        popupDismissTimer.current = setTimeout(() => setAntiCheatPopup(null), 7_000);
+
+        // Speak the message (TTS plays because tab is now visible)
+        setTimeout(() => speak(msg), 300);
       }
     };
+
     document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      if (osNotifTimer.current) clearTimeout(osNotifTimer.current);
+    };
   }, [visible, isStudying, fn, speak]);
 
   // ── Anti-cheat: idle-on-page ──────────────────────────────────────────────
@@ -381,10 +454,12 @@ export function PukuPartner({
   useEffect(() => () => {
     window.speechSynthesis?.cancel();
     speechCbRef.current("", false);
-    if (bubbleClearTimer.current) clearTimeout(bubbleClearTimer.current);
-    if (waterTimer.current)       clearInterval(waterTimer.current);
-    if (scheduleTimer.current)    clearTimeout(scheduleTimer.current);
-    if (idleCheckTimer.current)   clearInterval(idleCheckTimer.current);
+    if (bubbleClearTimer.current)  clearTimeout(bubbleClearTimer.current);
+    if (waterTimer.current)        clearInterval(waterTimer.current);
+    if (scheduleTimer.current)     clearTimeout(scheduleTimer.current);
+    if (idleCheckTimer.current)    clearInterval(idleCheckTimer.current);
+    if (osNotifTimer.current)      clearTimeout(osNotifTimer.current);
+    if (popupDismissTimer.current) clearTimeout(popupDismissTimer.current);
   }, []);
 
   // ── Minimize handler — stable ─────────────────────────────────────────────
@@ -395,78 +470,131 @@ export function PukuPartner({
 
   if (!visible) return null;
 
+  // ── Anti-cheat popup overlay (shows even when Puku is minimized) ──────────
+  const popupOverlay = antiCheatPopup ? (
+    <AnimatePresence>
+      <motion.div
+        key="puku-anticheat-popup"
+        initial={{ opacity: 0, y: -24, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0,   scale: 1    }}
+        exit={{    opacity: 0, y: -16, scale: 0.97 }}
+        className="fixed top-16 left-1/2 -translate-x-1/2 z-[9999] w-[calc(100%-2rem)] max-w-sm"
+        style={{ pointerEvents: "auto" }}
+      >
+        <div
+          className="rounded-2xl shadow-2xl overflow-hidden"
+          style={{
+            background: "linear-gradient(135deg, #7c3aed, #db2777)",
+            boxShadow: "0 8px 32px rgba(124,58,237,0.45), 0 2px 8px rgba(0,0,0,0.2)",
+          }}
+        >
+          {/* Header bar */}
+          <div className="flex items-center gap-2 px-4 pt-3 pb-1">
+            <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white font-black text-xs shrink-0">
+              P
+            </div>
+            <span className="text-white font-black text-xs tracking-widest opacity-90">PUKU SAYS</span>
+            <button
+              onClick={() => setAntiCheatPopup(null)}
+              className="ml-auto w-5 h-5 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+            >
+              <X className="w-3 h-3 text-white" />
+            </button>
+          </div>
+          {/* Message */}
+          <p className="text-white text-sm font-medium leading-snug px-4 pb-4 pt-1">
+            {antiCheatPopup}
+          </p>
+          {/* Progress bar — auto-dismiss after 7 s */}
+          <motion.div
+            className="h-1 bg-white/40"
+            initial={{ width: "100%" }}
+            animate={{ width: "0%" }}
+            transition={{ duration: 7, ease: "linear" }}
+          />
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  ) : null;
+
   // ── Minimized pill ────────────────────────────────────────────────────────
   if (minimized) {
     return (
-      <motion.button
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        onClick={() => handleMinimize(false)}
-        className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-40 flex flex-col items-center gap-0.5"
-        title="Show Puku in classroom"
-      >
-        <div
-          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-xs shadow-lg border-2 border-white"
-          style={{ background: "linear-gradient(135deg,#8b5cf6,#ec4899)" }}
+      <>
+        {popupOverlay}
+        <motion.button
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          onClick={() => handleMinimize(false)}
+          className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-40 flex flex-col items-center gap-0.5"
+          title="Show Puku in classroom"
         >
-          P
-        </div>
-        <span className="text-[8px] font-black text-purple-600 dark:text-purple-400 tracking-widest">PUKU</span>
-      </motion.button>
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-xs shadow-lg border-2 border-white"
+            style={{ background: "linear-gradient(135deg,#8b5cf6,#ec4899)" }}
+          >
+            P
+          </div>
+          <span className="text-[8px] font-black text-purple-600 dark:text-purple-400 tracking-widest">PUKU</span>
+        </motion.button>
+      </>
     );
   }
 
   // ── Control pill ──────────────────────────────────────────────────────────
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 10 }}
-      className="fixed bottom-20 right-3 lg:bottom-5 lg:right-4 z-40"
-    >
-      <div
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full shadow-lg"
-        style={{
-          background: "rgba(255,255,255,0.92)",
-          backdropFilter: "blur(12px)",
-          border: "1px solid rgba(139,92,246,0.2)",
-          boxShadow: "0 4px 20px rgba(139,92,246,0.15), 0 2px 8px rgba(0,0,0,0.1)",
-        }}
+    <>
+      {popupOverlay}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 10 }}
+        className="fixed bottom-20 right-3 lg:bottom-5 lg:right-4 z-40"
       >
         <div
-          className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8px] font-black shrink-0"
-          style={{ background: "linear-gradient(135deg,#8b5cf6,#ec4899)" }}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full shadow-lg"
+          style={{
+            background: "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(12px)",
+            border: "1px solid rgba(139,92,246,0.2)",
+            boxShadow: "0 4px 20px rgba(139,92,246,0.15), 0 2px 8px rgba(0,0,0,0.1)",
+          }}
         >
-          P
-        </div>
-        <span className="text-[9px] font-black tracking-wider text-purple-600">PUKU</span>
-
-        <button
-          onClick={() => setMuted(m => !m)}
-          className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
-          title={muted ? "Unmute" : "Mute"}
-        >
-          {muted ? <VolumeX className="w-3 h-3 text-gray-400" /> : <Volume2 className="w-3 h-3 text-purple-500" />}
-        </button>
-
-        <button
-          onClick={() => handleMinimize(true)}
-          className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
-          title="Minimize"
-        >
-          <Minus className="w-3 h-3 text-gray-400" />
-        </button>
-
-        {onLeave && (
-          <button
-            onClick={() => { window.speechSynthesis?.cancel(); speechCbRef.current("", false); onLeave(); }}
-            className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-red-50 transition-colors"
-            title="Dismiss Puku"
+          <div
+            className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8px] font-black shrink-0"
+            style={{ background: "linear-gradient(135deg,#8b5cf6,#ec4899)" }}
           >
-            <X className="w-3 h-3 text-gray-400" />
+            P
+          </div>
+          <span className="text-[9px] font-black tracking-wider text-purple-600">PUKU</span>
+
+          <button
+            onClick={() => setMuted(m => !m)}
+            className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
+            title={muted ? "Unmute" : "Mute"}
+          >
+            {muted ? <VolumeX className="w-3 h-3 text-gray-400" /> : <Volume2 className="w-3 h-3 text-purple-500" />}
           </button>
-        )}
-      </div>
-    </motion.div>
+
+          <button
+            onClick={() => handleMinimize(true)}
+            className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
+            title="Minimize"
+          >
+            <Minus className="w-3 h-3 text-gray-400" />
+          </button>
+
+          {onLeave && (
+            <button
+              onClick={() => { window.speechSynthesis?.cancel(); speechCbRef.current("", false); onLeave(); }}
+              className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-red-50 transition-colors"
+              title="Dismiss Puku"
+            >
+              <X className="w-3 h-3 text-gray-400" />
+            </button>
+          )}
+        </div>
+      </motion.div>
+    </>
   );
 }
