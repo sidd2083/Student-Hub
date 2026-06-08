@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { RoomParticipant, getLiveStudyMins, RoomTheme, formatTime } from "@/lib/studyRooms";
 import { Crown, BookOpen, Coffee } from "lucide-react";
 import { useTimerDisplay } from "@/context/ActiveRoomContext";
+import { PukuFace, type PukuEmotion } from "@/components/study-room/PukuPartner";
 
 const PUKU_UID = "__puku__";
 
@@ -21,6 +22,7 @@ interface Props {
   pukuVisible?: boolean;
   pukuSpeech?: string;
   pukuSpeaking?: boolean;
+  pukuEmotion?: PukuEmotion;
 }
 
 const AVATAR_COLORS = [
@@ -301,9 +303,9 @@ const OccupiedSeat = memo(function OccupiedSeat({
 
 // ── Puku bench seat — sits like a real student ────────────────────────────────
 const PukuSeat = memo(function PukuSeat({
-  compact, tc, speech, isSpeaking,
+  compact, tc, speech, isSpeaking, emotion = "happy",
 }: {
-  compact: boolean; tc: ThemeConfig; speech: string; isSpeaking: boolean;
+  compact: boolean; tc: ThemeConfig; speech: string; isSpeaking: boolean; emotion?: PukuEmotion;
 }) {
   const sz = compact ? 36 : 44;
 
@@ -337,7 +339,6 @@ const PukuSeat = memo(function PukuSeat({
                 }}
               >
                 <p className="text-[9px] leading-snug font-medium text-gray-700 text-center">{speech}</p>
-                {/* Triangle tail pointing down to Puku */}
                 <div
                   className="absolute left-1/2 bottom-0 translate-y-full -translate-x-1/2"
                   style={{
@@ -353,7 +354,7 @@ const PukuSeat = memo(function PukuSeat({
           )}
         </AnimatePresence>
 
-        {/* Puku animated avatar */}
+        {/* Puku animated avatar — now with emotion states */}
         <motion.div
           animate={isSpeaking ? { scale: [1, 1.05, 1, 1.05, 1] } : { scale: 1 }}
           transition={{ repeat: isSpeaking ? Infinity : 0, duration: 0.65 }}
@@ -370,38 +371,7 @@ const PukuSeat = memo(function PukuSeat({
                 : `0 3px 12px rgba(0,0,0,0.3), 0 0 0 2px rgba(255,255,255,0.2)`,
             }}
           >
-            {/* Ears */}
-            <div className="absolute bg-purple-400 rounded-full" style={{ width: sz*0.17, height: sz*0.17, top: "-5%", left: "12%" }} />
-            <div className="absolute bg-purple-400 rounded-full" style={{ width: sz*0.17, height: sz*0.17, top: "-5%", right: "12%" }} />
-            {/* Eyes */}
-            <div className="absolute flex" style={{ gap: sz*0.1, top: "27%" }}>
-              <motion.div
-                animate={{ scaleY: [1, 0.08, 1] }}
-                transition={{ repeat: Infinity, repeatDelay: 3.2, duration: 0.13 }}
-                className="bg-white rounded-full"
-                style={{ width: sz*0.13, height: sz*0.13 }}
-              />
-              <motion.div
-                animate={{ scaleY: [1, 0.08, 1] }}
-                transition={{ repeat: Infinity, repeatDelay: 3.2, duration: 0.13, delay: 0.06 }}
-                className="bg-white rounded-full"
-                style={{ width: sz*0.13, height: sz*0.13 }}
-              />
-            </div>
-            {/* Mouth */}
-            <motion.div
-              animate={isSpeaking ? { scaleX: [1, 1.5, 0.7, 1.4, 1] } : {}}
-              transition={{ repeat: isSpeaking ? Infinity : 0, duration: 0.33 }}
-              className="absolute bg-white"
-              style={{
-                width: sz*0.22, height: sz*0.11,
-                bottom: "22%",
-                borderRadius: "0 0 50% 50%",
-              }}
-            />
-            {/* Cheeks */}
-            <div className="absolute" style={{ bottom:"18%", left:"9%", width:sz*0.16, height:sz*0.09, borderRadius:"50%", background:"rgba(255,180,200,0.45)" }} />
-            <div className="absolute" style={{ bottom:"18%", right:"9%", width:sz*0.16, height:sz*0.09, borderRadius:"50%", background:"rgba(255,180,200,0.45)" }} />
+            <PukuFace emotion={emotion} size={sz} speaking={isSpeaking} />
           </div>
 
           {/* Speaking ring */}
@@ -413,7 +383,7 @@ const PukuSeat = memo(function PukuSeat({
             />
           )}
 
-          {/* AI badge instead of online dot */}
+          {/* AI badge */}
           <div
             className="absolute font-black text-white flex items-center justify-center"
             style={{
@@ -442,7 +412,7 @@ const PukuSeat = memo(function PukuSeat({
 // ── Wooden desk bench ─────────────────────────────────────────────────────────
 const Bench = memo(function Bench({
   left, right, hostUid, onSelect, compact, tc, myUid, myStudyMins,
-  pukuSpeech, pukuSpeaking,
+  pukuSpeech, pukuSpeaking, pukuEmotion,
 }: {
   left: RoomParticipant | null;
   right: RoomParticipant | null;
@@ -454,6 +424,7 @@ const Bench = memo(function Bench({
   myStudyMins?: number;
   pukuSpeech?: string;
   pukuSpeaking?: boolean;
+  pukuEmotion?: PukuEmotion;
 }) {
   const deskW = compact ? "w-36" : "w-48 sm:w-56";
   const gap   = compact ? "gap-4" : "gap-6 sm:gap-10";
@@ -471,6 +442,7 @@ const Bench = memo(function Bench({
           tc={tc}
           speech={pukuSpeech ?? ""}
           isSpeaking={pukuSpeaking ?? false}
+          emotion={pukuEmotion ?? "happy"}
         />
       );
     }
@@ -523,7 +495,7 @@ export const ClassroomView = memo(function ClassroomView({
   participants, hostUid, onSelectStudent,
   timerLabel, timerPhaseType, roomStatus, compact = false,
   theme = "classic", myUid, myStudyMins,
-  pukuVisible = false, pukuSpeech = "", pukuSpeaking = false,
+  pukuVisible = false, pukuSpeech = "", pukuSpeaking = false, pukuEmotion = "happy",
 }: Props) {
   const { remainingSeconds } = useTimerDisplay();
   const timerDisplay = formatTime(remainingSeconds);
@@ -681,7 +653,7 @@ export const ClassroomView = memo(function ClassroomView({
                 hostUid={hostUid} onSelect={handleSelect}
                 compact={compact} tc={tc}
                 myUid={myUid} myStudyMins={myStudyMins}
-                pukuSpeech={pukuSpeech} pukuSpeaking={pukuSpeaking}
+                pukuSpeech={pukuSpeech} pukuSpeaking={pukuSpeaking} pukuEmotion={pukuEmotion}
               />
             </div>
           );

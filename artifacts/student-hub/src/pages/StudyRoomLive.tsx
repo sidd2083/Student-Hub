@@ -206,6 +206,7 @@ export default function StudyRoomLive() {
   const [pukuSpeech,    setPukuSpeech]    = useState("");
   const [pukuSpeaking,  setPukuSpeaking]  = useState(false);
   const [pukuMinimized, setPukuMinimized] = useState(false);
+  const [pukuEmotion,   setPukuEmotion]   = useState<import("@/components/study-room/PukuPartner").PukuEmotion>("happy");
   const prevParticipantCount              = useRef<number>(0);
 
   // Stable callbacks — never recreate so PukuPartner never re-renders due to prop churn
@@ -1457,6 +1458,7 @@ export default function StudyRoomLive() {
                   pukuVisible={showPuku && joined && !pukuMinimized}
                   pukuSpeech={pukuSpeech}
                   pukuSpeaking={pukuSpeaking}
+                  pukuEmotion={pukuEmotion}
                 />
                 <AnimatePresence>
                   {floatingEmojis.map(fe => (
@@ -1521,6 +1523,7 @@ export default function StudyRoomLive() {
               pukuVisible={showPuku && joined && !pukuMinimized}
               pukuSpeech={pukuSpeech}
               pukuSpeaking={pukuSpeaking}
+              pukuEmotion={pukuEmotion}
             />
             <AnimatePresence>
               {floatingEmojis.map(fe => (
@@ -1789,6 +1792,7 @@ export default function StudyRoomLive() {
       {/* ── PUKU AI Study Partner — sits in classroom bench, logic+controls here ─── */}
       <PukuPartner
         firstName={profile?.name ?? "Student"}
+        grade={profile?.grade}
         isStudying={isStudying}
         isBreak={isBreak}
         studyMins={studyMinsInSession}
@@ -1796,6 +1800,7 @@ export default function StudyRoomLive() {
         onLeave={pukuLeave}
         onSpeechUpdate={pukuSpeechUpdate}
         onMinimizeChange={setPukuMinimized}
+        onEmotionChange={setPukuEmotion}
       />
     </>
   );

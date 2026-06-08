@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { ActiveRoomBar } from "@/components/study-room/ActiveRoomBar";
+import { PukuFloating } from "@/components/PukuFloating";
 
 function fmtStudyMins(m: number): string {
   if (m < 60) return `${m}m`;
@@ -129,6 +130,7 @@ export function Layout({ children }: LayoutProps) {
     >
       <FloatingTimerBar />
       <ActiveRoomBar />
+      {!location.startsWith("/study-rooms/") && <PukuFloating />}
 
       {/* ── Sidebar (desktop) ── */}
       <aside className="hidden md:flex w-64 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 flex-col shadow-sm flex-shrink-0">

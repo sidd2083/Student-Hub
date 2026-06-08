@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Volume2, VolumeX, Minus, X } from "lucide-react";
+import { Volume2, VolumeX, Minus, X, CheckCircle, XCircle } from "lucide-react";
+
+export type PukuEmotion = "happy" | "relaxed" | "focused" | "concerned" | "frustrated" | "proud" | "excited";
 
 interface Props {
   firstName: string;
+  grade?: number;
   isStudying: boolean;
   isBreak: boolean;
   studyMins: number;
@@ -11,9 +14,11 @@ interface Props {
   visible: boolean;
   onSpeechUpdate: (speech: string, isSpeaking: boolean) => void;
   onMinimizeChange?: (minimized: boolean) => void;
+  onEmotionChange?: (emotion: PukuEmotion) => void;
+  onFocusPause?: () => void;
+  onFocusResume?: () => void;
 }
 
-// ── Strip emojis so TTS reads clean text ────────────────────────────────────
 function stripForSpeech(text: string): string {
   return text
     .replace(/[\u{1F000}-\u{1FFFF}]/gu, "")
@@ -23,7 +28,6 @@ function stripForSpeech(text: string): string {
     .trim();
 }
 
-// ── Best available TTS voice ─────────────────────────────────────────────────
 function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
   if (!voices.length) return null;
   for (const name of [
@@ -38,162 +42,326 @@ function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null 
 
 function timePart() {
   const h = new Date().getHours();
-  if (h < 5) return "late night"; if (h < 12) return "morning";
-  if (h < 17) return "afternoon"; if (h < 21) return "evening"; return "night";
+  if (h < 5)  return "late night";
+  if (h < 12) return "morning";
+  if (h < 17) return "afternoon";
+  if (h < 21) return "evening";
+  return "night";
 }
+
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
 
-// ── Message bank ─────────────────────────────────────────────────────────────
+// ── Grade label helper ───────────────────────────────────────────────────────
+function gradeContext(grade?: number): string {
+  if (!grade) return "";
+  if (grade === 9)  return "grade9";
+  if (grade === 10) return "grade10";
+  if (grade === 11) return "grade11";
+  if (grade === 12) return "grade12";
+  if (grade === 13) return "cee";
+  if (grade === 14) return "ioe";
+  if (grade === 15) return "bachelors";
+  return "";
+}
+
+// ── Massive grade-personalized message bank ──────────────────────────────────
 const MSG = {
-  greet: (fn: string) => pick([
-    `Hey ${fn}! Puku here — your personal study buddy. Just you and me today. Let's make this count, okay?`,
-    `${fn}! You actually showed up. That already puts you ahead of most people. Let's get to it.`,
-    `${fn}, ${timePart()} session — respect. I'll be right here beside you the whole time. Let's go.`,
-    `Hey ${fn}! I was waiting for you. Ready? Let's make this one of those sessions you look back on.`,
-    `${fn}! It's us today. No one else — just you, your books, and me. Let's make it a good one.`,
-  ]),
-  studyStart: (fn: string) => pick([
-    `Let's lock in ${fn}. Timer's running — this is your time now.`,
-    `Focus mode on, ${fn}. Just you and the material. I'll keep you company.`,
-    `Okay ${fn}, this is it. Phone down, books open. I'm right here with you.`,
-    `Clock's ticking ${fn}. Give it everything. I believe in you.`,
-    `Let's go ${fn}! Forget everything else for now — just this.`,
-  ]),
-  early: (fn: string) => pick([
-    `Good start ${fn}. The first few minutes are always the hardest — push through, you've got this.`,
-    `${fn}, you're just warming up. Stay with it — it gets easier in a few minutes.`,
-    `${fn}, give it 10 minutes and you'll hit your stride. I've seen you do this before.`,
-    `Starting is the hardest part ${fn}. You already did it. Now just keep going.`,
-  ]),
-  mid: (fn: string, m: number) => pick([
-    `${fn}, ${m} minutes in and still going strong. That's what I'm talking about.`,
-    `Look at you ${fn} — ${m} minutes of real focus. I'm genuinely proud of you.`,
-    `${m} minutes, ${fn}. You're past the hardest part now. This is where it gets good.`,
-    `${fn}, ${m} minutes of actual work. Your brain is literally building connections right now.`,
-    `${m} minutes ${fn}. Honestly? You're doing great. Don't stop.`,
-  ]),
-  long: (fn: string, m: number) => pick([
-    `${fn}, ${m} minutes. Bro — that is serious dedication. NEB toppers study exactly like this.`,
-    `${m} minutes ${fn}. I won't lie — most people can't sit this long. You're different.`,
-    `${fn}, ${m} minutes in. The people who top their class? This is what they do. That's you right now.`,
-    `${fn}! ${m} minutes. I'm not exaggerating when I say — you should be proud of yourself.`,
-  ]),
-  milestone5:   (fn: string) => pick([
-    `${fn}, five minutes down! The hardest part is always starting — and you already crushed it.`,
-    `Five minutes ${fn}. You showed up and stayed. That's more than most. Keep going!`,
-  ]),
-  milestone15:  (fn: string) => pick([
-    `Fifteen minutes ${fn}! You're locked in now. Ride this wave — don't break it.`,
-    `${fn}, 15 minutes of real study done. You're in the zone. Stay there.`,
-  ]),
-  milestone30:  (fn: string) => pick([
-    `${fn}, thirty minutes of solid studying. Genuinely impressive — I mean that.`,
-    `Half an hour ${fn}! Thirty whole minutes. Your future self is already thanking you.`,
-  ]),
-  milestone60:  (fn: string) => pick([
-    `One hour ${fn}. One full hour. I don't say this lightly — that is exceptional work.`,
-    `${fn}! One hour. ONE HOUR. Bro, you are built for this. Keep going.`,
-  ]),
-  milestone90:  (fn: string) => pick([
-    `${fn}, ninety minutes. You are genuinely built differently. I'm not even surprised anymore.`,
-    `90 minutes ${fn}. That's elite-level dedication. Board exams won't know what hit them.`,
-  ]),
-  milestone120: (fn: string) => pick([
-    `Two hours ${fn}. Two full hours of focused work. Your future self will look back at this day.`,
-    `${fn}! Two hours! You've been here with me for two whole hours. I'm honored, honestly.`,
-  ]),
-  water: (fn: string) => pick([
-    `${fn}, quick — when did you last drink water? Your brain is 75% water. Go get some, I'll wait.`,
-    `Hey ${fn}, water check! Get up, grab a glass, come back. Your focus will thank you.`,
-    `${fn}, hydration time. You literally cannot focus properly when dehydrated. Go drink something now.`,
-    `${fn}! Water break. Non-negotiable. I'll be right here when you get back.`,
-  ]),
+
+  greet: (fn: string, grade?: number) => {
+    const ctx = gradeContext(grade);
+    const shared = [
+      `Hey ${fn}! Puku here, your study buddy. Just us today — let's make it count.`,
+      `${fn}! You showed up. That already puts you ahead. Ready?`,
+      `${fn}, ${timePart()} session — let's go. I'll be right here with you.`,
+      `Hey ${fn}! Been waiting for you. Let's make this one of those good sessions.`,
+    ];
+    const specific: Record<string, string[]> = {
+      grade9:   [`${fn}! Grade 9 is where good habits start. Let's build one right now.`, `Welcome ${fn} — early practice makes everything easier later. Let's focus.`],
+      grade10:  [`${fn}! SEE is closer than you think. Let's use this time well.`, `${fn}, this is your SEE prep time. Let's not waste a minute of it.`],
+      grade11:  [`${fn}! +2 is a fresh start — let's make your first sessions count.`, `Hey ${fn}, welcome to the big leagues. Let's focus and get ahead.`],
+      grade12:  [`${fn}! Board exam season. Every session this year matters. Let's go.`, `${fn}, you're in the final stretch. Let's make this session a good one.`],
+      cee:      [`${fn}! Medical entrance prep is intense. I'm here with you — let's focus.`, `${fn}, every session brings you closer to that CEE seat. Let's lock in.`],
+      ioe:      [`${fn}! IOE prep session — engineering entrance rewards the consistent. Let's start.`, `${fn}, here to crush some IOE prep? Let's do this properly.`],
+      bachelors:[`${fn}! Small progress every day beats last-minute panic. Ready?`, `${fn}, consistent daily study is the bachelor's student's superpower. Let's go.`],
+    };
+    const pool = ctx && specific[ctx] ? [...shared, ...specific[ctx]] : shared;
+    return pick(pool);
+  },
+
+  studyStart: (fn: string, grade?: number) => {
+    const ctx = gradeContext(grade);
+    const shared = [
+      `Let's lock in, ${fn}. Timer's running — this is your time.`,
+      `Focus mode on. Just you and the material. I'm right here.`,
+      `Okay ${fn}, phone down, books open. Let's go.`,
+      `Clock's ticking. Give it everything you've got.`,
+      `This session counts. Make it mean something.`,
+    ];
+    const specific: Record<string, string[]> = {
+      grade10:  [`SEE prep starts now. One session at a time.`, `Let's get some SEE-level material done, ${fn}.`],
+      grade12:  [`Board exam prep in session. Focus.`, `${fn}, imagine how good you'll feel at the end of this. Let's start.`],
+      cee:      [`CEE entrance is waiting. This session is your investment.`, `Medical entrance needs this kind of focus, ${fn}. Let's go.`],
+      ioe:      [`IOE prep mode on. Engineering doesn't wait.`, `Every minute of focused IOE prep pays off. Let's start.`],
+      bachelors:[`Consistent progress. That's what today's about.`, `Bachelor's life: study now, enjoy later. Let's go.`],
+    };
+    const pool = ctx && specific[ctx] ? [...shared, ...specific[ctx]] : shared;
+    return pick(pool);
+  },
+
   breakStart: (fn: string) => pick([
-    `Break time ${fn}! Step away from the screen, stretch a little. You earned this rest.`,
-    `${fn}, real break — don't peek at study material. Your brain needs to decompress. Let it.`,
-    `Rest mode ${fn}. Walk around, drink water, look at something far away. Back at it soon!`,
-    `${fn}, you worked hard — now rest properly. No phone doom-scrolling though. Just breathe.`,
+    `Break time! Step away, stretch a little. You earned it.`,
+    `${fn}, real break — don't peek at study material. Let your brain reset.`,
+    `Rest mode. Walk around, drink water, look outside. Back soon!`,
+    `You worked hard — rest properly. No doom-scrolling though. Just breathe.`,
+    `Good time to grab some water and relax your eyes.`,
   ]),
-  random: (fn: string) => pick([
-    `${fn}, try explaining what you just read out loud. Sounds silly but it seriously works.`,
-    `${fn}, you know what separates good students from great ones? They don't quit when it's boring.`,
-    `${fn} — NEB toppers didn't have superpowers. They just showed up. Like you're doing right now.`,
-    `Hey ${fn}, I've been watching — you're more focused than you give yourself credit for.`,
-    `${fn}, one topic at a time. Don't look at everything at once. Just the next page.`,
-    `${fn}, every minute here is compounding. Future you is going to be so glad you stayed.`,
-    `The ${timePart()} session is lowkey the best one ${fn}. Quiet, focused, effective.`,
-    `${fn}, write it down if you're stuck. Pen on paper does something to your brain.`,
-    `Hey ${fn} — you're not just studying, you're building a version of yourself. Keep going.`,
-    `${fn}, the fact that you're here right now, studying with me — that means something. Don't forget that.`,
+
+  milestone5: (fn: string) => pick([
+    `Five minutes down, ${fn}! The hardest part is always starting — you already crushed it.`,
+    `${fn}, five minutes in. You showed up and stayed. Keep going!`,
+    `Nice start. Five minutes is still five minutes. Build on it.`,
   ]),
-  tabAway1:    (fn: string, m: number) => pick([
-    `${fn}, you were away for ${m} minutes. Your timer kept running — was that actually study time?`,
-    `Hey ${fn}, I noticed you were gone for ${m} minutes. Let's get back to it.`,
-    `${fn}, ${m} minutes away. The exam won't give you those minutes back.`,
+
+  milestone15: (fn: string) => pick([
+    `Fifteen minutes, ${fn}. You're locked in now — don't break this flow.`,
+    `${fn}, 15 minutes of real work done. You're in the zone. Stay there.`,
+    `Quarter hour. Nice.`,
   ]),
-  tabAway2:    (fn: string, m: number) => pick([
-    `${fn}, that's the second time. ${m} more minutes gone. Your focus is slipping — let's fix that.`,
-    `Again ${fn}? ${m} minutes away again. I need you to stay on this page.`,
+
+  milestone30: (fn: string, grade?: number) => {
+    const ctx = gradeContext(grade);
+    const shared = [
+      `${fn}, thirty minutes. Genuinely impressive — I mean that.`,
+      `Half an hour! Your future self is already grateful.`,
+      `Thirty minutes of solid focus. That's what it looks like.`,
+    ];
+    const specific: Record<string, string[]> = {
+      cee:   [`${fn}, 30 focused minutes of CEE prep. That's real progress.`],
+      ioe:   [`Half an hour of IOE prep, ${fn}. Respect.`],
+      grade12:[`30 minutes down. Board exam prep is happening.`],
+    };
+    const pool = ctx && specific[ctx] ? [...shared, ...specific[ctx]] : shared;
+    return pick(pool);
+  },
+
+  milestone60: (fn: string, grade?: number) => {
+    const ctx = gradeContext(grade);
+    const shared = [
+      `One full hour, ${fn}. That is exceptional.`,
+      `${fn}! One hour! You're built for this. Keep going.`,
+      `Sixty minutes of focus. Most students never get here. You did.`,
+    ];
+    const specific: Record<string, string[]> = {
+      cee:   [`One hour of CEE prep, ${fn}. You're serious about this. It shows.`],
+      ioe:   [`An hour of IOE grind, ${fn}. This is what it takes.`],
+      grade12:[`An hour in. Board toppers study like this. That's you right now.`],
+      bachelors:[`An hour already. You're one of the consistent ones, ${fn}.`],
+    };
+    const pool = ctx && specific[ctx] ? [...shared, ...specific[ctx]] : shared;
+    return pick(pool);
+  },
+
+  milestone90: (fn: string) => pick([
+    `${fn}, ninety minutes. You are genuinely built differently.`,
+    `90 minutes of focus. That's elite. Don't stop now.`,
+    `Ninety minutes, ${fn}. I'm honestly proud of you.`,
   ]),
-  tabAway3:    (fn: string, m: number) => pick([
-    `${fn}, three times now. ${m} minutes of distraction. Close everything else and just study.`,
-    `${fn}, this keeps happening. The board exam is coming — let's stop this pattern right now.`,
+
+  milestone120: (fn: string) => pick([
+    `Two hours, ${fn}. Two full hours. Your future self will remember this session.`,
+    `${fn}! Two hours! I've been here with you the whole time. Truly impressive.`,
+    `Two hours of real study. You're doing something most people only talk about.`,
   ]),
-  idle: (fn: string, m: number) => pick([
-    `${fn}, your cursor hasn't moved in ${m} minutes. Are you actually reading, or just staring?`,
-    `Hey ${fn}, still with me? ${m} minutes of no activity.`,
+
+  midSession: (fn: string, m: number, grade?: number) => {
+    const ctx = gradeContext(grade);
+    const shared = [
+      `${m} minutes in and still going, ${fn}. That's what I like to see.`,
+      `Nice pace, ${fn}. Keep it exactly like this.`,
+      `${fn}, you're past the hard part now. It gets easier from here.`,
+      `Still focused. Good. Don't break it.`,
+      `${fn}, you're doing the work other students skip. Remember that.`,
+    ];
+    const specific: Record<string, string[]> = {
+      grade10:  [`${m} minutes of SEE prep. You're ahead of most right now, ${fn}.`],
+      grade12:  [`${m} minutes of board prep. This is exactly what the top scorers do.`],
+      cee:      [`${m} minutes of focused CEE prep, ${fn}. This is the difference-maker.`],
+      ioe:      [`${m} minutes in. IOE entrance is about this kind of consistency.`],
+      bachelors:[`${m} minutes down, ${fn}. Small daily progress adds up fast.`],
+    };
+    const pool = ctx && specific[ctx] ? [...shared, ...specific[ctx]] : shared;
+    return pick(pool);
+  },
+
+  longSession: (fn: string, m: number) => pick([
+    `${fn}, ${m} minutes. That is serious dedication.`,
+    `${m} minutes in, ${fn}. The people who top their class do exactly this.`,
+    `${fn}! ${m} minutes. I won't lie — most people can't sit this long. You're different.`,
+    `${m} minutes of real work. Be proud of that, ${fn}.`,
   ]),
-  bye: (fn: string) => `${fn}, looks like someone joined. I'll give you your space. You've been great today.`,
+
+  water: (fn: string) => pick([
+    `Quick water break, ${fn}? Your brain is 75% water.`,
+    `Hey — when did you last drink water? Go grab some. I'll wait.`,
+    `Hydration check! A glass of water will actually help you focus better.`,
+    `${fn}, water. Non-negotiable. Go drink something now.`,
+    `Small reminder: water. Two minutes. Worth it.`,
+  ]),
+
+  health: () => pick([
+    `Quick tip — relax your shoulders right now. You've been hunched.`,
+    `Look away from the screen for 20 seconds. Your eyes need the rest.`,
+    `Sit up straight for a second. Good posture actually helps you think.`,
+    `Take three deep breaths. Seriously — it resets your focus.`,
+    `Stand up and stretch for just 30 seconds. Your back will thank you.`,
+    `Blink a few times. Staring at screens reduces blinking — rest your eyes.`,
+  ]),
+
+  encouragement: (fn: string, grade?: number) => {
+    const ctx = gradeContext(grade);
+    const shared = [
+      `${fn}, you're doing better than you think.`,
+      `One page at a time. Don't look at everything at once.`,
+      `${fn}, the fact that you're here studying right now matters. Don't forget that.`,
+      `Every minute here is compounding. Future you is grateful.`,
+      `${fn}, I've been watching — you're more focused than you give yourself credit for.`,
+      `Write it down if you're stuck. Pen on paper does something to your brain.`,
+      `${fn}, try explaining what you just read out loud. Sounds silly. It works.`,
+      `NEB toppers didn't have superpowers. They just showed up — like you're doing now.`,
+      `Boring topics are part of it, ${fn}. Push through. It gets easier.`,
+    ];
+    const specific: Record<string, string[]> = {
+      grade9:   [`Grade 9 is early, ${fn}. The habits you build now will carry you through Grade 12 and beyond.`],
+      grade10:  [`${fn}, SEE preparation becomes easier when you're consistent. This is how you build that.`, `Every SEE practice session is practice for the real thing, ${fn}.`],
+      grade11:  [`${fn}, +2 is tough but manageable. Just don't fall behind. You're not behind.`],
+      grade12:  [`${fn}, the students who don't panic on exam day are the ones who did exactly this.`, `Board exams reward the consistent, ${fn}. This is your consistency.`],
+      cee:      [`${fn}, every focused session gets you closer to that medical entrance seat.`, `CEE is competitive, ${fn}. But so are you. Keep going.`],
+      ioe:      [`${fn}, engineering entrance rewards consistency over cramming. You're doing it right.`, `IOE toppers study like this, ${fn}. Consistent. Patient. Focused.`],
+      bachelors:[`${fn}, small progress every day beats last-minute panic. You're living proof.`, `Bachelor's is a marathon, ${fn}. Pace matters more than sprints.`],
+    };
+    const pool = ctx && specific[ctx] ? [...shared, ...specific[ctx]] : shared;
+    return pick(pool);
+  },
+
+  humor: (fn: string) => pick([
+    `${fn}, your phone is probably boring. I promise.`,
+    `Fun fact: you've been more productive in this session than most people manage all day.`,
+    `${fn}, the ${timePart()} study session is lowkey the most underrated.`,
+    `Your future self just sent a message. It says "thank you."`,
+    `${fn}, you're doing the thing people say they'll do "later." Respect.`,
+  ]),
+
+  comeBack: (fn: string, mins: number, grade?: number) => {
+    const ctx = gradeContext(grade);
+    const shared = [
+      `${fn}, still studying?`,
+      `You've been away for ${mins} minutes, ${fn}. Still with me?`,
+      `Hey — ${mins} minutes outside. Everything okay, ${fn}?`,
+    ];
+    const specific: Record<string, string[]> = {
+      grade10:  [`${fn}, ${mins} minutes away from your SEE prep. Still studying?`],
+      grade12:  [`${fn}, ${mins} minutes away. Board prep doesn't stop — come back when you're ready.`],
+      cee:      [`${fn}, ${mins} minutes away from your CEE prep. Your seat won't wait. Still studying?`],
+      ioe:      [`${fn}, ${mins} minutes away. IOE prep in progress — coming back?`],
+    };
+    const pool = ctx && specific[ctx] ? [...shared, ...specific[ctx]] : shared;
+    return pick(pool);
+  },
+
+  frustrated: (fn: string) => pick([
+    `${fn}, this keeps happening. Let's break the pattern right now.`,
+    `Hey — I know it's tough to stay focused. But you came here to study. Let's try again.`,
+    `${fn}, every time you come back, it still counts. Let's lock back in.`,
+    `Distraction is normal. Coming back is what matters. Come back, ${fn}.`,
+  ]),
+
+  sessionComplete: (fn: string, mins: number, grade?: number) => {
+    const ctx = gradeContext(grade);
+    const shared = [
+      `${fn}, great work today. ${mins} minutes of real study. Be proud of that.`,
+      `Session done! ${mins} minutes, ${fn}. That's genuinely impressive.`,
+      `Good work today, ${fn}. ${mins} minutes. Rest well — you earned it.`,
+    ];
+    const specific: Record<string, string[]> = {
+      grade10:  [`${fn}, ${mins} minutes of SEE prep done. That's what top scorers do.`],
+      grade12:  [`${fn}, ${mins} minutes of board prep. Your exam day self will thank you.`],
+      cee:      [`${fn}, ${mins} minutes of CEE prep. Every session like this gets you closer.`],
+      ioe:      [`IOE grind: ${mins} minutes, ${fn}. Consistent. Excellent.`],
+    };
+    const pool = ctx && specific[ctx] ? [...shared, ...specific[ctx]] : shared;
+    return pick(pool);
+  },
+
+  bye: (fn: string) => pick([
+    `${fn}, looks like someone joined. I'll give you your space. You've been great today.`,
+    `Another student's here — my work is done. Good luck, ${fn}!`,
+    `Company's arrived! I'll step back. You did well today, ${fn}.`,
+  ]),
 };
 
-// ── Send a browser OS notification (visible even in other tabs) ──────────────
+// ── OS notification helper ───────────────────────────────────────────────────
 function sendOsNotif(title: string, body: string) {
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
   try {
     const n = new Notification(title, {
       body,
       icon: "/icons/icon-192.png",
-      tag:  "puku-anticheat",
-      renotify: true,
-      requireInteraction: false,
-      silent: false,
+      tag: "puku-companion",
+      silent: true,
     });
-    // Auto-close after 8 s
-    setTimeout(() => n.close(), 8_000);
-    // Click notification → focus the tab
+    setTimeout(() => n.close(), 10_000);
     n.onclick = () => { window.focus(); n.close(); };
   } catch {}
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function PukuPartner({
-  firstName, isStudying, isBreak, studyMins, onLeave, visible,
-  onSpeechUpdate, onMinimizeChange,
+  firstName, grade, isStudying, isBreak, studyMins, onLeave, visible,
+  onSpeechUpdate, onMinimizeChange, onEmotionChange, onFocusPause, onFocusResume,
 }: Props) {
-  const [minimized,      setMinimized]      = useState(false);
-  const [muted,          setMuted]          = useState(false);
-  const [antiCheatPopup, setAntiCheatPopup] = useState<string | null>(null);
+  const [minimized,   setMinimized]   = useState(false);
+  const [muted,       setMuted]       = useState(false);
+  const [emotion,     setEmotion]     = useState<PukuEmotion>("happy");
+  const [distractPopup, setDistractPopup] = useState(false);
+  const [isPaused,    setIsPaused]    = useState(false);
 
   const fn = firstName.split(" ")[0];
 
-  // ── Refs — avoid stale closures + prevent GC of timers ───────────────────
-  const muteRef          = useRef(muted);
-  const speechCbRef      = useRef(onSpeechUpdate);
+  const muteRef         = useRef(muted);
+  const speechCbRef     = useRef(onSpeechUpdate);
+  const emotionCbRef    = useRef(onEmotionChange);
+  const pauseCbRef      = useRef(onFocusPause);
+  const resumeCbRef     = useRef(onFocusResume);
   const bubbleClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const waterTimer       = useRef<ReturnType<typeof setInterval> | null>(null);
-  const scheduleTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const idleCheckTimer   = useRef<ReturnType<typeof setInterval> | null>(null);
-  const cachedVoiceRef   = useRef<SpeechSynthesisVoice | null>(null);
-  const voicesReadyRef   = useRef(false);
+  const healthTimer     = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const midSessionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const osNotifTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const popupAutoTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cachedVoiceRef  = useRef<SpeechSynthesisVoice | null>(null);
+  const voicesReadyRef  = useRef(false);
 
-  // Keep refs in sync — no render triggered
   useEffect(() => { muteRef.current = muted; }, [muted]);
   useEffect(() => { speechCbRef.current = onSpeechUpdate; }, [onSpeechUpdate]);
+  useEffect(() => { emotionCbRef.current = onEmotionChange; }, [onEmotionChange]);
+  useEffect(() => { pauseCbRef.current = onFocusPause; }, [onFocusPause]);
+  useEffect(() => { resumeCbRef.current = onFocusResume; }, [onFocusResume]);
 
-  // ── Pre-warm TTS voices on mount ─────────────────────────────────────────
-  // Chrome returns an empty voices array on the very first getVoices() call.
-  // By listening to voiceschanged immediately, we cache the best voice before
-  // speak() is ever called — so the first greeting fires in sync with the bubble.
+  const hasGreeted    = useRef(false);
+  const prevStudying  = useRef(false);
+  const prevBreak     = useRef(false);
+  const milestones    = useRef<Set<number>>(new Set());
+  const tabHiddenAt   = useRef<number | null>(null);
+  const distractCount = useRef(0);
+  const lastWarnedAt  = useRef(0);
+  const wasBye        = useRef(false);
+  const lastHealthAt  = useRef(0);
+
+  const setEmotionBoth = useCallback((e: PukuEmotion) => {
+    setEmotion(e);
+    emotionCbRef.current?.(e);
+  }, []);
+
+  // ── Pre-warm TTS voices ────────────────────────────────────────────────────
   useEffect(() => {
     if (!window.speechSynthesis) return;
     const load = () => {
@@ -208,35 +376,13 @@ export function PukuPartner({
     return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
   }, []);
 
-  // Anti-cheat refs
-  const hasGreeted        = useRef(false);
-  const prevStudying      = useRef(false);
-  const prevBreak         = useRef(false);
-  const milestones        = useRef<Set<number>>(new Set());
-  const tabHiddenAt       = useRef<number | null>(null);
-  const lastActivity      = useRef<number>(Date.now());
-  const distractCount     = useRef(0);
-  const lastIdleAlert     = useRef<number>(0);
-  const wasBye            = useRef(false);
-  // timer that fires a browser OS notification while tab is hidden
-  const osNotifTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // timer that auto-dismisses the in-app anti-cheat popup
-  const popupDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // ── speak — stable (created once, uses only refs) ────────────────────────
+  // ── speak — stable ────────────────────────────────────────────────────────
   const speak = useCallback((text: string) => {
-    // Cancel any pending bubble-clear
     if (bubbleClearTimer.current) clearTimeout(bubbleClearTimer.current);
-
     const hasTTS = !muteRef.current && !!window.speechSynthesis;
-
-    // Show bubble + start animation immediately.
-    // The bubble stays open until TTS onend fires — NOT a fixed timer.
-    // This guarantees text, animation, and voice are always in sync.
     speechCbRef.current(text, hasTTS);
 
     if (!hasTTS) {
-      // No TTS — clear bubble after 7 s
       bubbleClearTimer.current = setTimeout(() => speechCbRef.current("", false), 7_000);
       return;
     }
@@ -249,31 +395,25 @@ export function PukuPartner({
     }
 
     const utt = new SpeechSynthesisUtterance(clean);
-    // Slightly varied rate/pitch per utterance for a more natural, human feel
-    utt.rate   = 0.88 + Math.random() * 0.08; // 0.88–0.96
-    utt.pitch  = 1.0  + Math.random() * 0.10; // 1.00–1.10
+    utt.rate   = 0.88 + Math.random() * 0.08;
+    utt.pitch  = 1.0  + Math.random() * 0.10;
     utt.volume = 0.92;
 
     const doSpeak = () => {
       const v = cachedVoiceRef.current ?? pickVoice(window.speechSynthesis.getVoices());
       if (v) utt.voice = v;
-
-      // Bubble clears exactly when speech ends — perfect sync
       utt.onend = () => {
         if (bubbleClearTimer.current) clearTimeout(bubbleClearTimer.current);
         speechCbRef.current("", false);
       };
       utt.onerror = () => {
         if (bubbleClearTimer.current) clearTimeout(bubbleClearTimer.current);
-        // TTS failed — keep bubble visible (no animation) for 4 s
         speechCbRef.current(text, false);
-        bubbleClearTimer.current = setTimeout(() => speechCbRef.current("", false), 4_000);
+        bubbleClearTimer.current = setTimeout(() => speechCbRef.current("", false), 5_000);
       };
-
       window.speechSynthesis.speak(utt);
     };
 
-    // Safety fallback: if TTS never fires onend (browser bug), clear after 20 s
     bubbleClearTimer.current = setTimeout(() => {
       window.speechSynthesis.cancel();
       speechCbRef.current("", false);
@@ -282,84 +422,115 @@ export function PukuPartner({
     if (voicesReadyRef.current || window.speechSynthesis.getVoices().length > 0) {
       doSpeak();
     } else {
-      // Voices not cached yet — wait for them, then speak
       window.speechSynthesis.addEventListener("voiceschanged", () => {
         cachedVoiceRef.current = pickVoice(window.speechSynthesis.getVoices());
         voicesReadyRef.current = true;
         doSpeak();
       }, { once: true });
     }
-  }, []); // stable — no external deps, only refs
+  }, []);
 
   // ── Greeting (once) ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!visible || hasGreeted.current) return;
     hasGreeted.current = true;
-    const t = setTimeout(() => speak(MSG.greet(fn)), 1200);
+    setEmotionBoth("excited");
+    const t = setTimeout(() => {
+      speak(MSG.greet(fn, grade));
+      setTimeout(() => setEmotionBoth("happy"), 4000);
+    }, 1200);
     return () => clearTimeout(t);
-  }, [visible, fn, speak]);
+  }, [visible, fn, grade, speak, setEmotionBoth]);
 
   // ── Study / break transitions ─────────────────────────────────────────────
   useEffect(() => {
     if (!visible) return;
-    if (isStudying && !prevStudying.current) speak(MSG.studyStart(fn));
-    else if (isBreak && !prevBreak.current)  speak(MSG.breakStart(fn));
+    if (isStudying && !prevStudying.current) {
+      setEmotionBoth("focused");
+      speak(MSG.studyStart(fn, grade));
+    } else if (isBreak && !prevBreak.current) {
+      setEmotionBoth("relaxed");
+      speak(MSG.breakStart(fn));
+    }
     prevStudying.current = isStudying;
     prevBreak.current    = isBreak;
-  }, [isStudying, isBreak, visible, fn, speak]);
+  }, [isStudying, isBreak, visible, fn, grade, speak, setEmotionBoth]);
 
   // ── Milestones ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!visible) return;
-    const checks: [number, (fn: string) => string][] = [
-      [5, MSG.milestone5], [15, MSG.milestone15], [30, MSG.milestone30],
-      [60, MSG.milestone60], [90, MSG.milestone90], [120, MSG.milestone120],
+    const checks: [number, (fn: string, grade?: number) => string, PukuEmotion][] = [
+      [5,   MSG.milestone5,   "happy"],
+      [15,  MSG.milestone15,  "happy"],
+      [30,  MSG.milestone30,  "proud"],
+      [60,  MSG.milestone60,  "proud"],
+      [90,  MSG.milestone90,  "excited"],
+      [120, MSG.milestone120, "excited"],
     ];
-    for (const [mins, msgFn] of checks) {
+    for (const [mins, msgFn, em] of checks) {
       if (studyMins >= mins && !milestones.current.has(mins)) {
         milestones.current.add(mins);
-        speak(msgFn(fn));
+        setEmotionBoth(em);
+        speak(msgFn(fn, grade));
+        setTimeout(() => setEmotionBoth("focused"), 6000);
         return;
       }
     }
-  }, [studyMins, visible, fn, speak]);
+  }, [studyMins, visible, fn, grade, speak, setEmotionBoth]);
 
-  // ── Periodic motivational (scheduled recursively, cleared on unmount) ────
+  // ── Mid-session encouragement (sparse — not spam) ────────────────────────
+  // Only fires once every 15–25 minutes. Uses a pool that mixes encouragement,
+  // light humour, and grade-relevant tips.
   useEffect(() => {
     if (!visible) return;
-    const scheduleNext = (): ReturnType<typeof setTimeout> =>
-      setTimeout(() => {
-        if (isStudying) {
-          speak(
-            studyMins < 5  ? MSG.early(fn) :
-            studyMins < 20 ? MSG.mid(fn, studyMins) :
-            studyMins < 60 ? pick([MSG.mid(fn, studyMins), MSG.random(fn)]) :
-                             pick([MSG.long(fn, studyMins), MSG.random(fn)])
-          );
+
+    const scheduleNext = (): ReturnType<typeof setTimeout> => {
+      const delay = (15 + Math.random() * 10) * 60_000; // 15–25 min
+      return setTimeout(() => {
+        if (isStudying && !isPaused) {
+          const roll = Math.random();
+          if (roll < 0.5) {
+            speak(MSG.encouragement(fn, grade));
+          } else if (roll < 0.7) {
+            speak(MSG.humor(fn));
+          } else if (studyMins > 20) {
+            speak(MSG.midSession(fn, studyMins, grade));
+          } else {
+            speak(MSG.encouragement(fn, grade));
+          }
         }
-        scheduleTimer.current = scheduleNext();
-      }, (4.5 + Math.random() * 4) * 60_000);
+        midSessionTimer.current = scheduleNext();
+      }, delay);
+    };
 
-    scheduleTimer.current = scheduleNext();
-    return () => { if (scheduleTimer.current) clearTimeout(scheduleTimer.current); };
-  }, [visible, fn]); // intentionally excludes speak — always latest via ref pattern
+    midSessionTimer.current = scheduleNext();
+    return () => { if (midSessionTimer.current) clearTimeout(midSessionTimer.current); };
+  }, [visible, fn, grade]); // intentionally minimal deps — uses stale-ref pattern
 
-  // ── Water reminder every 30 min ───────────────────────────────────────────
+  // ── Health reminders — very occasional (every 40–60 min) ─────────────────
   useEffect(() => {
     if (!visible) return;
-    waterTimer.current = setInterval(() => { if (isStudying) speak(MSG.water(fn)); }, 30 * 60_000);
-    return () => { if (waterTimer.current) clearInterval(waterTimer.current); };
+
+    const scheduleHealth = (): ReturnType<typeof setTimeout> => {
+      const delay = (40 + Math.random() * 20) * 60_000; // 40–60 min
+      return setTimeout(() => {
+        if (isStudying) {
+          const now = Date.now();
+          // Alternate: water or a body health tip
+          if (now - lastHealthAt.current > 35 * 60_000) {
+            lastHealthAt.current = now;
+            speak(Math.random() < 0.5 ? MSG.water(fn) : MSG.health());
+          }
+        }
+        healthTimer.current = scheduleHealth();
+      }, delay);
+    };
+
+    healthTimer.current = scheduleHealth();
+    return () => { if (healthTimer.current) clearTimeout(healthTimer.current); };
   }, [visible, fn]);
 
-  // ── Activity tracking ─────────────────────────────────────────────────────
-  useEffect(() => {
-    const touch = () => { lastActivity.current = Date.now(); };
-    const evts = ["mousemove", "keydown", "click", "scroll", "touchstart"] as const;
-    evts.forEach(e => window.addEventListener(e, touch, { passive: true }));
-    return () => evts.forEach(e => window.removeEventListener(e, touch));
-  }, []);
-
-  // ── Request browser notification permission once when Puku becomes visible ──
+  // ── Browser notification permission ──────────────────────────────────────
   useEffect(() => {
     if (!visible) return;
     if (typeof Notification !== "undefined" && Notification.permission === "default") {
@@ -367,32 +538,28 @@ export function PukuPartner({
     }
   }, [visible]);
 
-  // ── Anti-cheat: tab-away ──────────────────────────────────────────────────
-  // Triggers after just 30 s away (was 1.5 min).
-  // While hidden: schedules a browser OS notification after 45 s so it
-  // appears in the user's OS tray even if they're in a completely different app.
-  // On return: shows a prominent in-app popup overlay + speaks the warning.
+  // ── Anti-cheat: tab-away detection ───────────────────────────────────────
+  // Warns ONLY after 5 full minutes away (not 30 seconds).
+  // Shows a YES/NO popup. If ignored for 60s → auto-pause.
+  // After confirming "Yes", cooldown of 15 min before next warning.
   useEffect(() => {
     if (!visible) return;
 
     const onVis = () => {
       if (document.hidden) {
-        // Tab just became hidden ─────────────────────────────────────────
         if (!isStudying) return;
         tabHiddenAt.current = Date.now();
 
-        // Schedule OS notification for 45 s from now (if still hidden)
+        // OS notification fires after 5 minutes away — only once
         if (osNotifTimer.current) clearTimeout(osNotifTimer.current);
         osNotifTimer.current = setTimeout(() => {
-          if (!document.hidden) return; // user already came back
-          sendOsNotif(
-            `⚠️ Hey ${fn}! Your study timer is running…`,
-            `You've been away from your study session. Come back and stay focused!`,
-          );
-        }, 45_000);
+          if (!document.hidden) return;
+          const now = Date.now();
+          if (now - lastWarnedAt.current < 15 * 60_000) return; // respect cooldown
+          sendOsNotif(`Still studying, ${fn}?`, "You've been away for 5 minutes. Come back when you're ready.");
+        }, 5 * 60_000);
 
       } else {
-        // Tab just became visible ────────────────────────────────────────
         if (osNotifTimer.current) { clearTimeout(osNotifTimer.current); osNotifTimer.current = null; }
 
         const at = tabHiddenAt.current;
@@ -400,25 +567,30 @@ export function PukuPartner({
         if (!at || !isStudying) return;
 
         const secsAway = Math.round((Date.now() - at) / 1_000);
-        if (secsAway < 30) return; // ignore accidental quick switches < 30 s
+        if (secsAway < 5 * 60) return; // only warn after 5 full minutes
 
-        const mins = Math.max(1, Math.round(secsAway / 60));
+        const now = Date.now();
+        if (now - lastWarnedAt.current < 15 * 60_000) return; // cooldown after "yes"
+
+        const minsAway = Math.max(1, Math.round(secsAway / 60));
         distractCount.current += 1;
-        const n = distractCount.current;
 
-        const msg = n >= 3
-          ? MSG.tabAway3(fn, mins)
-          : n === 2
-          ? MSG.tabAway2(fn, mins)
-          : MSG.tabAway1(fn, mins);
+        // Update emotion based on distraction count
+        if (distractCount.current >= 3) setEmotionBoth("frustrated");
+        else if (distractCount.current >= 2) setEmotionBoth("concerned");
+        else setEmotionBoth("concerned");
 
-        // Show prominent popup overlay inside the room
-        if (popupDismissTimer.current) clearTimeout(popupDismissTimer.current);
-        setAntiCheatPopup(msg);
-        popupDismissTimer.current = setTimeout(() => setAntiCheatPopup(null), 7_000);
+        speak(MSG.comeBack(fn, minsAway, grade));
+        setDistractPopup(true);
 
-        // Speak the message (TTS plays because tab is now visible)
-        setTimeout(() => speak(msg), 300);
+        // Auto-pause if ignored for 60 seconds
+        if (popupAutoTimer.current) clearTimeout(popupAutoTimer.current);
+        popupAutoTimer.current = setTimeout(() => {
+          setDistractPopup(false);
+          setIsPaused(true);
+          setEmotionBoth("frustrated");
+          pauseCbRef.current?.();
+        }, 60_000);
       }
     };
 
@@ -427,22 +599,49 @@ export function PukuPartner({
       document.removeEventListener("visibilitychange", onVis);
       if (osNotifTimer.current) clearTimeout(osNotifTimer.current);
     };
-  }, [visible, isStudying, fn, speak]);
+  }, [visible, isStudying, fn, grade, speak, setEmotionBoth]);
 
-  // ── Anti-cheat: idle-on-page ──────────────────────────────────────────────
-  useEffect(() => {
-    if (!visible) return;
-    idleCheckTimer.current = setInterval(() => {
-      if (!isStudying || document.hidden) return;
-      const idleMs = Date.now() - lastActivity.current;
-      if (idleMs < 6 * 60_000 || Date.now() - lastIdleAlert.current < 12 * 60_000) return;
-      lastIdleAlert.current = Date.now();
-      speak(MSG.idle(fn, Math.round(idleMs / 60_000)));
-    }, 90_000);
-    return () => { if (idleCheckTimer.current) clearInterval(idleCheckTimer.current); };
-  }, [visible, isStudying, fn, speak]);
+  // ── "Yes, I'm studying" handler ───────────────────────────────────────────
+  const handleConfirmStudying = useCallback(() => {
+    if (popupAutoTimer.current) clearTimeout(popupAutoTimer.current);
+    setDistractPopup(false);
+    lastWarnedAt.current = Date.now();
+    if (isPaused) {
+      setIsPaused(false);
+      resumeCbRef.current?.();
+    }
+    setEmotionBoth("focused");
+    speak(pick([
+      `Good — let's get back to it.`,
+      `Back in the zone. Let's go.`,
+      `Welcome back. Focus mode: on.`,
+    ]));
+    setTimeout(() => setEmotionBoth("focused"), 3000);
+  }, [isPaused, speak, setEmotionBoth]);
 
-  // ── Bye when Puku hides (someone joined) ─────────────────────────────────
+  // ── "I'm distracted" handler ──────────────────────────────────────────────
+  const handleConfirmDistracted = useCallback(() => {
+    if (popupAutoTimer.current) clearTimeout(popupAutoTimer.current);
+    setDistractPopup(false);
+    setIsPaused(true);
+    setEmotionBoth("concerned");
+    pauseCbRef.current?.();
+    speak(pick([
+      `No worries. Take a moment, then come back. I'll be here.`,
+      `That's honest. Rest a bit — come back when you're ready.`,
+      `It happens. Take a real break and come back fresh.`,
+    ]));
+  }, [speak, setEmotionBoth]);
+
+  // ── Resume from paused state ──────────────────────────────────────────────
+  const handleResume = useCallback(() => {
+    setIsPaused(false);
+    resumeCbRef.current?.();
+    setEmotionBoth("focused");
+    speak(MSG.studyStart(fn, grade));
+  }, [fn, grade, speak, setEmotionBoth]);
+
+  // ── Bye when Puku hides ───────────────────────────────────────────────────
   useEffect(() => {
     if (!visible && !wasBye.current && hasGreeted.current) {
       wasBye.current = true;
@@ -455,14 +654,12 @@ export function PukuPartner({
     window.speechSynthesis?.cancel();
     speechCbRef.current("", false);
     if (bubbleClearTimer.current)  clearTimeout(bubbleClearTimer.current);
-    if (waterTimer.current)        clearInterval(waterTimer.current);
-    if (scheduleTimer.current)     clearTimeout(scheduleTimer.current);
-    if (idleCheckTimer.current)    clearInterval(idleCheckTimer.current);
+    if (healthTimer.current)       clearTimeout(healthTimer.current);
+    if (midSessionTimer.current)   clearTimeout(midSessionTimer.current);
     if (osNotifTimer.current)      clearTimeout(osNotifTimer.current);
-    if (popupDismissTimer.current) clearTimeout(popupDismissTimer.current);
+    if (popupAutoTimer.current)    clearTimeout(popupAutoTimer.current);
   }, []);
 
-  // ── Minimize handler — stable ─────────────────────────────────────────────
   const handleMinimize = useCallback((val: boolean) => {
     setMinimized(val);
     onMinimizeChange?.(val);
@@ -470,48 +667,70 @@ export function PukuPartner({
 
   if (!visible) return null;
 
-  // ── Anti-cheat popup overlay (shows even when Puku is minimized) ──────────
-  const popupOverlay = antiCheatPopup ? (
+  // ── Distraction popup ─────────────────────────────────────────────────────
+  const distractOverlay = distractPopup ? (
     <AnimatePresence>
       <motion.div
-        key="puku-anticheat-popup"
-        initial={{ opacity: 0, y: -24, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0,   scale: 1    }}
-        exit={{    opacity: 0, y: -16, scale: 0.97 }}
-        className="fixed top-16 left-1/2 -translate-x-1/2 z-[9999] w-[calc(100%-2rem)] max-w-sm"
-        style={{ pointerEvents: "auto" }}
+        key="puku-distract-popup"
+        initial={{ opacity: 0, y: -20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0,   scale: 1 }}
+        exit={{    opacity: 0, y: -14, scale: 0.97 }}
+        className="fixed top-16 left-1/2 -translate-x-1/2 z-[9999] w-[calc(100%-2rem)] max-w-xs"
       >
-        <div
-          className="rounded-2xl shadow-2xl overflow-hidden"
-          style={{
-            background: "linear-gradient(135deg, #7c3aed, #db2777)",
-            boxShadow: "0 8px 32px rgba(124,58,237,0.45), 0 2px 8px rgba(0,0,0,0.2)",
-          }}
-        >
-          {/* Header bar */}
-          <div className="flex items-center gap-2 px-4 pt-3 pb-1">
-            <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white font-black text-xs shrink-0">
-              P
-            </div>
-            <span className="text-white font-black text-xs tracking-widest opacity-90">PUKU SAYS</span>
+        <div className="rounded-2xl shadow-2xl overflow-hidden"
+          style={{ background: "linear-gradient(135deg,#7c3aed,#db2777)", boxShadow: "0 8px 32px rgba(124,58,237,0.45)" }}>
+          <div className="flex items-center gap-2 px-4 pt-3 pb-2">
+            <PukuFace emotion="concerned" size={28} speaking={false} />
+            <span className="text-white font-black text-xs tracking-widest flex-1">PUKU</span>
+          </div>
+          <p className="text-white text-sm font-semibold leading-snug px-4 pb-3">Still studying?</p>
+          <div className="flex gap-2 px-4 pb-4">
             <button
-              onClick={() => setAntiCheatPopup(null)}
-              className="ml-auto w-5 h-5 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+              onClick={handleConfirmStudying}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors"
             >
-              <X className="w-3 h-3 text-white" />
+              <CheckCircle className="w-3.5 h-3.5" />
+              Yes, I'm studying
+            </button>
+            <button
+              onClick={handleConfirmDistracted}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/20 text-white/80 text-xs font-bold px-3 py-2 rounded-xl transition-colors"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              I'm distracted
             </button>
           </div>
-          {/* Message */}
-          <p className="text-white text-sm font-medium leading-snug px-4 pb-4 pt-1">
-            {antiCheatPopup}
-          </p>
-          {/* Progress bar — auto-dismiss after 7 s */}
           <motion.div
-            className="h-1 bg-white/40"
+            className="h-0.5 bg-white/30"
             initial={{ width: "100%" }}
             animate={{ width: "0%" }}
-            transition={{ duration: 7, ease: "linear" }}
+            transition={{ duration: 60, ease: "linear" }}
           />
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  ) : null;
+
+  // ── Paused state banner ────────────────────────────────────────────────────
+  const pausedBanner = isPaused ? (
+    <AnimatePresence>
+      <motion.div
+        key="puku-paused-banner"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="fixed top-16 left-1/2 -translate-x-1/2 z-[9998] w-[calc(100%-2rem)] max-w-xs"
+      >
+        <div className="rounded-xl bg-amber-500 shadow-lg px-4 py-2.5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <PukuFace emotion="concerned" size={24} speaking={false} />
+            <span className="text-white text-xs font-bold">Study tracking paused</span>
+          </div>
+          <button
+            onClick={handleResume}
+            className="bg-white text-amber-600 text-[10px] font-black px-2.5 py-1 rounded-full shrink-0 hover:bg-amber-50 transition-colors"
+          >
+            Resume
+          </button>
         </div>
       </motion.div>
     </AnimatePresence>
@@ -521,66 +740,57 @@ export function PukuPartner({
   if (minimized) {
     return (
       <>
-        {popupOverlay}
+        {distractOverlay}
+        {pausedBanner}
         <motion.button
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           onClick={() => handleMinimize(false)}
-          className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-40 flex flex-col items-center gap-0.5"
-          title="Show Puku in classroom"
+          className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-40"
+          title="Show Puku"
         >
-          <div
-            className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-xs shadow-lg border-2 border-white"
-            style={{ background: "linear-gradient(135deg,#8b5cf6,#ec4899)" }}
-          >
-            P
+          <div className="w-10 h-10 rounded-full shadow-lg border-2 border-white relative overflow-visible"
+            style={{ background: "linear-gradient(135deg,#8b5cf6,#ec4899)" }}>
+            <PukuFace emotion={emotion} size={40} speaking={false} />
           </div>
-          <span className="text-[8px] font-black text-purple-600 dark:text-purple-400 tracking-widest">PUKU</span>
+          <span className="block text-center text-[8px] font-black text-purple-600 tracking-widest mt-0.5">PUKU</span>
         </motion.button>
       </>
     );
   }
 
-  // ── Control pill ──────────────────────────────────────────────────────────
   return (
     <>
-      {popupOverlay}
+      {distractOverlay}
+      {pausedBanner}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 10 }}
         className="fixed bottom-20 right-3 lg:bottom-5 lg:right-4 z-40"
       >
-        <div
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full shadow-lg"
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full shadow-lg"
           style={{
             background: "rgba(255,255,255,0.92)",
             backdropFilter: "blur(12px)",
             border: "1px solid rgba(139,92,246,0.2)",
             boxShadow: "0 4px 20px rgba(139,92,246,0.15), 0 2px 8px rgba(0,0,0,0.1)",
-          }}
-        >
-          <div
-            className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8px] font-black shrink-0"
-            style={{ background: "linear-gradient(135deg,#8b5cf6,#ec4899)" }}
-          >
-            P
+          }}>
+          <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0"
+            style={{ background: "linear-gradient(135deg,#8b5cf6,#ec4899)" }}>
+            <PukuFace emotion={emotion} size={24} speaking={false} />
           </div>
           <span className="text-[9px] font-black tracking-wider text-purple-600">PUKU</span>
 
-          <button
-            onClick={() => setMuted(m => !m)}
+          <button onClick={() => setMuted(m => !m)}
             className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
-            title={muted ? "Unmute" : "Mute"}
-          >
+            title={muted ? "Unmute" : "Mute"}>
             {muted ? <VolumeX className="w-3 h-3 text-gray-400" /> : <Volume2 className="w-3 h-3 text-purple-500" />}
           </button>
 
-          <button
-            onClick={() => handleMinimize(true)}
+          <button onClick={() => handleMinimize(true)}
             className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
-            title="Minimize"
-          >
+            title="Minimize">
             <Minus className="w-3 h-3 text-gray-400" />
           </button>
 
@@ -588,13 +798,109 @@ export function PukuPartner({
             <button
               onClick={() => { window.speechSynthesis?.cancel(); speechCbRef.current("", false); onLeave(); }}
               className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-red-50 transition-colors"
-              title="Dismiss Puku"
-            >
+              title="Dismiss Puku">
               <X className="w-3 h-3 text-gray-400" />
             </button>
           )}
         </div>
       </motion.div>
     </>
+  );
+}
+
+// ── PukuFace — reusable face SVG for emotion states ──────────────────────────
+// Used both inside this file and exported for ClassroomView.
+export function PukuFace({
+  emotion, size, speaking,
+}: { emotion: PukuEmotion; size: number; speaking: boolean }) {
+  const s = size;
+
+  // Emotion-specific face configs
+  const face: Record<PukuEmotion, {
+    eyeScaleY: number; eyeOffsetY: number; browOffset: number;
+    mouthPath: string; cheekOpacity: number;
+  }> = {
+    happy:     { eyeScaleY: 1,    eyeOffsetY: 0,    browOffset: 0,  mouthPath: "arc-up",    cheekOpacity: 0.5  },
+    relaxed:   { eyeScaleY: 0.5,  eyeOffsetY: 1,    browOffset: 0,  mouthPath: "small-up",  cheekOpacity: 0.4  },
+    focused:   { eyeScaleY: 1,    eyeOffsetY: -1,   browOffset: -2, mouthPath: "straight",  cheekOpacity: 0.15 },
+    concerned: { eyeScaleY: 1,    eyeOffsetY: -1,   browOffset: -3, mouthPath: "small-down",cheekOpacity: 0.3  },
+    frustrated:{ eyeScaleY: 0.85, eyeOffsetY: 0,    browOffset: -5, mouthPath: "frown",     cheekOpacity: 0.2  },
+    proud:     { eyeScaleY: 0.6,  eyeOffsetY: 1,    browOffset: 2,  mouthPath: "big-up",    cheekOpacity: 0.55 },
+    excited:   { eyeScaleY: 1.2,  eyeOffsetY: -2,   browOffset: 3,  mouthPath: "open-up",   cheekOpacity: 0.6  },
+  };
+
+  const cfg = face[emotion];
+
+  const cx = s / 2;
+  const cy = s / 2;
+  const eyeY  = cy * 0.55 + cfg.eyeOffsetY;
+  const eyeGap = s * 0.13;
+  const eyeW  = s * 0.11;
+  const eyeH  = s * 0.11 * cfg.eyeScaleY;
+  const mouthY = cy + s * 0.18;
+  const mouthW = s * 0.28;
+  const mouthH = s * 0.10;
+
+  function mouthPath() {
+    const mx = cx - mouthW / 2;
+    const mr = cx + mouthW / 2;
+    switch (cfg.mouthPath) {
+      case "arc-up":     return `M${mx},${mouthY} Q${cx},${mouthY - mouthH * 1.4} ${mr},${mouthY}`;
+      case "small-up":   return `M${mx + mouthW * 0.15},${mouthY} Q${cx},${mouthY - mouthH * 0.9} ${mr - mouthW * 0.15},${mouthY}`;
+      case "straight":   return `M${mx},${mouthY} L${mr},${mouthY}`;
+      case "small-down": return `M${mx + mouthW * 0.15},${mouthY - mouthH * 0.4} Q${cx},${mouthY + mouthH * 0.6} ${mr - mouthW * 0.15},${mouthY - mouthH * 0.4}`;
+      case "frown":      return `M${mx},${mouthY} Q${cx},${mouthY + mouthH * 1.2} ${mr},${mouthY}`;
+      case "big-up":     return `M${mx},${mouthY} Q${cx},${mouthY - mouthH * 1.8} ${mr},${mouthY}`;
+      case "open-up":    return `M${mx},${mouthY} Q${cx},${mouthY - mouthH * 1.6} ${mr},${mouthY} Q${cx},${mouthY - mouthH * 0.5} ${mx},${mouthY}`;
+      default:           return `M${mx},${mouthY} L${mr},${mouthY}`;
+    }
+  }
+
+  const browY = eyeY - eyeH * 1.3;
+
+  return (
+    <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}>
+      {/* Ears */}
+      <circle cx={cx - s * 0.37} cy={cy - s * 0.3} r={s * 0.09} fill="rgba(167,139,250,0.9)" />
+      <circle cx={cx + s * 0.37} cy={cy - s * 0.3} r={s * 0.09} fill="rgba(167,139,250,0.9)" />
+
+      {/* Left eye */}
+      <ellipse cx={cx - eyeGap} cy={eyeY} rx={eyeW / 2} ry={eyeH / 2} fill="white" />
+      {/* Right eye */}
+      <ellipse cx={cx + eyeGap} cy={eyeY} rx={eyeW / 2} ry={eyeH / 2} fill="white" />
+
+      {/* Eyebrow left */}
+      {cfg.browOffset !== 0 && (
+        <>
+          <line
+            x1={cx - eyeGap - eyeW * 0.7} y1={browY + (cfg.browOffset < 0 ? -cfg.browOffset : 0)}
+            x2={cx - eyeGap + eyeW * 0.7} y2={browY + (cfg.browOffset < 0 ? 0 : cfg.browOffset)}
+            stroke="white" strokeWidth={s * 0.04} strokeLinecap="round" opacity="0.85"
+          />
+          <line
+            x1={cx + eyeGap - eyeW * 0.7} y1={browY + (cfg.browOffset < 0 ? 0 : cfg.browOffset)}
+            x2={cx + eyeGap + eyeW * 0.7} y2={browY + (cfg.browOffset < 0 ? -cfg.browOffset : 0)}
+            stroke="white" strokeWidth={s * 0.04} strokeLinecap="round" opacity="0.85"
+          />
+        </>
+      )}
+
+      {/* Cheeks */}
+      <ellipse cx={cx - s * 0.28} cy={cy + s * 0.12} rx={s * 0.1} ry={s * 0.06}
+        fill="rgba(255,180,200,1)" opacity={cfg.cheekOpacity} />
+      <ellipse cx={cx + s * 0.28} cy={cy + s * 0.12} rx={s * 0.1} ry={s * 0.06}
+        fill="rgba(255,180,200,1)" opacity={cfg.cheekOpacity} />
+
+      {/* Mouth */}
+      <path d={mouthPath()} stroke="white" strokeWidth={s * 0.045}
+        fill={cfg.mouthPath === "open-up" ? "rgba(255,255,255,0.3)" : "none"}
+        strokeLinecap="round" />
+
+      {/* Speaking animation overlay */}
+      {speaking && (
+        <ellipse cx={cx} cy={mouthY} rx={mouthW * 0.35} ry={mouthH * 0.6}
+          fill="rgba(255,255,255,0.3)" />
+      )}
+    </svg>
   );
 }
