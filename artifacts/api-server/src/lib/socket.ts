@@ -131,6 +131,39 @@ export function initSocketServer(httpServer: HTTPServer): SocketServer {
       stats.incWsReactions();
     });
 
+    // ── Study Buddy request routing (zero Firestore cost) ─────────────────────
+    // All request / accept / reject signals are routed directly to the target
+    // user's socket via their socketId in the room roster — no DB writes needed.
+    // Only the final setBuddyPair call (on accept, from the client) writes to Firestore.
+
+    socket.on("buddy-request", (data: { targetUid?: string }) => {
+      if (!roomId || !uid || !displayName) return;
+      const targetUid = String(data?.targetUid ?? "").slice(0, 128);
+      if (!targetUid || targetUid === uid) return;
+      const target = getRoster(roomId).get(targetUid);
+      if (!target) return;
+      io.to(target.socketId).emit("buddy-invite", { fromUid: uid, fromName: displayName });
+      logger.debug({ roomId, uid, targetUid }, "[WS] buddy-request");
+    });
+
+    socket.on("buddy-accept", (data: { targetUid?: string }) => {
+      if (!roomId || !uid || !displayName) return;
+      const targetUid = String(data?.targetUid ?? "").slice(0, 128);
+      if (!targetUid) return;
+      const target = getRoster(roomId).get(targetUid);
+      if (!target) return;
+      io.to(target.socketId).emit("buddy-accepted", { fromUid: uid, fromName: displayName });
+    });
+
+    socket.on("buddy-reject", (data: { targetUid?: string }) => {
+      if (!roomId || !uid) return;
+      const targetUid = String(data?.targetUid ?? "").slice(0, 128);
+      if (!targetUid) return;
+      const target = getRoster(roomId).get(targetUid);
+      if (!target) return;
+      io.to(target.socketId).emit("buddy-rejected", { fromUid: uid });
+    });
+
     // ── Leave / disconnect ─────────────────────────────────────────────────────
     function handleLeave() {
       if (!roomId || !uid) return;

@@ -35,6 +35,7 @@ export default function StudyRoomCreate() {
   const [step,            setStep]            = useState<"details" | "flow">("details");
   const [errors,          setErrors]          = useState<Record<string, string>>({});
   const [previewing,      setPreviewing]      = useState<string | null>(null);
+  const [pukuMode,        setPukuMode]        = useState(false);
 
   // Stop preview on unmount
   useEffect(() => () => stopPreview(), [stopPreview]);
@@ -215,7 +216,42 @@ export default function StudyRoomCreate() {
                 />
               </div>
 
-              {/* Max participants */}
+              {/* Study with Puku option */}
+              <div
+                className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
+                  pukuMode
+                    ? "border-purple-400 bg-purple-50 dark:bg-purple-950/30 dark:border-purple-600/40"
+                    : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-purple-300"
+                }`}
+                onClick={() => {
+                  const next = !pukuMode;
+                  setPukuMode(next);
+                  if (next) {
+                    setMaxParticipants(1);
+                    setIsPrivate(true);
+                    if (!password) setPassword(Math.random().toString(36).slice(2, 8).toUpperCase());
+                  } else {
+                    setMaxParticipants(20);
+                  }
+                }}
+              >
+                <div className={`w-11 h-6 rounded-full relative shrink-0 transition-colors ${pukuMode ? "bg-purple-500" : "bg-gray-300 dark:bg-gray-600"}`}>
+                  <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${pukuMode ? "translate-x-[22px]" : "translate-x-0.5"}`} />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🐾</span>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Study with Puku</p>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 font-medium">AI Partner</span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Solo private room. Puku — your AI study bestie — joins automatically to motivate and keep you company. Free, no API needed!
+                  </p>
+                </div>
+              </div>
+
+              {/* Max participants — hidden in Puku mode */}
+              {!pukuMode && (
               <div>
                 <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1.5">
                   Max Participants
@@ -235,6 +271,7 @@ export default function StudyRoomCreate() {
                   </div>
                 </div>
               </div>
+              )}
 
               {/* Privacy */}
               <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-4 space-y-3">

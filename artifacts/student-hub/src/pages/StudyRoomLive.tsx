@@ -26,7 +26,8 @@ import { auth } from "@/lib/firebase";
 import { ClassroomView } from "@/components/study-room/ClassroomView";
 import { VotingPanel } from "@/components/study-room/VotingPanel";
 import { StudentProfileModal } from "@/components/study-room/StudentProfileModal";
-import { StudyBuddyPanel } from "@/components/study-room/StudyBuddyPanel";
+import { StudyBuddyPanel, type BuddyInvite } from "@/components/study-room/StudyBuddyPanel";
+import { PukuPartner } from "@/components/study-room/PukuPartner";
 
 const EMOJI_REACTIONS = ["👍", "🔥", "💪", "🎯", "⚡", "🙏", "😎", "🥳"];
 
@@ -134,7 +135,7 @@ function wsToRoomMessage(d: WsChatMessage): RoomMessage {
 
 interface FloatingEmoji { id: string; emoji: string; x: number }
 
-type MobileTab = "class" | "vote" | "chat";
+type MobileTab = "class" | "vote" | "chat" | "buddy";
 
 // ── tiny helpers ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: Room["status"] }) {
@@ -196,6 +197,13 @@ export default function StudyRoomLive() {
 
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const lastSentAtRef = useRef<number>(0);
+
+  // ── Study Buddy invite state ───────────────────────────────────────────────────
+  const [buddyInvite, setBuddyInvite] = useState<BuddyInvite | null>(null);
+
+  // ── PUKU AI partner state ─────────────────────────────────────────────────────
+  const [showPuku, setShowPuku] = useState(false);
+  const prevParticipantCount    = useRef<number>(0);
 
   // ── AI chat state ─────────────────────────────────────────────────────────────
   const [aiChatLoading, setAiChatLoading]  = useState(false);
@@ -418,16 +426,42 @@ export default function StudyRoomLive() {
     if (joined) joinedRef.current = true;
   }, [joined]);
 
-  // ── Fullscreen ────────────────────────────────────────────────────────────────
+  // ── Buddy socket listeners ────────────────────────────────────────────────────
   useEffect(() => {
-    const h = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", h);
-    document.addEventListener("webkitfullscreenchange", h);
-    return () => {
-      document.removeEventListener("fullscreenchange", h);
-      document.removeEventListener("webkitfullscreenchange", h);
+    if (!joined) return;
+    const sock = getSocket();
+    const onInvite    = (d: BuddyInvite) => setBuddyInvite(d);
+    const onAccepted  = (_d: { fromUid: string; fromName: string }) => {
+      // The other user accepted our request — Firestore will update via subscription
+      setBuddyInvite(null);
     };
-  }, []);
+    const onRejected  = () => setBuddyInvite(null);
+    sock.on("buddy-invite",   onInvite);
+    sock.on("buddy-accepted", onAccepted);
+    sock.on("buddy-rejected", onRejected);
+    return () => {
+      sock.off("buddy-invite",   onInvite);
+      sock.off("buddy-accepted", onAccepted);
+      sock.off("buddy-rejected", onRejected);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joined]);
+
+  // ── PUKU: auto-show when solo, auto-hide when others join ─────────────────────
+  useEffect(() => {
+    if (!joined) return;
+    const count = participants.length;
+    const prev  = prevParticipantCount.current;
+    if (count === 1 && prev !== 1) {
+      // Became solo — show PUKU
+      setShowPuku(true);
+    } else if (count > 1 && prev === 1 && showPuku) {
+      // Someone joined while PUKU was active — PUKU will say bye and hide
+      setTimeout(() => setShowPuku(false), 3000);
+    }
+    prevParticipantCount.current = count;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [participants.length, joined]);
 
   // ── All chat messages (must be before render guards — hook cannot be conditional) ──
   const allMessages = useMemo(() =>
@@ -522,16 +556,15 @@ export default function StudyRoomLive() {
   }, []);
 
   // ── Actions ───────────────────────────────────────────────────────────────────
-  async function confirmLeave() {
-    // Prevent the unmount cleanup from double-calling leaveActiveRoom
+  function confirmLeave() {
+    // Prevent double-call leaveActiveRoom
     joinedRef.current = false;
     setShowLeave(false);
-    // Exit fullscreen first so the leave doesn't break the layout
-    if (document.fullscreenElement) {
-      try { await document.exitFullscreen(); } catch {}
-    }
-    await leaveActiveRoom();
+    if (isFullscreen) setIsFullscreen(false);
+    // Navigate immediately — leaveActiveRoom runs in background so the UI
+    // responds in <50ms instead of waiting 1-3s for the Firestore write.
     setLocation("/study-rooms");
+    leaveActiveRoom();
   }
 
   async function handleSend() {
@@ -688,12 +721,13 @@ export default function StudyRoomLive() {
   }
 
   function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-      const el = containerRef.current ?? document.documentElement;
-      (el.requestFullscreen?.() ?? (el as any).webkitRequestFullscreen?.())?.catch(() => {});
-    } else {
-      (document.exitFullscreen?.() ?? (document as any).webkitExitFullscreen?.())?.catch(() => {});
-    }
+    setIsFullscreen(prev => {
+      if (!prev) {
+        // Entering fullscreen — scroll the container to top so nothing is cut off
+        setTimeout(() => containerRef.current?.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior }), 30);
+      }
+      return !prev;
+    });
   }
 
   async function handleHostSkipVote() {
@@ -1228,10 +1262,12 @@ export default function StudyRoomLive() {
   }
 
   function MobileTabs() {
+    const buddyBadge = buddyInvite ? 1 : undefined;
     const allTabs: { id: MobileTab; label: string; icon: React.ReactNode; badge?: number }[] = [
       { id: "class", label: "Classroom", icon: <School className="w-4 h-4" /> },
       { id: "vote",  label: "Vote",      icon: <ListChecks className="w-4 h-4" />, badge: activeVoteCount || undefined },
       { id: "chat",  label: "Chat",      icon: <MessageCircle className="w-4 h-4" />, badge: unreadChatCount || undefined },
+      { id: "buddy", label: "Buddy",     icon: <Users className="w-4 h-4" />, badge: buddyBadge },
     ];
     // In focus mode only show the classroom tab — no distractions
     const tabs = focusMode ? allTabs.slice(0, 1) : allTabs;
@@ -1426,6 +1462,24 @@ export default function StudyRoomLive() {
                 {ChatPanel()}
               </motion.div>
             )}
+            {mobileTab === "buddy" && user && roomId && (
+              <motion.div key="buddy" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                <StudyBuddyPanel
+                  myUid={user.uid}
+                  roomId={roomId}
+                  participants={participants}
+                  buddyInvite={buddyInvite}
+                  onClearInvite={() => setBuddyInvite(null)}
+                  onBuddyGoalCelebrate={(buddyName) => {
+                    sendMessage(roomId, {
+                      uid: "system", name: "System",
+                      text: `🎉 ${profile?.name ?? "Someone"} just completed their study goal with ${buddyName}! Amazing teamwork! 🏆`,
+                      type: "system",
+                    }).catch(() => {});
+                  }}
+                />
+              </motion.div>
+            )}
           </AnimatePresence>
 
           {StudyFlow()}
@@ -1516,6 +1570,8 @@ export default function StudyRoomLive() {
                 myUid={user.uid}
                 roomId={roomId}
                 participants={participants}
+                buddyInvite={buddyInvite}
+                onClearInvite={() => setBuddyInvite(null)}
                 onBuddyGoalCelebrate={(buddyName) => {
                   sendMessage(roomId, {
                     uid: "system",
@@ -1703,6 +1759,16 @@ export default function StudyRoomLive() {
 
       <StudentProfileModal participant={selectedStudent} onClose={() => setSel(null)} />
       </div>  {/* ← closes containerRef — ALL modals above must be inside for fullscreen */}
+
+      {/* ── PUKU AI Study Partner — floats above the room, client-side only ─── */}
+      <PukuPartner
+        firstName={profile?.name ?? "Student"}
+        isStudying={isStudying}
+        isBreak={isBreak}
+        studyMins={studyMinsInSession}
+        visible={showPuku && joined}
+        onLeave={() => setShowPuku(false)}
+      />
     </>
   );
 }
