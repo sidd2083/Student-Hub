@@ -393,8 +393,9 @@ export default function StudyRoomLive() {
     if (!user || !profile) return; // not signed in — handled by render guard below
     if (joined) return;
 
-    // Private room — don't auto-join until the user provides the correct password
-    if (room.isPrivate && !passwordVerified && !alreadyIn) return;
+    // Private room — don't auto-join until the user provides the correct password.
+    // Exception: the room host always bypasses the password gate (they created the room).
+    if (room.isPrivate && !passwordVerified && !alreadyIn && user?.uid !== room?.hostUid) return;
 
     let cancelled = false;
     async function doJoin() {
@@ -461,9 +462,12 @@ export default function StudyRoomLive() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joined]);
 
-  // ── PUKU: auto-show when solo, auto-hide when others join ─────────────────────
+  // ── PUKU: auto-show only in Puku rooms (maxParticipants === 1) ───────────────
   useEffect(() => {
     if (!joined) return;
+    // Only show Puku in dedicated "Study with Puku" rooms (solo rooms).
+    // Normal rooms where the user happens to be alone should NOT show Puku.
+    if (room?.maxParticipants !== 1) return;
     const count = participants.length;
     const prev  = prevParticipantCount.current;
     if (count === 1 && prev !== 1) {

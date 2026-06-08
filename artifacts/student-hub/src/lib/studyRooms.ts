@@ -831,6 +831,9 @@ export function subscribePublicRooms(cb: RoomsCb): () => void {
         _roomsCache = snap.docs
           .map(d => ({ id: d.id, ...d.data() } as Room))
           .filter(r => {
+            // Never show private rooms in the public lobby — Puku rooms and
+            // password-protected rooms are invite-only (accessed via direct link).
+            if (r.isPrivate) return false;
             // Hide expired rooms
             if (r.expiresAt && r.expiresAt.toMillis() <= now) return false;
             // Hide zombie rooms: active/paused but nobody is there

@@ -46,57 +46,85 @@ function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length
 // ── Message bank ─────────────────────────────────────────────────────────────
 const MSG = {
   greet: (fn: string) => pick([
-    `Hey ${fn}! I'm Puku, your study buddy. I'll be right here with you — let's make this session count.`,
-    `${fn}! Good to see you showing up. That's already half the battle. Let's get to work.`,
-    `${fn}, you're here in the ${timePart()} — that means you're serious. I respect that. Let's go.`,
-    `Hey ${fn}. It's just you and me right now. Let's make every minute worth it.`,
+    `Hey ${fn}! Puku here — your personal study buddy. Just you and me today. Let's make this count, okay?`,
+    `${fn}! You actually showed up. That already puts you ahead of most people. Let's get to it.`,
+    `${fn}, ${timePart()} session — respect. I'll be right here beside you the whole time. Let's go.`,
+    `Hey ${fn}! I was waiting for you. Ready? Let's make this one of those sessions you look back on.`,
+    `${fn}! It's us today. No one else — just you, your books, and me. Let's make it a good one.`,
   ]),
   studyStart: (fn: string) => pick([
-    `Let's lock in ${fn}. Timer's running — make it count.`,
-    `Focus mode activated ${fn}. No distractions, just you and your books.`,
-    `Okay ${fn}, this is it. Full focus. I'll be right here watching.`,
-    `Clock's ticking ${fn}. Give me everything you've got.`,
+    `Let's lock in ${fn}. Timer's running — this is your time now.`,
+    `Focus mode on, ${fn}. Just you and the material. I'll keep you company.`,
+    `Okay ${fn}, this is it. Phone down, books open. I'm right here with you.`,
+    `Clock's ticking ${fn}. Give it everything. I believe in you.`,
+    `Let's go ${fn}! Forget everything else for now — just this.`,
   ]),
   early: (fn: string) => pick([
-    `Good start ${fn}. The first few minutes are always the hardest — push through.`,
-    `${fn}, just getting warmed up. Stay with it.`,
-    `${fn}, lock in. Give yourself 10 minutes and you'll hit your stride.`,
+    `Good start ${fn}. The first few minutes are always the hardest — push through, you've got this.`,
+    `${fn}, you're just warming up. Stay with it — it gets easier in a few minutes.`,
+    `${fn}, give it 10 minutes and you'll hit your stride. I've seen you do this before.`,
+    `Starting is the hardest part ${fn}. You already did it. Now just keep going.`,
   ]),
   mid: (fn: string, m: number) => pick([
-    `${fn}, ${m} minutes in and still going. That's the energy I wanted to see.`,
-    `Look at you ${fn} — ${m} minutes of solid focus. Keep that up.`,
-    `${m} minutes, ${fn}. You're past the hard part. This is where real studying happens.`,
-    `${fn}, ${m} minutes of actual work done. Your brain is building right now.`,
+    `${fn}, ${m} minutes in and still going strong. That's what I'm talking about.`,
+    `Look at you ${fn} — ${m} minutes of real focus. I'm genuinely proud of you.`,
+    `${m} minutes, ${fn}. You're past the hardest part now. This is where it gets good.`,
+    `${fn}, ${m} minutes of actual work. Your brain is literally building connections right now.`,
+    `${m} minutes ${fn}. Honestly? You're doing great. Don't stop.`,
   ]),
   long: (fn: string, m: number) => pick([
-    `${fn}, ${m} minutes. That is serious dedication. Board exam toppers study like this.`,
-    `${m} minutes ${fn}. I'm not exaggerating — most people can't do what you're doing right now.`,
-    `${fn} — ${m} minutes in. The people who succeed are the ones who stay seated this long. That's you.`,
+    `${fn}, ${m} minutes. Bro — that is serious dedication. NEB toppers study exactly like this.`,
+    `${m} minutes ${fn}. I won't lie — most people can't sit this long. You're different.`,
+    `${fn}, ${m} minutes in. The people who top their class? This is what they do. That's you right now.`,
+    `${fn}! ${m} minutes. I'm not exaggerating when I say — you should be proud of yourself.`,
   ]),
-  milestone5:   (fn: string) => `${fn}, five minutes down. The hardest part is starting — and you already did that.`,
-  milestone15:  (fn: string) => `Fifteen minutes ${fn}. You're properly focused now. Ride this wave.`,
-  milestone30:  (fn: string) => `${fn}, thirty minutes of real studying done. That is genuinely impressive.`,
-  milestone60:  (fn: string) => `One hour ${fn}. One full hour. I don't say this lightly — that is exceptional.`,
-  milestone90:  (fn: string) => `${fn}, ninety minutes. You are built differently. Keep going.`,
-  milestone120: (fn: string) => `Two hours ${fn}. Two hours of focused work. Your future self will thank you.`,
+  milestone5:   (fn: string) => pick([
+    `${fn}, five minutes down! The hardest part is always starting — and you already crushed it.`,
+    `Five minutes ${fn}. You showed up and stayed. That's more than most. Keep going!`,
+  ]),
+  milestone15:  (fn: string) => pick([
+    `Fifteen minutes ${fn}! You're locked in now. Ride this wave — don't break it.`,
+    `${fn}, 15 minutes of real study done. You're in the zone. Stay there.`,
+  ]),
+  milestone30:  (fn: string) => pick([
+    `${fn}, thirty minutes of solid studying. Genuinely impressive — I mean that.`,
+    `Half an hour ${fn}! Thirty whole minutes. Your future self is already thanking you.`,
+  ]),
+  milestone60:  (fn: string) => pick([
+    `One hour ${fn}. One full hour. I don't say this lightly — that is exceptional work.`,
+    `${fn}! One hour. ONE HOUR. Bro, you are built for this. Keep going.`,
+  ]),
+  milestone90:  (fn: string) => pick([
+    `${fn}, ninety minutes. You are genuinely built differently. I'm not even surprised anymore.`,
+    `90 minutes ${fn}. That's elite-level dedication. Board exams won't know what hit them.`,
+  ]),
+  milestone120: (fn: string) => pick([
+    `Two hours ${fn}. Two full hours of focused work. Your future self will look back at this day.`,
+    `${fn}! Two hours! You've been here with me for two whole hours. I'm honored, honestly.`,
+  ]),
   water: (fn: string) => pick([
-    `${fn}, when did you last drink water? Your brain is 75 percent water — go get some.`,
-    `Hey ${fn}, water check. Go drink a glass right now. I'll be here.`,
-    `${fn}, hydration reminder. You can't focus dehydrated. Quick — drink something.`,
+    `${fn}, quick — when did you last drink water? Your brain is 75% water. Go get some, I'll wait.`,
+    `Hey ${fn}, water check! Get up, grab a glass, come back. Your focus will thank you.`,
+    `${fn}, hydration time. You literally cannot focus properly when dehydrated. Go drink something now.`,
+    `${fn}! Water break. Non-negotiable. I'll be right here when you get back.`,
   ]),
   breakStart: (fn: string) => pick([
-    `Break time ${fn}. Step away from the screen, stretch out. You earned this.`,
-    `${fn}, real break — don't look at study material. Let your brain rest.`,
-    `Rest mode ${fn}. Walk around, get some water. Back at it after this.`,
+    `Break time ${fn}! Step away from the screen, stretch a little. You earned this rest.`,
+    `${fn}, real break — don't peek at study material. Your brain needs to decompress. Let it.`,
+    `Rest mode ${fn}. Walk around, drink water, look at something far away. Back at it soon!`,
+    `${fn}, you worked hard — now rest properly. No phone doom-scrolling though. Just breathe.`,
   ]),
   random: (fn: string) => pick([
-    `${fn}, explaining a topic out loud helps you remember it way better. Try it.`,
-    `${fn}, you know what separates good students from great ones? They don't quit when it gets boring.`,
-    `${fn} — NEB toppers didn't have superpowers. They just didn't stop showing up.`,
-    `Hey ${fn}, I've been watching — you're more focused than you think.`,
-    `${fn}, one chapter at a time. Don't overwhelm yourself.`,
-    `${fn}, every minute you study right now is an investment. It compounds.`,
-    `The ${timePart()} session is underrated ${fn}. Quiet, focused, effective.`,
+    `${fn}, try explaining what you just read out loud. Sounds silly but it seriously works.`,
+    `${fn}, you know what separates good students from great ones? They don't quit when it's boring.`,
+    `${fn} — NEB toppers didn't have superpowers. They just showed up. Like you're doing right now.`,
+    `Hey ${fn}, I've been watching — you're more focused than you give yourself credit for.`,
+    `${fn}, one topic at a time. Don't look at everything at once. Just the next page.`,
+    `${fn}, every minute here is compounding. Future you is going to be so glad you stayed.`,
+    `The ${timePart()} session is lowkey the best one ${fn}. Quiet, focused, effective.`,
+    `${fn}, write it down if you're stuck. Pen on paper does something to your brain.`,
+    `Hey ${fn} — you're not just studying, you're building a version of yourself. Keep going.`,
+    `${fn}, the fact that you're here right now, studying with me — that means something. Don't forget that.`,
   ]),
   tabAway1:    (fn: string, m: number) => pick([
     `${fn}, you were away for ${m} minutes. Your timer kept running — was that actually study time?`,
@@ -156,13 +184,16 @@ export function PukuPartner({
     // Cancel any pending bubble-clear
     if (bubbleClearTimer.current) clearTimeout(bubbleClearTimer.current);
 
-    // Show bubble in classroom via parent callback
-    speechCbRef.current(text, false);
+    // Show bubble immediately. If TTS will be used, set isSpeaking=true right away
+    // so the avatar animation starts at the same time as the text bubble appears —
+    // not after a separate async round-trip to speechSynthesis.speak().
+    const hasTTS = !muteRef.current && !!window.speechSynthesis;
+    speechCbRef.current(text, hasTTS);
 
     // Schedule bubble clear after 7 s
     bubbleClearTimer.current = setTimeout(() => speechCbRef.current("", false), 7000);
 
-    if (muteRef.current || !window.speechSynthesis) return;
+    if (!hasTTS) return;
     window.speechSynthesis.cancel();
 
     const clean = stripForSpeech(text);
