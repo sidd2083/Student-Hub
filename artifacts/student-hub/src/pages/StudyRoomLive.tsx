@@ -60,6 +60,67 @@ function MobileTimerClock() {
   return <span className="font-mono text-2xl font-black tabular-nums">{formatTime(remainingSeconds)}</span>;
 }
 
+// ── Desktop sidebar phase card — isolated so only this re-renders each second ─
+function DesktopPhaseCard({
+  phase, isStudying, isBreak, isPaused, isWaiting, studyMinsInSession, showTimer,
+}: {
+  phase: { label: string; durationMins: number; type: string } | undefined;
+  isStudying: boolean; isBreak: boolean; isPaused: boolean; isWaiting: boolean;
+  studyMinsInSession: number; showTimer: boolean;
+}) {
+  const { remainingSeconds } = useTimerDisplay();
+  const phaseMins = phase?.durationMins ?? 0;
+  const pct = phaseMins > 0
+    ? Math.max(0, Math.min(100, 100 - (remainingSeconds / (phaseMins * 60)) * 100))
+    : 0;
+
+  const bg = isStudying ? "bg-blue-600" : isBreak ? "bg-green-600" : isPaused ? "bg-orange-500" : "bg-gray-200 dark:bg-gray-700";
+  const textColor = (isStudying || isBreak || isPaused) ? "text-white" : "text-gray-500 dark:text-gray-400";
+
+  return (
+    <div className={`rounded-2xl overflow-hidden ${bg}`}>
+      <div className={`px-4 pt-4 pb-3 ${textColor}`}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            {isStudying && <BookOpen className="w-4 h-4 opacity-90" />}
+            {isBreak    && <Coffee   className="w-4 h-4 opacity-90" />}
+            {isPaused   && <span className="text-sm">⏸</span>}
+            {isWaiting  && <span className="text-sm">⏳</span>}
+            <span className={`text-sm font-semibold ${isWaiting ? "text-gray-500 dark:text-gray-400" : ""}`}>
+              {isWaiting ? "Waiting for host…" : phase?.label ?? "Session"}
+            </span>
+          </div>
+          {studyMinsInSession > 0 && (
+            <span className={`text-xs font-medium ${(isStudying || isBreak || isPaused) ? "opacity-80" : "text-blue-600 dark:text-blue-400"}`}>
+              {studyMinsInSession}m studied
+            </span>
+          )}
+        </div>
+
+        {showTimer ? (
+          <>
+            <p className="font-mono text-4xl font-black tabular-nums tracking-tight text-center mb-3">
+              {formatTime(remainingSeconds)}
+            </p>
+            {/* Phase progress bar */}
+            <div className={`h-2 rounded-full overflow-hidden ${(isStudying || isBreak || isPaused) ? "bg-white/25" : "bg-gray-300 dark:bg-gray-600"}`}>
+              <div
+                className={`h-full rounded-full transition-[width] duration-1000 ease-linear ${(isStudying || isBreak || isPaused) ? "bg-white/70" : "bg-blue-400"}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <p className={`text-[10px] mt-1 text-center ${(isStudying || isBreak || isPaused) ? "opacity-60" : "text-gray-400"}`}>
+              {Math.round(pct)}% of phase complete
+            </p>
+          </>
+        ) : (
+          <p className="text-sm text-center opacity-60 py-2">Start the session to begin</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Convert a WebSocket chat payload into the RoomMessage shape used by the renderer.
 // We provide a toMillis()-compatible createdAt so age checks work identically.
 function wsToRoomMessage(d: WsChatMessage): RoomMessage {
@@ -121,7 +182,7 @@ export default function StudyRoomLive() {
   const [mobileTab,       setMobileTab]   = useState<MobileTab>("class");
   const [chatMsg,         setChatMsg]     = useState("");
   const [showCopied,      setShowCopied]  = useState(false);
-  const [flowOpen,        setFlowOpen]    = useState(false);
+  const [flowOpen,        setFlowOpen]    = useState(true);
   const [isFullscreen,    setIsFullscreen] = useState(false);
   const [floatingEmojis,  setFE]          = useState<FloatingEmoji[]>([]);
   const [showLeave,       setShowLeave]   = useState(false);
@@ -699,6 +760,9 @@ export default function StudyRoomLive() {
 
   const phase      = room.studyFlow[room.currentPhaseIndex];
   const isStudying = room.status === "active" && phase?.type === "study";
+  const isBreak    = room.status === "active" && phase?.type === "break";
+  const isPaused   = room.status === "paused";
+  const isWaiting  = room.status === "waiting";
   const showTimer  = !!phase && room.status !== "waiting" && room.status !== "finished";
   const activeVoteCount = votes.filter(v => v.status === "active").length;
 
@@ -1316,12 +1380,15 @@ export default function StudyRoomLive() {
           {/* Right panel — hidden in Focus Mode so the classroom fills the screen */}
           {!focusMode && (
           <div className="flex flex-col gap-3 min-w-0 overflow-y-auto" style={{ maxHeight: "calc(100vh - 180px)" }}>
-            {studyMinsInSession > 0 && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/30 px-4 py-3 flex items-center justify-between">
-                <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">Your study time</span>
-                <span className="text-sm font-bold text-blue-700 dark:text-blue-300">{studyMinsInSession} min</span>
-              </div>
-            )}
+            <DesktopPhaseCard
+              phase={phase}
+              isStudying={isStudying}
+              isBreak={isBreak}
+              isPaused={isPaused}
+              isWaiting={isWaiting}
+              studyMinsInSession={studyMinsInSession}
+              showTimer={showTimer}
+            />
 
             {StudyFlow()}
 
