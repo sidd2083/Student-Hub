@@ -12,6 +12,8 @@ Allow: /tools
 Allow: /tools/gpa-calculator
 Allow: /tools/attendance-calculator
 Allow: /about
+Allow: /creators
+Allow: /creators/
 Allow: /contact
 Allow: /privacy
 Allow: /terms

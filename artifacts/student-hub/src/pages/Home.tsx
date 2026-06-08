@@ -74,8 +74,27 @@ const jsonLd = {
         "width": 192,
         "height": 192
       },
-      "description": "Free educational platform built for Grade 9–12 students across Nepal.",
-      "sameAs": []
+      "description": "Free educational platform built for Grade 9–12 students across Nepal. Founded by Siddhant Lamichhane (Founder & CEO) and Aarogya Sapkota (Co-Founder).",
+      "foundingDate": "2024",
+      "founder": [
+        {
+          "@type": "Person",
+          "@id": `${SITE_URL}/about#siddhant-lamichhane`,
+          "name": "Siddhant Lamichhane",
+          "jobTitle": "Founder & CEO",
+          "url": `${SITE_URL}/about`,
+          "sameAs": ["https://www.instagram.com/lmc_siddhant.7/"]
+        },
+        {
+          "@type": "Person",
+          "@id": `${SITE_URL}/about#aarogya-sapkota`,
+          "name": "Aarogya Sapkota",
+          "jobTitle": "Co-Founder",
+          "url": `${SITE_URL}/about`,
+          "sameAs": ["https://www.instagram.com/sapkota_aarogya/"]
+        }
+      ],
+      "sameAs": ["https://www.instagram.com/lmc_siddhant.7/"]
     },
     {
       "@type": "WebPage",
@@ -151,7 +170,7 @@ export default function Home() {
       <Helmet>
         <title>Student Hub — Free Study Platform for Grade 9–12 Students in Nepal</title>
         <meta name="description" content="Free study platform for Grade 9–12 Nepal students. Notes, PYQs, NEB GPA Calculator, Bunk Calculator, MCQ practice and AI tutor — all free, no sign-up needed." />
-        <meta name="keywords" content="student hub nepal, grade 10 notes, SEE preparation, NEB notes, PYQ nepal, study tracker nepal, free notes nepal, SEE 2080, NEB GPA calculator, bunk calculator nepal, attendance calculator, gpa calculator nepal" />
+        <meta name="keywords" content="student hub nepal, siddhant lamichhane, siddhant lamichhane founder student hub, aarogya sapkota co-founder student hub nepal, grade 10 notes, SEE preparation, NEB notes, PYQ nepal, study tracker nepal, free notes nepal, SEE 2080, NEB GPA calculator, bunk calculator nepal, attendance calculator, gpa calculator nepal" />
         <link rel="canonical" href={SITE_URL} />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={SITE_URL} />

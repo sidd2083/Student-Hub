@@ -6,41 +6,53 @@ export default function About() {
     <>
       <Helmet>
         <title>About Student Hub Nepal — Nepal's #1 Free Study Platform</title>
-        <meta name="description" content="Student Hub Nepal is 100% free — notes, past papers, AI tutor &amp; Pomodoro for Grade 9–12 SEE &amp; NEB students. Built by Siddhant Lamichhane. No fees, ever." />
-        <meta name="keywords" content="about student hub nepal, siddhant lamichhane student hub, student hub nepal founder, student hub nepal, free study platform nepal, best study platform nepal, NEB study platform, SEE preparation nepal, free education nepal, nepal study app, study platform grade 9 10 11 12, free learning nepal, Nep AI tutor, pomodoro study nepal, student hub mission, free notes nepal, free PYQ nepal, student hub features" />
+        <meta name="description" content="Student Hub Nepal is founded by Siddhant Lamichhane (Founder &amp; CEO) and Aarogya Sapkota (Co-Founder). 100% free notes, past papers, AI tutor &amp; Pomodoro for Grade 9–12 SEE &amp; NEB students in Nepal." />
+        <meta name="keywords" content="about student hub nepal, siddhant lamichhane, siddhant lamichhane student hub, siddhant lamichhane founder ceo, aarogya sapkota, aarogya sapkota co-founder student hub, student hub nepal founder, student hub nepal owner, who founded student hub nepal, who is ceo of student hub nepal, student hub nepal, free study platform nepal, best study platform nepal, NEB study platform, SEE preparation nepal, free education nepal, nepal study app, study platform grade 9 10 11 12, free learning nepal, Nep AI tutor, pomodoro study nepal, student hub mission, free notes nepal, free PYQ nepal, student hub features" />
         <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
-        <meta name="author" content="Siddhant Lamichhane" />
+        <meta name="author" content="Siddhant Lamichhane, Aarogya Sapkota" />
         <meta name="geo.region" content="NP" />
         <meta name="geo.placename" content="Nepal" />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.studenthubnp.com/about" />
-        <meta property="og:title" content="About Student Hub Nepal — Nepal's #1 Free Study Platform" />
-        <meta property="og:description" content="Student Hub Nepal is 100% free — notes, past papers, AI tutor &amp; Pomodoro for Grade 9–12 SEE &amp; NEB students. Built by Siddhant Lamichhane." />
+        <meta property="og:title" content="About Student Hub Nepal — Founded by Siddhant Lamichhane &amp; Aarogya Sapkota" />
+        <meta property="og:description" content="Student Hub Nepal is founded by Siddhant Lamichhane (Founder &amp; CEO) and Aarogya Sapkota (Co-Founder). 100% free study platform for Grade 9–12 SEE &amp; NEB students." />
         <meta property="og:image" content="https://www.studenthubnp.com/opengraph.jpg" />
-        <meta property="og:image:alt" content="Student Hub Nepal — Free Study Platform for Grade 9 to 12" />
+        <meta property="og:image:alt" content="Student Hub Nepal — Founded by Siddhant Lamichhane and Aarogya Sapkota" />
         <meta property="og:site_name" content="Student Hub Nepal" />
         <meta property="og:locale" content="en_NP" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="About Student Hub Nepal — Nepal's #1 Free Study Platform" />
-        <meta name="twitter:description" content="Student Hub Nepal is 100% free — notes, past papers, AI tutor &amp; Pomodoro for Grade 9–12 SEE &amp; NEB students. Built by Siddhant Lamichhane." />
+        <meta name="twitter:title" content="About Student Hub Nepal — Founded by Siddhant Lamichhane &amp; Aarogya Sapkota" />
+        <meta name="twitter:description" content="Student Hub Nepal is founded by Siddhant Lamichhane (Founder &amp; CEO) and Aarogya Sapkota (Co-Founder). Free study platform for Grade 9–12 students in Nepal." />
         <meta name="twitter:image" content="https://www.studenthubnp.com/opengraph.jpg" />
         <link rel="canonical" href="https://www.studenthubnp.com/about" />
         <script type="application/ld+json">{JSON.stringify({
           "@context": "https://schema.org",
           "@type": "Organization",
+          "@id": "https://www.studenthubnp.com/#organization",
           "name": "Student Hub Nepal",
           "url": "https://www.studenthubnp.com",
-          "logo": "https://www.studenthubnp.com/opengraph.jpg",
-          "description": "Student Hub Nepal is a free study platform for Grade 9–12 students preparing for SEE and NEB exams in Nepal. Offers notes, past papers, AI tutor (Nep AI), Pomodoro timer, and progress tracking.",
+          "logo": "https://www.studenthubnp.com/icon-512.png",
+          "description": "Student Hub Nepal is a free study platform for Grade 9–12 students preparing for SEE and NEB exams in Nepal. Founded by Siddhant Lamichhane (Founder & CEO) and Aarogya Sapkota (Co-Founder).",
           "areaServed": "NP",
           "foundingDate": "2024",
-          "founder": {
-            "@type": "Person",
-            "name": "Siddhant Lamichhane",
-            "jobTitle": "Founder & Developer",
-            "url": "https://www.studenthubnp.com/about",
-            "sameAs": ["https://www.instagram.com/lmc_siddhant.7/"]
-          },
+          "founder": [
+            {
+              "@type": "Person",
+              "@id": "https://www.studenthubnp.com/about#siddhant-lamichhane",
+              "name": "Siddhant Lamichhane",
+              "jobTitle": "Founder & CEO",
+              "url": "https://www.studenthubnp.com/about",
+              "sameAs": ["https://www.instagram.com/lmc_siddhant.7/"]
+            },
+            {
+              "@type": "Person",
+              "@id": "https://www.studenthubnp.com/about#aarogya-sapkota",
+              "name": "Aarogya Sapkota",
+              "jobTitle": "Co-Founder",
+              "url": "https://www.studenthubnp.com/about",
+              "sameAs": ["https://www.instagram.com/sapkota_aarogya/"]
+            }
+          ],
           "sameAs": ["https://www.instagram.com/lmc_siddhant.7/"],
           "contactPoint": {
             "@type": "ContactPoint",
@@ -52,9 +64,10 @@ export default function About() {
         <script type="application/ld+json">{JSON.stringify({
           "@context": "https://schema.org",
           "@type": "Person",
+          "@id": "https://www.studenthubnp.com/about#siddhant-lamichhane",
           "name": "Siddhant Lamichhane",
-          "jobTitle": "Founder & Developer",
-          "description": "Siddhant Lamichhane is the founder and developer of Student Hub Nepal — Nepal's leading free study platform for Grade 9–12 students preparing for SEE and NEB exams.",
+          "jobTitle": "Founder & CEO",
+          "description": "Siddhant Lamichhane is the Founder and CEO of Student Hub Nepal — Nepal's leading free study platform for Grade 9–12 students preparing for SEE and NEB exams.",
           "url": "https://www.studenthubnp.com/about",
           "sameAs": ["https://www.instagram.com/lmc_siddhant.7/"],
           "worksFor": {
@@ -62,7 +75,63 @@ export default function About() {
             "name": "Student Hub Nepal",
             "url": "https://www.studenthubnp.com"
           },
-          "nationality": { "@type": "Country", "name": "Nepal" }
+          "nationality": { "@type": "Country", "name": "Nepal" },
+          "knowsAbout": ["Nepal Education", "NEB Exam Preparation", "SEE Exam", "Student Hub Nepal", "Free Study Platform Nepal"]
+        })}</script>
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Person",
+          "@id": "https://www.studenthubnp.com/about#aarogya-sapkota",
+          "name": "Aarogya Sapkota",
+          "jobTitle": "Co-Founder",
+          "description": "Aarogya Sapkota is the Co-Founder of Student Hub Nepal — Nepal's leading free study platform for Grade 9–12 students preparing for SEE and NEB exams.",
+          "url": "https://www.studenthubnp.com/about",
+          "sameAs": ["https://www.instagram.com/sapkota_aarogya/"],
+          "worksFor": {
+            "@type": "Organization",
+            "name": "Student Hub Nepal",
+            "url": "https://www.studenthubnp.com"
+          },
+          "nationality": { "@type": "Country", "name": "Nepal" },
+          "knowsAbout": ["Nepal Education", "NEB Exam Preparation", "SEE Exam", "Student Hub Nepal", "Free Study Platform Nepal"]
+        })}</script>
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "Who is the founder of Student Hub Nepal?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Student Hub Nepal was founded by Siddhant Lamichhane (Founder & CEO) and Aarogya Sapkota (Co-Founder). Siddhant Lamichhane built the platform from the ground up to provide free study resources for Grade 9–12 students in Nepal."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Who is Siddhant Lamichhane?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Siddhant Lamichhane is the Founder and CEO of Student Hub Nepal — a free educational platform for Grade 9–12 students preparing for SEE and NEB exams in Nepal."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Who is the owner of Student Hub Nepal?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Student Hub Nepal is owned and operated by Siddhant Lamichhane (Founder & CEO) and Aarogya Sapkota (Co-Founder)."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Who is Aarogya Sapkota?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Aarogya Sapkota is the Co-Founder of Student Hub Nepal, committed to empowering students across Nepal with free educational resources for SEE and NEB exam preparation."
+              }
+            }
+          ]
         })}</script>
         <script type="application/ld+json">{JSON.stringify({
           "@context": "https://schema.org",
@@ -153,10 +222,10 @@ export default function About() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-semibold text-gray-900">Siddhant Lamichhane</p>
-                    <span className="px-2 py-0.5 bg-blue-500 text-white text-[10px] font-bold rounded-full">Owner</span>
+                    <span className="px-2 py-0.5 bg-blue-500 text-white text-[10px] font-bold rounded-full">Founder &amp; CEO</span>
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-                    Built Student Hub from the ground up — passionate about making quality study tools free and accessible for every student in Nepal.
+                    Founder &amp; CEO of Student Hub Nepal — built the platform from the ground up, passionate about making quality study tools free and accessible for every student in Nepal.
                   </p>
                 </div>
                 <a
@@ -178,10 +247,10 @@ export default function About() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-semibold text-gray-900">Aarogya Sapkota</p>
-                    <span className="px-2 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded-full">Founder</span>
+                    <span className="px-2 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded-full">Co-Founder</span>
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-                    Co-founder of Student Hub Nepal, committed to empowering students across Nepal with the best free educational resources.
+                    Co-Founder of Student Hub Nepal, committed to empowering students across Nepal with the best free educational resources for SEE and NEB exam preparation.
                   </p>
                 </div>
                 <a

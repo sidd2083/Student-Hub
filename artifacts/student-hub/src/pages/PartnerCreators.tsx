@@ -420,19 +420,21 @@ export default function PartnerCreators() {
   return (
     <>
       <Helmet>
-        <title>Partner Creators | Student Hub Nepal</title>
-        <meta name="description" content={`Meet Student Hub's official partner creators — ${creatorNames || "Nepal's top student creators"} — helping Grade 9–12 students with study tips, exam prep and motivation.`} />
-        <meta name="keywords" content={`student hub partner creators, student hub nepal creators, ${creatorKeywords}, nepal student youtubers, nepal study creators, neb study creators`} />
-        <meta name="robots" content="index, follow, max-image-preview:large" />
+        <title>Partner Creators — Student Hub Nepal | Official Content Creators</title>
+        <meta name="description" content={`Meet Student Hub Nepal's official partner creators — ${creatorNames || "Nepal's top student content creators"} — helping Grade 9–12 students with study tips, NEB &amp; SEE exam prep, and motivation. Founded by Siddhant Lamichhane.`} />
+        <meta name="keywords" content={`student hub partner creators, student hub nepal partner creator, partner creator student hub nepal, student hub nepal creators, ${creatorKeywords}, nepal student youtubers, nepal study creators, neb study creators, student hub nepal official creators, student hub content creators nepal, siddhant lamichhane student hub creators`} />
+        <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+        <meta name="author" content="Siddhant Lamichhane, Aarogya Sapkota" />
         <meta property="og:type" content="website" />
-        <meta property="og:title" content="Partner Creators | Student Hub Nepal" />
-        <meta property="og:description" content={`Meet Student Hub's verified partner creators — ${creatorNames || "Nepal's top student content creators"} — helping Grade 9–12 students ace their NEB and SEE exams.`} />
+        <meta property="og:title" content="Partner Creators — Student Hub Nepal | Official Content Creators" />
+        <meta property="og:description" content={`Meet Student Hub Nepal's verified partner creators — ${creatorNames || "Nepal's top student content creators"} — helping Grade 9–12 students ace their NEB and SEE exams.`} />
         <meta property="og:url" content="https://www.studenthubnp.com/creators" />
         <meta property="og:image" content={creators[0]?.image || "https://www.studenthubnp.com/opengraph.jpg"} />
-        <meta property="og:image:alt" content="Student Hub Partner Creators" />
+        <meta property="og:image:alt" content="Student Hub Nepal Partner Creators" />
+        <meta property="og:site_name" content="Student Hub Nepal" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Partner Creators | Student Hub Nepal" />
-        <meta name="twitter:description" content={`Meet Student Hub's verified partner creators helping Nepali students with NEB and SEE exam prep.`} />
+        <meta name="twitter:title" content="Partner Creators — Student Hub Nepal | Official Content Creators" />
+        <meta name="twitter:description" content={`Meet Student Hub Nepal's verified partner creators helping Nepali students with NEB and SEE exam prep.`} />
         <meta name="twitter:image" content={creators[0]?.image || "https://www.studenthubnp.com/opengraph.jpg"} />
         <link rel="canonical" href="https://www.studenthubnp.com/creators" />
         {jsonLd && (
