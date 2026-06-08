@@ -9,6 +9,10 @@ interface Props {
   studyMins: number;
   onLeave?: () => void;
   visible: boolean;
+  /** Called whenever Puku speaks — drives the classroom speech bubble */
+  onSpeechUpdate: (speech: string, isSpeaking: boolean) => void;
+  /** Called when minimized state changes — parent hides/shows Puku in classroom */
+  onMinimizeChange?: (minimized: boolean) => void;
 }
 
 // ── Strip emojis so TTS doesn't read them out ────────────────────────────────
@@ -133,7 +137,6 @@ const MESSAGES = {
     `The ${timePart()} session is underrated ${fn}. Quiet, focused, effective. You picked the right time.`,
   ]),
 
-  // ── Anti-cheat messages ────────────────────────────────────────────────────
   tabAway1: (fn: string, mins: number) => pick([
     `${fn}, you were away for ${mins} minutes. Your timer kept running — was that actually study time?`,
     `Hey ${fn}, I noticed you were gone for ${mins} minutes. Everything okay? Let's get back to it.`,
@@ -161,171 +164,61 @@ const MESSAGES = {
   bye: (fn: string) => `${fn}, looks like someone joined the room. I'll give you your space. You've been great today.`,
 };
 
-// ── Puku Avatar ───────────────────────────────────────────────────────────────
-function PukuAvatar({ isSpeaking, size = 72 }: { isSpeaking: boolean; size?: number }) {
-  return (
-    <motion.div
-      animate={isSpeaking ? { scale: [1, 1.04, 1, 1.04, 1] } : { scale: 1 }}
-      transition={{ repeat: isSpeaking ? Infinity : 0, duration: 0.7 }}
-      style={{ width: size, height: size }}
-      className="relative shrink-0"
-    >
-      <div
-        className="rounded-full flex items-center justify-center text-white relative overflow-hidden shadow-xl"
-        style={{
-          width: size, height: size,
-          background: "linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)",
-          boxShadow: isSpeaking
-            ? "0 0 0 4px rgba(139,92,246,0.25), 0 0 20px rgba(139,92,246,0.35), 0 4px 20px rgba(0,0,0,0.3)"
-            : "0 4px 20px rgba(0,0,0,0.25), 0 0 0 3px rgba(255,255,255,0.15)",
-        }}
-      >
-        {/* Eyes */}
-        <div className="absolute flex gap-2.5" style={{ top: "28%" }}>
-          <motion.div
-            animate={isSpeaking ? {} : { scaleY: [1, 0.08, 1] }}
-            transition={{ repeat: Infinity, repeatDelay: 3.5, duration: 0.12 }}
-            className="bg-white rounded-full"
-            style={{ width: size * 0.13, height: size * 0.13 }}
-          />
-          <motion.div
-            animate={isSpeaking ? {} : { scaleY: [1, 0.08, 1] }}
-            transition={{ repeat: Infinity, repeatDelay: 3.5, duration: 0.12, delay: 0.05 }}
-            className="bg-white rounded-full"
-            style={{ width: size * 0.13, height: size * 0.13 }}
-          />
-        </div>
-        {/* Mouth */}
-        <motion.div
-          animate={isSpeaking ? { scaleX: [1, 1.4, 0.7, 1.3, 1] } : {}}
-          transition={{ repeat: isSpeaking ? Infinity : 0, duration: 0.35 }}
-          className="absolute bg-white"
-          style={{
-            width: size * 0.22, height: size * 0.11,
-            bottom: "22%",
-            borderRadius: "0 0 50% 50%",
-          }}
-        />
-        {/* Cheeks */}
-        <div className="absolute" style={{ bottom: "18%", left: "10%", width: size * 0.16, height: size * 0.1, borderRadius: "50%", background: "rgba(255,180,200,0.45)" }} />
-        <div className="absolute" style={{ bottom: "18%", right: "10%", width: size * 0.16, height: size * 0.1, borderRadius: "50%", background: "rgba(255,180,200,0.45)" }} />
-        {/* Ears */}
-        <div className="absolute bg-purple-400 rounded-full" style={{ width: size * 0.17, height: size * 0.17, top: "-6%", left: "11%" }} />
-        <div className="absolute bg-purple-400 rounded-full" style={{ width: size * 0.17, height: size * 0.17, top: "-6%", right: "11%" }} />
-      </div>
-
-      {/* Pulsing ring when speaking */}
-      {isSpeaking && (
-        <motion.div
-          className="absolute inset-0 rounded-full border-2 border-purple-400"
-          animate={{ scale: [1, 1.3], opacity: [0.5, 0] }}
-          transition={{ repeat: Infinity, duration: 0.9 }}
-        />
-      )}
-
-      {/* Online dot */}
-      <div
-        className="absolute border-2 border-white rounded-full bg-green-400"
-        style={{ width: 12, height: 12, bottom: 2, right: 2, boxShadow: "0 0 0 2px rgba(34,197,94,0.3)" }}
-      />
-    </motion.div>
-  );
-}
-
-// ── Speech bubble ──────────────────────────────────────────────────────────────
-function SpeechBubble({ text, visible }: { text: string; visible: boolean }) {
-  return (
-    <AnimatePresence>
-      {visible && text && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.88, y: 6 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.92, y: 4 }}
-          transition={{ type: "spring", damping: 22, stiffness: 300 }}
-          className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-64"
-          style={{ zIndex: 1 }}
-        >
-          <div
-            className="relative px-3.5 py-2.5 rounded-2xl text-sm leading-snug font-medium text-gray-800 dark:text-gray-100 shadow-xl"
-            style={{
-              background: "rgba(255,255,255,0.97)",
-              backdropFilter: "blur(12px)",
-              border: "1px solid rgba(139,92,246,0.18)",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(139,92,246,0.12)",
-            }}
-          >
-            {text}
-            {/* Bubble tail */}
-            <div
-              className="absolute left-1/2 -translate-x-1/2 bottom-0 translate-y-full"
-              style={{
-                width: 0, height: 0,
-                borderLeft: "8px solid transparent",
-                borderRight: "8px solid transparent",
-                borderTop: "8px solid rgba(255,255,255,0.97)",
-                filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.08))",
-              }}
-            />
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
-// ── Main component ─────────────────────────────────────────────────────────────
-export function PukuPartner({ firstName, isStudying, isBreak, studyMins, onLeave, visible }: Props) {
-  const [minimized,  setMinimized]  = useState(false);
-  const [muted,      setMuted]      = useState(false);
-  const [bubble,     setBubble]     = useState("");
-  const [showBubble, setShowBubble] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+// ── Main component — logic + small control pill ───────────────────────────────
+export function PukuPartner({
+  firstName, isStudying, isBreak, studyMins, onLeave, visible,
+  onSpeechUpdate, onMinimizeChange,
+}: Props) {
+  const [minimized, setMinimized] = useState(false);
+  const [muted,     setMuted]     = useState(false);
 
   const fn = firstName.split(" ")[0];
 
-  // Tracking refs
+  // Refs for tracking
   const hasGreeted      = useRef(false);
   const prevStudying    = useRef(false);
   const prevBreak       = useRef(false);
   const milestones      = useRef<Set<number>>(new Set());
-  const bubbleTimer     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const waterTimer      = useRef<ReturnType<typeof setInterval> | null>(null);
-  const idleTimer       = useRef<ReturnType<typeof setInterval> | null>(null);
+  const scheduleTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Anti-cheat refs
-  const tabHiddenAt     = useRef<number | null>(null);
-  const lastActivity    = useRef<number>(Date.now());
-  const distractCount   = useRef(0);
-  const lastIdleAlert   = useRef<number>(0);
+  const tabHiddenAt   = useRef<number | null>(null);
+  const lastActivity  = useRef<number>(Date.now());
+  const distractCount = useRef(0);
+  const lastIdleAlert = useRef<number>(0);
 
-  // ── Show bubble with auto-hide ────────────────────────────────────────────
-  const showMessage = useCallback((text: string, durationMs = 7000) => {
-    setBubble(text);
-    setShowBubble(true);
-    if (bubbleTimer.current) clearTimeout(bubbleTimer.current);
-    bubbleTimer.current = setTimeout(() => setShowBubble(false), durationMs);
-  }, []);
+  // ── Notify parent of minimize changes ─────────────────────────────────────
+  const handleMinimize = useCallback((val: boolean) => {
+    setMinimized(val);
+    onMinimizeChange?.(val);
+  }, [onMinimizeChange]);
 
-  // ── Speak via TTS (strips emojis, picks best voice) ──────────────────────
+  // ── Speak: TTS + update classroom speech bubble ───────────────────────────
   const speak = useCallback((text: string) => {
-    showMessage(text);
+    // Show bubble in classroom
+    onSpeechUpdate(text, false);
+
+    // Auto-clear bubble after 7s
+    setTimeout(() => onSpeechUpdate("", false), 7000);
+
     if (muted || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
 
     const clean = stripForSpeech(text);
     if (!clean) return;
 
-    const utt = new SpeechSynthesisUtterance(clean);
-    utt.rate   = 0.93;
-    utt.pitch  = 1.08;
-    utt.volume = 0.9;
+    const utt    = new SpeechSynthesisUtterance(clean);
+    utt.rate     = 0.93;
+    utt.pitch    = 1.08;
+    utt.volume   = 0.9;
 
     const trySpeak = () => {
       const v = pickVoice(window.speechSynthesis.getVoices());
       if (v) utt.voice = v;
-      setIsSpeaking(true);
-      utt.onend  = () => setIsSpeaking(false);
-      utt.onerror = () => setIsSpeaking(false);
+      onSpeechUpdate(text, true);
+      utt.onend   = () => onSpeechUpdate(text, false);
+      utt.onerror = () => onSpeechUpdate(text, false);
       window.speechSynthesis.speak(utt);
     };
 
@@ -334,7 +227,7 @@ export function PukuPartner({ firstName, isStudying, isBreak, studyMins, onLeave
     } else {
       window.speechSynthesis.addEventListener("voiceschanged", trySpeak, { once: true });
     }
-  }, [muted, showMessage]);
+  }, [muted, onSpeechUpdate]);
 
   // ── Greeting ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -344,28 +237,22 @@ export function PukuPartner({ firstName, isStudying, isBreak, studyMins, onLeave
     return () => clearTimeout(t);
   }, [visible]);
 
-  // ── Study/break phase changes ──────────────────────────────────────────────
+  // ── Study/break transitions ───────────────────────────────────────────────
   useEffect(() => {
     if (!visible) return;
-    if (isStudying && !prevStudying.current) {
-      speak(MESSAGES.studyStart(fn));
-    } else if (isBreak && !prevBreak.current) {
-      speak(MESSAGES.breakStart(fn));
-    }
+    if (isStudying && !prevStudying.current) speak(MESSAGES.studyStart(fn));
+    else if (isBreak && !prevBreak.current)  speak(MESSAGES.breakStart(fn));
     prevStudying.current = isStudying;
     prevBreak.current    = isBreak;
   }, [isStudying, isBreak]);
 
-  // ── Milestones ───────────────────────────────────────────────────────────
+  // ── Study milestones ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!visible) return;
     const checks: [number, (fn: string) => string][] = [
-      [5,   MESSAGES.milestone5],
-      [15,  MESSAGES.milestone15],
-      [30,  MESSAGES.milestone30],
-      [60,  MESSAGES.milestone60],
-      [90,  MESSAGES.milestone90],
-      [120, MESSAGES.milestone120],
+      [5, MESSAGES.milestone5], [15, MESSAGES.milestone15],
+      [30, MESSAGES.milestone30], [60, MESSAGES.milestone60],
+      [90, MESSAGES.milestone90], [120, MESSAGES.milestone120],
     ];
     for (const [mins, msgFn] of checks) {
       if (studyMins >= mins && !milestones.current.has(mins)) {
@@ -376,7 +263,7 @@ export function PukuPartner({ firstName, isStudying, isBreak, studyMins, onLeave
     }
   }, [studyMins]);
 
-  // ── Periodic motivational messages (only during study) ───────────────────
+  // ── Periodic motivational (only during study) ─────────────────────────────
   useEffect(() => {
     if (!visible) return;
     const scheduleNext = () => {
@@ -392,11 +279,11 @@ export function PukuPartner({ firstName, isStudying, isBreak, studyMins, onLeave
                 : pick([MESSAGES.long(fn, studyMins), MESSAGES.random(fn)]);
           speak(msg);
         }
-        idleTimer.current = scheduleNext();
+        scheduleTimer.current = scheduleNext();
       }, delayMs);
     };
-    idleTimer.current = scheduleNext();
-    return () => { if (idleTimer.current) clearTimeout(idleTimer.current as unknown as number); };
+    scheduleTimer.current = scheduleNext();
+    return () => { if (scheduleTimer.current) clearTimeout(scheduleTimer.current); };
   }, [visible, fn]);
 
   // ── Water reminder every 30 min ──────────────────────────────────────────
@@ -408,18 +295,17 @@ export function PukuPartner({ firstName, isStudying, isBreak, studyMins, onLeave
     return () => { if (waterTimer.current) clearInterval(waterTimer.current); };
   }, [visible, fn]);
 
-  // ── Activity tracker ─────────────────────────────────────────────────────
+  // ── Activity tracking ─────────────────────────────────────────────────────
   useEffect(() => {
     const touch = () => { lastActivity.current = Date.now(); };
-    const events = ["mousemove", "keydown", "click", "scroll", "touchstart"] as const;
-    events.forEach(e => window.addEventListener(e, touch, { passive: true }));
-    return () => events.forEach(e => window.removeEventListener(e, touch));
+    const evts = ["mousemove", "keydown", "click", "scroll", "touchstart"] as const;
+    evts.forEach(e => window.addEventListener(e, touch, { passive: true }));
+    return () => evts.forEach(e => window.removeEventListener(e, touch));
   }, []);
 
-  // ── Anti-cheat: tab-away detection ───────────────────────────────────────
+  // ── Anti-cheat: tab-away ──────────────────────────────────────────────────
   useEffect(() => {
     if (!visible) return;
-
     const onVisChange = () => {
       if (document.hidden) {
         if (isStudying) tabHiddenAt.current = Date.now();
@@ -427,41 +313,35 @@ export function PukuPartner({ firstName, isStudying, isBreak, studyMins, onLeave
         const hiddenAt = tabHiddenAt.current;
         tabHiddenAt.current = null;
         if (!hiddenAt || !isStudying) return;
-        const awayMs   = Date.now() - hiddenAt;
-        const awayMins = Math.max(1, Math.round(awayMs / 60000));
-        if (awayMins < 1.5) return; // < 90s → ignore
-
+        const awayMins = Math.max(1, Math.round((Date.now() - hiddenAt) / 60000));
+        if (awayMins < 1.5) return;
         distractCount.current += 1;
         const n = distractCount.current;
-        const msg = n >= 3
-          ? MESSAGES.tabAway3plus(fn, awayMins)
-          : n === 2
-            ? MESSAGES.tabAway2(fn, awayMins)
-            : MESSAGES.tabAway1(fn, awayMins);
+        const msg = n >= 3 ? MESSAGES.tabAway3plus(fn, awayMins)
+          : n === 2 ? MESSAGES.tabAway2(fn, awayMins)
+          : MESSAGES.tabAway1(fn, awayMins);
         setTimeout(() => speak(msg), 500);
       }
     };
-
     document.addEventListener("visibilitychange", onVisChange);
     return () => document.removeEventListener("visibilitychange", onVisChange);
   }, [visible, isStudying, fn]);
 
-  // ── Anti-cheat: idle-on-page detection ───────────────────────────────────
+  // ── Anti-cheat: idle-on-page ──────────────────────────────────────────────
   useEffect(() => {
     if (!visible) return;
-    const interval = setInterval(() => {
+    const iv = setInterval(() => {
       if (!isStudying || document.hidden) return;
       const idleMs = Date.now() - lastActivity.current;
       if (idleMs < 6 * 60 * 1000) return;
       if (Date.now() - lastIdleAlert.current < 12 * 60 * 1000) return;
       lastIdleAlert.current = Date.now();
-      const idleMins = Math.round(idleMs / 60000);
-      speak(MESSAGES.idleOnPage(fn, idleMins));
+      speak(MESSAGES.idleOnPage(fn, Math.round(idleMs / 60000)));
     }, 90 * 1000);
-    return () => clearInterval(interval);
+    return () => clearInterval(iv);
   }, [visible, isStudying, fn]);
 
-  // ── Bye when others join ─────────────────────────────────────────────────
+  // ── Bye when someone joins ────────────────────────────────────────────────
   const wasBye = useRef(false);
   useEffect(() => {
     if (!visible && !wasBye.current && hasGreeted.current) {
@@ -474,93 +354,96 @@ export function PukuPartner({ firstName, isStudying, isBreak, studyMins, onLeave
   useEffect(() => {
     return () => {
       window.speechSynthesis?.cancel();
-      if (bubbleTimer.current) clearTimeout(bubbleTimer.current);
+      onSpeechUpdate("", false);
       if (waterTimer.current)  clearInterval(waterTimer.current);
+      if (scheduleTimer.current) clearTimeout(scheduleTimer.current);
     };
   }, []);
 
   if (!visible) return null;
 
-  // ── Minimized pill ────────────────────────────────────────────────────────
+  // ── Minimized: tiny floating avatar pill ──────────────────────────────────
   if (minimized) {
     return (
       <motion.button
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        onClick={() => setMinimized(false)}
+        onClick={() => handleMinimize(false)}
         className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-40 flex flex-col items-center gap-0.5"
-        title="Puku is here"
+        title="Show Puku in classroom"
       >
-        <PukuAvatar isSpeaking={isSpeaking} size={48} />
-        <span className="text-[9px] font-black text-purple-600 dark:text-purple-400 tracking-widest">PUKU</span>
-        {bubble && showBubble && (
-          <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-purple-500 border-2 border-white animate-pulse" />
-        )}
+        {/* Tiny avatar */}
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-xs shadow-lg border-2 border-white"
+          style={{ background: "linear-gradient(135deg,#8b5cf6,#ec4899)" }}
+        >
+          P
+        </div>
+        <span className="text-[8px] font-black text-purple-600 dark:text-purple-400 tracking-widest">PUKU</span>
       </motion.button>
     );
   }
 
-  // ── Expanded presence ─────────────────────────────────────────────────────
+  // ── Expanded: small control pill ──────────────────────────────────────────
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 30, scale: 0.9 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 30, scale: 0.9 }}
-      transition={{ type: "spring", damping: 22, stiffness: 280 }}
-      className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-40 flex flex-col items-center"
-    >
-      {/* Speech bubble sits above avatar */}
-      <div className="relative w-20 flex flex-col items-center">
-        <SpeechBubble text={bubble} visible={showBubble} />
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 10 }}
+        className="fixed bottom-20 right-3 lg:bottom-5 lg:right-4 z-40"
+      >
+        <div
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full shadow-lg"
+          style={{
+            background: "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(12px)",
+            border: "1px solid rgba(139,92,246,0.2)",
+            boxShadow: "0 4px 20px rgba(139,92,246,0.15), 0 2px 8px rgba(0,0,0,0.1)",
+          }}
+        >
+          {/* Small avatar dot */}
+          <div
+            className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8px] font-black shrink-0"
+            style={{ background: "linear-gradient(135deg,#8b5cf6,#ec4899)" }}
+          >
+            P
+          </div>
+          <span className="text-[9px] font-black tracking-wider text-purple-600">PUKU</span>
 
-        {/* Avatar */}
-        <PukuAvatar isSpeaking={isSpeaking} size={72} />
-
-        {/* Name tag */}
-        <div className="mt-1.5 flex items-center gap-1">
-          <span className="text-[10px] font-black tracking-widest text-purple-600 dark:text-purple-400">PUKU</span>
-          {isSpeaking && (
-            <motion.div className="flex gap-0.5 items-end" style={{ height: 10 }}>
-              {[0, 1, 2].map(i => (
-                <motion.div key={i} className="w-0.5 rounded-full bg-purple-500"
-                  animate={{ height: ["3px", "9px", "3px"] }}
-                  transition={{ repeat: Infinity, duration: 0.5, delay: i * 0.12 }}
-                />
-              ))}
-            </motion.div>
-          )}
-        </div>
-
-        {/* Controls */}
-        <div className="mt-2 flex items-center gap-1.5">
+          {/* Mute */}
           <button
             onClick={() => setMuted(m => !m)}
-            className="w-6 h-6 rounded-full flex items-center justify-center bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            title={muted ? "Unmute Puku" : "Mute Puku"}
+            className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
+            title={muted ? "Unmute" : "Mute"}
           >
             {muted
-              ? <VolumeX className="w-3 h-3 text-gray-500" />
+              ? <VolumeX className="w-3 h-3 text-gray-400" />
               : <Volume2 className="w-3 h-3 text-purple-500" />
             }
           </button>
+
+          {/* Minimize */}
           <button
-            onClick={() => setMinimized(true)}
-            className="w-6 h-6 rounded-full flex items-center justify-center bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            title="Minimize Puku"
+            onClick={() => handleMinimize(true)}
+            className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
+            title="Minimize"
           >
-            <Minus className="w-3 h-3 text-gray-500" />
+            <Minus className="w-3 h-3 text-gray-400" />
           </button>
+
+          {/* Dismiss */}
           {onLeave && (
             <button
-              onClick={() => { window.speechSynthesis?.cancel(); onLeave(); }}
-              className="w-6 h-6 rounded-full flex items-center justify-center bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-red-50 hover:border-red-200 dark:hover:bg-red-900/20 transition-colors"
+              onClick={() => { window.speechSynthesis?.cancel(); onSpeechUpdate("", false); onLeave(); }}
+              className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-red-50 transition-colors"
               title="Dismiss Puku"
             >
-              <X className="w-3 h-3 text-gray-500" />
+              <X className="w-3 h-3 text-gray-400" />
             </button>
           )}
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }

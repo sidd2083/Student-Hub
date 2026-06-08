@@ -202,8 +202,11 @@ export default function StudyRoomLive() {
   const [buddyInvite, setBuddyInvite] = useState<BuddyInvite | null>(null);
 
   // ── PUKU AI partner state ─────────────────────────────────────────────────────
-  const [showPuku, setShowPuku] = useState(false);
-  const prevParticipantCount    = useRef<number>(0);
+  const [showPuku,      setShowPuku]      = useState(false);
+  const [pukuSpeech,    setPukuSpeech]    = useState("");
+  const [pukuSpeaking,  setPukuSpeaking]  = useState(false);
+  const [pukuMinimized, setPukuMinimized] = useState(false);
+  const prevParticipantCount              = useRef<number>(0);
 
   // ── AI chat state ─────────────────────────────────────────────────────────────
   const [aiChatLoading, setAiChatLoading]  = useState(false);
@@ -1436,6 +1439,9 @@ export default function StudyRoomLive() {
                   roomStatus={room.status}
                   theme={room.theme ?? "classic"}
                   myUid={user?.uid} myStudyMins={studyMinsInSession}
+                  pukuVisible={showPuku && joined && !pukuMinimized}
+                  pukuSpeech={pukuSpeech}
+                  pukuSpeaking={pukuSpeaking}
                 />
                 <AnimatePresence>
                   {floatingEmojis.map(fe => (
@@ -1497,6 +1503,9 @@ export default function StudyRoomLive() {
               roomStatus={room.status}
               theme={room.theme ?? "classic"}
               myUid={user?.uid} myStudyMins={studyMinsInSession}
+              pukuVisible={showPuku && joined && !pukuMinimized}
+              pukuSpeech={pukuSpeech}
+              pukuSpeaking={pukuSpeaking}
             />
             <AnimatePresence>
               {floatingEmojis.map(fe => (
@@ -1762,14 +1771,16 @@ export default function StudyRoomLive() {
       <StudentProfileModal participant={selectedStudent} onClose={() => setSel(null)} />
       </div>  {/* ← closes containerRef — ALL modals above must be inside for fullscreen */}
 
-      {/* ── PUKU AI Study Partner — floats above the room, client-side only ─── */}
+      {/* ── PUKU AI Study Partner — sits in classroom bench, logic+controls here ─── */}
       <PukuPartner
         firstName={profile?.name ?? "Student"}
         isStudying={isStudying}
         isBreak={isBreak}
         studyMins={studyMinsInSession}
         visible={showPuku && joined}
-        onLeave={() => setShowPuku(false)}
+        onLeave={() => { setShowPuku(false); setPukuSpeech(""); setPukuSpeaking(false); }}
+        onSpeechUpdate={(speech, speaking) => { setPukuSpeech(speech); setPukuSpeaking(speaking); }}
+        onMinimizeChange={setPukuMinimized}
       />
     </>
   );

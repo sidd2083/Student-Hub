@@ -4,6 +4,8 @@ import { RoomParticipant, getLiveStudyMins, RoomTheme, formatTime } from "@/lib/
 import { Crown, BookOpen, Coffee } from "lucide-react";
 import { useTimerDisplay } from "@/context/ActiveRoomContext";
 
+const PUKU_UID = "__puku__";
+
 interface Props {
   participants: RoomParticipant[];
   hostUid: string;
@@ -15,6 +17,10 @@ interface Props {
   theme?: RoomTheme;
   myUid?: string;
   myStudyMins?: number;
+  // Puku bench presence
+  pukuVisible?: boolean;
+  pukuSpeech?: string;
+  pukuSpeaking?: boolean;
 }
 
 const AVATAR_COLORS = [
@@ -293,9 +299,150 @@ const OccupiedSeat = memo(function OccupiedSeat({
   );
 });
 
+// ── Puku bench seat — sits like a real student ────────────────────────────────
+const PukuSeat = memo(function PukuSeat({
+  compact, tc, speech, isSpeaking,
+}: {
+  compact: boolean; tc: ThemeConfig; speech: string; isSpeaking: boolean;
+}) {
+  const sz = compact ? 36 : 44;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.6, y: 10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.5, y: 8 }}
+      className={`flex flex-col items-center gap-1 ${compact ? "w-14" : "w-18"} relative`}
+    >
+      <div className="relative flex flex-col items-center">
+
+        {/* Speech bubble — appears above Puku's head in the classroom */}
+        <AnimatePresence>
+          {speech && (
+            <motion.div
+              key="puku-bubble"
+              initial={{ opacity: 0, scale: 0.85, y: 4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 2 }}
+              transition={{ type: "spring", damping: 20, stiffness: 280 }}
+              className="absolute z-30"
+              style={{ bottom: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", width: compact ? 130 : 160 }}
+            >
+              <div
+                className="relative px-2.5 py-1.5 rounded-xl shadow-lg"
+                style={{
+                  background: "rgba(255,255,255,0.97)",
+                  border: "1.5px solid rgba(139,92,246,0.22)",
+                  boxShadow: "0 6px 20px rgba(0,0,0,0.12), 0 2px 8px rgba(139,92,246,0.15)",
+                }}
+              >
+                <p className="text-[9px] leading-snug font-medium text-gray-700 text-center">{speech}</p>
+                {/* Triangle tail pointing down to Puku */}
+                <div
+                  className="absolute left-1/2 bottom-0 translate-y-full -translate-x-1/2"
+                  style={{
+                    width: 0, height: 0,
+                    borderLeft: "6px solid transparent",
+                    borderRight: "6px solid transparent",
+                    borderTop: "6px solid rgba(255,255,255,0.97)",
+                    filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.06))",
+                  }}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Puku animated avatar */}
+        <motion.div
+          animate={isSpeaking ? { scale: [1, 1.05, 1, 1.05, 1] } : { scale: 1 }}
+          transition={{ repeat: isSpeaking ? Infinity : 0, duration: 0.65 }}
+          style={{ width: sz, height: sz }}
+          className="relative"
+        >
+          <div
+            className="rounded-full flex items-center justify-center relative overflow-hidden"
+            style={{
+              width: sz, height: sz,
+              background: "linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)",
+              boxShadow: isSpeaking
+                ? `0 0 0 3px rgba(139,92,246,0.3), 0 0 14px rgba(139,92,246,0.4), 0 3px 12px rgba(0,0,0,0.3)`
+                : `0 3px 12px rgba(0,0,0,0.3), 0 0 0 2px rgba(255,255,255,0.2)`,
+            }}
+          >
+            {/* Ears */}
+            <div className="absolute bg-purple-400 rounded-full" style={{ width: sz*0.17, height: sz*0.17, top: "-5%", left: "12%" }} />
+            <div className="absolute bg-purple-400 rounded-full" style={{ width: sz*0.17, height: sz*0.17, top: "-5%", right: "12%" }} />
+            {/* Eyes */}
+            <div className="absolute flex" style={{ gap: sz*0.1, top: "27%" }}>
+              <motion.div
+                animate={{ scaleY: [1, 0.08, 1] }}
+                transition={{ repeat: Infinity, repeatDelay: 3.2, duration: 0.13 }}
+                className="bg-white rounded-full"
+                style={{ width: sz*0.13, height: sz*0.13 }}
+              />
+              <motion.div
+                animate={{ scaleY: [1, 0.08, 1] }}
+                transition={{ repeat: Infinity, repeatDelay: 3.2, duration: 0.13, delay: 0.06 }}
+                className="bg-white rounded-full"
+                style={{ width: sz*0.13, height: sz*0.13 }}
+              />
+            </div>
+            {/* Mouth */}
+            <motion.div
+              animate={isSpeaking ? { scaleX: [1, 1.5, 0.7, 1.4, 1] } : {}}
+              transition={{ repeat: isSpeaking ? Infinity : 0, duration: 0.33 }}
+              className="absolute bg-white"
+              style={{
+                width: sz*0.22, height: sz*0.11,
+                bottom: "22%",
+                borderRadius: "0 0 50% 50%",
+              }}
+            />
+            {/* Cheeks */}
+            <div className="absolute" style={{ bottom:"18%", left:"9%", width:sz*0.16, height:sz*0.09, borderRadius:"50%", background:"rgba(255,180,200,0.45)" }} />
+            <div className="absolute" style={{ bottom:"18%", right:"9%", width:sz*0.16, height:sz*0.09, borderRadius:"50%", background:"rgba(255,180,200,0.45)" }} />
+          </div>
+
+          {/* Speaking ring */}
+          {isSpeaking && (
+            <motion.div
+              className="absolute inset-0 rounded-full border-2 border-purple-400"
+              animate={{ scale: [1, 1.35], opacity: [0.5, 0] }}
+              transition={{ repeat: Infinity, duration: 0.85 }}
+            />
+          )}
+
+          {/* AI badge instead of online dot */}
+          <div
+            className="absolute font-black text-white flex items-center justify-center"
+            style={{
+              bottom: -1, right: -1,
+              width: compact ? 13 : 16, height: compact ? 13 : 16,
+              borderRadius: "50%",
+              background: "linear-gradient(135deg,#7c3aed,#db2777)",
+              fontSize: compact ? 5 : 6,
+              border: "1.5px solid white",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+            }}
+          >
+            AI
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Name */}
+      <p className={`${compact ? "text-[9px]" : "text-[10px]"} font-black leading-tight text-center text-purple-600 dark:text-purple-400`}>
+        Puku
+      </p>
+    </motion.div>
+  );
+});
+
 // ── Wooden desk bench ─────────────────────────────────────────────────────────
 const Bench = memo(function Bench({
   left, right, hostUid, onSelect, compact, tc, myUid, myStudyMins,
+  pukuSpeech, pukuSpeaking,
 }: {
   left: RoomParticipant | null;
   right: RoomParticipant | null;
@@ -305,25 +452,48 @@ const Bench = memo(function Bench({
   tc: ThemeConfig;
   myUid?: string;
   myStudyMins?: number;
+  pukuSpeech?: string;
+  pukuSpeaking?: boolean;
 }) {
   const deskW = compact ? "w-36" : "w-48 sm:w-56";
   const gap   = compact ? "gap-4" : "gap-6 sm:gap-10";
 
-  // For the current user's avatar, use local wall-clock minutes (same source as the
-  // side panel) so the badge matches. For other participants use getLiveStudyMins.
   const leftMins  = left  ? (left.uid  === myUid && myStudyMins !== undefined ? myStudyMins  : getLiveStudyMins(left))  : 0;
   const rightMins = right ? (right.uid === myUid && myStudyMins !== undefined ? myStudyMins : getLiveStudyMins(right)) : 0;
+
+  function renderSeat(p: RoomParticipant | null, side: "left" | "right") {
+    if (!p) return <EmptySeat key={`e-${side}`} compact={compact} tc={tc} />;
+    if (p.uid === PUKU_UID) {
+      return (
+        <PukuSeat
+          key="puku"
+          compact={compact}
+          tc={tc}
+          speech={pukuSpeech ?? ""}
+          isSpeaking={pukuSpeaking ?? false}
+        />
+      );
+    }
+    const mins = side === "left" ? leftMins : rightMins;
+    return (
+      <OccupiedSeat
+        key={p.uid}
+        p={p}
+        isHost={p.uid === hostUid}
+        onClick={() => onSelect(p)}
+        compact={compact}
+        liveMins={mins}
+        tc={tc}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col items-center" style={{ gap: 0 }}>
       <div className={`flex items-end ${gap} mb-1`}>
         <AnimatePresence mode="popLayout">
-          {left
-            ? <OccupiedSeat key={left.uid}  p={left}  isHost={left.uid  === hostUid} onClick={() => onSelect(left)}  compact={compact} liveMins={leftMins}  tc={tc} />
-            : <EmptySeat key="el" compact={compact} tc={tc} />}
-          {right
-            ? <OccupiedSeat key={right.uid} p={right} isHost={right.uid === hostUid} onClick={() => onSelect(right)} compact={compact} liveMins={rightMins} tc={tc} />
-            : <EmptySeat key="er" compact={compact} tc={tc} />}
+          {renderSeat(left, "left")}
+          {renderSeat(right, "right")}
         </AnimatePresence>
       </div>
 
@@ -353,10 +523,8 @@ export const ClassroomView = memo(function ClassroomView({
   participants, hostUid, onSelectStudent,
   timerLabel, timerPhaseType, roomStatus, compact = false,
   theme = "classic", myUid, myStudyMins,
+  pukuVisible = false, pukuSpeech = "", pukuSpeaking = false,
 }: Props) {
-  // Read the per-second countdown directly from context so StudyRoomLive parent
-  // doesn't need to pass a prop that changes every second (which caused the whole
-  // parent to re-render every second — the #1 performance bottleneck).
   const { remainingSeconds } = useTimerDisplay();
   const timerDisplay = formatTime(remainingSeconds);
 
@@ -366,16 +534,21 @@ export const ClassroomView = memo(function ClassroomView({
 
   const tc = useMemo(() => getThemeConfig(theme), [theme]);
 
+  // Inject Puku as a fake participant so he gets a real bench seat
+  const seatsWithPuku = useMemo(() => {
+    if (!pukuVisible) return participants;
+    const pukuFake = { uid: PUKU_UID, name: "Puku" } as RoomParticipant;
+    return [...participants, pukuFake];
+  }, [participants, pukuVisible]);
+
   const pairs = useMemo(() => {
     const p: (RoomParticipant | null)[][] = [];
-    for (let i = 0; i < participants.length; i += 2) {
-      p.push([participants[i] ?? null, participants[i + 1] ?? null]);
+    for (let i = 0; i < seatsWithPuku.length; i += 2) {
+      p.push([seatsWithPuku[i] ?? null, seatsWithPuku[i + 1] ?? null]);
     }
-    // Always minimum 2 benches — consistent on every screen size.
-    // Same room → same layout on mobile and desktop.
     while (p.length < 2) p.push([null, null]);
     return p;
-  }, [participants]);
+  }, [seatsWithPuku]);
 
   const isStudying = timerPhaseType === "study" && roomStatus === "active";
   const isBreak    = timerPhaseType === "break"  && roomStatus === "active";
@@ -383,8 +556,6 @@ export const ClassroomView = memo(function ClassroomView({
   const isWaiting  = roomStatus === "waiting";
   const showTimer  = roomStatus && roomStatus !== "waiting" && roomStatus !== "finished";
 
-  // Dynamic height: grows to accommodate all benches so every participant is visible.
-  // overflow-x-hidden clips decorative side elements (windows) without cutting off rows.
   const minH = compact
     ? 300 + pairs.length * 90
     : 370 + pairs.length * 108;
@@ -395,7 +566,6 @@ export const ClassroomView = memo(function ClassroomView({
       {/* ── WALL BACKGROUND ──────────────────────────────────────────────── */}
       <div className={`absolute inset-0 bg-gradient-to-b ${tc.wallBg}`} />
 
-      {/* ── NIGHT: warm lamp glow radiates from the side bulb ───────────── */}
       {theme === "night" && (
         <>
           <div className="absolute inset-0 pointer-events-none"
@@ -405,26 +575,20 @@ export const ClassroomView = memo(function ClassroomView({
         </>
       )}
 
-      {/* ── CLASSIC: soft ceiling ambient ────────────────────────────────── */}
       {theme !== "night" && (
         <div className="absolute inset-x-0 top-0 h-32 pointer-events-none"
           style={{ background: "radial-gradient(ellipse 60% 60% at 50% 0%, rgba(254,243,199,0.55) 0%, transparent 100%)" }} />
       )}
 
-      {/* Wainscoting — fixed pixel from top so it stays below the blackboard area
-           regardless of how many benches are rendered (not percentage-based). */}
       <div className={`absolute inset-x-0 ${tc.wainscoteLine}`} style={{ top: compact ? 168 : 218, height: 2 }} />
       <div className={`absolute inset-x-0 bottom-0 ${tc.wainscotePanel}`} style={{ top: compact ? 168 : 218 }} />
 
-      {/* ── CEILING LIGHT ────────────────────────────────────────────────── */}
       {theme === "night"
         ? <EdisonBulb   compact={compact} />
         : <ClassicCeilingLight />}
 
-      {/* ── PRAYER FLAGS ─────────────────────────────────────────────────── */}
       <PrayerFlags compact={compact} theme={theme} />
 
-      {/* ── WINDOWS ──────────────────────────────────────────────────────── */}
       <div className={`absolute ${compact ? "top-3 left-2" : "top-4 left-3"}`}>
         {theme === "night" ? <WindowNight compact={compact} /> : <WindowClassic compact={compact} />}
       </div>
@@ -505,14 +669,20 @@ export const ClassroomView = memo(function ClassroomView({
       {/* ── STUDENT ROWS ─────────────────────────────────────────────── */}
       <div className="relative px-3 pb-5">
         {pairs.map((pair, row) => {
-          const totalRows  = Math.max(pairs.length, 1);
+          const totalRows   = Math.max(pairs.length, 1);
           const depthFactor = row / Math.max(totalRows - 1, 1);
           const scale       = 0.84 + depthFactor * 0.16;
           const opacity     = 0.88 + depthFactor * 0.12;
           return (
             <div key={row} className="flex justify-center"
               style={{ marginBottom: compact ? 12 : 16, transform: `scale(${scale})`, transformOrigin: "center bottom", opacity }}>
-              <Bench left={pair[0]} right={pair[1]} hostUid={hostUid} onSelect={handleSelect} compact={compact} tc={tc} myUid={myUid} myStudyMins={myStudyMins} />
+              <Bench
+                left={pair[0]} right={pair[1]}
+                hostUid={hostUid} onSelect={handleSelect}
+                compact={compact} tc={tc}
+                myUid={myUid} myStudyMins={myStudyMins}
+                pukuSpeech={pukuSpeech} pukuSpeaking={pukuSpeaking}
+              />
             </div>
           );
         })}
@@ -528,7 +698,7 @@ export const ClassroomView = memo(function ClassroomView({
         ))}
       </div>
 
-      {/* Student count */}
+      {/* Student count — excludes Puku */}
       <div className="absolute bottom-1.5 right-2 pointer-events-none">
         <p className={`text-[9px] font-medium ${tc.countColor}`}>
           {participants.length} student{participants.length !== 1 ? "s" : ""}
