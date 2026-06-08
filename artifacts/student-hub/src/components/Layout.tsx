@@ -281,10 +281,10 @@ export function Layout({ children }: LayoutProps) {
           style={{
             WebkitOverflowScrolling: "touch",
             overscrollBehavior: "contain",
-            // Study-room live pages handle their own bottom spacing (room tab bar).
-            // All other pages need padding for the app's bottom nav bar (5rem).
+            // Study-room pages: global nav (4rem) stays visible — room tab bar floats above it.
+            // All other pages: pad for the global bottom nav (5rem with safe-area).
             paddingBottom: /^\/study-rooms\/[^/]+/.test(location)
-              ? "0px"
+              ? "calc(4rem + env(safe-area-inset-bottom, 0px))"
               : "calc(5rem + env(safe-area-inset-bottom, 0px))",
           }}
         >
@@ -334,13 +334,11 @@ export function Layout({ children }: LayoutProps) {
         </>
       )}
 
-      {/* ── Mobile Bottom Navigation ──
-           Hidden on live study-room pages: the room has its own bottom tab bar
-           (Classroom / Vote / Chat / Buddy) which must sit above this nav.       */}
+      {/* ── Mobile Bottom Navigation — always visible.
+           On study-room pages the room's own tab bar floats above this nav.
+           On all other pages this is the primary navigation.                      */}
       <nav
-        className={`md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 shadow-lg z-40 ${
-          /^\/study-rooms\/[^/]+/.test(location) ? "hidden" : ""
-        }`}
+        className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 shadow-lg z-40"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
         <div className="flex items-center justify-around h-16 px-2">

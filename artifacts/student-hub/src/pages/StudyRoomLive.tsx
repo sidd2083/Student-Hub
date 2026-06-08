@@ -187,6 +187,7 @@ export default function StudyRoomLive() {
   const [showCopied,      setShowCopied]  = useState(false);
   const [flowOpen,        setFlowOpen]    = useState(true);
   const [isFullscreen,    setIsFullscreen] = useState(false);
+  const [nativeFS,        setNativeFS]     = useState(false);
   const [floatingEmojis,  setFE]          = useState<FloatingEmoji[]>([]);
   const [showLeave,       setShowLeave]   = useState(false);
   const [showEndVote,     setShowEndVote] = useState(false);
@@ -501,6 +502,21 @@ export default function StudyRoomLive() {
     if (mobileTab === "chat") setUnreadChatCount(0);
   }, [mobileTab]);
 
+  // ── Native fullscreen change listener ─────────────────────────────────────
+  useEffect(() => {
+    function onFSChange() {
+      const isNative = document.fullscreenElement === containerRef.current;
+      setNativeFS(isNative);
+      setIsFullscreen(isNative || !!document.fullscreenElement);
+      if (!document.fullscreenElement) {
+        // Exiting fullscreen — scroll to top so nothing is cut off
+        setTimeout(() => containerRef.current?.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior }), 50);
+      }
+    }
+    document.addEventListener("fullscreenchange", onFSChange);
+    return () => document.removeEventListener("fullscreenchange", onFSChange);
+  }, []);
+
   // ── Memoised messages JSX — prevents re-render on every 1-second timer tick ──
   const messagesJSX = useMemo(() =>
     allMessages.map((msg, idx) => {
@@ -579,7 +595,9 @@ export default function StudyRoomLive() {
     // Prevent double-call leaveActiveRoom
     joinedRef.current = false;
     setShowLeave(false);
-    if (isFullscreen) setIsFullscreen(false);
+    if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); }
+    setIsFullscreen(false);
+    setNativeFS(false);
     // Navigate immediately — leaveActiveRoom runs in background so the UI
     // responds in <50ms instead of waiting 1-3s for the Firestore write.
     setLocation("/study-rooms");
@@ -739,14 +757,29 @@ export default function StudyRoomLive() {
     }
   }
 
-  function toggleFullscreen() {
-    setIsFullscreen(prev => {
-      if (!prev) {
-        // Entering fullscreen — scroll the container to top so nothing is cut off
-        setTimeout(() => containerRef.current?.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior }), 30);
+  async function toggleFullscreen() {
+    if (!isFullscreen) {
+      // Try native browser fullscreen first (YouTube-style)
+      if (containerRef.current?.requestFullscreen) {
+        try {
+          await containerRef.current.requestFullscreen();
+          // nativeFS state is set by fullscreenchange listener
+          return;
+        } catch {
+          // Native blocked (e.g. not allowed by browser policy) — CSS fallback
+        }
       }
-      return !prev;
-    });
+      // CSS-based fallback (iOS Safari / browsers without Fullscreen API)
+      setIsFullscreen(true);
+      setNativeFS(false);
+      setTimeout(() => containerRef.current?.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior }), 30);
+    } else {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      setIsFullscreen(false);
+      setNativeFS(false);
+    }
   }
 
   async function handleHostSkipVote() {
@@ -1394,14 +1427,21 @@ export default function StudyRoomLive() {
       <Helmet><title>{room.title} — Study Room</title></Helmet>
 
       <div ref={containerRef}
-        className={`${isFullscreen ? "fixed inset-0 z-50 bg-white dark:bg-gray-950 overflow-auto" : "max-w-screen-xl mx-auto"} px-2 sm:px-4 py-3 flex flex-col gap-3`}
+        className={[
+          nativeFS
+            ? "w-full h-full overflow-auto bg-white dark:bg-gray-950"
+            : isFullscreen
+            ? "fixed inset-0 z-50 bg-white dark:bg-gray-950 overflow-auto"
+            : "max-w-screen-xl mx-auto",
+          "px-2 sm:px-4 py-3 flex flex-col gap-3",
+        ].join(" ")}
       >
         {HeaderBar()}
         {HostBar()}
         {AnnouncementBanner()}
 
         {/* ── MOBILE LAYOUT ──────────────────────────────────────────────────── */}
-        <div className="lg:hidden flex flex-col gap-3 pb-16">
+        <div className="lg:hidden flex flex-col gap-3 pb-[3.5rem]">
           {showTimer && (
             <div className={`flex items-center justify-between px-4 py-3 rounded-2xl ${isStudying ? "bg-blue-600 text-white" : "bg-green-600 text-white"}`}>
               <div className="flex items-center gap-2 flex-col items-start">
@@ -1615,8 +1655,11 @@ export default function StudyRoomLive() {
           )}
         </div>
 
-        {/* Mobile bottom nav — z-50 so it stays above the app's layout nav (z-40) */}
-        <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden shadow-lg">
+        {/* Mobile room tab bar — sits above the global bottom nav when not fullscreen */}
+        <div
+          className="fixed left-0 right-0 z-50 lg:hidden shadow-lg"
+          style={{ bottom: isFullscreen ? 0 : "calc(4rem + env(safe-area-inset-bottom, 0px))" }}
+        >
           {MobileTabs()}
         </div>
 
