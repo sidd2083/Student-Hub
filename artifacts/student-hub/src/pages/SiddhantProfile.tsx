@@ -99,6 +99,7 @@ export default function SiddhantProfile() {
             <div className="space-y-3">
               {[
                 { label: "Studying", value: "Grade 11, Hetauda" },
+                { label: "Schooled", value: "SEE — Gyandeep Sikshya Niketan, Hetauda" },
                 { label: "Building", value: "Student Hub Nepal" },
                 { label: "Learning", value: "AI / ML" },
                 { label: "Working", value: "Freelancing" },

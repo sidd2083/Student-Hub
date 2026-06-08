@@ -14,6 +14,7 @@ Allow: /tools/attendance-calculator
 Allow: /about
 Allow: /creators
 Allow: /siddhant-lamichhane
+Allow: /aarogya-sapkota
 Allow: /creators/
 Allow: /contact
 Allow: /privacy
