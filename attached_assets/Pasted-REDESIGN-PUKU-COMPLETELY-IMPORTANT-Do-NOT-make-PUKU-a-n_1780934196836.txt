@@ -1,0 +1,310 @@
+REDESIGN PUKU COMPLETELY.
+
+IMPORTANT:
+Do NOT make PUKU a notification spam system.
+
+The current problem is that PUKU talks too often and becomes annoying. Students should feel that PUKU is a helpful study companion, not a distraction.
+
+NO FIREBASE / NO DATABASE:
+
+* Do not use Firestore.
+* Do not use backend AI memory.
+* Do not increase database reads/writes.
+* Everything should work client-side only.
+
+MAIN GOAL:
+
+PUKU should feel like a friend studying with the user.
+
+Not a chatbot.
+Not a notification bot.
+Not a teacher.
+
+A study companion.
+
+---
+
+## INTELLIGENT DISTRACTION DETECTION
+
+Current behavior is bad.
+
+Do NOT show warnings every minute.
+
+Instead:
+
+If user switches tab:
+
+* Start monitoring.
+* Do not immediately warn.
+
+After 5 minutes outside Student Hub:
+
+Show ONE warning.
+
+Example:
+
+"Still studying?"
+
+Buttons:
+
+[ Yes, I'm studying ]
+[ I'm distracted ]
+
+IMPORTANT:
+
+If user clicks "Yes, I'm studying":
+
+* Continue session.
+* Do not show another warning immediately.
+
+Wait another meaningful period before checking again.
+
+If user ignores the popup completely:
+
+* Pause study timer.
+* Pause room timer contribution.
+* Pause productivity tracking.
+
+Only resume when user confirms they are studying.
+
+This should work similarly to Pomodoro anti-cheat.
+
+---
+
+## WHEN USER IS IN ANOTHER TAB
+
+If user is outside Student Hub:
+
+PUKU must still be able to get attention.
+
+Use browser notifications only for important situations:
+
+Examples:
+
+* 5+ minutes away
+* Session completed
+* Long inactivity
+
+DO NOT spam notifications.
+
+Maximum goal:
+Make notifications meaningful.
+
+---
+
+## PUKU SHOULD NOT TALK CONSTANTLY
+
+Bad:
+
+1 minute:
+"Keep studying."
+
+2 minutes:
+"Stay focused."
+
+3 minutes:
+"Keep going."
+
+This is annoying.
+
+Instead:
+
+Session Start
+
+Early Session
+
+Mid Session
+
+Near Session End
+
+Session Complete
+
+Natural conversation only.
+
+---
+
+## PERSONALITY SYSTEM
+
+PUKU should have emotions.
+
+States:
+
+* Happy
+* Relaxed
+* Focused
+* Concerned
+* Frustrated
+* Proud
+* Excited
+
+Example:
+
+Many distractions:
+
+PUKU becomes concerned.
+
+Many ignored warnings:
+
+PUKU becomes frustrated.
+
+Session completed:
+
+PUKU becomes proud and excited.
+
+Visual emotion changes should be visible.
+
+---
+
+## GRADE PERSONALIZATION
+
+Messages should NOT be identical for everyone.
+
+Generate separate message pools for:
+
+* Grade 9
+* Grade 10
+* Grade 11
+* Grade 12
+* CEE
+* IOE
+* Bachelor's
+
+Examples:
+
+Grade 10:
+
+"SEE preparation becomes easier when you're consistent."
+
+CEE:
+
+"Every focused session gets you closer to medical entrance."
+
+IOE:
+
+"Engineering entrance rewards consistency."
+
+Bachelor's:
+
+"Small progress every day beats last-minute panic."
+
+Messages should feel relevant.
+
+---
+
+## MASSIVE MESSAGE VARIETY
+
+Current issue:
+
+Messages become predictable.
+
+Create large message pools.
+
+Categories:
+
+* Motivation
+* Focus
+* Break reminders
+* Water reminders
+* Session completion
+* Come-back messages
+* Distraction warnings
+* Encouragement
+* Light humor
+
+The same message should rarely repeat.
+
+Rotation must feel natural.
+
+---
+
+## HEALTH REMINDERS
+
+Occasionally remind:
+
+* Drink water
+* Fix posture
+* Stretch
+* Rest eyes
+
+Not too often.
+
+Examples:
+
+"Quick water break?"
+
+"Relax your shoulders."
+
+"Look away from the screen for a few seconds."
+
+---
+
+## PRESENCE SYSTEM
+
+PUKU should always feel present.
+
+Visible in:
+
+* Study Room
+* Dashboard
+* Notes
+* Leaderboard
+* Other pages
+
+He should not disappear.
+
+Use:
+
+* Small avatar
+* Expressions
+* Speech bubbles
+* Subtle animations
+
+Do not make him intrusive.
+
+---
+
+## STUDY COMPANION MODE
+
+The feeling should be:
+
+"Someone is studying with me."
+
+Examples:
+
+Session Start:
+
+"Let's focus."
+
+Mid Session:
+
+"Nice pace."
+
+Near End:
+
+"Almost there."
+
+Session End:
+
+"Good work today."
+
+Natural.
+
+Simple.
+
+Human.
+
+---
+
+## FINAL GOAL
+
+When students use Student Hub for a week:
+
+They should feel:
+
+"I like studying with PUKU."
+
+NOT:
+
+"This thing keeps interrupting me."
+
+PUKU should improve focus, reduce loneliness, and create a better study atmosphere while remaining lightweight, fast, client-side only, and non-intrusive.
