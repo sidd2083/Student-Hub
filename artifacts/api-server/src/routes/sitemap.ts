@@ -65,6 +65,7 @@ const STATIC_URLS = [
   { loc: `${SITE_URL}/tools`,                       priority: "0.90", changefreq: "monthly" },
   { loc: `${SITE_URL}/tools/gpa-calculator`,        priority: "1.0",  changefreq: "weekly"  },
   { loc: `${SITE_URL}/tools/attendance-calculator`, priority: "1.0",  changefreq: "weekly"  },
+  { loc: `${SITE_URL}/creators`,                    priority: "0.85", changefreq: "weekly"  },
   { loc: `${SITE_URL}/about`,                       priority: "0.60", changefreq: "monthly" },
   { loc: `${SITE_URL}/contact`,                     priority: "0.50", changefreq: "monthly" },
   { loc: `${SITE_URL}/privacy`,                     priority: "0.40", changefreq: "yearly"  },
@@ -89,10 +90,11 @@ function buildXml(urls: UrlEntry[], today: string): string {
 // cause a gap where Google sees only the static-only fallback.
 
 interface DiskCache {
-  xml:         string;
-  generatedAt: number; // epoch ms
-  noteCount:   number;
-  pyqCount:    number;
+  xml:          string;
+  generatedAt:  number; // epoch ms
+  noteCount:    number;
+  pyqCount:     number;
+  creatorCount: number;
 }
 
 function loadFromDisk(): DiskCache | null {
@@ -105,7 +107,7 @@ function loadFromDisk(): DiskCache | null {
       log.info("Sitemap: disk cache too old, ignoring");
       return null;
     }
-    log.info({ noteCount: c.noteCount, pyqCount: c.pyqCount, ageMin: Math.round(ageMs / 60_000) }, "Sitemap: loaded from disk cache");
+    log.info({ noteCount: c.noteCount, pyqCount: c.pyqCount, creatorCount: c.creatorCount ?? 0, ageMin: Math.round(ageMs / 60_000) }, "Sitemap: loaded from disk cache");
     return c;
   } catch {
     return null;
@@ -155,7 +157,11 @@ async function generateAndCache(pingAfter = false): Promise<void> {
     const today = new Date().toISOString().split("T")[0];
     log.info("Sitemap: fetching Firestore collections");
 
-    const [noteDocs, pyqDocs] = await Promise.all([fetchAll("notes"), fetchAll("pyqs")]);
+    const [noteDocs, pyqDocs, creatorDocs] = await Promise.all([
+      fetchAll("notes"),
+      fetchAll("pyqs"),
+      fetchAll("creators"),
+    ]);
 
     const noteUrls: UrlEntry[] = noteDocs.filter(d => d.fields).map(d => ({
       loc:        `${SITE_URL}/notes/${docId(d.name)}-grade-${fInt(d.fields, "grade")}-${toSlug(fStr(d.fields, "subject"))}-${toSlug(fStr(d.fields, "title"))}`,
@@ -169,18 +175,28 @@ async function generateAndCache(pingAfter = false): Promise<void> {
       changefreq: "monthly",
     }));
 
+    // Individual creator profile URLs — visible creators only
+    const creatorUrls: UrlEntry[] = creatorDocs
+      .filter(d => d.fields && d.fields.visible?.booleanValue !== false)
+      .map(d => ({
+        loc:        `${SITE_URL}/creators/${docId(d.name)}-${toSlug(fStr(d.fields, "name"))}`,
+        priority:   "0.80",
+        changefreq: "weekly",
+      }));
+
     const disk: DiskCache = {
-      xml:         buildXml([...STATIC_URLS, ...noteUrls, ...pyqUrls], today),
-      generatedAt: Date.now(),
-      noteCount:   noteUrls.length,
-      pyqCount:    pyqUrls.length,
+      xml:          buildXml([...STATIC_URLS, ...noteUrls, ...pyqUrls, ...creatorUrls], today),
+      generatedAt:  Date.now(),
+      noteCount:    noteUrls.length,
+      pyqCount:     pyqUrls.length,
+      creatorCount: creatorUrls.length,
     };
 
     sitemapCache = { ...disk, isFullData: true };
     saveToDisk(disk);
 
     log.info(
-      { notes: noteUrls.length, pyqs: pyqUrls.length, total: STATIC_URLS.length + noteUrls.length + pyqUrls.length },
+      { notes: noteUrls.length, pyqs: pyqUrls.length, creators: creatorUrls.length, total: STATIC_URLS.length + noteUrls.length + pyqUrls.length + creatorUrls.length },
       "Sitemap: generated",
     );
 
@@ -206,11 +222,12 @@ async function generateAndCache(pingAfter = false): Promise<void> {
   } else {
     const today = new Date().toISOString().split("T")[0];
     sitemapCache = {
-      xml:         buildXml([...STATIC_URLS], today),
-      generatedAt: Date.now(),
-      noteCount:   0,
-      pyqCount:    0,
-      isFullData:  false,
+      xml:          buildXml([...STATIC_URLS], today),
+      generatedAt:  Date.now(),
+      noteCount:    0,
+      pyqCount:     0,
+      creatorCount: 0,
+      isFullData:   false,
     };
     log.info("Sitemap: no disk cache — static placeholder active, generating full sitemap in background");
   }
@@ -308,15 +325,16 @@ router.post("/api/sitemap/redeploy", async (_req: Request, res: Response) => {
 });
 
 router.get("/api/sitemap/status", (_req: Request, res: Response) => {
-  const { noteCount, pyqCount, generatedAt, isFullData } = sitemapCache;
+  const { noteCount, pyqCount, creatorCount, generatedAt, isFullData } = sitemapCache;
   res.json({
-    ready:       true,
+    ready:        true,
     isFullData,
     noteCount,
     pyqCount,
-    totalUrls:   STATIC_URLS.length + noteCount + pyqCount,
-    ageMin:      Math.round((Date.now() - generatedAt) / 60_000),
-    generatedAt: new Date(generatedAt).toISOString(),
+    creatorCount: creatorCount ?? 0,
+    totalUrls:    STATIC_URLS.length + noteCount + pyqCount + (creatorCount ?? 0),
+    ageMin:       Math.round((Date.now() - generatedAt) / 60_000),
+    generatedAt:  new Date(generatedAt).toISOString(),
   });
 });
 
@@ -334,6 +352,8 @@ router.get("/robots.txt", (_req: Request, res: Response) => {
     "Allow: /tools",
     "Allow: /tools/gpa-calculator",
     "Allow: /tools/attendance-calculator",
+    "Allow: /creators",
+    "Allow: /creators/",
     "Allow: /about",
     "Allow: /contact",
     "Allow: /privacy",
