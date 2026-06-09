@@ -1,0 +1,313 @@
+REDESIGN PUKU AS A REAL STUDY COMPANION
+
+Current implementation is not acceptable.
+
+PUKU currently behaves like a scheduled notification bot.
+
+This is NOT what we want.
+
+GOAL:
+
+PUKU should feel like a real study partner sitting beside the student.
+
+Not a timer.
+Not a chatbot.
+Not a notification system.
+
+A study companion.
+
+---
+
+## ANTI-CHEAT / ACTIVITY SYSTEM
+
+Current activity detection is too weak.
+
+User should not receive study credit simply because the tab is open.
+
+Track meaningful activity:
+
+* Mouse movement
+* Scrolling
+* Clicking
+* Keyboard activity
+* User responses
+
+Activity should NOT require constant movement.
+
+Students may read for several minutes without touching anything.
+
+Therefore:
+
+Create activity confidence scoring.
+
+Example:
+
+Recent interaction:
+100%
+
+Reading silently:
+80%
+
+No activity for long period:
+60%
+
+Very long inactivity:
+40%
+
+Suspicious inactivity:
+20%
+
+At low confidence:
+
+PUKU begins checking.
+
+---
+
+## INTELLIGENT CHECK SYSTEM
+
+DO NOT check every minute.
+
+DO NOT annoy users.
+
+Example:
+
+5-10 minutes no activity:
+
+PUKU says:
+
+"Still with me?"
+
+Show popup.
+
+Buttons:
+
+[ Yes, studying ]
+[ Taking a break ]
+
+If user confirms:
+
+Continue.
+
+If ignored:
+
+Pause study tracking.
+
+---
+
+## PROGRESSIVE RESPONSE SYSTEM
+
+First inactivity:
+
+Friendly.
+
+Second inactivity:
+
+Concerned.
+
+Third inactivity:
+
+More serious.
+
+Example:
+
+1st:
+"Still studying?"
+
+2nd:
+"You've been quiet for a while."
+
+3rd:
+"Should I pause the timer?"
+
+4th:
+"No response. I'm pausing your study time."
+
+This feels human.
+
+---
+
+## PUKU MUST FEEL ALIVE
+
+PUKU should react to events.
+
+Examples:
+
+User returns after distraction:
+
+"Welcome back."
+
+User studies 20 minutes:
+
+"You're locked in today."
+
+User studies 45 minutes:
+
+"This is some serious focus."
+
+User finishes session:
+
+"Nice work. That session counted."
+
+User ignores multiple checks:
+
+"I think you've left."
+
+---
+
+## NO FIXED TIMER DIALOGUE
+
+Current problem:
+
+Start
+5 min
+15 min
+End
+
+Too predictable.
+
+Instead:
+
+Use event-driven dialogue.
+
+PUKU talks because something happened.
+
+Not because a clock hit a number.
+
+---
+
+## LONGER NATURAL MESSAGES
+
+Current messages are too short.
+
+Bad:
+
+"Good job."
+
+Bad:
+
+"Keep going."
+
+Bad:
+
+"Stay focused."
+
+Use human-style messages.
+
+Examples:
+
+"You're making good progress. Just keep moving forward."
+
+"Nice. You stayed focused through that section."
+
+"That was a solid study block."
+
+"Let's finish this session properly."
+
+Natural language.
+
+---
+
+## LARGE MESSAGE LIBRARY
+
+Create large message pools.
+
+At least:
+
+* Motivation
+* Focus
+* Inactivity
+* Session completion
+* Comeback
+* Break reminders
+* Water reminders
+* Humor
+* Encouragement
+
+Messages should rarely repeat.
+
+---
+
+## POPUPS MUST BE IMPORTANT
+
+Popup = important event.
+
+Do not spam.
+
+Use popup for:
+
+* Inactivity checks
+* Session completion
+* Timer pause
+* Long absence
+
+---
+
+## SESSION COMPLETION
+
+After final session ends:
+
+Immediately freeze study tracking.
+
+No additional study time should ever be recorded.
+
+Show host popup:
+
+Choose next action:
+
+[ Restart Session ]
+
+[ Create New Session Timing ]
+
+[ End Room Session ]
+
+Host must choose.
+
+No hidden background timer.
+
+No extra study tracking after completion.
+
+---
+
+## PUKU PERSONALITY
+
+PUKU should have emotions.
+
+Relaxed
+
+Happy
+
+Focused
+
+Proud
+
+Concerned
+
+Frustrated
+
+Example:
+
+Repeated ignored checks:
+
+PUKU becomes frustrated.
+
+User returns:
+
+PUKU relaxes.
+
+User completes session:
+
+PUKU becomes proud.
+
+---
+
+## FINAL GOAL
+
+A student should feel:
+
+"PUKU is studying with me."
+
+NOT:
+
+"PUKU is sending notifications."
+
+PUKU should improve focus, detect inactivity intelligently, pause study time when necessary, feel human, react to behavior, and create a genuine study companion experience.

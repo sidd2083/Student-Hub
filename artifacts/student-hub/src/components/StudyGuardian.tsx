@@ -461,7 +461,7 @@ export function StudyGuardian() {
       if (phaseRef.current !== "work") return;
 
       const idleMs = Date.now() - lastActivityRef.current;
-      if (idleMs < 4 * 60_000) return; // < 4 min idle → still probably studying
+      if (idleMs < 8 * 60_000) return; // < 8 min idle → still probably studying (reading silently)
 
       // Cooldown: don't show more than once per 20 min
       if (lastIdleCheckRef.current && Date.now() - lastIdleCheckRef.current < 20 * 60_000) return;

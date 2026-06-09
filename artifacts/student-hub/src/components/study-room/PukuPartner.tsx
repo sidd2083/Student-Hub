@@ -297,6 +297,62 @@ const MSG = {
     `Another student's here — my work is done. Good luck, ${fn}!`,
     `Company's arrived! I'll step back. You did well today, ${fn}.`,
   ]),
+
+  inactivityCheck: (fn: string, count: number) => {
+    if (count === 1) return pick([
+      `Still with me, ${fn}?`,
+      `Hey ${fn} — still studying?`,
+      `Just checking in. You still here?`,
+      `${fn}, still going?`,
+      `Everything okay over there, ${fn}?`,
+    ]);
+    if (count === 2) return pick([
+      `${fn}, you've been quiet for a while.`,
+      `Haven't heard from you in a bit, ${fn}.`,
+      `${fn}... still there?`,
+      `You've gone quiet, ${fn}. Still focused?`,
+      `It's been a while, ${fn}. You with me?`,
+    ]);
+    return pick([
+      `${fn}, should I pause the timer?`,
+      `Want me to pause while you sort things out, ${fn}?`,
+      `${fn}, I'm going to pause soon if you don't respond.`,
+      `Still there, ${fn}? One more check before I pause.`,
+      `${fn}, last call before I pause the timer.`,
+    ]);
+  },
+
+  inactivityAutoPause: (fn: string) => pick([
+    `No response, ${fn}. I'm pausing your study time.`,
+    `You haven't responded. Pausing the timer — come back when you're ready.`,
+    `I think you've left, ${fn}. Pausing. Come back and we'll pick this up.`,
+    `No response for a while. I'm pausing. You can resume when you're back.`,
+  ]),
+
+  lockedIn: (fn: string, mins: number) => {
+    if (mins <= 25) return pick([
+      `${fn}, you're locked in today. Keep going.`,
+      `Twenty minutes of solid focus, ${fn}. Don't break it now.`,
+      `You're in the zone right now. This is exactly what progress looks like.`,
+      `${fn}, this kind of session is what moves the needle. Stay in it.`,
+      `Nice. You're finding your rhythm, ${fn}. Keep moving forward.`,
+    ]);
+    return pick([
+      `${fn}, this is some serious focus. Forty-five minutes in.`,
+      `${fn}, you've been locked in for a while. The effort is showing.`,
+      `This is what real preparation looks like, ${fn}. Genuinely proud of this.`,
+      `${fn}, most students never get this deep into a session. You did.`,
+      `Forty-five minutes. That's not easy. You're building something real here, ${fn}.`,
+    ]);
+  },
+
+  comeback: (fn: string) => pick([
+    `Welcome back, ${fn}. Let's finish this properly.`,
+    `Good to have you back. Let's pick up where we left off.`,
+    `${fn}, you're back. Ready to lock in again?`,
+    `Back at it, ${fn}. Let's make the rest of this count.`,
+    `There you are. Let's not waste the momentum you already built.`,
+  ]),
 };
 
 // ── OS notification helper ───────────────────────────────────────────────────
@@ -319,11 +375,12 @@ export function PukuPartner({
   firstName, grade, isStudying, isBreak, studyMins, onLeave, visible,
   onSpeechUpdate, onMinimizeChange, onEmotionChange, onFocusPause, onFocusResume,
 }: Props) {
-  const [minimized,   setMinimized]   = useState(false);
-  const [muted,       setMuted]       = useState(false);
-  const [emotion,     setEmotion]     = useState<PukuEmotion>("happy");
+  const [minimized,     setMinimized]     = useState(false);
+  const [muted,         setMuted]         = useState(false);
+  const [emotion,       setEmotion]       = useState<PukuEmotion>("happy");
   const [distractPopup, setDistractPopup] = useState(false);
-  const [isPaused,    setIsPaused]    = useState(false);
+  const [isPaused,      setIsPaused]      = useState(false);
+  const [idleCheckMsg,  setIdleCheckMsg]  = useState("Still with me?");
 
   const fn = firstName.split(" ")[0];
 
@@ -345,6 +402,7 @@ export function PukuPartner({
   useEffect(() => { emotionCbRef.current = onEmotionChange; }, [onEmotionChange]);
   useEffect(() => { pauseCbRef.current = onFocusPause; }, [onFocusPause]);
   useEffect(() => { resumeCbRef.current = onFocusResume; }, [onFocusResume]);
+  useEffect(() => { distractPopupRef.current = distractPopup; }, [distractPopup]);
 
   const hasGreeted    = useRef(false);
   const prevStudying  = useRef(false);
@@ -355,6 +413,12 @@ export function PukuPartner({
   const lastWarnedAt  = useRef(0);
   const wasBye        = useRef(false);
   const lastHealthAt  = useRef(0);
+
+  // ── Activity confidence tracking ──────────────────────────────────────────
+  const lastActivityRef          = useRef<number>(Date.now());
+  const idleCheckCountRef        = useRef<number>(0);   // consecutive ignored checks
+  const lastConfirmedStudyingAt  = useRef<number>(0);   // when user last clicked "Yes, studying"
+  const distractPopupRef         = useRef<boolean>(false); // mirror of distractPopup for timers
 
   const setEmotionBoth = useCallback((e: PukuEmotion) => {
     setEmotion(e);
@@ -430,6 +494,16 @@ export function PukuPartner({
     }
   }, []);
 
+  // ── Activity tracking (on-page idle confidence) ───────────────────────────
+  // Any real interaction resets the idle clock. We track silently.
+  useEffect(() => {
+    if (!visible) return;
+    const touch = () => { lastActivityRef.current = Date.now(); };
+    const EVENTS = ["mousemove", "keydown", "click", "scroll", "touchstart"] as const;
+    EVENTS.forEach(ev => window.addEventListener(ev, touch, { passive: true }));
+    return () => EVENTS.forEach(ev => window.removeEventListener(ev, touch));
+  }, [visible]);
+
   // ── Greeting (once) ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!visible || hasGreeted.current) return;
@@ -456,13 +530,77 @@ export function PukuPartner({
     prevBreak.current    = isBreak;
   }, [isStudying, isBreak, visible, fn, grade, speak, setEmotionBoth]);
 
+  // ── On-page idle detection with progressive escalation ────────────────────
+  // Students reading silently shouldn't be flagged too early. First check at
+  // 6–9 minutes. If the popup is ignored, PUKU escalates: friendly → concerned →
+  // serious → auto-pause. Resets completely when user confirms "Yes, studying".
+  useEffect(() => {
+    if (!visible) return;
+
+    // Called every 90s when popup is already showing but still being ignored
+    const doEscalate = () => {
+      if (!distractPopupRef.current) return; // user dismissed — stop cascade
+
+      idleCheckCountRef.current = Math.min(idleCheckCountRef.current + 1, 4);
+
+      if (idleCheckCountRef.current >= 4) {
+        // Auto-pause after 3 consecutive ignored checks
+        setDistractPopup(false);
+        setIsPaused(true);
+        pauseCbRef.current?.();
+        setEmotionBoth("frustrated");
+        speak(MSG.inactivityAutoPause(fn));
+        idleCheckCountRef.current = 0;
+        return;
+      }
+
+      const nextMsg = MSG.inactivityCheck(fn, idleCheckCountRef.current);
+      setIdleCheckMsg(nextMsg);
+      speak(nextMsg);
+      if (idleCheckCountRef.current >= 3) setEmotionBoth("frustrated");
+      else setEmotionBoth("concerned");
+
+      if (popupAutoTimer.current) clearTimeout(popupAutoTimer.current);
+      popupAutoTimer.current = setTimeout(doEscalate, 90_000);
+    };
+
+    // Poll every 30 s: fire first check after 6–9 min of on-page inactivity
+    const intervalId = setInterval(() => {
+      if (!isStudying || isPaused) return;
+      if (document.hidden) return; // tab-away handles off-tab case
+      if (distractPopupRef.current) return; // popup already visible
+
+      const idleMs = Date.now() - lastActivityRef.current;
+      if (idleMs < 6 * 60_000) return; // under 6 min — likely reading
+
+      // Cool-down: don't re-fire within 8 min of user confirming "yes"
+      if (Date.now() - lastConfirmedStudyingAt.current < 8 * 60_000) return;
+
+      // First check — always friendly
+      idleCheckCountRef.current = 1;
+      const msg = MSG.inactivityCheck(fn, 1);
+      setIdleCheckMsg(msg);
+      setEmotionBoth("happy");
+      setDistractPopup(true);
+      speak(msg);
+
+      if (popupAutoTimer.current) clearTimeout(popupAutoTimer.current);
+      popupAutoTimer.current = setTimeout(doEscalate, 90_000);
+    }, 30_000);
+
+    return () => clearInterval(intervalId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, isStudying, isPaused, fn]); // uses refs for mutable state — intentional
+
   // ── Milestones ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!visible) return;
     const checks: [number, (fn: string, grade?: number) => string, PukuEmotion][] = [
       [5,   MSG.milestone5,   "happy"],
       [15,  MSG.milestone15,  "happy"],
+      [20,  (f) => MSG.lockedIn(f, 20), "focused"],
       [30,  MSG.milestone30,  "proud"],
+      [45,  (f) => MSG.lockedIn(f, 45), "focused"],
       [60,  MSG.milestone60,  "proud"],
       [90,  MSG.milestone90,  "excited"],
       [120, MSG.milestone120, "excited"],
@@ -580,7 +718,9 @@ export function PukuPartner({
         else if (distractCount.current >= 2) setEmotionBoth("concerned");
         else setEmotionBoth("concerned");
 
-        speak(MSG.comeBack(fn, minsAway, grade));
+        const tabAwayMsg = MSG.comeBack(fn, minsAway, grade);
+        setIdleCheckMsg(tabAwayMsg);
+        speak(tabAwayMsg);
         setDistractPopup(true);
 
         // Auto-pause if ignored for 60 seconds
@@ -601,11 +741,15 @@ export function PukuPartner({
     };
   }, [visible, isStudying, fn, grade, speak, setEmotionBoth]);
 
-  // ── "Yes, I'm studying" handler ───────────────────────────────────────────
+  // ── "Yes, studying" handler ───────────────────────────────────────────────
   const handleConfirmStudying = useCallback(() => {
     if (popupAutoTimer.current) clearTimeout(popupAutoTimer.current);
     setDistractPopup(false);
     lastWarnedAt.current = Date.now();
+    // Reset idle-check state so the cascade starts fresh
+    idleCheckCountRef.current = 0;
+    lastActivityRef.current = Date.now();
+    lastConfirmedStudyingAt.current = Date.now();
     if (isPaused) {
       setIsPaused(false);
       resumeCbRef.current?.();
@@ -615,8 +759,9 @@ export function PukuPartner({
       `Good — let's get back to it.`,
       `Back in the zone. Let's go.`,
       `Welcome back. Focus mode: on.`,
+      `Alright. Back on track.`,
+      `That's what I like to hear. Keep going.`,
     ]));
-    setTimeout(() => setEmotionBoth("focused"), 3000);
   }, [isPaused, speak, setEmotionBoth]);
 
   // ── "I'm distracted" handler ──────────────────────────────────────────────
@@ -637,9 +782,12 @@ export function PukuPartner({
   const handleResume = useCallback(() => {
     setIsPaused(false);
     resumeCbRef.current?.();
+    idleCheckCountRef.current = 0;
+    lastActivityRef.current = Date.now();
+    lastConfirmedStudyingAt.current = Date.now();
     setEmotionBoth("focused");
-    speak(MSG.studyStart(fn, grade));
-  }, [fn, grade, speak, setEmotionBoth]);
+    speak(MSG.comeback(fn));
+  }, [fn, speak, setEmotionBoth]);
 
   // ── Bye when Puku hides ───────────────────────────────────────────────────
   useEffect(() => {
@@ -683,28 +831,29 @@ export function PukuPartner({
             <PukuFace emotion="concerned" size={28} speaking={false} />
             <span className="text-white font-black text-xs tracking-widest flex-1">PUKU</span>
           </div>
-          <p className="text-white text-sm font-semibold leading-snug px-4 pb-3">Still studying?</p>
+          <p className="text-white text-sm font-semibold leading-snug px-4 pb-3">{idleCheckMsg}</p>
           <div className="flex gap-2 px-4 pb-4">
             <button
               onClick={handleConfirmStudying}
               className="flex-1 flex items-center justify-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors"
             >
               <CheckCircle className="w-3.5 h-3.5" />
-              Yes, I'm studying
+              Yes, studying
             </button>
             <button
               onClick={handleConfirmDistracted}
               className="flex-1 flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/20 text-white/80 text-xs font-bold px-3 py-2 rounded-xl transition-colors"
             >
               <XCircle className="w-3.5 h-3.5" />
-              I'm distracted
+              Taking a break
             </button>
           </div>
           <motion.div
+            key={idleCheckCountRef.current}
             className="h-0.5 bg-white/30"
             initial={{ width: "100%" }}
             animate={{ width: "0%" }}
-            transition={{ duration: 60, ease: "linear" }}
+            transition={{ duration: 90, ease: "linear" }}
           />
         </div>
       </motion.div>
