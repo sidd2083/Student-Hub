@@ -381,7 +381,14 @@ export default function PartnerCreators() {
   const closeModal = useCallback(() => setSelected(null), []);
 
   const creatorNames = creators.map(c => c.name).join(", ");
-  const creatorKeywords = creators.map(c => `${c.name} student hub, ${c.name} nepal`).join(", ");
+  const creatorKeywords = creators.map(c =>
+    `${c.name} student hub, ${c.name} nepal, ${c.name} student hub nepal partner creator, ${c.name} neb study`
+  ).join(", ");
+
+  function nameSlug(name: string) {
+    return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  }
+
   const jsonLd = creators.length > 0 ? JSON.stringify({
     "@context": "https://schema.org",
     "@graph": [
@@ -393,15 +400,21 @@ export default function PartnerCreators() {
         "description": "Meet Student Hub's official partner creators — Nepal's top student content creators helping Grade 9–12 students with study tips, exam prep, and motivation.",
         "isPartOf": { "@id": "https://www.studenthubnp.com/#website" },
         "inLanguage": "en-NP",
+        "about": creators.map(c => ({ "@type": "Person", "name": c.name })),
       },
       ...creators.map(c => ({
         "@type": "Person",
-        "@id": `https://www.studenthubnp.com/creators#${c.id}`,
+        "@id": `https://www.studenthubnp.com/creators#${nameSlug(c.name)}`,
         "name": c.name,
-        "description": c.description,
+        "description": `${c.name} is an official Student Hub Nepal partner creator — helping Grade 9–12 Nepali students with NEB and SEE exam preparation. ${c.description}`,
         "image": c.image || undefined,
-        "url": `https://www.studenthubnp.com/creators`,
-        "jobTitle": "Student Hub Partner Creator",
+        "url": `https://www.studenthubnp.com/creators#${nameSlug(c.name)}`,
+        "jobTitle": "Official Partner Creator, Student Hub Nepal",
+        "affiliation": {
+          "@type": "Organization",
+          "name": "Student Hub Nepal",
+          "url": "https://www.studenthubnp.com",
+        },
         "worksFor": {
           "@type": "Organization",
           "name": "Student Hub Nepal",
@@ -412,7 +425,14 @@ export default function PartnerCreators() {
           c.tiktok,
           c.youtube,
         ].filter(Boolean),
-        "knowsAbout": ["Nepal Education", "NEB Exam Preparation", "SEE Exam", "Study Tips", "Grade 9 to 12 Nepal"],
+        "knowsAbout": [
+          "Nepal Education",
+          "NEB Exam Preparation",
+          "SEE Exam",
+          "Study Tips",
+          "Grade 9 to 12 Nepal",
+          "Student Hub Nepal",
+        ],
       })),
     ],
   }) : null;
@@ -474,7 +494,9 @@ export default function PartnerCreators() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {creators.map(c => (
-                <CreatorCard key={c.id} creator={c} onOpen={() => openModal(c)} />
+                <div key={c.id} id={nameSlug(c.name)}>
+                  <CreatorCard creator={c} onOpen={() => openModal(c)} />
+                </div>
               ))}
             </div>
           )}

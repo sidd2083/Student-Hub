@@ -3,8 +3,6 @@ import { useLocation } from "wouter";
 import { Shield, AlertTriangle, LogIn } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
-const ADMIN_SESSION = "admin_session_v1";
-
 export default function AdminLogin() {
   const [, setLocation] = useLocation();
   const { user, profile, loading, signInWithGoogle } = useAuth();
@@ -13,7 +11,6 @@ export default function AdminLogin() {
 
   useEffect(() => {
     if (isAdmin) {
-      sessionStorage.setItem(ADMIN_SESSION, "1");
       setLocation("/admin/dashboard");
     }
   }, [isAdmin, setLocation]);

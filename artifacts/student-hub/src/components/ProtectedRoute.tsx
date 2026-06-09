@@ -18,15 +18,12 @@ export function PrivateRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-const ADMIN_SESSION = "admin_session_v1";
-
 export function AdminDashboardRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
-  const hasSession = sessionStorage.getItem(ADMIN_SESSION) === "1";
 
-  if (loading && !hasSession) return <LoadingScreen />;
+  if (loading) return <LoadingScreen />;
 
-  const isAdmin = hasSession || (user && profile?.role === "admin");
+  const isAdmin = user && profile?.role === "admin";
   if (!isAdmin) return null;
 
   return <>{children}</>;

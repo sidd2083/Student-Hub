@@ -79,11 +79,13 @@ if (typeof requestIdleCallback !== "undefined") {
     void import("@/pages/DailyMissions");
     void import("@/pages/Pyqs");
   }, { timeout: 4000 });
-  // Priority 3: Secondary pages
+  // Priority 3: Secondary pages + study rooms (heavy but commonly visited)
   requestIdleCallback(() => {
     void import("@/pages/Pomodoro");
     void import("@/pages/NepAi");
     void import("@/pages/Tools");
+    void import("@/pages/StudyRooms");
+    void import("@/pages/StudyRoomLive");
   }, { timeout: 7000 });
 }
 

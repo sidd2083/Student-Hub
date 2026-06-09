@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "framer-motion";
@@ -7,6 +7,8 @@ import { Room, subscribePublicRooms, SUBJECTS } from "@/lib/studyRooms";
 import { RoomCard } from "@/components/study-room/RoomCard";
 import { useAuth } from "@/context/AuthContext";
 import { Link } from "wouter";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const STATUS_FILTERS = [
   { value: "all",     label: "All"     },
@@ -17,7 +19,8 @@ const STATUS_FILTERS = [
 export default function StudyRooms() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const [rooms, setRooms]               = useState<Room[]>([]);
+  const [publicRooms, setPublicRooms]   = useState<Room[]>([]);
+  const [myPrivateRooms, setMyPrivateRooms] = useState<Room[]>([]);
   const [search, setSearch]             = useState("");
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [statusFilter, setStatusFilter]   = useState("all");
@@ -30,13 +33,43 @@ export default function StudyRooms() {
   const [showPw, setShowPw]             = useState(false);
   const pwInputRef = useRef<HTMLInputElement>(null);
 
+  // Merge public rooms + host's own private rooms (deduplicated by id)
+  const rooms = useMemo(() => {
+    const map = new Map<string, Room>();
+    for (const r of publicRooms) map.set(r.id, r);
+    for (const r of myPrivateRooms) map.set(r.id, r);
+    return Array.from(map.values()).sort(
+      (a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0)
+    );
+  }, [publicRooms, myPrivateRooms]);
+
   useEffect(() => {
     const unsub = subscribePublicRooms((r) => {
-      setRooms(r);
+      setPublicRooms(r);
       setLoading(false);
     });
     return unsub;
   }, []);
+
+  // Subscribe to the current user's own private rooms (host only)
+  useEffect(() => {
+    if (!user) { setMyPrivateRooms([]); return; }
+    const now = Date.now();
+    const q = query(
+      collection(db, "studyRooms"),
+      where("hostUid", "==", user.uid),
+      where("isPrivate", "==", true),
+      where("status", "in", ["waiting", "active", "paused"]),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setMyPrivateRooms(
+        snap.docs
+          .map(d => ({ id: d.id, ...d.data() } as Room))
+          .filter(r => !r.expiresAt || r.expiresAt.toMillis() > now)
+      );
+    }, () => setMyPrivateRooms([]));
+    return unsub;
+  }, [user]);
 
   // Focus password input when modal opens
   useEffect(() => {
