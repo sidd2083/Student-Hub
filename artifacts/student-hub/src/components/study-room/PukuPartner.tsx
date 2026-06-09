@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Volume2, VolumeX, Minus, X, CheckCircle, XCircle } from "lucide-react";
 
@@ -114,18 +115,35 @@ const MSG = {
     `Rest mode. Walk around, drink water, look outside. Back soon!`,
     `You worked hard — rest properly. No doom-scrolling though. Just breathe.`,
     `Good time to grab some water and relax your eyes.`,
+    `${fn}, the break is part of the process. Use it properly.`,
+    `Five minutes of real rest beats twenty minutes of fake studying.`,
+    `Close your eyes for a minute. Seriously — your brain will thank you.`,
+    `${fn}, go stand up. Sit back down only when you're ready to focus.`,
+    `This is your break. Own it — no half-resting while scrolling.`,
+    `Step away from the screen, ${fn}. The notes will still be there.`,
+    `Break earned. The rule: actually rest. Not "rest" while watching reels.`,
+    `Your brain just did real work. Now let it recharge — properly.`,
   ]),
 
   milestone5: (fn: string) => pick([
     `Five minutes down, ${fn}! The hardest part is always starting — you already crushed it.`,
     `${fn}, five minutes in. You showed up and stayed. Keep going!`,
     `Nice start. Five minutes is still five minutes. Build on it.`,
+    `${fn}, first five minutes done. Most people quit before this. You didn't.`,
+    `Five in. The session is real now. Don't stop.`,
+    `${fn}, okay — we're doing this. Five minutes strong.`,
+    `You showed up and you stayed. Five minutes. That's how it starts.`,
   ]),
 
   milestone15: (fn: string) => pick([
     `Fifteen minutes, ${fn}. You're locked in now — don't break this flow.`,
     `${fn}, 15 minutes of real work done. You're in the zone. Stay there.`,
     `Quarter hour. Nice.`,
+    `${fn}, fifteen minutes. The warm-up is over. This is the real session now.`,
+    `15 minutes in and still going. That's the ${fn} I know.`,
+    `Quarter hour down. Most people haven't even opened their books yet.`,
+    `${fn}, you're fifteen minutes into something real. Don't let it slip.`,
+    `Fifteen solid minutes. Your brain is warmed up. Keep pushing.`,
   ]),
 
   milestone30: (fn: string, grade?: number) => {
@@ -165,12 +183,20 @@ const MSG = {
     `${fn}, ninety minutes. You are genuinely built differently.`,
     `90 minutes of focus. That's elite. Don't stop now.`,
     `Ninety minutes, ${fn}. I'm honestly proud of you.`,
+    `${fn}, an hour and a half. This is the kind of session that actually moves things.`,
+    `Ninety minutes in. The commitment is showing, ${fn}. Keep it going.`,
+    `${fn}, ninety minutes. You're not just studying — you're building a habit.`,
+    `An hour and a half. That's not luck, ${fn}. That's discipline.`,
   ]),
 
   milestone120: (fn: string) => pick([
     `Two hours, ${fn}. Two full hours. Your future self will remember this session.`,
     `${fn}! Two hours! I've been here with you the whole time. Truly impressive.`,
     `Two hours of real study. You're doing something most people only talk about.`,
+    `${fn}, two hours. That is not normal. That is exceptional. I mean it.`,
+    `Two full hours. Whatever exam is coming — you just got more ready for it.`,
+    `${fn}, two hours in. The consistency you're showing today is exactly what toppers do.`,
+    `You've been at this for two hours, ${fn}. This is the version of you that wins.`,
   ]),
 
   midSession: (fn: string, m: number, grade?: number) => {
@@ -181,13 +207,41 @@ const MSG = {
       `${fn}, you're past the hard part now. It gets easier from here.`,
       `Still focused. Good. Don't break it.`,
       `${fn}, you're doing the work other students skip. Remember that.`,
+      `${fn}, still here? Good. Keep going — this is it.`,
+      `The session is going well, ${fn}. You're building real momentum.`,
+      `${fn}, the fact that you haven't quit yet puts you ahead of most.`,
+      `This is what studying actually looks like. Not glamorous. Just consistent.`,
+      `${fn}, don't overthink it — just keep doing what you're doing.`,
+      `You're ${m} minutes in. Most people gave up before this.`,
+      `${fn}, the clock is your friend right now. Every minute counts.`,
+      `Still focused. I noticed. Good work, ${fn}.`,
+      `${fn}, one concept at a time. You've got this.`,
+      `Progress doesn't always feel like progress. But this is it.`,
+      `${fn}, you're doing better than you realize.`,
+      `Don't stop to check if you're doing it right. Just keep going.`,
+      `${fn}, if this topic is tough — it means you're actually learning.`,
     ];
     const specific: Record<string, string[]> = {
-      grade10:  [`${m} minutes of SEE prep. You're ahead of most right now, ${fn}.`],
-      grade12:  [`${m} minutes of board prep. This is exactly what the top scorers do.`],
-      cee:      [`${m} minutes of focused CEE prep, ${fn}. This is the difference-maker.`],
-      ioe:      [`${m} minutes in. IOE entrance is about this kind of consistency.`],
-      bachelors:[`${m} minutes down, ${fn}. Small daily progress adds up fast.`],
+      grade10:  [
+        `${m} minutes of SEE prep. You're ahead of most right now, ${fn}.`,
+        `SEE toppers sit exactly like this, ${fn}. ${m} minutes in.`,
+      ],
+      grade12:  [
+        `${m} minutes of board prep. This is exactly what the top scorers do.`,
+        `${fn}, board season rewards the consistent. You're building that consistency now.`,
+      ],
+      cee:      [
+        `${m} minutes of focused CEE prep, ${fn}. This is the difference-maker.`,
+        `${fn}, medical entrance is competitive. This session? This is how you compete.`,
+      ],
+      ioe:      [
+        `${m} minutes in. IOE entrance is about this kind of consistency.`,
+        `${fn}, engineering entrance doesn't forgive gaps. You're not leaving any.`,
+      ],
+      bachelors:[
+        `${m} minutes down, ${fn}. Small daily progress adds up fast.`,
+        `${fn}, consistency beats intensity every time. You're living proof right now.`,
+      ],
     };
     const pool = ctx && specific[ctx] ? [...shared, ...specific[ctx]] : shared;
     return pick(pool);
@@ -206,6 +260,12 @@ const MSG = {
     `Hydration check! A glass of water will actually help you focus better.`,
     `${fn}, water. Non-negotiable. Go drink something now.`,
     `Small reminder: water. Two minutes. Worth it.`,
+    `${fn}, seriously — water. Don't make me ask twice.`,
+    `You've been at this a while. Drink some water, come back sharp.`,
+    `${fn}, when did you last hydrate? Go fix that. Right now.`,
+    `Your brain runs on water, ${fn}. Literally. Go drink some.`,
+    `A glass of water is the cheapest performance upgrade available. Go get it.`,
+    `${fn}, dehydration makes everything harder. Water. Now. I'll be here.`,
   ]),
 
   health: () => pick([
@@ -215,6 +275,12 @@ const MSG = {
     `Take three deep breaths. Seriously — it resets your focus.`,
     `Stand up and stretch for just 30 seconds. Your back will thank you.`,
     `Blink a few times. Staring at screens reduces blinking — rest your eyes.`,
+    `Roll your neck left and right. Slowly. Your muscles will thank you.`,
+    `Put your palms over your eyes for 10 seconds. Screen fatigue is real.`,
+    `Uncross your legs. Sit with both feet flat on the floor. Go.`,
+    `Stretch your arms above your head and hold it for 5 seconds.`,
+    `Open a window or look outside for 20 seconds. Natural light helps.`,
+    `Wiggle your fingers and shake out your hands. You've been gripping that pen.`,
   ]),
 
   encouragement: (fn: string, grade?: number) => {
@@ -271,12 +337,32 @@ const MSG = {
       `${fn}, still studying?`,
       `You've been away for ${mins} minutes, ${fn}. Still with me?`,
       `Hey — ${mins} minutes outside. Everything okay, ${fn}?`,
+      `${fn}, the clock kept running. You've been away ${mins} minutes.`,
+      `${mins} minutes, ${fn}. Where did you go?`,
+      `You left the session open for ${mins} minutes. Still coming back?`,
+      `${fn}... ${mins} minutes away. I was starting to wonder.`,
+      `Back already? You were gone ${mins} minutes. Still studying or taking a break?`,
+      `${fn}, ${mins} minutes just passed. Timer was still running. Still in?`,
+      `I noticed you were away, ${fn}. ${mins} minutes. Everything alright?`,
+      `Your session's been running without you for ${mins} minutes, ${fn}.`,
     ];
     const specific: Record<string, string[]> = {
-      grade10:  [`${fn}, ${mins} minutes away from your SEE prep. Still studying?`],
-      grade12:  [`${fn}, ${mins} minutes away. Board prep doesn't stop — come back when you're ready.`],
-      cee:      [`${fn}, ${mins} minutes away from your CEE prep. Your seat won't wait. Still studying?`],
-      ioe:      [`${fn}, ${mins} minutes away. IOE prep in progress — coming back?`],
+      grade10:  [
+        `${fn}, ${mins} minutes away from your SEE prep. Still studying?`,
+        `${fn}, that's ${mins} minutes of SEE prep time. Come back when you're ready.`,
+      ],
+      grade12:  [
+        `${fn}, ${mins} minutes away. Board prep doesn't stop — come back when you're ready.`,
+        `Board exams don't care about distractions, ${fn}. ${mins} minutes gone. Let's go.`,
+      ],
+      cee:      [
+        `${fn}, ${mins} minutes away from your CEE prep. Your seat won't wait. Still studying?`,
+        `${fn}, the competition didn't take a ${mins}-minute break. Come back.`,
+      ],
+      ioe:      [
+        `${fn}, ${mins} minutes away. IOE prep in progress — coming back?`,
+        `Engineering entrance doesn't wait, ${fn}. ${mins} minutes away. Let's resume.`,
+      ],
     };
     const pool = ctx && specific[ctx] ? [...shared, ...specific[ctx]] : shared;
     return pick(pool);
@@ -319,6 +405,13 @@ const MSG = {
       `Just checking in. You still here?`,
       `${fn}, still going?`,
       `Everything okay over there, ${fn}?`,
+      `${fn}, haven't seen any movement. You good?`,
+      `Psst — ${fn}. You still there?`,
+      `Hey, just a quick check — still focused, ${fn}?`,
+      `${fn}, tap anything if you're still with me.`,
+      `You've been very still, ${fn}. Deep focus or drifted off?`,
+      `${fn}? Just checking you're still in it.`,
+      `A little quiet over there. Still studying, ${fn}?`,
     ]);
     if (count === 2) return pick([
       `${fn}, you've been quiet for a while.`,
@@ -326,6 +419,11 @@ const MSG = {
       `${fn}... still there?`,
       `You've gone quiet, ${fn}. Still focused?`,
       `It's been a while, ${fn}. You with me?`,
+      `${fn}, things got a little too quiet over here.`,
+      `I'm still here, ${fn}. Are you?`,
+      `${fn}, second check — still in the session?`,
+      `You haven't responded, ${fn}. Everything okay?`,
+      `${fn}, your session's still running. Just want to make sure you're still in it.`,
     ]);
     return pick([
       `${fn}, should I pause the timer?`,
@@ -333,6 +431,9 @@ const MSG = {
       `${fn}, I'm going to pause soon if you don't respond.`,
       `Still there, ${fn}? One more check before I pause.`,
       `${fn}, last call before I pause the timer.`,
+      `${fn}, I'm about to pause. Tell me you're still there.`,
+      `Timer's about to pause, ${fn}. One more chance.`,
+      `${fn}, three times now. Say something or I'm pausing.`,
     ]);
   },
 
@@ -341,6 +442,8 @@ const MSG = {
     `You haven't responded. Pausing the timer — come back when you're ready.`,
     `I think you've left, ${fn}. Pausing. Come back and we'll pick this up.`,
     `No response for a while. I'm pausing. You can resume when you're back.`,
+    `${fn}, three checks and no reply. I'm pausing — resume when you're ready.`,
+    `Pausing the timer, ${fn}. Come back whenever you're actually ready to focus.`,
   ]),
 
   lockedIn: (fn: string, mins: number) => {
@@ -350,6 +453,11 @@ const MSG = {
       `You're in the zone right now. This is exactly what progress looks like.`,
       `${fn}, this kind of session is what moves the needle. Stay in it.`,
       `Nice. You're finding your rhythm, ${fn}. Keep moving forward.`,
+      `${fn}, twenty minutes. The warm-up is long over. This is the real thing.`,
+      `You've been locked in for twenty minutes straight, ${fn}. That's rare.`,
+      `${fn}, don't stop now. You're right in the middle of something good.`,
+      `Twenty minutes. Not checking your phone, not distracted. Just working. That's it.`,
+      `${fn}, this is what a good session looks like. Keep exactly this energy.`,
     ]);
     return pick([
       `${fn}, this is some serious focus. Forty-five minutes in.`,
@@ -357,6 +465,11 @@ const MSG = {
       `This is what real preparation looks like, ${fn}. Genuinely proud of this.`,
       `${fn}, most students never get this deep into a session. You did.`,
       `Forty-five minutes. That's not easy. You're building something real here, ${fn}.`,
+      `${fn}, you've been at it for forty-five minutes. Your brain is working hard. Keep going.`,
+      `Almost an hour, ${fn}. This session is going to matter.`,
+      `${fn}, forty-five minutes of real work. The dedication is real.`,
+      `This is the version of you that passes, ${fn}. Forty-five minutes in and still focused.`,
+      `${fn}, don't let up now. Forty-five minutes earned — keep building on it.`,
     ]);
   },
 
@@ -366,6 +479,13 @@ const MSG = {
     `${fn}, you're back. Ready to lock in again?`,
     `Back at it, ${fn}. Let's make the rest of this count.`,
     `There you are. Let's not waste the momentum you already built.`,
+    `${fn}, okay — you're back. Let's not lose the pace.`,
+    `Break's over. Let's go again, ${fn}.`,
+    `${fn}, welcome back. The books missed you. Let's finish this.`,
+    `Good. You're back. Don't let that break derail the whole session.`,
+    `${fn}, back in the chair. Now back in the focus. You've got this.`,
+    `Reset done. Now let's lock back in, ${fn}.`,
+    `${fn}, the timer's waiting. Ready to go again?`,
   ]),
 };
 
@@ -434,6 +554,7 @@ export function PukuPartner({
   const idleCheckCountRef        = useRef<number>(0);   // consecutive ignored checks
   const lastConfirmedStudyingAt  = useRef<number>(0);   // when user last clicked "Yes, studying"
   const distractPopupRef         = useRef<boolean>(false); // mirror of distractPopup for timers
+  const breakCountRef            = useRef<number>(0);   // how many times "Taking a break" clicked
 
   const setEmotionBoth = useCallback((e: PukuEmotion) => {
     setEmotion(e);
@@ -806,10 +927,10 @@ export function PukuPartner({
     if (popupAutoTimer.current) clearTimeout(popupAutoTimer.current);
     setDistractPopup(false);
     lastWarnedAt.current = Date.now();
-    // Reset idle-check state so the cascade starts fresh
     idleCheckCountRef.current = 0;
     lastActivityRef.current = Date.now();
     lastConfirmedStudyingAt.current = Date.now();
+    breakCountRef.current = 0; // reset break count on confirmed studying
     if (isPaused) {
       setIsPaused(false);
       resumeCbRef.current?.();
@@ -821,22 +942,45 @@ export function PukuPartner({
       `Welcome back. Focus mode: on.`,
       `Alright. Back on track.`,
       `That's what I like to hear. Keep going.`,
+      `Nice. Still in it. Don't let that momentum slip.`,
+      `Good. Keep doing exactly what you were doing.`,
     ]));
   }, [isPaused, speak, setEmotionBoth]);
 
-  // ── "I'm distracted" handler ──────────────────────────────────────────────
+  // ── "Taking a break" handler — smart escalation ───────────────────────────
+  // First 2 times: acknowledge without pausing (give benefit of the doubt).
+  // 3rd time+: pause the timer and speak directly.
   const handleConfirmDistracted = useCallback(() => {
     if (popupAutoTimer.current) clearTimeout(popupAutoTimer.current);
     setDistractPopup(false);
-    setIsPaused(true);
-    setEmotionBoth("concerned");
-    pauseCbRef.current?.();
-    speak(pick([
-      `No worries. Take a moment, then come back. I'll be here.`,
-      `That's honest. Rest a bit — come back when you're ready.`,
-      `It happens. Take a real break and come back fresh.`,
-    ]));
-  }, [speak, setEmotionBoth]);
+    breakCountRef.current++;
+    idleCheckCountRef.current = 0;
+
+    if (breakCountRef.current <= 2) {
+      // Light acknowledgement — timer stays running
+      setEmotionBoth("relaxed");
+      speak(pick([
+        `Okay, short break. Come back soon — I'll be here.`,
+        `Alright. Clear your head and come back.`,
+        `Take a breather, ${fn}. Don't make it a long one.`,
+        `Quick break noted. Timer's still going — come back when you're ready.`,
+        `Got it. Step away, reset, come back focused.`,
+        `No problem, ${fn}. Take a moment. Just don't get sucked in.`,
+      ]));
+    } else {
+      // Pattern detected — pause and be direct
+      setIsPaused(true);
+      setEmotionBoth("concerned");
+      pauseCbRef.current?.();
+      speak(pick([
+        `${fn}, this keeps happening. I'm pausing the timer — come back when you're actually ready.`,
+        `Okay, timer's paused. Take a proper break this time, ${fn}. Come back reset.`,
+        `${fn}, I'm pausing. This is your chance to actually reset. Come back focused.`,
+        `Pausing, ${fn}. You need a real break. Take it — then let's lock in properly.`,
+        `${fn}, multiple breaks now. I'm pausing the timer. Rest properly, then come back.`,
+      ]));
+    }
+  }, [fn, speak, setEmotionBoth]);
 
   // ── Resume from paused state ──────────────────────────────────────────────
   const handleResume = useCallback(() => {
@@ -845,6 +989,7 @@ export function PukuPartner({
     idleCheckCountRef.current = 0;
     lastActivityRef.current = Date.now();
     lastConfirmedStudyingAt.current = Date.now();
+    breakCountRef.current = 0; // fresh start after resuming
     setEmotionBoth("focused");
     speak(MSG.comeback(fn));
   }, [fn, speak, setEmotionBoth]);
@@ -876,8 +1021,9 @@ export function PukuPartner({
 
   if (!visible) return null;
 
-  // ── Distraction popup ─────────────────────────────────────────────────────
-  const distractOverlay = distractPopup ? (
+  // ── Distraction popup — portalled to document.body so it always escapes
+  //    parent overflow:hidden and fullscreen containers ─────────────────────
+  const distractOverlay = distractPopup ? createPortal(
     <AnimatePresence>
       <motion.div
         key="puku-distract-popup"
@@ -918,11 +1064,12 @@ export function PukuPartner({
           />
         </div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   ) : null;
 
-  // ── Paused state banner ────────────────────────────────────────────────────
-  const pausedBanner = isPaused ? (
+  // ── Paused state banner — also portalled to document.body ─────────────────
+  const pausedBanner = isPaused ? createPortal(
     <AnimatePresence>
       <motion.div
         key="puku-paused-banner"
@@ -943,7 +1090,8 @@ export function PukuPartner({
           </button>
         </div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   ) : null;
 
   // ── Minimized pill ────────────────────────────────────────────────────────
