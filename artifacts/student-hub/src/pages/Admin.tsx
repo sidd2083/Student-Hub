@@ -5,7 +5,7 @@ import { noteUrl, pyqUrl, SITE_URL, toSlug } from "@/lib/slugs";
 import { triggerSitemapUpdate } from "@/lib/sitemapUpdate";
 import {
   collection, getDocs, doc, query, where, orderBy,
-  setDoc, getDoc, addDoc, deleteDoc, updateDoc,
+  setDoc, getDoc, addDoc, deleteDoc, updateDoc, getCountFromServer,
 } from "firebase/firestore";
 import { deleteRoomCascade, sweepZombieRooms } from "@/lib/studyRooms";
 import { signInWithPopup } from "firebase/auth";
@@ -18,7 +18,6 @@ import {
   Eye, EyeOff, ArrowUp, ArrowDown, Instagram, Youtube,
 } from "lucide-react";
 
-const ADMIN_SESSION = "admin_session_v1";
 type Section = "dashboard" | "notes" | "pyqs" | "announcements" | "users" | "reports" | "seo" | "sitemap" | "rooms" | "creators";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -345,11 +344,13 @@ function AdminOverview() {
   const [pyqCount, setPyqCount] = useState(0);
 
   useEffect(() => {
-    getDocs(collection(db, "users")).then(s => {
+    // Users: fetch full list for grade breakdown + new-today stats (admin-only)
+    getDocs(query(collection(db, "users"), orderBy("createdAt", "desc"))).then(s => {
       setUsers(s.docs.map(d => ({ uid: d.id, ...d.data() } as FireUser)));
     }).catch(console.error);
-    getDocs(collection(db, "notes")).then(s => setNoteCount(s.size)).catch(console.error);
-    getDocs(collection(db, "pyqs")).then(s => setPyqCount(s.size)).catch(console.error);
+    // Notes/PYQs: server-side count — no need to download all docs just to get the number
+    getCountFromServer(collection(db, "notes")).then(r => setNoteCount(r.data().count)).catch(console.error);
+    getCountFromServer(collection(db, "pyqs")).then(r => setPyqCount(r.data().count)).catch(console.error);
   }, []);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -2368,20 +2369,41 @@ function ManageCreators() {
   const handleImageUpload = (file: File) => {
     setUploadError("");
     if (!file.type.startsWith("image/")) { setUploadError("Please upload an image file."); return; }
-    if (file.size > 1.5 * 1024 * 1024) {
-      setUploadError("Image is too large (max 1.5 MB). Please resize it first or paste a URL instead.");
+    if (file.size > 8 * 1024 * 1024) {
+      setUploadError("Image is too large (max 8 MB).");
       return;
     }
-    setUploadProgress(50);
-    const reader = new FileReader();
-    reader.onerror = () => { setUploadError("Failed to read the file."); setUploadProgress(null); };
-    reader.onload = (e) => {
-      const result = e.target?.result;
-      if (typeof result !== "string") { setUploadError("Could not read image data."); setUploadProgress(null); return; }
-      setForm(f => ({ ...f, image: result }));
+    setUploadProgress(30);
+    const url = URL.createObjectURL(file);
+    const img = new window.Image();
+    img.onload = () => {
+      // Max 1200px, quality 0.85 — gives crisp 16:9 thumbnails on retina screens
+      // without hitting Firestore's 1MB document limit.
+      const MAX = 1200;
+      let { width, height } = img;
+      const ratio = Math.min(1, MAX / Math.max(width, height));
+      width  = Math.round(width  * ratio);
+      height = Math.round(height * ratio);
+      const canvas = document.createElement("canvas");
+      canvas.width  = width;
+      canvas.height = height;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      let dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      // Safety cap: if still >800 KB, compress more
+      if (dataUrl.length > 800_000) {
+        const c2 = document.createElement("canvas");
+        const s2 = Math.sqrt(800_000 / dataUrl.length);
+        c2.width  = Math.round(width  * s2);
+        c2.height = Math.round(height * s2);
+        c2.getContext("2d")!.drawImage(canvas, 0, 0, c2.width, c2.height);
+        dataUrl = c2.toDataURL("image/jpeg", 0.80);
+      }
       setUploadProgress(null);
+      setForm(f => ({ ...f, image: dataUrl }));
     };
-    reader.readAsDataURL(file);
+    img.onerror = () => { URL.revokeObjectURL(url); setUploadError("Failed to read image."); setUploadProgress(null); };
+    img.src = url;
   };
 
   const handleSave = async () => {
@@ -2524,7 +2546,7 @@ function ManageCreators() {
                     <div className="mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-44 overflow-y-auto">
                       {userResults.map(u => (
                         <button key={u.uid} onClick={() => {
-                          setForm(f => ({ ...f, name: u.name || f.name, image: u.photoURL || f.image, uid: u.uid }));
+                          setForm(f => ({ ...f, name: u.name || f.name, uid: u.uid }));
                           setUserSearch(u.name || "");
                           setUserResults([]);
                         }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 transition-all text-left border-b border-gray-50 last:border-0">

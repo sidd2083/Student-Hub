@@ -3,7 +3,7 @@ import { getAuth, GoogleAuthProvider, Auth } from "firebase/auth";
 import {
   initializeFirestore,
   persistentLocalCache,
-  persistentMultipleTabManager,
+  persistentSingleTabManager,
   getFirestore,
   Firestore,
 } from "firebase/firestore";
@@ -42,9 +42,11 @@ if (isConfigured) {
   // Falls back to memory-only if the browser blocks IndexedDB (private mode, etc.)
   try {
     db = initializeFirestore(app, {
-      // Multi-tab manager: allows multiple browser tabs to share the same
-      // IndexedDB cache without the "failed to obtain exclusive access" error.
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      // Single-tab manager: each tab independently manages its own IndexedDB
+      // cache. Simpler and more stable than multi-tab — avoids "Failed to
+      // obtain primary lease" errors that occur when multiple dev-server ports
+      // or Replit preview iframes compete for the same IndexedDB primary lease.
+      localCache: persistentLocalCache({ tabManager: persistentSingleTabManager() }),
     });
   } catch {
     db = getFirestore(app);

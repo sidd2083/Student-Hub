@@ -3,7 +3,7 @@ import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
 import {
-  collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc,
+  collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, limit,
 } from "firebase/firestore";
 import { getNepaliDate } from "@/lib/nepaliDate";
 import { db } from "@/lib/firebase";
@@ -33,7 +33,8 @@ function TodoContent() {
     try {
       const q = query(
         collection(db, "tasks"),
-        where("uid", "==", user.uid)
+        where("uid", "==", user.uid),
+        limit(200)
       );
       const snap = await getDocs(q);
       const list: Task[] = snap.docs

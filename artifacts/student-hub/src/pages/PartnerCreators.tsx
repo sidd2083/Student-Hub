@@ -246,10 +246,12 @@ function CreatorCard({ creator, onOpen }: { creator: Creator; onOpen: () => void
             alt={creator.name}
             onError={() => setImgErr(true)}
             className="absolute inset-0 w-full h-full object-cover"
-            loading="lazy"
+            style={{ objectPosition: "center top" }}
+            loading={creator.featured ? "eager" : "lazy"}
             decoding="async"
-            fetchPriority={creator.featured ? "high" : "low"}
+            fetchPriority={creator.featured ? "high" : "auto"}
             referrerPolicy="no-referrer-when-downgrade"
+            crossOrigin="anonymous"
           />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
