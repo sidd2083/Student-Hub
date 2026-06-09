@@ -229,6 +229,14 @@ const MSG = {
       `${fn}, try explaining what you just read out loud. Sounds silly. It works.`,
       `NEB toppers didn't have superpowers. They just showed up — like you're doing now.`,
       `Boring topics are part of it, ${fn}. Push through. It gets easier.`,
+      `${fn}, the gap between where you are and where you want to be is exactly this — sessions like today.`,
+      `When this topic feels confusing, that means you're actually engaging with it. Confusion is progress.`,
+      `${fn}, you don't have to understand everything right now. Just keep moving forward.`,
+      `Take a second to look at what you've already done. That's real. Don't dismiss it.`,
+      `${fn}, most students quit in the middle. You're still here. That's the difference.`,
+      `If this feels hard, that's because it is hard. Doesn't mean you're doing it wrong.`,
+      `${fn}, the secret isn't studying more. It's showing up consistently. You're here. That counts.`,
+      `You already made the decision to be here. Don't waste it by holding back.`,
     ];
     const specific: Record<string, string[]> = {
       grade9:   [`Grade 9 is early, ${fn}. The habits you build now will carry you through Grade 12 and beyond.`],
@@ -249,6 +257,12 @@ const MSG = {
     `${fn}, the ${timePart()} study session is lowkey the most underrated.`,
     `Your future self just sent a message. It says "thank you."`,
     `${fn}, you're doing the thing people say they'll do "later." Respect.`,
+    `Nobody who studied less than you is getting the same result. Just saying.`,
+    `${fn}, that "five more minutes" you kept pushing? This is it. You're in it.`,
+    `Imagine showing someone your screen right now. They'd be impressed.`,
+    `${fn}, your classmates are probably scrolling Instagram. You're not. Good.`,
+    `Real talk — the people who complain about exams didn't do this. You are.`,
+    `${fn}, the session isn't glamorous. Neither is winning. Both take the same thing.`,
   ]),
 
   comeBack: (fn: string, mins: number, grade?: number) => {
@@ -394,6 +408,7 @@ export function PukuPartner({
   const midSessionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const osNotifTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const popupAutoTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bgSpeakTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cachedVoiceRef  = useRef<SpeechSynthesisVoice | null>(null);
   const voicesReadyRef  = useRef(false);
 
@@ -441,11 +456,15 @@ export function PukuPartner({
   }, []);
 
   // ── speak — stable ────────────────────────────────────────────────────────
+  // Subtitle appears immediately; voice starts 350 ms later so the text
+  // is always visible before the voice kicks in.
   const speak = useCallback((text: string) => {
     if (bubbleClearTimer.current) clearTimeout(bubbleClearTimer.current);
-    const hasTTS = !muteRef.current && !!window.speechSynthesis;
-    speechCbRef.current(text, hasTTS);
 
+    // Show subtitle TEXT immediately (not-speaking state)
+    speechCbRef.current(text, false);
+
+    const hasTTS = !muteRef.current && !!window.speechSynthesis;
     if (!hasTTS) {
       bubbleClearTimer.current = setTimeout(() => speechCbRef.current("", false), 7_000);
       return;
@@ -475,13 +494,17 @@ export function PukuPartner({
         speechCbRef.current(text, false);
         bubbleClearTimer.current = setTimeout(() => speechCbRef.current("", false), 5_000);
       };
-      window.speechSynthesis.speak(utt);
+      // 350 ms delay: subtitle renders before voice begins
+      setTimeout(() => {
+        speechCbRef.current(text, true); // mark as actively speaking
+        window.speechSynthesis.speak(utt);
+      }, 350);
     };
 
     bubbleClearTimer.current = setTimeout(() => {
       window.speechSynthesis.cancel();
       speechCbRef.current("", false);
-    }, 20_000);
+    }, 22_000);
 
     if (voicesReadyRef.current || window.speechSynthesis.getVoices().length > 0) {
       doSpeak();
@@ -616,26 +639,27 @@ export function PukuPartner({
     }
   }, [studyMins, visible, fn, grade, speak, setEmotionBoth]);
 
-  // ── Mid-session encouragement (sparse — not spam) ────────────────────────
-  // Only fires once every 15–25 minutes. Uses a pool that mixes encouragement,
-  // light humour, and grade-relevant tips.
+  // ── Mid-session check-ins ─────────────────────────────────────────────────
+  // More frequent early (8–12 min) so the session feels alive.
+  // Spaces out as the student gets deeper in (14–22 min after 45 min).
   useEffect(() => {
     if (!visible) return;
+    let callCount = 0;
 
     const scheduleNext = (): ReturnType<typeof setTimeout> => {
-      const delay = (15 + Math.random() * 10) * 60_000; // 15–25 min
+      let minD: number, maxD: number;
+      if (callCount === 0)          { minD = 8;  maxD = 12; }  // first check-in: 8–12 min
+      else if (studyMins < 45)      { minD = 10; maxD = 16; }  // mid-session:   10–16 min
+      else                          { minD = 14; maxD = 22; }  // deep session:  14–22 min
+      const delay = (minD + Math.random() * (maxD - minD)) * 60_000;
+
       return setTimeout(() => {
         if (isStudying && !isPaused) {
+          callCount++;
           const roll = Math.random();
-          if (roll < 0.5) {
-            speak(MSG.encouragement(fn, grade));
-          } else if (roll < 0.7) {
-            speak(MSG.humor(fn));
-          } else if (studyMins > 20) {
-            speak(MSG.midSession(fn, studyMins, grade));
-          } else {
-            speak(MSG.encouragement(fn, grade));
-          }
+          if (roll < 0.45)      speak(MSG.encouragement(fn, grade));
+          else if (roll < 0.70) speak(MSG.humor(fn));
+          else                  speak(MSG.midSession(fn, studyMins, grade));
         }
         midSessionTimer.current = scheduleNext();
       }, delay);
@@ -676,28 +700,65 @@ export function PukuPartner({
     }
   }, [visible]);
 
-  // ── Anti-cheat: tab-away detection ───────────────────────────────────────
-  // Warns ONLY after 5 full minutes away (not 30 seconds).
-  // Shows a YES/NO popup. If ignored for 60s → auto-pause.
-  // After confirming "Yes", cooldown of 15 min before next warning.
+  // ── Anti-cheat: tab-away detection — progressive ─────────────────────────
+  // Thresholds scale with offence count: 1st=5min, 2nd=8min, 3rd+=12min.
+  // Background TTS fires at 3 min (light nudge) and again at threshold —
+  // Chrome & Edge will play the voice even while the tab is in background.
   useEffect(() => {
     if (!visible) return;
+
+    // Helper: speak silently on a background tab via a raw SpeechSynthesisUtterance
+    const bgSpeak = (text: string) => {
+      if (muteRef.current || !window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate   = 0.88 + Math.random() * 0.06;
+      u.pitch  = 1.0;
+      u.volume = 1.0;
+      const v = cachedVoiceRef.current ?? pickVoice(window.speechSynthesis.getVoices());
+      if (v) u.voice = v;
+      window.speechSynthesis.speak(u);
+    };
 
     const onVis = () => {
       if (document.hidden) {
         if (!isStudying) return;
         tabHiddenAt.current = Date.now();
 
-        // OS notification fires after 5 minutes away — only once
+        // Progressive threshold: 1st=5min, 2nd=8min, 3rd+=12min
+        const threshMin = distractCount.current === 0 ? 5
+          : distractCount.current === 1 ? 8
+          : 12;
+
+        // Early nudge at 3 min — light background voice
+        if (bgSpeakTimer.current) clearTimeout(bgSpeakTimer.current);
+        bgSpeakTimer.current = setTimeout(() => {
+          if (!document.hidden || !isStudying) return;
+          bgSpeak(pick([
+            `${fn}, you're still on the clock.`,
+            `Hey ${fn}, you left the study room open.`,
+            `${fn}... don't forget you're in a study session.`,
+          ]));
+        }, 3 * 60_000);
+
+        // Main check at progressive threshold
         if (osNotifTimer.current) clearTimeout(osNotifTimer.current);
         osNotifTimer.current = setTimeout(() => {
           if (!document.hidden) return;
-          const now = Date.now();
-          if (now - lastWarnedAt.current < 15 * 60_000) return; // respect cooldown
-          sendOsNotif(`Still studying, ${fn}?`, "You've been away for 5 minutes. Come back when you're ready.");
-        }, 5 * 60_000);
+          // Background voice — audible on another tab
+          bgSpeak(pick([
+            `${fn}, you've been away for ${threshMin} minutes. The clock is still running.`,
+            `Hey — ${fn}. It's been ${threshMin} minutes. Come back when you're ready.`,
+            `${fn}, ${threshMin} minutes away. Your study timer hasn't stopped.`,
+          ]));
+          sendOsNotif(
+            `Still studying, ${fn}?`,
+            `You've been away for ${threshMin} minutes. Come back when you're ready.`,
+          );
+        }, threshMin * 60_000);
 
       } else {
+        if (bgSpeakTimer.current) { clearTimeout(bgSpeakTimer.current); bgSpeakTimer.current = null; }
         if (osNotifTimer.current) { clearTimeout(osNotifTimer.current); osNotifTimer.current = null; }
 
         const at = tabHiddenAt.current;
@@ -705,15 +766,14 @@ export function PukuPartner({
         if (!at || !isStudying) return;
 
         const secsAway = Math.round((Date.now() - at) / 1_000);
-        if (secsAway < 5 * 60) return; // only warn after 5 full minutes
-
-        const now = Date.now();
-        if (now - lastWarnedAt.current < 15 * 60_000) return; // cooldown after "yes"
+        const threshMin = distractCount.current === 0 ? 5
+          : distractCount.current === 1 ? 8
+          : 12;
+        if (secsAway < threshMin * 60) return; // not away long enough yet
 
         const minsAway = Math.max(1, Math.round(secsAway / 60));
         distractCount.current += 1;
 
-        // Update emotion based on distraction count
         if (distractCount.current >= 3) setEmotionBoth("frustrated");
         else if (distractCount.current >= 2) setEmotionBoth("concerned");
         else setEmotionBoth("concerned");
@@ -723,7 +783,6 @@ export function PukuPartner({
         speak(tabAwayMsg);
         setDistractPopup(true);
 
-        // Auto-pause if ignored for 60 seconds
         if (popupAutoTimer.current) clearTimeout(popupAutoTimer.current);
         popupAutoTimer.current = setTimeout(() => {
           setDistractPopup(false);
@@ -738,6 +797,7 @@ export function PukuPartner({
     return () => {
       document.removeEventListener("visibilitychange", onVis);
       if (osNotifTimer.current) clearTimeout(osNotifTimer.current);
+      if (bgSpeakTimer.current) clearTimeout(bgSpeakTimer.current);
     };
   }, [visible, isStudying, fn, grade, speak, setEmotionBoth]);
 
@@ -806,6 +866,7 @@ export function PukuPartner({
     if (midSessionTimer.current)   clearTimeout(midSessionTimer.current);
     if (osNotifTimer.current)      clearTimeout(osNotifTimer.current);
     if (popupAutoTimer.current)    clearTimeout(popupAutoTimer.current);
+    if (bgSpeakTimer.current)      clearTimeout(bgSpeakTimer.current);
   }, []);
 
   const handleMinimize = useCallback((val: boolean) => {
