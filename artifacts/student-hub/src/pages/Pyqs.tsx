@@ -4,7 +4,7 @@ import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { pyqUrl } from "@/lib/slugs";
-import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   FileText, ImageIcon, Search, X, ExternalLink, Filter, LogIn,
@@ -317,7 +317,7 @@ function PyqsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
       return;
     }
     setLoading(true);
-    const q = query(collection(db, "pyqs"), where("grade", "==", grade));
+    const q = query(collection(db, "pyqs"), where("grade", "==", grade), limit(200));
     getDocs(q)
       .then(snap => {
         const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Pyq)).sort((a, b) => (b.year ?? 0) - (a.year ?? 0));

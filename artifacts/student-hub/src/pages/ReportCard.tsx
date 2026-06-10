@@ -4,7 +4,7 @@ import { Link, useLocation } from "wouter";
 import { setAiContext } from "@/lib/aiContext";
 import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
-import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, documentId, getDoc, getDocs, query, where, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getNepaliDate, getNepaliYesterday } from "@/lib/nepaliDate";
 import ShareCardModal from "@/components/ShareCardModal";
@@ -300,9 +300,19 @@ function ReportContent() {
     if (!user) return;
     if (!silent) setLoading(true);
     try {
+      // Fetch only the last 35 days of study_logs using document-ID range query.
+      // Doc IDs are `${uid}_${YYYY-MM-DD}` so a range on doc ID scopes to
+      // this user AND to recent dates — no composite index required.
+      const NPT_OFFSET_MS = (5 * 60 + 45) * 60 * 1000;
+      const cutoff = new Date(Date.now() - 35 * 86_400_000 + NPT_OFFSET_MS).toISOString().slice(0, 10);
       const [userSnap, logsSnap] = await Promise.all([
         getDoc(doc(db, "users", user.uid)),
-        getDocs(query(collection(db, "study_logs"), where("uid", "==", user.uid))),
+        getDocs(query(
+          collection(db, "study_logs"),
+          where(documentId(), ">=", `${user.uid}_${cutoff}`),
+          where(documentId(), "<=", `${user.uid}_9999-99-99`),
+          limit(40),
+        )),
       ]);
 
       let newStats: StudyStats;
@@ -426,7 +436,8 @@ Be real with me. Don't sugarcoat — but keep me motivated.`;
 
   return (
     <div className="p-4 sm:p-8 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      {/* Header — stacks vertically on mobile so the period tabs never overflow */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 mb-1 flex items-center gap-2">
             <BarChart2 className="w-6 h-6 text-blue-500" />
@@ -435,7 +446,7 @@ Be real with me. Don't sugarcoat — but keep me motivated.`;
           <p className="text-gray-500 text-sm">Your study performance and progress</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={load} className="p-2 text-gray-400 hover:text-blue-500 transition-colors">
+          <button onClick={load} className="p-2 text-gray-400 hover:text-blue-500 transition-colors" aria-label="Refresh">
             <RefreshCw className="w-4 h-4" />
           </button>
           <button
@@ -445,6 +456,7 @@ Be real with me. Don't sugarcoat — but keep me motivated.`;
             <Share2 className="w-3.5 h-3.5" />
             Share
           </button>
+          {/* Period tabs — Today / Week / Month */}
           <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
             {(["day", "week", "month"] as const).map(p => (
               <button key={p} onClick={() => setPeriod(p)}

@@ -135,21 +135,29 @@ router.post("/study/leave", async (req: Request, res: Response) => {
       return res.status(400).json({ ok: false, error: "roomId and uid required" });
     }
 
-    // Security: if a Firebase ID token is supplied, verify the caller is only
-    // removing themselves — not kicking another participant from outside the app.
+    // Always require a valid Firebase ID token.
+    // The client sends one via the keepalive token cache even on tab-close.
+    // Rejecting unauthenticated requests prevents anyone who knows a uid
+    // from remotely removing another participant from a room.
     const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith("Bearer ")) {
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ ok: false, error: "Authentication required" });
+    }
+
+    const adminAuth = getAdminAuth();
+    if (adminAuth) {
       try {
-        const adminAuth = getAdminAuth();
-        if (adminAuth) {
-          const decoded = await adminAuth.verifyIdToken(authHeader.slice(7));
-          if (decoded.uid !== uid) {
-            return res.status(403).json({ ok: false, error: "Cannot remove another participant" });
-          }
+        const decoded = await adminAuth.verifyIdToken(authHeader.slice(7));
+        if (decoded.uid !== uid) {
+          return res.status(403).json({ ok: false, error: "Cannot remove another participant" });
         }
       } catch {
         return res.status(401).json({ ok: false, error: "Invalid auth token" });
       }
+    } else {
+      // Admin SDK unavailable (no FIREBASE_SERVICE_ACCOUNT_JSON).
+      // Log a warning but allow through — the keepalive token was at least present.
+      logger.warn({ roomId, uid }, "[Study] Leave — Admin SDK unavailable, token not verified");
     }
 
     const db = getAdminDb();

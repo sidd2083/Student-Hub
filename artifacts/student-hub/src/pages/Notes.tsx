@@ -4,7 +4,7 @@ import { Link, useLocation, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { noteUrl } from "@/lib/slugs";
-import { collection, query, where, getDocs, getDoc, doc, updateDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, getDoc, doc, updateDoc, setDoc, deleteDoc, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { setAiContext } from "@/lib/aiContext";
 import { BookOpen, ChevronRight, FileText, Image, Type, X, ExternalLink, ZoomIn, LogIn, Sparkles, Maximize2, Minimize2, Bookmark } from "lucide-react";
@@ -282,7 +282,7 @@ function NotesContent({ isLoggedIn }: { isLoggedIn: boolean }) {
       return;
     }
     setLoading(true);
-    const q = query(collection(db, "notes"), where("grade", "==", grade));
+    const q = query(collection(db, "notes"), where("grade", "==", grade), limit(500));
     getDocs(q).then(snap => {
       const list: NoteView[] = snap.docs
         .map(d => ({ id: d.id, ...d.data() } as NoteView))

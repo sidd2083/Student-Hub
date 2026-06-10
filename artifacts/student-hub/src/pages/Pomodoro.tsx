@@ -4,7 +4,7 @@ import { Helmet } from "react-helmet-async";
 import { SoftGate } from "@/components/SoftGate";
 import { useTimer } from "@/context/TimerContext";
 import { useAuth } from "@/context/AuthContext";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   Play, Pause, RotateCcw, Timer, CheckSquare,
@@ -183,7 +183,7 @@ function PomodoroContent() {
 
   useEffect(() => {
     if (!user?.uid) return;
-    getDocs(query(collection(db, "tasks"), where("uid", "==", user.uid), where("completed", "==", false)))
+    getDocs(query(collection(db, "tasks"), where("uid", "==", user.uid), where("completed", "==", false), limit(100)))
       .then(snap => {
         setPendingTasks(snap.docs.map(d => ({ id: d.id, text: d.data().text })));
       })

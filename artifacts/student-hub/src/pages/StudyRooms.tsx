@@ -7,7 +7,7 @@ import { Room, subscribePublicRooms, SUBJECTS } from "@/lib/studyRooms";
 import { RoomCard } from "@/components/study-room/RoomCard";
 import { useAuth } from "@/context/AuthContext";
 import { Link } from "wouter";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, onSnapshot, query, where, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 const STATUS_FILTERS = [
@@ -60,6 +60,7 @@ export default function StudyRooms() {
       where("hostUid", "==", user.uid),
       where("isPrivate", "==", true),
       where("status", "in", ["waiting", "active", "paused"]),
+      limit(5),
     );
     const unsub = onSnapshot(q, (snap) => {
       setMyPrivateRooms(

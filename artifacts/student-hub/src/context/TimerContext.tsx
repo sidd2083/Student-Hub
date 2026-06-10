@@ -301,6 +301,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     // NOTE: This fallback intentionally does NOT modify `streak`.
     // Streak is authoritative on the server only; it will sync on the next
     // successful backend call. This prevents client-side streak manipulation.
+    //
+    // Caps mirror the backend validation to prevent abuse via this path:
+    //   • per-call cap:  60 min  (max Pomodoro work session)
+    //   • daily cap:    600 min  (10 hours — no legitimate user exceeds this)
+    const MAX_PER_CALL = 60;
+    const MAX_DAILY    = 600;
+    const clampedMins  = Math.min(Math.max(Math.floor(mins), 0), MAX_PER_CALL);
+    if (clampedMins === 0) return;
     try {
       const today = getNepaliDate();
       const userDocRef = doc(db, "users", uid);
@@ -310,10 +318,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       const lastActive: string = data.lastActiveDate ?? "";
       const prevToday: number = lastActive === today ? (data.todayStudyTime ?? 0) : 0;
       const prevTotal: number = data.totalStudyTime ?? 0;
-      const newToday = prevToday + mins;
+
+      // Enforce daily cap — never let fallback push today's total past MAX_DAILY
+      const newToday   = Math.min(prevToday + clampedMins, MAX_DAILY);
+      const actualAdded = newToday - prevToday;
+      if (actualAdded <= 0) return;
 
       await setDoc(userDocRef, {
-        totalStudyTime: prevTotal + mins,
+        totalStudyTime: prevTotal + actualAdded,
         todayStudyTime: newToday,
         lastActiveDate: today,
       }, { merge: true });
@@ -324,9 +336,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       const logRef = doc(db, "study_logs", logId);
       const logSnap = await getDoc(logRef);
       if (logSnap.exists()) {
-        await updateDoc(logRef, { studyMinutes: (logSnap.data().studyMinutes ?? 0) + mins });
+        await updateDoc(logRef, { studyMinutes: (logSnap.data().studyMinutes ?? 0) + actualAdded });
       } else {
-        await setDoc(logRef, { uid, date: today, studyMinutes: mins, tasksCompleted: 0, notesViewed: 0 });
+        await setDoc(logRef, { uid, date: today, studyMinutes: actualAdded, tasksCompleted: 0, notesViewed: 0 });
       }
     } catch (err) {
       console.error("[Timer] All save methods failed:", err);

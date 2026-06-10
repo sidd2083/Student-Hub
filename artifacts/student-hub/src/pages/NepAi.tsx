@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Send, MessageCircle, Sparkles, BookOpen, BarChart2, ListChecks } from "lucide-react";
 import { useSearch, useLocation } from "wouter";
 import { consumeAiContext } from "@/lib/aiContext";
-import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, documentId, getDoc, getDocs, query, where, limit } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 
 interface Message { role: "user" | "assistant"; content: string }
@@ -252,10 +252,19 @@ function getLocalFallback(msg: string): string {
 }
 
 async function loadStudyContext(uid: string): Promise<StudyContext> {
+  // Last 35 days of logs via doc-ID range (no composite index needed).
+  // Tasks capped at 50 — AI context only needs a representative sample.
+  const NPT_OFFSET_MS = (5 * 60 + 45) * 60 * 1000;
+  const cutoff = new Date(Date.now() - 35 * 86_400_000 + NPT_OFFSET_MS).toISOString().slice(0, 10);
   const [userSnap, tasksSnap, logsSnap] = await Promise.all([
     getDoc(doc(db, "users", uid)),
-    getDocs(query(collection(db, "tasks"), where("uid", "==", uid))),
-    getDocs(query(collection(db, "study_logs"), where("uid", "==", uid))),
+    getDocs(query(collection(db, "tasks"), where("uid", "==", uid), limit(50))),
+    getDocs(query(
+      collection(db, "study_logs"),
+      where(documentId(), ">=", `${uid}_${cutoff}`),
+      where(documentId(), "<=", `${uid}_9999-99-99`),
+      limit(40),
+    )),
   ]);
 
   let stats: StudyContext["stats"] | undefined;
