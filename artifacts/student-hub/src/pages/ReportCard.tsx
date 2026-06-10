@@ -4,7 +4,7 @@ import { Link, useLocation } from "wouter";
 import { setAiContext } from "@/lib/aiContext";
 import { useAuth } from "@/context/AuthContext";
 import { SoftGate } from "@/components/SoftGate";
-import { collection, doc, documentId, getDoc, getDocs, query, where, limit } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getNepaliDate, getNepaliYesterday } from "@/lib/nepaliDate";
 import ShareCardModal from "@/components/ShareCardModal";
@@ -300,19 +300,15 @@ function ReportContent() {
     if (!user) return;
     if (!silent) setLoading(true);
     try {
-      // Fetch only the last 35 days of study_logs using document-ID range query.
-      // Doc IDs are `${uid}_${YYYY-MM-DD}` so a range on doc ID scopes to
-      // this user AND to recent dates — no composite index required.
-      const NPT_OFFSET_MS = (5 * 60 + 45) * 60 * 1000;
-      const cutoff = new Date(Date.now() - 35 * 86_400_000 + NPT_OFFSET_MS).toISOString().slice(0, 10);
+      // Fetch the user's study_logs using a uid equality filter — this satisfies
+      // the Firestore security rule (resource.data.uid == request.auth.uid)
+      // without requiring a composite index. Date filtering is done in memory.
       const [userSnap, logsSnap] = await Promise.all([
         getDoc(doc(db, "users", user.uid)),
         getDocs(query(
           collection(db, "study_logs"),
           where("uid", "==", user.uid),
-          where(documentId(), ">=", `${user.uid}_${cutoff}`),
-          where(documentId(), "<=", `${user.uid}_9999-99-99`),
-          limit(40),
+          limit(60),
         )),
       ]);
 
