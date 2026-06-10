@@ -309,6 +309,7 @@ function ReportContent() {
         getDoc(doc(db, "users", user.uid)),
         getDocs(query(
           collection(db, "study_logs"),
+          where("uid", "==", user.uid),
           where(documentId(), ">=", `${user.uid}_${cutoff}`),
           where(documentId(), "<=", `${user.uid}_9999-99-99`),
           limit(40),
