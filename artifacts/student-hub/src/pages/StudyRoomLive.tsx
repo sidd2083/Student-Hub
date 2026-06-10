@@ -1839,6 +1839,8 @@ export default function StudyRoomLive() {
         isStudying={isStudying}
         isBreak={isBreak}
         studyMins={studyMinsInSession}
+        todayMins={profile?.todayStudyTime}
+        streak={profile?.streak}
         visible={showPuku && joined}
         onLeave={pukuLeave}
         onSpeechUpdate={pukuSpeechUpdate}
