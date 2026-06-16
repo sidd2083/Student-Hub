@@ -3,24 +3,27 @@
  *
  * ZERO Firestore. All state in RAM.
  *
- * Matchmaking: Strict-grade, 3-round cascading algorithm
- *  Round 1 — Top Performers   (same grade, high study/streak score, top 3)
- *  Round 2 — Low-Criteria     (same grade, any available, random 3)
- *  Round 3 — Ultimate Fallback (same grade, broadest filter, random 3)
+ * Matchmaking: 5-Round cascading algorithm
+ *  Round 1 — Same grade, Top Performers   (score-sorted, allowNotifications, no cooldown)
+ *  Round 2 — Same grade, Any Available    (random, allowNotifications, no cooldown)
+ *  Round 3 — Same grade, Broadest         (random, ignores cooldown & allowNotifications)
+ *  Round 4 — Adjacent grades, Available   (random, allowNotifications, no cooldown)
+ *  Round 5 — Adjacent grades, Broadest    (random, ignores cooldown & allowNotifications)
+ *  → If all 5 rounds yield 0 → enter 5-minute waiting queue
  *
  * Toggle Independence Law:
- *  Users with allowNotifications=false are NEVER targeted by matchmaking.
- *  (Round 3 exception: ignores cooldowns but still respects allowNotifications
- *   unless truly nobody else is available — see ROUND_3_ALLOW_ALL below.)
+ *  allowNotifications=false users skipped in R1/R2/R4. R3/R5 override this as last resort.
+ *
+ * Cooldown distinction:
+ *  - Explicit reject (Pass button) → REJECT_COOLDOWN_MS (3 min) — intentional opt-out
+ *  - Timeout (ignored popup) → TIMEOUT_COOLDOWN_MS (60 s) — might have been distracted
  *
  * Key design decisions:
- *  - Users are NOT deleted from activeUsers on disconnect.
- *    Instead their socketId is blanked and a GC timer purges them after 2 min.
- *  - Requests with 0 immediate candidates enter a waitingQueue (up to 90 s).
- *    When any user registers / reconnects, the queue is checked and dispatched.
- *  - Online count is pushed to requesters so the UI can show "X students online".
- *
- * Grades: "9" | "10" | "11" | "12" | "cee" | "ioe"
+ *  - Users NOT deleted on disconnect. GC purges after 2 min.
+ *  - Zero-candidate requests enter waitingQueue (5 min TTL).
+ *  - Queue is flushed when any user registers, reconnects, OR finishes a session.
+ *  - Adjacent grade flush: a Grade 12 student coming online also helps waiting Grade 11s.
+ *  - All waiting requests for a new helper are flushed (no break), not just one.
  */
 
 import type { Server as SocketServer, Socket } from "socket.io";
@@ -114,15 +117,39 @@ const disconnectedAt     = new Map<string, number>();
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const POPUP_TIMEOUT_MS      = 30_000;
-const REJECT_COOLDOWN_MS    = 3 * 60_000;
-const GOOD_SAMARITAN_MS     = 7 * 60_000;
-const WAITING_QUEUE_TTL_MS  = 90_000;
+const POPUP_TIMEOUT_MS      = 25_000;          // 25 s per round
+const REJECT_COOLDOWN_MS    = 3 * 60_000;      // Explicit Pass → 3 min cooldown
+const TIMEOUT_COOLDOWN_MS   = 60_000;          // Ignored (distracted) → 60 s cooldown
+const GOOD_SAMARITAN_MS     = 7 * 60_000;      // Helper accepted → 7 min grace
+const WAITING_QUEUE_TTL_MS  = 5 * 60_000;      // 5 min (was 90 s — far too short)
 const DISCONNECT_GC_MS      = 2 * 60_000;
+const MAX_ROUNDS            = 5;               // R1–R3 same-grade, R4–R5 adjacent
 
 // Round 1 performance thresholds (defines "Top Performer")
 const R1_MIN_STUDY_MINS = 10;   // at least 10 min studied today
 const R1_MIN_STREAK     = 3;    // OR at least 3-day streak
+
+// ── Adjacent grade map ─────────────────────────────────────────────────────────
+/**
+ * Used by Rounds 4 & 5 when no same-grade helpers are reachable.
+ * Adjacent grades share curriculum overlap and can reasonably help.
+ */
+const ADJACENT_GRADES: Record<string, string[]> = {
+  "9":       ["10"],
+  "10":      ["9", "11"],
+  "11":      ["10", "12"],
+  "12":      ["11", "13", "cee"],
+  "13":      ["12", "14", "cee", "ioe"],
+  "cee":     ["12", "11", "13"],
+  "14":      ["13", "15", "cee", "ioe"],
+  "ioe":     ["12", "13", "14"],
+  "15":      ["14", "13", "ioe"],
+  "bachelor":["14", "13", "ioe"],
+};
+
+function getAdjacentGrades(grade: string): string[] {
+  return ADJACENT_GRADES[grade.toLowerCase()] ?? [];
+}
 
 // ── GC: purge users gone > 2 min ──────────────────────────────────────────────
 
@@ -137,12 +164,35 @@ setInterval(() => {
   }
 }, 30_000);
 
-// ── Online count ───────────────────────────────────────────────────────────────
+// ── Online counts ──────────────────────────────────────────────────────────────
 
 function getOnlineCount(): number {
   let n = 0;
   for (const u of activeUsers.values()) {
     if (u.socketId) n++;
+  }
+  return n;
+}
+
+/** How many users in a specific grade are currently online */
+function getGradeOnlineCount(grade: string): number {
+  const g = grade.toLowerCase();
+  let n = 0;
+  for (const u of activeUsers.values()) {
+    if (u.socketId && u.grade.toLowerCase() === g) n++;
+  }
+  return n;
+}
+
+/** How many users available (not busy/in-popup) in a grade right now */
+function getGradeAvailableCount(grade: string): number {
+  const g = grade.toLowerCase();
+  let n = 0;
+  for (const u of activeUsers.values()) {
+    if (!u.socketId) continue;
+    if (u.grade.toLowerCase() !== g) continue;
+    if (u.currentStatus === "busy_helping" || u.currentStatus === "in_sos_popup") continue;
+    n++;
   }
   return n;
 }
@@ -160,24 +210,31 @@ function newId(): string {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// ── 3-Round Strict-Grade Matchmaking ──────────────────────────────────────────
+// ── 5-Round Matchmaking ────────────────────────────────────────────────────────
 /**
- * STRICT GRADE LAW: All rounds ONLY match users within the exact requested grade.
+ * Rounds 1–3: STRICT GRADE — only exact grade match.
+ * Rounds 4–5: ADJACENT GRADES — neighbours with curriculum overlap.
  *
- * Round 1 — Top Performers
- *   Requires allowNotifications=true, no cooldown, not busy/in-popup.
+ * Round 1 — Same grade, Top Performers
+ *   allowNotifications=true, no cooldown, not busy/in-popup.
  *   Filter: todayStudyMinutes >= R1_MIN_STUDY_MINS OR streakDays >= R1_MIN_STREAK.
- *   Sort by composite score desc, pick top 3.
- *   If 0 qualify (criteria too selective) → immediately fall through to Round 2.
+ *   Score-sorted, top 3. If 0 qualify → fall through to Round 2.
  *
- * Round 2 — Low-Criteria Catch
- *   Requires allowNotifications=true, no cooldown, not busy/in-popup.
- *   No performance filter — random pick up to 3.
+ * Round 2 — Same grade, Any Available
+ *   allowNotifications=true, no cooldown, not busy/in-popup.
+ *   No performance filter — random 3.
  *
- * Round 3 — Ultimate Grade Fallback
- *   ONLY excludes: offline, busy_helping, in_sos_popup, already notified this session.
- *   Ignores cooldowns and allowNotifications to surface ANY reachable user.
- *   Random pick up to 3.
+ * Round 3 — Same grade, Broadest
+ *   Only excludes: busy_helping, in_sos_popup, already notified.
+ *   Ignores cooldown & allowNotifications. Random 3.
+ *
+ * Round 4 — Adjacent grades, Available
+ *   Same criteria as Round 2, but searches adjacent grades.
+ *   allowNotifications=true, no cooldown, not busy/in-popup. Random 3.
+ *
+ * Round 5 — Adjacent grades, Broadest
+ *   Same criteria as Round 3, but on adjacent grades.
+ *   Ignores cooldown & allowNotifications. Random 3.
  */
 function findRoundCandidates(
   requesterUid: string,
@@ -188,44 +245,50 @@ function findRoundCandidates(
 ): ActiveUser[] {
   const excluded = new Set([requesterUid, ...allNotifiedUids]);
   const grade    = helpGrade.toLowerCase();
+
+  // Which grades to search depends on the round
+  const targetGrades: Set<string> =
+    round <= 3
+      ? new Set([grade])                          // R1–R3: strict same grade
+      : new Set(getAdjacentGrades(grade));        // R4–R5: adjacent grades only
+
+  if (targetGrades.size === 0) return [];         // no adjacent grades mapped
+
   const pool: ActiveUser[] = [];
 
   for (const user of activeUsers.values()) {
-    // Always-excluded (all rounds)
-    if (excluded.has(user.uid))              continue;
-    if (!user.socketId)                      continue; // offline
-    if (user.grade.toLowerCase() !== grade)  continue; // STRICT GRADE
+    if (excluded.has(user.uid))                             continue;
+    if (!user.socketId)                                     continue; // offline
+    if (!targetGrades.has(user.grade.toLowerCase()))        continue; // grade filter
 
-    if (round <= 2) {
-      // Rounds 1 & 2 — respect opt-out toggle and standard lock conditions
-      if (!user.allowNotifications)         continue;
-      if (user.currentStatus === "busy_helping")  continue;
-      if (user.currentStatus === "in_sos_popup")  continue;
+    // Per-round filter logic
+    if (round === 1 || round === 2 || round === 4) {
+      // Standard availability — respect opt-out, cooldown, and status lock
+      if (!user.allowNotifications)                         continue;
+      if (user.currentStatus === "busy_helping")            continue;
+      if (user.currentStatus === "in_sos_popup")            continue;
       if (user.cooldownUntil !== null && Date.now() < user.cooldownUntil) continue;
     } else {
-      // Round 3 — broadest filter; only exclude truly occupied users
-      if (user.currentStatus === "busy_helping")  continue;
-      if (user.currentStatus === "in_sos_popup")  continue;
+      // Round 3 / Round 5 — broadest fallback; only exclude truly occupied
+      if (user.currentStatus === "busy_helping")            continue;
+      if (user.currentStatus === "in_sos_popup")            continue;
     }
 
     pool.push(user);
   }
 
   if (round === 1) {
-    // Filter to top performers only
+    // Performance filter: top performers only
     const highPerformers = pool.filter(
       u => u.todayStudyMinutes >= R1_MIN_STUDY_MINS || u.streakDays >= R1_MIN_STREAK,
     );
-    if (highPerformers.length === 0) {
-      // Criteria too selective — signal caller to fall through to Round 2
-      return [];
-    }
+    if (highPerformers.length === 0) return []; // signal: fall through to Round 2
     return highPerformers
       .sort((a, b) => computeScore(b, subject) - computeScore(a, subject))
       .slice(0, 3);
   }
 
-  // Rounds 2 & 3 — random selection
+  // Rounds 2–5: random selection
   return pool.sort(() => Math.random() - 0.5).slice(0, 3);
 }
 
@@ -278,10 +341,10 @@ function dispatchToHelpers(
 /**
  * Attempts to find candidates starting at req.round.
  * If a round yields 0 candidates, immediately advances to the next round.
- * If all rounds (1-3) yield 0, enters the waiting queue.
+ * If all 5 rounds yield 0, enters the 5-min waiting queue.
  */
 function tryDispatchNextRound(io: SocketServer, req: SosRequest): void {
-  while (req.round <= 3) {
+  while (req.round <= MAX_ROUNDS) {
     const candidates = findRoundCandidates(
       req.requesterUid, req.helpGrade, req.subject, req.allNotifiedUids, req.round,
     );
@@ -298,7 +361,7 @@ function tryDispatchNextRound(io: SocketServer, req: SosRequest): void {
     req.round++;
   }
 
-  // All 3 rounds yielded 0 candidates — enter waiting queue
+  // All 5 rounds yielded 0 candidates — enter waiting queue
   pendingSosRequests.delete(req.requestId);
   enterWaitingQueue(io, req);
 }
@@ -344,15 +407,28 @@ function enterWaitingQueue(io: SocketServer, req: SosRequest | { requestId: stri
 }
 
 // ── Try to serve any waiting requests for a newly-available user ───────────────
-
+/**
+ * Called whenever a user registers, reconnects, or finishes a session.
+ * Flushes ALL waiting requests that the new user (or their grade neighbours)
+ * can potentially help with — not just the first one.
+ *
+ * Grade-match logic: flush if newUser.grade === helpGrade OR
+ * newUser.grade is in the adjacency list for helpGrade.
+ * (Adjacent-grade match allows R4/R5 to reach the new helper.)
+ */
 function tryFlushWaitingQueue(io: SocketServer, newUid: string): void {
+  const newUser = activeUsers.get(newUid);
+  if (!newUser || !newUser.socketId) return;
+
+  const newGrade = newUser.grade.toLowerCase();
+
   for (const [requestId, wReq] of waitingQueue) {
     if (wReq.requesterUid === newUid) continue;
 
-    // Only flush if the new user could plausibly help (same grade, online)
-    const newUser = activeUsers.get(newUid);
-    if (!newUser || !newUser.socketId) continue;
-    if (newUser.grade.toLowerCase() !== wReq.helpGrade.toLowerCase()) continue;
+    const helpGrade = wReq.helpGrade.toLowerCase();
+    const isSameGrade     = newGrade === helpGrade;
+    const isAdjacentGrade = getAdjacentGrades(helpGrade).includes(newGrade);
+    if (!isSameGrade && !isAdjacentGrade) continue;
 
     clearTimeout(wReq.expiryTimer);
     waitingQueue.delete(requestId);
@@ -373,24 +449,24 @@ function tryFlushWaitingQueue(io: SocketServer, newUid: string): void {
     };
     pendingSosRequests.set(requestId, req);
     tryDispatchNextRound(io, req);
-    logger.info({ requestId, newUid }, "[SOS] waiting queue flushed on new user");
-    break; // dispatch one at a time
+    logger.info({ requestId, newUid, isSameGrade, isAdjacentGrade }, "[SOS] waiting queue flushed");
+    // No break — flush every matching waiting request, not just the first
   }
 }
 
-// ── Cascade to next round after 30s timeout ────────────────────────────────────
+// ── Cascade to next round after popup timeout ──────────────────────────────────
 
 function cascadeSos(io: SocketServer, requestId: string): void {
   const req = pendingSosRequests.get(requestId);
   if (!req) return;
 
-  // Apply timeout penalty: users who ignored the popup get the full cooldown
+  // Timeout penalty — shorter than explicit reject (user was probably just distracted)
   for (const nUid of req.notifiedUids) {
     const user = activeUsers.get(nUid);
     if (!user) continue;
     if (user.currentStatus === "in_sos_popup") {
       user.currentStatus = "idle";
-      user.cooldownUntil = Date.now() + REJECT_COOLDOWN_MS;
+      user.cooldownUntil = Date.now() + TIMEOUT_COOLDOWN_MS; // 60 s, not 3 min
     }
     if (user.socketId) io.to(user.socketId).emit("sos_popup_clear", { requestId });
   }
@@ -399,16 +475,11 @@ function cascadeSos(io: SocketServer, requestId: string): void {
   // Advance to next round
   req.round++;
 
-  if (req.round > 3) {
-    // All 3 rounds completed with no acceptances
+  if (req.round > MAX_ROUNDS) {
+    // All 5 rounds completed with no acceptances — enter waiting queue
     pendingSosRequests.delete(requestId);
-    const requesterSocket = io.sockets.sockets.get(req.requesterSocketId);
-    if (requesterSocket) {
-      requesterSocket.emit("sos_no_helpers", {
-        message: "No helpers responded after 3 rounds. Please try again later.",
-      });
-    }
-    logger.info({ requestId }, "[SOS] all 3 rounds exhausted — no accept");
+    enterWaitingQueue(io, req);
+    logger.info({ requestId }, "[SOS] all 5 rounds exhausted — entering waiting queue");
     return;
   }
 
@@ -479,7 +550,11 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
       activeUsers.set(userId, user);
       socketToUid.set(socket.id, userId);
 
-      socket.emit("sos_online_count", { count: getOnlineCount() });
+      socket.emit("sos_online_count", {
+        count:          getOnlineCount(),
+        gradeCount:     getGradeOnlineCount(user.grade),
+        gradeAvailable: getGradeAvailableCount(user.grade),
+      });
       logger.debug(
         { uid: userId, grade: user.grade, allowNotifications: user.allowNotifications, onlineCount: getOnlineCount() },
         "[SOS] user registered",
@@ -860,6 +935,9 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
     userToSession.delete(session.helperUid);
     io.socketsLeave(sessionId);
     logger.info({ sessionId }, "[SOS] session ended");
+
+    // Helper is now free — check if anyone is waiting that they can help
+    if (session.helperUid) tryFlushWaitingQueue(io, session.helperUid);
   });
 
   // ── Cancel end ───────────────────────────────────────────────────────────

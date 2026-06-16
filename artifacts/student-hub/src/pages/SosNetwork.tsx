@@ -42,7 +42,7 @@ const ALLOW_NOTIFICATIONS_KEY  = "sh_allow_notifications";
 
 export default function SosNetwork() {
   const { profile } = useAuth();
-  const { requestStatus, sendSosRequest, cancelSosRequest, onlineCount } = useSos();
+  const { requestStatus, sendSosRequest, cancelSosRequest, onlineCount, gradeCount, gradeAvailable } = useSos();
 
   const [topicTitle,          setTopicTitle]          = useState("");
   const [subject,             setSubject]             = useState("Math");
@@ -216,12 +216,20 @@ export default function SosNetwork() {
               <h2 className="font-bold text-gray-900 dark:text-white">Request Help</h2>
             </div>
             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-              onlineCount > 1
+              gradeAvailable > 0
                 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                : gradeCount > 0
+                ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
                 : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
             }`}>
               <Wifi className="w-3 h-3" />
-              {onlineCount > 1 ? `${onlineCount - 1} helper${onlineCount - 1 === 1 ? "" : "s"} online` : "No helpers online now"}
+              {gradeAvailable > 0
+                ? `${gradeAvailable} in your grade available`
+                : gradeCount > 0
+                ? `${gradeCount} in your grade (all busy)`
+                : onlineCount > 1
+                ? `${onlineCount - 1} online (other grades)`
+                : "No helpers online now"}
             </div>
           </div>
 

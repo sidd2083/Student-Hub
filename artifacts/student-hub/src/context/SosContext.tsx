@@ -65,8 +65,12 @@ interface SosContextType {
   session: SosSession | null;
   /** Show the end-confirm prompt */
   showRatingModal: boolean;
-  /** Number of users currently online in Get Help system */
+  /** Total users currently online in Get Help system */
   onlineCount: number;
+  /** Online users in the same grade as the current user */
+  gradeCount: number;
+  /** Available (not busy/in-popup) users in the same grade */
+  gradeAvailable: number;
 
   sendSosRequest: (topicTitle: string, subject: string, helpGrade?: string) => void;
   cancelSosRequest: () => void;
@@ -143,7 +147,9 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
   const [incomingRequest, setIncomingRequest] = useState<SosIncomingRequest | null>(null);
   const [session, setSession] = useState<SosSession | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
-  const [onlineCount, setOnlineCount] = useState(0);
+  const [onlineCount, setOnlineCount]       = useState(0);
+  const [gradeCount, setGradeCount]         = useState(0);
+  const [gradeAvailable, setGradeAvailable] = useState(0);
 
   // Track mount to avoid state updates after unmount
   const mountedRef = useRef(true);
@@ -293,9 +299,11 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
     };
 
     // Online count update from server
-    const onOnlineCount = (data: { count: number }) => {
+    const onOnlineCount = (data: { count: number; gradeCount?: number; gradeAvailable?: number }) => {
       if (!mountedRef.current) return;
       setOnlineCount(data.count);
+      if (data.gradeCount     !== undefined) setGradeCount(data.gradeCount);
+      if (data.gradeAvailable !== undefined) setGradeAvailable(data.gradeAvailable);
     };
 
     // Partner wants to end — show confirm prompt on both screens
@@ -461,6 +469,8 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
     session,
     showRatingModal,
     onlineCount,
+    gradeCount,
+    gradeAvailable,
     sendSosRequest,
     cancelSosRequest,
     acceptSos,
