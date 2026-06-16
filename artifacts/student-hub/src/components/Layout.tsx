@@ -9,6 +9,7 @@ import {
   MessageCircle, Trophy, LayoutDashboard, LogOut,
   Shield, Settings, User, Home, Wrench, ArrowLeft, X, BarChart2,
   Pause, Play, Bookmark, Download, Calculator, Zap, Users, Star,
+  AlertTriangle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { ActiveRoomBar } from "@/components/study-room/ActiveRoomBar";
@@ -23,6 +24,7 @@ function fmtStudyMins(m: number): string {
 
 const sidebarNav = [
   { href: "/dashboard",    icon: LayoutDashboard, label: "Dashboard"        },
+  { href: "/sos",          icon: AlertTriangle,   label: "SOS Network"      },
   { href: "/missions",     icon: Zap,             label: "Daily Missions"   },
   { href: "/study-rooms",  icon: Users,           label: "Study Rooms"      },
   { href: "/notes",        icon: BookOpen,        label: "Notes"            },

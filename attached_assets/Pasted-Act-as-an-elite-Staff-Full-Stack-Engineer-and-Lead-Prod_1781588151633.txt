@@ -1,0 +1,78 @@
+Act as an elite Staff Full-Stack Engineer and Lead Product Architect. Your task is to build a production-ready, ultra-smooth, responsive Real-Time Peer Support Feature called "SOS Network" for the student platform "Student Hub". 
+
+To ensure you build this perfectly, read the comprehensive feature explanation and technical architectural guide below before generating code.
+
+=========================================
+📖 FEATURE EXPLANATION & USER EXPERIENCE FLOW
+=========================================
+The "SOS Network" is an on-demand, live-help system for students who hit an academic wall while studying late at night or during deep focus sessions. Instead of abandoning their studies to scroll social media, they use this feature to get immediate peer intervention.
+
+1. THE CRY FOR HELP: A student gets stuck on a complex problem (e.g., a difficult Math or Science equation). They click a prominent "Get Help" button on their dashboard, type a descriptive Topic Title (e.g., "Optics - Lens Formula Help"), choose the subject, and hit "Send SOS".
+2. THE RADAR POPUP: The server scans active users and selectively flashes a real-time, high-priority alert popup onto the screens of exactly 3 optimal candidates.
+3. THE LIVE COLLABORATIVE SANDBOX: When a helper clicks "Accept", both users are dropped into a shared workspace. 
+   - They can instantly text-chat to resolve simple queries.
+   - For complex problems, they use an interactive Whiteboard Canvas. The student drops an image/screenshot of the textbook problem, and the canvas acts as a transparent overlay, allowing the helper to draw steps or write text directly on top of the image in real time.
+   - To incentivize helpers, their profile card prominently links to their Instagram and TikTok handles. Top students are motivated to act as helpers because it funnels real followers to their social media channels.
+4. THE DEMOCRATIC EXIT: To prevent trolls or hanging rooms, the session only ends when both users click "End Conversation" and complete a mutual quality rating overlay (Great / Decent / Bad).
+
+=========================================
+⚡ HARDWARE & TECHNICAL ARCHITECTURE (ZERO DATABASE BILLING)
+=========================================
+CRITICAL CONDITION: To protect Firebase free-tier limits, this feature must run with absolute ZERO Firestore reads, writes, updates, or deletes. Do not import or invoke any database hooks. 
+- All state tracking, matching loops, and data streams must live strictly inside the server's RAM using standard JavaScript data structures (like a global `Map` or `Object`).
+- All interactive traffic (chat messages, canvas paths, coordinate streams) must run exclusively over ephemeral WebSockets (Socket.io) and vanish entirely from volatile memory the moment the session terminates.
+
+Implement the system exactly according to the technical rules below:
+
+### 1. SERVER-SIDE IN-MEMORY STATE SCHEMA
+Maintain a global `ActiveUsers` Map on the WebSocket server. When a client connects, cache their metadata in memory:
+- `userId` (String)
+- `socketId` (String)
+- `grade` (Integer, e.g., 10)
+- `todayStudyMinutes` (Integer, updated live by frontend tracking socket updates)
+- `streakDays` (Integer)
+- `subjectMastery` (Object mapping subjects to points, e.g., `{ math: 120, science: 85 }`)
+- `cooldownUntil` (Timestamp, defaults to null)
+- `currentStatus` (String: 'idle', 'pomodoro', 'study_room', 'in_sos_popup', 'busy_helping')
+
+### 2. FLOATING TIERED CRITERIA MATCHMAKING (WITH FAIL-SAFE FALLBACK)
+When a `client_sos_request` packet arrives, execute this search sequence:
+- LOCKOUT FILTER: Exclude any active user if their `currentStatus` is 'in_sos_popup' or 'busy_helping', if `cooldownUntil` is a timestamp in the future, or if they are the request sender.
+- TIER 1 (The Elites): From the non-locked active user map, filter by `grade == request.grade` (or `request.grade + 1`) and whose status is 'idle', 'pomodoro', or 'study_room'. Sort these users by a mathematical weighted priority score: `(todayStudyMinutes * 0.4) + (streakDays * 0.3) + (subjectMastery[request.subject] * 0.3)`. Route the popup to the top 3 highest scorers.
+- TIER 2 FALLBACK (Zero-Freeze Loop): If Tier 1 matches fewer than 3 users because criteria are too selective, IMMEDIATELY drop all scoring logic. Instantly pick up to 3 random users from the in-memory Map who share the target `grade` and are not locked/on cooldown. The feature must never freeze or display an empty queue if grade peers are active.
+- 30-SECOND CASCADE TIMEOUT: Trigger a server-side 30-second countdown for the request. If none of the 3 targeted users click accept, clear the popup on their screens, revert their status, and automatically execute the matching script again to cascade the alert to the next 3 best available users.
+
+### 3. THE ANTI-SPAM COOLDOWN MACHINE
+Manage notification boundaries tightly inside the server's volatile memory:
+- Active Popup Lock: The millisecond a user is selected for a popup, set their memory state `currentStatus = 'in_sos_popup'` to block other requests.
+- Rejection / Ignore Penalty (3-Min Cooldown): If a user clicks "Reject" or lets the 30-second timer expire, immediately set their memory state `cooldownUntil = Date.now() + (3 * 60 * 1000)` and revert their status.
+- Good Samaritan Rest (7-Min Cooldown): When a session successfully terminates, immediately set the helper's memory state `cooldownUntil = Date.now() + (7 * 60 * 1000)` to grant them uninterrupted study time.
+
+### 4. WORKSPACE STATE MANAGEMENT & INTEGRATIONS
+The moment a helper accepts, join both users to a private WebSocket room channel and update their states to 'busy_helping'. Trigger these client-side integrations:
+- Pomodoro Auto-Pause: Execute a client event that completely PAUSES the helper's active local Pomodoro countdown timer. Do not touch Firestore to save this state change.
+- Virtual Study Room Preservation: If the helper is inside a multiplayer Virtual Study Room canvas, DO NOT disconnect their socket or drop their coordinates. Let the room run in the background, but programmatically change their room desk avatar badge indicator to read "⚡ In SOS Session".
+
+### 5. ADAPTIVE TWO-WAY LIVE WORKSPACE UI (TAILWIND CSS)
+Build a highly polished UI component that uses structural CSS media queries to fluidly adapt layouts based on device type:
+
+A. LAPTOP & DESKTOP SPLIT-SCREEN DASHBOARD:
+- Top Context Bar: Displays the user-submitted `topicTitle`, a live ascending timer (`MM:SS`), and a prominent red "End Conversation" button.
+- Left Pane (Interactive Multi-Tool Canvas): A high-performance HTML5 canvas wrapper. Provide UI buttons for Pen/Marker (with vector brush smoothing), Eraser, Text Tool, and a "Clear Canvas" icon. The canvas must listen for file uploads or drag-and-drops; when an image is uploaded, draw it as the canvas background layer. Stream drawing path coordinates as lightweight vector arrays over WebSockets (`canvas_draw_stream` event) with zero latency, scaling proportions perfectly across desktop display resolutions.
+- Right Pane (Social Chat Console): A clean live chat box streaming messages in memory via WebSockets. Pin the helper's profile card to the absolute top of this panel, featuring clear, conversion-optimized buttons: "Connect on Instagram" and "Follow on TikTok" using their pre-configured handle strings.
+
+B. MOBILE ADAPTIVE TAB SLIDER:
+On mobile screens, stack the UI vertically and display a fixed bottom navigation bar with smooth active-state indicator transitions containing two tab panels:
+- Tab 1: Chat Box & Social Handles (optimized for swift touch keyboard entry and camera roll image uploads).
+- Tab 2: Full-Screen Interactive Whiteboard Canvas (handling touch gesture events cleanly and auto-scaling incoming vector coordinates from desktop hosts seamlessly without cropping or layout breaking).
+
+### 6. DEMOCRATIC ACTION CLOSING ENGINE
+- Clicking the "End Conversation" button triggers a synchronized modal prompt on BOTH screens via WebSockets: "Do you want to end this session and submit ratings? [Yes] [No]".
+- If either participant chooses [No], instantly close the prompt on both devices and resume the live session without interrupting the WebSocket tunnel.
+- If BOTH select [Yes], execute this exact sequence:
+  1. Gracefully sever the specific WebSocket room channel.
+  2. Purge the temporary session mapping object entirely from the server's RAM.
+  3. Prompt a modal peer rating screen layer with three options: [Great], [Decent], and [Bad].
+  4. Once clicked, redirect the helper user back to their previous screen, automatically UNPAUSE their Pomodoro timer exactly where it left off, and restore their active Virtual Study Room desk avatar state to normal status.
+
+Deliver clean, production-ready, fully commented, bug-free code written in modern JavaScript. Use Socket.io for backend routing, HTML5 Canvas for the visual whiteboard, and Tailwind CSS for the client layout wrappers. Absolutely no database dependencies are permitted.

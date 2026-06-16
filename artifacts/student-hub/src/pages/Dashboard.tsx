@@ -10,6 +10,7 @@ import {
   BookOpen, BarChart2, FileText, CheckSquare,
   Timer, MessageCircle, Flame, Megaphone, X, Bookmark,
   ChevronDown, ChevronRight, Users, Instagram, Star,
+  AlertTriangle, Zap,
 } from "lucide-react";
 import { SiteGuide } from "@/components/SiteGuide";
 import { DailyMissionWidget } from "@/components/DailyMissionWidget";
@@ -425,6 +426,32 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* ── SOS Network Widget ─────────────────────────────────────────── */}
+        <Link href="/sos">
+          <a className="block mb-5 group">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-red-500 to-orange-500 p-4 shadow-lg shadow-red-500/20 hover:shadow-red-500/30 transition-all hover:-translate-y-0.5 active:translate-y-0">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/20 shrink-0">
+                  <AlertTriangle className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-white text-base leading-tight">SOS Network</p>
+                  <p className="text-red-100 text-xs mt-0.5 leading-tight">
+                    Stuck? Get live help from a peer in seconds
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 bg-white/20 hover:bg-white/30 transition-colors text-white text-xs font-bold px-3 py-1.5 rounded-full shrink-0">
+                  <Zap className="w-3.5 h-3.5" />
+                  Get Help
+                </div>
+              </div>
+              {/* Decorative glow orbs */}
+              <div className="pointer-events-none absolute -top-4 -right-4 w-20 h-20 rounded-full bg-white/10" />
+              <div className="pointer-events-none absolute -bottom-6 -left-2 w-24 h-24 rounded-full bg-white/5" />
+            </div>
+          </a>
+        </Link>
 
         <h2 className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider mb-3 sm:mb-4">Quick Access</h2>
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">

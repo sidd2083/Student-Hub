@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/context/AuthContext";
 import { TimerProvider } from "@/context/TimerContext";
 import { ActiveRoomProvider } from "@/context/ActiveRoomContext";
+import { SosProvider } from "@/context/SosContext";
 import {
   PrivateRoute,
   AdminDashboardRoute,
@@ -52,6 +53,7 @@ const DailyMissions       = lazy(() => import("@/pages/DailyMissions"));
 const StudyRooms          = lazy(() => import("@/pages/StudyRooms"));
 const StudyRoomCreate     = lazy(() => import("@/pages/StudyRoomCreate"));
 const StudyRoomLive       = lazy(() => import("@/pages/StudyRoomLive"));
+const SosNetwork          = lazy(() => import("@/pages/SosNetwork"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -187,6 +189,9 @@ function AppRoutes() {
         <Route path="/study-rooms/create" component={StudyRoomCreate} />
         <Route path="/study-rooms/:id"    component={StudyRoomLive} />
         <Route path="/study-rooms"        component={StudyRooms} />
+        <Route path="/sos">
+          <PrivateRoute><SosNetwork /></PrivateRoute>
+        </Route>
         <Route path="/dashboard">
           <PrivateRoute><Dashboard /></PrivateRoute>
         </Route>
@@ -257,10 +262,12 @@ function App() {
             <AuthProvider>
               <TimerProvider>
                 <ActiveRoomProvider>
-                  <StudyGuardian />
-                  <ErrorBoundary>
-                    <Router />
-                  </ErrorBoundary>
+                  <SosProvider>
+                    <StudyGuardian />
+                    <ErrorBoundary>
+                      <Router />
+                    </ErrorBoundary>
+                  </SosProvider>
                 </ActiveRoomProvider>
               </TimerProvider>
             </AuthProvider>

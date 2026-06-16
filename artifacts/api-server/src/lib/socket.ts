@@ -3,6 +3,7 @@ import { Server as SocketServer } from "socket.io";
 import { getAdminDb } from "./firebase-admin";
 import { logger } from "./logger";
 import { stats } from "./stats";
+import { initSosHandlers } from "./sos";
 
 interface WsMember {
   uid: string;
@@ -177,6 +178,9 @@ export function initSocketServer(httpServer: HTTPServer): SocketServer {
 
     socket.on("leave-room", handleLeave);
     socket.on("disconnect", handleLeave);
+
+    // ── SOS Network handlers (zero-Firestore in-memory matching) ──────────
+    initSosHandlers(io, socket);
   });
 
   logger.info("[WS] Socket.io server ready");
