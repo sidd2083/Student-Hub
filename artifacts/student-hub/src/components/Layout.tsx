@@ -24,7 +24,7 @@ function fmtStudyMins(m: number): string {
 
 const sidebarNav = [
   { href: "/dashboard",    icon: LayoutDashboard, label: "Dashboard"        },
-  { href: "/sos",          icon: AlertTriangle,   label: "SOS Network"      },
+  { href: "/sos",          icon: AlertTriangle,   label: "Get Help"         },
   { href: "/missions",     icon: Zap,             label: "Daily Missions"   },
   { href: "/study-rooms",  icon: Users,           label: "Study Rooms"      },
   { href: "/notes",        icon: BookOpen,        label: "Notes"            },

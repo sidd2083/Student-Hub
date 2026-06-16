@@ -96,7 +96,7 @@ export default function SosNetwork() {
   return (
     <>
       <Helmet>
-        <title>SOS Network – Student Hub</title>
+        <title>Get Help – Student Hub</title>
         <meta name="description" content="Get instant live help from your peers when you're stuck." />
       </Helmet>
 
@@ -107,7 +107,7 @@ export default function SosNetwork() {
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-900/30 mb-3">
             <AlertTriangle className="w-7 h-7 text-red-600 dark:text-red-400" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">SOS Network</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Get Help</h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
             Stuck on a problem? Get live help from a peer in seconds.
           </p>

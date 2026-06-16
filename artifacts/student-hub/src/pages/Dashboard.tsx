@@ -17,7 +17,8 @@ import { DailyMissionWidget } from "@/components/DailyMissionWidget";
 import { StudyRoomWidget } from "@/components/study-room/StudyRoomWidget";
 
 const sections = [
-  { href: "/study-rooms", icon: Users,         label: "Study Rooms",        desc: "Study live with other students", color: "bg-indigo-50 text-indigo-600" },
+  { href: "/sos",        icon: AlertTriangle, label: "Get Help",           desc: "Live peer help when you're stuck", color: "bg-red-50 text-red-600"       },
+  { href: "/study-rooms", icon: Users,        label: "Study Rooms",        desc: "Study live with other students", color: "bg-indigo-50 text-indigo-600" },
   { href: "/notes",      icon: BookOpen,      label: "Notes",              desc: "Study materials by subject",  color: "bg-blue-50 text-blue-600"    },
   { href: "/report",     icon: BarChart2,     label: "Report Card",        desc: "Track your study progress",   color: "bg-purple-50 text-purple-600" },
   { href: "/pyqs",       icon: FileText,      label: "Important Questions & PYQ", desc: "Past exam papers & key questions", color: "bg-orange-50 text-orange-600" },
@@ -436,9 +437,9 @@ export default function Dashboard() {
                   <AlertTriangle className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-white text-base leading-tight">SOS Network</p>
+                  <p className="font-bold text-white text-base leading-tight">Get Help</p>
                   <p className="text-red-100 text-xs mt-0.5 leading-tight">
-                    Stuck? Get live help from a peer in seconds
+                    Stuck? Get live peer help in seconds
                   </p>
                 </div>
                 <div className="flex items-center gap-1 bg-white/20 hover:bg-white/30 transition-colors text-white text-xs font-bold px-3 py-1.5 rounded-full shrink-0">
