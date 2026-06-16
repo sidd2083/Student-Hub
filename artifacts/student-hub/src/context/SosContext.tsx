@@ -17,6 +17,7 @@ import { getSocket } from "@/lib/socket";
 import { useAuth } from "@/context/AuthContext";
 import { SosPopup } from "@/components/sos/SosPopup";
 import { SosWorkspace } from "@/components/sos/SosWorkspace";
+import { prewarmAudio } from "@/lib/sosAudio";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ export interface SosPartnerInfo {
   uid: string;
   name: string;
   photoURL?: string;
-  grade?: number;
+  grade?: string;
   instagramHandle?: string;
   tiktokHandle?: string;
 }
@@ -149,6 +150,17 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
+  }, []);
+
+  // Pre-warm Web Audio on first user gesture so SOS popup sounds work on iOS
+  useEffect(() => {
+    const warm = () => prewarmAudio();
+    document.addEventListener("touchstart", warm, { once: true, passive: true });
+    document.addEventListener("click",      warm, { once: true, passive: true });
+    return () => {
+      document.removeEventListener("touchstart", warm);
+      document.removeEventListener("click",      warm);
+    };
   }, []);
 
   // ── Register / update user ──────────────────────────────────────────────

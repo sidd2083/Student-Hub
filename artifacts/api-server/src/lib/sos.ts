@@ -28,11 +28,15 @@ import { logger } from "./logger";
 
 // ── Grade system ───────────────────────────────────────────────────────────────
 
-const VALID_GRADES = new Set(["9", "10", "11", "12", "cee", "ioe"]);
+const VALID_GRADES = new Set(["9", "10", "11", "12", "13", "14", "15", "cee", "ioe", "bachelor"]);
 
 function parseGrade(raw: unknown): string {
   const s = String(raw ?? "").toLowerCase().trim();
-  return VALID_GRADES.has(s) ? s : "10";
+  if (VALID_GRADES.has(s)) return s;
+  // Accept numeric form (profile.grade might be a JS number 9–15)
+  const n = Number(s);
+  if (!isNaN(n) && n >= 9 && n <= 15) return String(Math.round(n));
+  return "10";
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -669,6 +673,7 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
     };
     const requesterPayload = {
       uid: req.requesterUid, name: req.requesterName, photoURL: requester?.photoURL, grade: req.helpGrade,
+      instagramHandle: requester?.instagramHandle, tiktokHandle: requester?.tiktokHandle,
     };
     const sessionPayload = { sessionId, topicTitle: req.topicTitle, subject: req.subject };
 
@@ -730,6 +735,35 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
       name: user.name,
       photoURL: user.photoURL,
       text,
+      createdAtMs: Date.now(),
+    });
+  });
+
+  // ── In-session image file share (chat) ───────────────────────────────────
+  socket.on("sos_chat_file", (data: { dataUrl?: string }) => {
+    const userId = uid();
+    if (!userId) return;
+    const sessionId = userToSession.get(userId);
+    if (!sessionId) return;
+    const session = activeSessions.get(sessionId);
+    if (!session) return;
+    const user = activeUsers.get(userId);
+    if (!user) return;
+
+    const dataUrl = String(data?.dataUrl ?? "");
+    if (!dataUrl.startsWith("data:image/")) return;
+    // Reject payloads larger than ~1.4 MB (base64 of ~1 MB image)
+    if (dataUrl.length > 1_500_000) {
+      socket.emit("sos_error", { message: "Image too large. Please send a smaller image." });
+      return;
+    }
+
+    io.to(sessionId).emit("sos_chat_file", {
+      id:          `${Date.now()}_${userId.slice(0, 6)}`,
+      uid:         userId,
+      name:        user.name,
+      photoURL:    user.photoURL,
+      imageUrl:    dataUrl,
       createdAtMs: Date.now(),
     });
   });

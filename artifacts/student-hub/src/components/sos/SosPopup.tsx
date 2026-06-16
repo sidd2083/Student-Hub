@@ -1,16 +1,15 @@
 /**
  * SOS Popup — shown to potential helpers when a student sends a Get Help request.
  * 30-second circular countdown, continuous beep via Web Audio API, spring entrance.
+ * Mobile: full-width from the bottom. Desktop: bottom-right card.
  */
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  AlertTriangle, X, Zap,
-  BookOpen, FlaskConical, Calculator, Globe, Cpu,
-} from "lucide-react";
+import { AlertTriangle, X, Zap, BookOpen, FlaskConical, Calculator, Globe, Cpu } from "lucide-react";
 import type { SosIncomingRequest } from "@/context/SosContext";
 import { useSos } from "@/context/SosContext";
+import { playBeep } from "@/lib/sosAudio";
 
 // ── Subject meta ───────────────────────────────────────────────────────────────
 
@@ -34,29 +33,12 @@ function getSubjectMeta(subject: string) {
 
 function getGradeLabel(g: unknown): string {
   const s = String(g ?? "").toLowerCase();
-  if (s === "cee") return "CEE";
-  if (s === "ioe") return "IOE";
+  if (s === "cee" || s === "13") return "CEE/Medical";
+  if (s === "ioe" || s === "14") return "IOE/Engineering";
+  if (s === "15") return "Bachelor's";
   const n = Number(s);
   if (n >= 9 && n <= 12) return `Grade ${n}`;
   return `Grade ${s}`;
-}
-
-// ── Web Audio beep ─────────────────────────────────────────────────────────────
-
-function playBeep(ctx: AudioContext, urgent: boolean) {
-  try {
-    const osc  = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = "sine";
-    osc.frequency.value = urgent ? 1040 : 880;
-    gain.gain.setValueAtTime(0, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.22, ctx.currentTime + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (urgent ? 0.12 : 0.18));
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.22);
-  } catch {}
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -65,15 +47,14 @@ export function SosPopup({ request }: { request: SosIncomingRequest }) {
   const { acceptSos, rejectSos } = useSos();
   const totalSecs = Math.round(request.timeoutMs / 1000);
 
-  const [secondsLeft,   setSecondsLeft]   = useState(totalSecs);
-  const [phase,         setPhase]         = useState<"entering" | "visible" | "leaving">("entering");
-  const [pulseKey,      setPulseKey]      = useState(0);
+  const [secondsLeft,  setSecondsLeft]  = useState(totalSecs);
+  const [phase,        setPhase]        = useState<"entering" | "visible" | "leaving">("entering");
+  const [pulseKey,     setPulseKey]     = useState(0);
 
-  const timerRef         = useRef<ReturnType<typeof setInterval> | null>(null);
-  const beepIntervalRef  = useRef<ReturnType<typeof setInterval> | null>(null);
-  const audioCtxRef      = useRef<AudioContext | null>(null);
-  const autoRejectedRef  = useRef(false);
-  const urgentRef        = useRef(false);
+  const timerRef        = useRef<ReturnType<typeof setInterval> | null>(null);
+  const beepIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoRejectedRef = useRef(false);
+  const urgentRef       = useRef(false);
 
   // ── Entrance spring ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -83,38 +64,26 @@ export function SosPopup({ request }: { request: SosIncomingRequest }) {
     return () => cancelAnimationFrame(raf1);
   }, []);
 
-  // ── Web Audio beeping ─────────────────────────────────────────────────────
+  // ── Beeping ───────────────────────────────────────────────────────────────
   useEffect(() => {
-    let ctx: AudioContext;
-    try {
-      ctx = new AudioContext();
-      audioCtxRef.current = ctx;
-      ctx.resume().then(() => {
-        playBeep(ctx, false);
-        beepIntervalRef.current = setInterval(() => {
-          playBeep(ctx, urgentRef.current);
-          if (urgentRef.current) setPulseKey(k => k + 1);
-        }, urgentRef.current ? 550 : 900);
-      }).catch(() => {});
-    } catch {}
+    playBeep(false);
+    beepIntervalRef.current = setInterval(() => {
+      playBeep(urgentRef.current);
+      if (urgentRef.current) setPulseKey(k => k + 1);
+    }, urgentRef.current ? 550 : 900);
     return () => {
       if (beepIntervalRef.current) clearInterval(beepIntervalRef.current);
-      audioCtxRef.current?.close().catch(() => {});
     };
   }, []);
 
-  // Adjust beep speed when urgent changes (< 10 s)
   useEffect(() => {
     if (secondsLeft <= 10 && !urgentRef.current) {
       urgentRef.current = true;
       if (beepIntervalRef.current) clearInterval(beepIntervalRef.current);
-      const ctx = audioCtxRef.current;
-      if (ctx) {
-        beepIntervalRef.current = setInterval(() => {
-          playBeep(ctx, true);
-          setPulseKey(k => k + 1);
-        }, 500);
-      }
+      beepIntervalRef.current = setInterval(() => {
+        playBeep(true);
+        setPulseKey(k => k + 1);
+      }, 500);
     }
   }, [secondsLeft]);
 
@@ -140,7 +109,6 @@ export function SosPopup({ request }: { request: SosIncomingRequest }) {
   function stopAll() {
     if (timerRef.current)        clearInterval(timerRef.current);
     if (beepIntervalRef.current) clearInterval(beepIntervalRef.current);
-    audioCtxRef.current?.close().catch(() => {});
   }
 
   const handleAccept = () => {
@@ -156,195 +124,209 @@ export function SosPopup({ request }: { request: SosIncomingRequest }) {
   };
 
   // ── SVG ring ──────────────────────────────────────────────────────────────
-  const isUrgent    = secondsLeft <= 10;
-  const progress    = secondsLeft / totalSecs;
-  const radius      = 30;
+  const isUrgent      = secondsLeft <= 10;
+  const progress      = secondsLeft / totalSecs;
+  const radius        = 30;
   const circumference = 2 * Math.PI * radius;
-  const dashOffset  = circumference * (1 - progress);
+  const dashOffset    = circumference * (1 - progress);
 
-  const subjectMeta  = getSubjectMeta(request.subject);
-  const gradeLabel   = getGradeLabel(request.requesterGrade);
+  const subjectMeta = getSubjectMeta(request.subject);
+  const gradeLabel  = getGradeLabel(request.requesterGrade);
 
-  const isVisible  = phase === "visible";
-  const isLeaving  = phase === "leaving";
+  const isVisible = phase === "visible";
+  const isLeaving = phase === "leaving";
 
   const popup = (
     <>
-      {/* Dark backdrop */}
+      {/* Soft backdrop */}
       <div
         className="fixed inset-0 z-[9995] pointer-events-none"
         style={{
-          background: "radial-gradient(ellipse at bottom right, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.15) 100%)",
+          background: "radial-gradient(ellipse at bottom right, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 100%)",
           opacity: isVisible ? 1 : 0,
           transition: "opacity 0.35s ease",
         }}
       />
 
-      {/* Card wrapper */}
+      {/*
+        Wrapper:
+        Mobile  → full-width, 12px from each side, 12px from bottom
+        Desktop → bottom-right, fixed 360px wide, 20px from edges
+      */}
       <div
-        className="fixed bottom-5 right-5 z-[9997] w-full"
-        style={{ maxWidth: 360 }}
+        className="fixed z-[9997]"
+        style={{
+          left: "12px",
+          right: "12px",
+          bottom: "12px",
+        }}
       >
-        {/* Animated glow ring */}
-        <div
-          className="absolute -inset-[3px] rounded-[24px]"
-          style={{
-            background: isUrgent
-              ? "linear-gradient(135deg, #ef4444 0%, #f97316 50%, #ef4444 100%)"
-              : "linear-gradient(135deg, #ef4444 0%, #f59e0b 50%, #ef4444 100%)",
-            backgroundSize: "300% 300%",
-            animation: `sosGradientShift ${isUrgent ? "0.8s" : "2s"} ease infinite`,
-            opacity: isVisible ? 1 : 0,
-            transform: isVisible ? "scale(1)" : "scale(0.88)",
-            transition: "transform 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease",
-          }}
-        />
+        {/* On sm+ screens, restrict to right side */}
+        <style>{`
+          @media (min-width: 480px) {
+            .sos-popup-positioner {
+              left: auto !important;
+              right: 20px !important;
+              width: 360px !important;
+            }
+          }
+        `}</style>
+        <div className="sos-popup-positioner" style={{ position: "fixed", left: 12, right: 12, bottom: 12 }}>
 
-        {/* Card */}
-        <div
-          className="relative bg-white dark:bg-gray-950 rounded-[22px] overflow-hidden shadow-2xl"
-          style={{
-            transform: isLeaving
-              ? "translateY(120%) scale(0.88)"
-              : isVisible
-                ? "translateY(0) scale(1)"
-                : "translateY(100%) scale(0.88)",
-            opacity: isVisible ? 1 : 0,
-            transition: isLeaving
-              ? "transform 0.28s ease-in, opacity 0.25s ease-in"
-              : "transform 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s ease",
-          }}
-        >
-          {/* Progress bar */}
-          <div className="h-1.5 bg-gray-100 dark:bg-gray-800">
-            <div
-              className="h-full"
-              style={{
-                width: `${progress * 100}%`,
-                background: isUrgent
-                  ? "linear-gradient(90deg, #ef4444, #f97316)"
-                  : "linear-gradient(90deg, #6366f1, #ef4444)",
-                transition: "width 1s linear",
-              }}
-            />
-          </div>
+          {/* Animated glow ring */}
+          <div
+            className="absolute -inset-[3px] rounded-[24px]"
+            style={{
+              background: isUrgent
+                ? "linear-gradient(135deg, #ef4444 0%, #f97316 50%, #ef4444 100%)"
+                : "linear-gradient(135deg, #ef4444 0%, #f59e0b 50%, #ef4444 100%)",
+              backgroundSize: "300% 300%",
+              animation: `sosGradientShift ${isUrgent ? "0.8s" : "2s"} ease infinite`,
+              opacity: isVisible ? 1 : 0,
+              transform: isVisible ? "scale(1)" : "scale(0.92)",
+              transition: "transform 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease",
+            }}
+          />
 
-          <div className="p-5">
-            {/* Top row: alert icon + label + circular timer */}
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div className="flex items-center gap-3">
-                {/* Pulsing icon */}
-                <div className="relative shrink-0">
-                  <div
-                    className="w-11 h-11 rounded-full flex items-center justify-center shadow-lg"
+          {/* Card */}
+          <div
+            className="relative bg-white dark:bg-gray-950 rounded-[22px] overflow-hidden shadow-2xl"
+            style={{
+              transform: isLeaving
+                ? "translateY(110%) scale(0.9)"
+                : isVisible
+                  ? "translateY(0) scale(1)"
+                  : "translateY(100%) scale(0.9)",
+              opacity: isVisible ? 1 : 0,
+              transition: isLeaving
+                ? "transform 0.28s ease-in, opacity 0.25s ease-in"
+                : "transform 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s ease",
+            }}
+          >
+            {/* Progress bar */}
+            <div className="h-1.5 bg-gray-100 dark:bg-gray-800">
+              <div
+                className="h-full"
+                style={{
+                  width: `${progress * 100}%`,
+                  background: isUrgent
+                    ? "linear-gradient(90deg, #ef4444, #f97316)"
+                    : "linear-gradient(90deg, #6366f1, #ef4444)",
+                  transition: "width 1s linear",
+                }}
+              />
+            </div>
+
+            <div className="p-4 sm:p-5">
+              {/* Top row: alert icon + label + circular timer */}
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  {/* Pulsing icon */}
+                  <div className="relative shrink-0">
+                    <div
+                      className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center shadow-lg"
+                      style={{
+                        background: "linear-gradient(135deg, #ef4444, #f97316)",
+                        boxShadow: isUrgent
+                          ? "0 0 0 6px rgba(239,68,68,0.3), 0 4px 14px rgba(239,68,68,0.45)"
+                          : "0 4px 14px rgba(239,68,68,0.35)",
+                        animation: "sosPulse 1.2s ease-in-out infinite",
+                      }}
+                    >
+                      <AlertTriangle className="w-5 h-5 text-white" />
+                    </div>
+                    <span
+                      className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-red-500 border-2 border-white dark:border-gray-950"
+                      style={{ animation: "sosDot 1s ease-in-out infinite" }}
+                    />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black text-red-600 dark:text-red-400 uppercase tracking-[0.12em] leading-tight">
+                      SOS — Help Needed!
+                    </p>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white truncate mt-0.5">
+                      {request.requesterName}
+                    </p>
+                    {/* Grade badge inline under name */}
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{gradeLabel}</p>
+                  </div>
+                </div>
+
+                {/* Circular countdown */}
+                <div className="relative flex items-center justify-center w-[60px] h-[60px] sm:w-[68px] sm:h-[68px] shrink-0">
+                  <svg
+                    className="absolute inset-0 w-full h-full"
+                    viewBox="0 0 76 76"
+                    style={{ transform: "rotate(-90deg)" }}
+                  >
+                    <circle cx="38" cy="38" r={radius} fill="none" stroke={isUrgent ? "#fee2e2" : "#e5e7eb"} strokeWidth="5" />
+                    <circle
+                      cx="38" cy="38" r={radius} fill="none"
+                      stroke={isUrgent ? "#ef4444" : "#6366f1"}
+                      strokeWidth="5" strokeLinecap="round"
+                      strokeDasharray={circumference} strokeDashoffset={dashOffset}
+                      style={{ transition: "stroke-dashoffset 1s linear, stroke 0.5s ease" }}
+                    />
+                  </svg>
+                  <span
+                    className="text-xl font-black tabular-nums"
                     style={{
-                      background: "linear-gradient(135deg, #ef4444, #f97316)",
-                      boxShadow: isUrgent
-                        ? "0 0 0 6px rgba(239,68,68,0.3), 0 4px 14px rgba(239,68,68,0.45)"
-                        : "0 4px 14px rgba(239,68,68,0.35)",
-                      animation: "sosPulse 1.2s ease-in-out infinite",
+                      color: isUrgent ? "#ef4444" : "#374151",
+                      transform: secondsLeft <= 5 ? "scale(1.15)" : "scale(1)",
+                      transition: "transform 0.2s, color 0.5s",
                     }}
                   >
-                    <AlertTriangle className="w-5 h-5 text-white" />
-                  </div>
-                  <span
-                    className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-red-500 border-2 border-white dark:border-gray-950"
-                    style={{ animation: "sosDot 1s ease-in-out infinite" }}
-                  />
-                </div>
-
-                <div>
-                  <p className="text-[11px] font-black text-red-600 dark:text-red-400 uppercase tracking-[0.12em] leading-tight">
-                    Get Help Request!
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-medium">
-                    {request.requesterName}
-                  </p>
+                    {secondsLeft}
+                  </span>
                 </div>
               </div>
 
-              {/* Circular countdown */}
-              <div className="relative flex items-center justify-center w-[68px] h-[68px] shrink-0">
-                <svg
-                  className="absolute inset-0 w-full h-full"
-                  viewBox="0 0 76 76"
-                  style={{ transform: "rotate(-90deg)" }}
-                >
-                  <circle
-                    cx="38" cy="38" r={radius}
-                    fill="none"
-                    stroke={isUrgent ? "#fee2e2" : "#e5e7eb"}
-                    strokeWidth="5"
-                  />
-                  <circle
-                    cx="38" cy="38" r={radius}
-                    fill="none"
-                    stroke={isUrgent ? "#ef4444" : "#6366f1"}
-                    strokeWidth="5"
-                    strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={dashOffset}
-                    style={{ transition: "stroke-dashoffset 1s linear, stroke 0.5s ease" }}
-                  />
-                </svg>
-                <span
-                  className="text-xl font-black tabular-nums"
-                  style={{
-                    color: isUrgent ? "#ef4444" : "#374151",
-                    transform: secondsLeft <= 5 ? "scale(1.15)" : "scale(1)",
-                    transition: "transform 0.2s, color 0.5s",
-                  }}
-                >
-                  {secondsLeft}
+              {/* Topic title */}
+              <div className="mb-3 px-3.5 py-2.5 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
+                <p className="font-bold text-gray-900 dark:text-white text-sm leading-snug line-clamp-2">
+                  {request.topicTitle}
+                </p>
+              </div>
+
+              {/* Grade + subject badges */}
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border border-red-200 dark:border-red-800">
+                  📚 {gradeLabel}
+                </span>
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border border-transparent ${subjectMeta.bg} ${subjectMeta.color}`}>
+                  {subjectMeta.icon}
+                  {subjectMeta.label}
                 </span>
               </div>
-            </div>
 
-            {/* Topic title */}
-            <div className="mb-3 px-3.5 py-3 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
-              <p className="font-bold text-gray-900 dark:text-white text-sm leading-snug line-clamp-2">
-                {request.topicTitle}
-              </p>
-            </div>
-
-            {/* Grade + subject badges */}
-            <div className="flex items-center gap-2 mb-4 flex-wrap">
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border border-red-200 dark:border-red-800">
-                📚 {gradeLabel}
-              </span>
-              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${subjectMeta.bg} ${subjectMeta.color}`}>
-                {subjectMeta.icon}
-                {subjectMeta.label}
-              </span>
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex gap-2.5">
-              <button
-                onClick={handleReject}
-                className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl border-2 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-sm font-semibold hover:border-red-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all active:scale-95 select-none"
-              >
-                <X className="w-4 h-4" />
-                Pass
-              </button>
-              <button
-                onClick={handleAccept}
-                className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-2xl text-white text-sm font-black transition-all active:scale-95 select-none"
-                style={{
-                  background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                  boxShadow: "0 4px 18px rgba(34,197,94,0.45)",
-                  letterSpacing: "0.01em",
-                }}
-              >
-                <Zap className="w-4 h-4" />
-                Help Now!
-              </button>
+              {/* Action buttons */}
+              <div className="flex gap-2.5">
+                <button
+                  onClick={handleReject}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl border-2 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-sm font-semibold hover:border-red-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all active:scale-95 select-none"
+                >
+                  <X className="w-4 h-4" />
+                  Pass
+                </button>
+                <button
+                  onClick={handleAccept}
+                  className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-2xl text-white text-sm font-black transition-all active:scale-95 select-none"
+                  style={{
+                    background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                    boxShadow: "0 4px 18px rgba(34,197,94,0.45)",
+                    letterSpacing: "0.01em",
+                  }}
+                >
+                  <Zap className="w-4 h-4" />
+                  Help Now!
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Keyframe animations (injected once) */}
       <style>{`
         @keyframes sosPulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5), 0 4px 14px rgba(239,68,68,0.35); }
@@ -358,6 +340,15 @@ export function SosPopup({ request }: { request: SosIncomingRequest }) {
           0%   { background-position: 0% 50%; }
           50%  { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
+        }
+        @media (min-width: 480px) {
+          .sos-popup-positioner {
+            position: fixed !important;
+            left: auto !important;
+            right: 20px !important;
+            bottom: 20px !important;
+            width: 360px !important;
+          }
         }
       `}</style>
     </>
