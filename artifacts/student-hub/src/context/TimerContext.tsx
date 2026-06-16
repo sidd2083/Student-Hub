@@ -671,6 +671,15 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // ── SOS helper pause: pause Pomodoro instantly when accepting a help request ──
+  useEffect(() => {
+    const handler = () => {
+      if (runningRef.current) pause();
+    };
+    window.addEventListener("sh:pomodoro:pause", handler);
+    return () => window.removeEventListener("sh:pomodoro:pause", handler);
+  }, [pause]);
+
   const restartForMission = useCallback((workMins?: number) => {
     if (runningRef.current) return;
     const focusMins = workMins && workMins > 0 ? workMins : 25;

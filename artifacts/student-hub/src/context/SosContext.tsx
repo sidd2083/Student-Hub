@@ -121,6 +121,17 @@ function getSubjectMastery(): Record<string, number> {
   }
 }
 
+/** Read notification opt-in preference from localStorage (default: true) */
+function getAllowNotifications(): boolean {
+  try {
+    const raw = localStorage.getItem("sh_allow_notifications");
+    if (raw === null) return true;
+    return raw !== "false";
+  } catch {
+    return true;
+  }
+}
+
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export function SosProvider({ children }: { children: React.ReactNode }) {
@@ -174,6 +185,7 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
         todayStudyMinutes,
         streakDays,
         subjectMastery: mastery,
+        allowNotifications: getAllowNotifications(),
         ...handles,
       });
     },
@@ -304,6 +316,11 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
       setShowRatingModal(false);
     };
 
+    // Server tells this helper to pause their Pomodoro instantly on acceptance
+    const onTimerPause = () => {
+      window.dispatchEvent(new CustomEvent("sh:pomodoro:pause"));
+    };
+
     socket.on("sos_popup",               onPopup);
     socket.on("sos_popup_clear",         onPopupClear);
     socket.on("sos_popup_expired",       onPopupClear);
@@ -316,6 +333,7 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
     socket.on("sos_end_cancelled",       onEndCancelled);
     socket.on("sos_session_ended",       onSessionEnded);
     socket.on("sos_partner_disconnected",onPartnerDisconnected);
+    socket.on("sos_timer_pause",         onTimerPause);
 
     return () => {
       socket.off("sos_popup",               onPopup);
@@ -330,6 +348,7 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
       socket.off("sos_end_cancelled",       onEndCancelled);
       socket.off("sos_session_ended",       onSessionEnded);
       socket.off("sos_partner_disconnected",onPartnerDisconnected);
+      socket.off("sos_timer_pause",         onTimerPause);
     };
   }, [user]);
 

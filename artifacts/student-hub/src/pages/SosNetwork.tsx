@@ -6,10 +6,11 @@ import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import {
   AlertTriangle, Send, Loader2, CheckCircle2,
-  Instagram, Users, Zap, BookOpen,
+  Instagram, Users, Zap, BookOpen, Bell, BellOff,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useSos } from "@/context/SosContext";
+import { getSocket } from "@/lib/socket";
 import { Clock, Wifi } from "lucide-react";
 
 function TikTokIcon({ className }: { className?: string }) {
@@ -35,22 +36,24 @@ const GRADES: { value: string; label: string; desc: string }[] = [
   { value: "ioe", label: "IOE",      desc: "Engineering entrance"        },
 ];
 
-const SUBJECT_MASTERY_KEY = "sh_subject_mastery";
-const SOCIAL_HANDLES_KEY  = "sh_social_handles";
+const SUBJECT_MASTERY_KEY      = "sh_subject_mastery";
+const SOCIAL_HANDLES_KEY       = "sh_social_handles";
+const ALLOW_NOTIFICATIONS_KEY  = "sh_allow_notifications";
 
 export default function SosNetwork() {
   const { profile } = useAuth();
   const { requestStatus, sendSosRequest, cancelSosRequest, onlineCount } = useSos();
 
-  const [topicTitle,    setTopicTitle]    = useState("");
-  const [subject,       setSubject]       = useState("Math");
-  const [helpGrade,     setHelpGrade]     = useState<string>("11");
+  const [topicTitle,          setTopicTitle]          = useState("");
+  const [subject,             setSubject]             = useState("Math");
+  const [helpGrade,           setHelpGrade]           = useState<string>("11");
 
-  const [instagram,     setInstagram]     = useState("");
-  const [tiktok,        setTiktok]        = useState("");
-  const [handlesSaved,  setHandlesSaved]  = useState(false);
+  const [instagram,           setInstagram]           = useState("");
+  const [tiktok,              setTiktok]              = useState("");
+  const [handlesSaved,        setHandlesSaved]        = useState(false);
 
-  const [mastery,       setMastery]       = useState<Record<string, number>>({});
+  const [mastery,             setMastery]             = useState<Record<string, number>>({});
+  const [allowNotifications,  setAllowNotifications]  = useState<boolean>(true);
 
   useEffect(() => {
     try {
@@ -62,6 +65,10 @@ export default function SosNetwork() {
       }
       const m = localStorage.getItem(SUBJECT_MASTERY_KEY);
       if (m) setMastery(JSON.parse(m) as Record<string, number>);
+
+      // Load notification preference (default: opted-in)
+      const notifRaw = localStorage.getItem(ALLOW_NOTIFICATIONS_KEY);
+      setAllowNotifications(notifRaw === null || notifRaw !== "false");
     } catch {}
     // Pre-select grade from profile
     if (profile?.grade) {
@@ -70,6 +77,13 @@ export default function SosNetwork() {
       if (valid.has(g)) setHelpGrade(g);
     }
   }, [profile?.grade]);
+
+  const toggleNotifications = () => {
+    const next = !allowNotifications;
+    setAllowNotifications(next);
+    try { localStorage.setItem(ALLOW_NOTIFICATIONS_KEY, String(next)); } catch {}
+    getSocket().emit("sos_update_notifications", { allowNotifications: next });
+  };
 
   const saveHandles = () => {
     try {
@@ -142,6 +156,56 @@ export default function SosNetwork() {
               <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{step.desc}</p>
             </div>
           ))}
+        </div>
+
+        {/* Notifications Toggle — Toggle Independence Law */}
+        <div
+          className={`flex items-center justify-between gap-4 px-5 py-4 rounded-2xl border transition-colors ${
+            allowNotifications
+              ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
+              : "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700"
+          }`}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+              allowNotifications
+                ? "bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400"
+                : "bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500"
+            }`}>
+              {allowNotifications
+                ? <Bell className="w-4.5 h-4.5" />
+                : <BellOff className="w-4.5 h-4.5" />
+              }
+            </div>
+            <div className="min-w-0">
+              <p className={`text-sm font-bold leading-tight ${
+                allowNotifications
+                  ? "text-green-800 dark:text-green-300"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}>
+                {allowNotifications ? "Receiving Help Requests" : "Help Requests Paused"}
+              </p>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                {allowNotifications
+                  ? "You may receive SOS popups from peers"
+                  : "You won't be notified when someone needs help"}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={toggleNotifications}
+            aria-pressed={allowNotifications}
+            className={`relative shrink-0 w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 ${
+              allowNotifications ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                allowNotifications ? "translate-x-6" : "translate-x-0"
+              }`}
+            />
+          </button>
         </div>
 
         {/* Request form */}

@@ -1,0 +1,28 @@
+Act as an elite Full-Stack and Backend Engineer. Build a fast, bulletproof Socket.io matchmaking algorithm and state handler for a student app called "Student Hub". 
+
+🔴 CRITICAL BOUNDARY: 0 FIRESTORE/FIREBASE USAGES. Absolutely zero database reads or writes. This entire matchmaking system, toggle states, cooldown tracking, and fallback array looping must run 100% inside the server's volatile memory (RAM) using standard JavaScript structures (like a global `Map` or `Object`).
+
+Implement the exact algorithm flow and conditions described below:
+
+### 1. THE TOGGLE INDEPENDENCE LAW (OPT-IN/OPT-OUT)
+- On the dashboard/get-help page, provide a toggle button to "Receive Help Notifications". 
+- When a user flips this toggle off, the client emits a status packet to the backend, updating their in-memory profile flag to `allowNotifications = false`.
+- Any user with `allowNotifications = false` must be completely bypassed by the matchmaking algorithm. They must never receive an SOS popup.
+
+### 2. THE STRICT-GRADE, CASCADING 3-ROUND MATCHING ALGORITHM
+When a student inputs a grade and clicks "Get Help", the server triggers a strict-grade search. The system MUST NEVER bypass the requested grade—it only searches for active users within that exact grade. It processes the queue across 3 distinct consecutive rounds, lowering candidate filters dynamically to prevent empty results:
+
+- **ROUND 1 (The Top Performers):** Scan the in-memory Map for online users who match the exact requested grade, have notifications enabled, and are not busy. Sort them by a combination of their high study time (`todayStudyMinutes`) and high consistency (`streakDays`). Pick the top 3 highest-ranking students from that grade and flash the popup.
+- **ROUND 2 (The Low-Criteria Catch):** If Round 1 returns fewer than 3 users because the high study time or streak criteria are too selective, immediately drop the high-tier performance scores. Instantly pull up to 3 random online users who match the requested grade, have notifications enabled, and are not busy.
+- **ROUND 3 (The Ultimate Grade Fallback):** If 3 rounds pass with no acceptances, or if Round 2 yields 0 available users, the server must broaden the search to ANY active user currently online in that exact grade. 
+- **STRICT CANDIDATE EXCLUSION LAWS:** In all rounds, the system must NEVER send a popup to:
+  1. A user who is currently offline.
+  2. A user who was already sent a popup during this active SOS session and either clicked "Reject" or ignored the timer.
+
+### 3. THE 30-SECOND LIFECYCLE & COOLDOWN RULES
+- **The 30-Second Timeout:** The moment the 3 helpers are selected for a round, start a 30-second countdown in memory.
+- **The 3-Min Cooldown Penalty:** If a targeted user clicks "Reject" on the popup, or completely ignores it for the 30 seconds, their memory state must immediately be updated with a 3-minute cooldown lock (`cooldownUntil = Date.now() + 3 * 60 * 1000`). They are blocked from getting any new alerts for 3 minutes, and their browser modal must be forcefully cleared.
+- **The Next Group Cascade:** The moment the 30 seconds expire with no acceptances, the server automatically executes the next cascade round to pull the next 3 available users from memory who haven't been targeted yet.
+- **Instant Acceptance Bridge:** The exact millisecond any user clicks "Accept", kill the countdown timer, mark both users as busy in memory, pause the helper's local Pomodoro countdown timer via a WebSocket event, and open up the private live room channel.
+
+Deliver a clean, modular, production-ready Node.js backend matchmaking function using Socket.io and native JavaScript maps, written with zero external database dependencies.

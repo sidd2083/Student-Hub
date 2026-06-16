@@ -3,17 +3,24 @@
  *
  * ZERO Firestore. All state in RAM.
  *
+ * Matchmaking: Strict-grade, 3-round cascading algorithm
+ *  Round 1 — Top Performers   (same grade, high study/streak score, top 3)
+ *  Round 2 — Low-Criteria     (same grade, any available, random 3)
+ *  Round 3 — Ultimate Fallback (same grade, broadest filter, random 3)
+ *
+ * Toggle Independence Law:
+ *  Users with allowNotifications=false are NEVER targeted by matchmaking.
+ *  (Round 3 exception: ignores cooldowns but still respects allowNotifications
+ *   unless truly nobody else is available — see ROUND_3_ALLOW_ALL below.)
+ *
  * Key design decisions:
  *  - Users are NOT deleted from activeUsers on disconnect.
  *    Instead their socketId is blanked and a GC timer purges them after 2 min.
- *    This prevents the common "reconnecting socket" race condition where a user
- *    sends a request right after a reconnect but before re-registration lands.
  *  - Requests with 0 immediate candidates enter a waitingQueue (up to 90 s).
  *    When any user registers / reconnects, the queue is checked and dispatched.
  *  - Online count is pushed to requesters so the UI can show "X students online".
  *
  * Grades: "9" | "10" | "11" | "12" | "cee" | "ioe"
- * Rank:    0      1      2      3      4       4
  */
 
 import type { Server as SocketServer, Socket } from "socket.io";
@@ -22,17 +29,10 @@ import { logger } from "./logger";
 // ── Grade system ───────────────────────────────────────────────────────────────
 
 const VALID_GRADES = new Set(["9", "10", "11", "12", "cee", "ioe"]);
-const GRADE_RANK: Record<string, number> = {
-  "9": 0, "10": 1, "11": 2, "12": 3, "cee": 4, "ioe": 4,
-};
 
 function parseGrade(raw: unknown): string {
   const s = String(raw ?? "").toLowerCase().trim();
   return VALID_GRADES.has(s) ? s : "10";
-}
-
-function gradeRank(g: string): number {
-  return GRADE_RANK[g.toLowerCase()] ?? 1;
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -49,6 +49,8 @@ export interface ActiveUser {
   subjectMastery: Record<string, number>;
   cooldownUntil: number | null;
   currentStatus: "idle" | "pomodoro" | "study_room" | "in_sos_popup" | "busy_helping";
+  /** Toggle Independence Law — if false, never target with SOS popups */
+  allowNotifications: boolean;
   instagramHandle?: string;
   tiktokHandle?: string;
 }
@@ -61,7 +63,15 @@ interface SosRequest {
   helpGrade: string;
   topicTitle: string;
   subject: string;
+  /** UIDs currently being shown the popup in this batch */
   notifiedUids: string[];
+  /**
+   * ALL UIDs ever sent a popup for this request (across all rounds).
+   * Permanently excluded from future batches per the Strict Exclusion Law.
+   */
+  allNotifiedUids: string[];
+  /** Current cascade round: 1 | 2 | 3 */
+  round: number;
   cascadeTimer: ReturnType<typeof setTimeout> | null;
   createdAt: number;
 }
@@ -90,24 +100,28 @@ interface SosSession {
 
 // ── In-Memory State ────────────────────────────────────────────────────────────
 
-const activeUsers         = new Map<string, ActiveUser>();
-const pendingSosRequests  = new Map<string, SosRequest>();
-/** Requests waiting because no candidates were available right now */
-const waitingQueue        = new Map<string, WaitingRequest>();
-const activeSessions      = new Map<string, SosSession>();
-const socketToUid         = new Map<string, string>();
-const userToSession       = new Map<string, string>();
-/** uid → timestamp they disconnected (for GC) */
-const disconnectedAt      = new Map<string, number>();
+const activeUsers        = new Map<string, ActiveUser>();
+const pendingSosRequests = new Map<string, SosRequest>();
+const waitingQueue       = new Map<string, WaitingRequest>();
+const activeSessions     = new Map<string, SosSession>();
+const socketToUid        = new Map<string, string>();
+const userToSession      = new Map<string, string>();
+const disconnectedAt     = new Map<string, number>();
 
 // ── Constants ──────────────────────────────────────────────────────────────────
+
 const POPUP_TIMEOUT_MS      = 30_000;
 const REJECT_COOLDOWN_MS    = 3 * 60_000;
 const GOOD_SAMARITAN_MS     = 7 * 60_000;
-const WAITING_QUEUE_TTL_MS  = 90_000; // 90 s waiting before giving up
-const DISCONNECT_GC_MS      = 2 * 60_000; // purge after 2 min offline
+const WAITING_QUEUE_TTL_MS  = 90_000;
+const DISCONNECT_GC_MS      = 2 * 60_000;
+
+// Round 1 performance thresholds (defines "Top Performer")
+const R1_MIN_STUDY_MINS = 10;   // at least 10 min studied today
+const R1_MIN_STREAK     = 3;    // OR at least 3-day streak
 
 // ── GC: purge users gone > 2 min ──────────────────────────────────────────────
+
 setInterval(() => {
   const cutoff = Date.now() - DISCONNECT_GC_MS;
   for (const [uid, ts] of disconnectedAt) {
@@ -120,6 +134,7 @@ setInterval(() => {
 }, 30_000);
 
 // ── Online count ───────────────────────────────────────────────────────────────
+
 function getOnlineCount(): number {
   let n = 0;
   for (const u of activeUsers.values()) {
@@ -135,71 +150,96 @@ function computeScore(user: ActiveUser, subject: string): number {
   return (user.todayStudyMinutes * 0.4) + (user.streakDays * 0.3) + (mastery * 0.3);
 }
 
-function isUserLocked(user: ActiveUser): boolean {
-  if (!user.socketId) return true; // disconnected
-  if (user.currentStatus === "in_sos_popup" || user.currentStatus === "busy_helping") return true;
-  if (user.cooldownUntil !== null && Date.now() < user.cooldownUntil) return true;
-  return false;
-}
-
-// ── Matchmaking ────────────────────────────────────────────────────────────────
-/**
- * Tier 1 — helpers with grade rank > helpGrade rank (seniors, sorted by score)
- * Tier 2 — helpers with same grade rank (peers, sorted by score)
- * Tier 3 — any non-locked, non-excluded user (cross-grade fallback, random)
- */
-function findCandidates(
-  requesterUid: string,
-  helpGrade: string,
-  subject: string,
-  alreadyNotified: string[],
-): ActiveUser[] {
-  const requestRank = gradeRank(helpGrade);
-  const excluded    = new Set([requesterUid, ...alreadyNotified]);
-
-  const seniors: ActiveUser[] = [];
-  const peers:   ActiveUser[] = [];
-  const anyone:  ActiveUser[] = [];
-
-  for (const user of activeUsers.values()) {
-    if (excluded.has(user.uid)) continue;
-    if (isUserLocked(user)) continue;
-
-    const rank = gradeRank(user.grade);
-    if (rank > requestRank)        seniors.push(user);
-    else if (rank === requestRank) peers.push(user);
-    else                           anyone.push(user);
-  }
-
-  if (seniors.length > 0) {
-    logger.info({ count: seniors.length, helpGrade, tier: 1 }, "[SOS] match tier 1");
-    return seniors.sort((a, b) => computeScore(b, subject) - computeScore(a, subject)).slice(0, 3);
-  }
-  if (peers.length > 0) {
-    logger.info({ count: peers.length, helpGrade, tier: 2 }, "[SOS] match tier 2");
-    return peers.sort((a, b) => computeScore(b, subject) - computeScore(a, subject)).slice(0, 3);
-  }
-  if (anyone.length > 0) {
-    logger.info({ count: anyone.length, helpGrade, tier: 3 }, "[SOS] match tier 3");
-    return anyone.sort(() => Math.random() - 0.5).slice(0, 3);
-  }
-  return [];
-}
-
 // ── ID generator ───────────────────────────────────────────────────────────────
+
 function newId(): string {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// ── Dispatch helpers (shared by immediate path and waiting-queue path) ─────────
+// ── 3-Round Strict-Grade Matchmaking ──────────────────────────────────────────
+/**
+ * STRICT GRADE LAW: All rounds ONLY match users within the exact requested grade.
+ *
+ * Round 1 — Top Performers
+ *   Requires allowNotifications=true, no cooldown, not busy/in-popup.
+ *   Filter: todayStudyMinutes >= R1_MIN_STUDY_MINS OR streakDays >= R1_MIN_STREAK.
+ *   Sort by composite score desc, pick top 3.
+ *   If 0 qualify (criteria too selective) → immediately fall through to Round 2.
+ *
+ * Round 2 — Low-Criteria Catch
+ *   Requires allowNotifications=true, no cooldown, not busy/in-popup.
+ *   No performance filter — random pick up to 3.
+ *
+ * Round 3 — Ultimate Grade Fallback
+ *   ONLY excludes: offline, busy_helping, in_sos_popup, already notified this session.
+ *   Ignores cooldowns and allowNotifications to surface ANY reachable user.
+ *   Random pick up to 3.
+ */
+function findRoundCandidates(
+  requesterUid: string,
+  helpGrade: string,
+  subject: string,
+  allNotifiedUids: string[],
+  round: number,
+): ActiveUser[] {
+  const excluded = new Set([requesterUid, ...allNotifiedUids]);
+  const grade    = helpGrade.toLowerCase();
+  const pool: ActiveUser[] = [];
+
+  for (const user of activeUsers.values()) {
+    // Always-excluded (all rounds)
+    if (excluded.has(user.uid))              continue;
+    if (!user.socketId)                      continue; // offline
+    if (user.grade.toLowerCase() !== grade)  continue; // STRICT GRADE
+
+    if (round <= 2) {
+      // Rounds 1 & 2 — respect opt-out toggle and standard lock conditions
+      if (!user.allowNotifications)         continue;
+      if (user.currentStatus === "busy_helping")  continue;
+      if (user.currentStatus === "in_sos_popup")  continue;
+      if (user.cooldownUntil !== null && Date.now() < user.cooldownUntil) continue;
+    } else {
+      // Round 3 — broadest filter; only exclude truly occupied users
+      if (user.currentStatus === "busy_helping")  continue;
+      if (user.currentStatus === "in_sos_popup")  continue;
+    }
+
+    pool.push(user);
+  }
+
+  if (round === 1) {
+    // Filter to top performers only
+    const highPerformers = pool.filter(
+      u => u.todayStudyMinutes >= R1_MIN_STUDY_MINS || u.streakDays >= R1_MIN_STREAK,
+    );
+    if (highPerformers.length === 0) {
+      // Criteria too selective — signal caller to fall through to Round 2
+      return [];
+    }
+    return highPerformers
+      .sort((a, b) => computeScore(b, subject) - computeScore(a, subject))
+      .slice(0, 3);
+  }
+
+  // Rounds 2 & 3 — random selection
+  return pool.sort(() => Math.random() - 0.5).slice(0, 3);
+}
+
+// ── Dispatch helpers ───────────────────────────────────────────────────────────
+
 function dispatchToHelpers(
   io: SocketServer,
   req: SosRequest,
   candidates: ActiveUser[],
 ): void {
+  // Mark candidates as showing popup
   for (const c of candidates) c.currentStatus = "in_sos_popup";
 
+  // Update current batch and accumulate into full history
   req.notifiedUids = candidates.map(c => c.uid);
+  for (const uid of req.notifiedUids) {
+    if (!req.allNotifiedUids.includes(uid)) req.allNotifiedUids.push(uid);
+  }
 
   const popupPayload = {
     requestId:      req.requestId,
@@ -218,19 +258,98 @@ function dispatchToHelpers(
 
   const requesterSocket = io.sockets.sockets.get(req.requesterSocketId);
   if (requesterSocket) {
-    requesterSocket.emit("sos_searching", { requestId: req.requestId, helperCount: candidates.length });
+    requesterSocket.emit("sos_searching", {
+      requestId:   req.requestId,
+      helperCount: candidates.length,
+      round:       req.round,
+    });
   }
-  logger.info({ requestId: req.requestId, helpGrade: req.helpGrade, candidates: candidates.length }, "[SOS] dispatched");
+  logger.info(
+    { requestId: req.requestId, helpGrade: req.helpGrade, round: req.round, candidates: candidates.length },
+    "[SOS] dispatched",
+  );
+}
+
+// ── Try to dispatch starting at req.round, advancing if a round yields 0 ──────
+/**
+ * Attempts to find candidates starting at req.round.
+ * If a round yields 0 candidates, immediately advances to the next round.
+ * If all rounds (1-3) yield 0, enters the waiting queue.
+ */
+function tryDispatchNextRound(io: SocketServer, req: SosRequest): void {
+  while (req.round <= 3) {
+    const candidates = findRoundCandidates(
+      req.requesterUid, req.helpGrade, req.subject, req.allNotifiedUids, req.round,
+    );
+
+    if (candidates.length > 0) {
+      dispatchToHelpers(io, req, candidates);
+      return;
+    }
+
+    logger.info(
+      { requestId: req.requestId, round: req.round, helpGrade: req.helpGrade },
+      "[SOS] round yielded 0 candidates — advancing",
+    );
+    req.round++;
+  }
+
+  // All 3 rounds yielded 0 candidates — enter waiting queue
+  pendingSosRequests.delete(req.requestId);
+  enterWaitingQueue(io, req);
+}
+
+// ── Waiting queue helpers ──────────────────────────────────────────────────────
+
+function enterWaitingQueue(io: SocketServer, req: SosRequest | { requestId: string; requesterUid: string; requesterSocketId: string; requesterName: string; helpGrade: string; topicTitle: string; subject: string }): void {
+  const requestId = req.requestId;
+  logger.info({ requestId, helpGrade: req.helpGrade }, "[SOS] entering waiting queue");
+
+  const requesterSocket = io.sockets.sockets.get(req.requesterSocketId);
+
+  const expiryTimer = setTimeout(() => {
+    waitingQueue.delete(requestId);
+    if (requesterSocket) {
+      requesterSocket.emit("sos_no_helpers", {
+        message: "No helpers found after waiting. Please try again later.",
+      });
+    }
+    logger.info({ requestId }, "[SOS] waiting request expired");
+  }, WAITING_QUEUE_TTL_MS);
+
+  const wReq: WaitingRequest = {
+    requestId:         req.requestId,
+    requesterUid:      req.requesterUid,
+    requesterSocketId: req.requesterSocketId,
+    requesterName:     req.requesterName,
+    helpGrade:         req.helpGrade,
+    topicTitle:        req.topicTitle,
+    subject:           req.subject,
+    expiresAt:         Date.now() + WAITING_QUEUE_TTL_MS,
+    expiryTimer,
+  };
+  waitingQueue.set(requestId, wReq);
+
+  if (requesterSocket) {
+    requesterSocket.emit("sos_waiting", {
+      requestId,
+      message: "No helpers are online for your grade right now. You'll get a popup the moment someone comes online!",
+      expiresInMs: WAITING_QUEUE_TTL_MS,
+    });
+  }
 }
 
 // ── Try to serve any waiting requests for a newly-available user ───────────────
+
 function tryFlushWaitingQueue(io: SocketServer, newUid: string): void {
   for (const [requestId, wReq] of waitingQueue) {
-    if (wReq.requesterUid === newUid) continue; // can't help yourself
-    const candidates = findCandidates(wReq.requesterUid, wReq.helpGrade, wReq.subject, []);
-    if (candidates.length === 0) continue;
+    if (wReq.requesterUid === newUid) continue;
 
-    // Found a match — promote from waiting queue to live request
+    // Only flush if the new user could plausibly help (same grade, online)
+    const newUser = activeUsers.get(newUid);
+    if (!newUser || !newUser.socketId) continue;
+    if (newUser.grade.toLowerCase() !== wReq.helpGrade.toLowerCase()) continue;
+
     clearTimeout(wReq.expiryTimer);
     waitingQueue.delete(requestId);
 
@@ -243,13 +362,54 @@ function tryFlushWaitingQueue(io: SocketServer, newUid: string): void {
       topicTitle:         wReq.topicTitle,
       subject:            wReq.subject,
       notifiedUids:       [],
+      allNotifiedUids:    [],
+      round:              1,
       cascadeTimer:       null,
       createdAt:          Date.now(),
     };
-    dispatchToHelpers(io, req, candidates);
+    pendingSosRequests.set(requestId, req);
+    tryDispatchNextRound(io, req);
     logger.info({ requestId, newUid }, "[SOS] waiting queue flushed on new user");
-    break; // dispatch one at a time to avoid race
+    break; // dispatch one at a time
   }
+}
+
+// ── Cascade to next round after 30s timeout ────────────────────────────────────
+
+function cascadeSos(io: SocketServer, requestId: string): void {
+  const req = pendingSosRequests.get(requestId);
+  if (!req) return;
+
+  // Apply timeout penalty: users who ignored the popup get the full cooldown
+  for (const nUid of req.notifiedUids) {
+    const user = activeUsers.get(nUid);
+    if (!user) continue;
+    if (user.currentStatus === "in_sos_popup") {
+      user.currentStatus = "idle";
+      user.cooldownUntil = Date.now() + REJECT_COOLDOWN_MS;
+    }
+    if (user.socketId) io.to(user.socketId).emit("sos_popup_clear", { requestId });
+  }
+  req.notifiedUids = [];
+
+  // Advance to next round
+  req.round++;
+
+  if (req.round > 3) {
+    // All 3 rounds completed with no acceptances
+    pendingSosRequests.delete(requestId);
+    const requesterSocket = io.sockets.sockets.get(req.requesterSocketId);
+    if (requesterSocket) {
+      requesterSocket.emit("sos_no_helpers", {
+        message: "No helpers responded after 3 rounds. Please try again later.",
+      });
+    }
+    logger.info({ requestId }, "[SOS] all 3 rounds exhausted — no accept");
+    return;
+  }
+
+  // Try next round (will keep advancing if that round also has 0 candidates)
+  tryDispatchNextRound(io, req);
 }
 
 // ── Core SOS Event Handlers ────────────────────────────────────────────────────
@@ -268,14 +428,14 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
       todayStudyMinutes?: number;
       streakDays?: number;
       subjectMastery?: Record<string, number>;
+      allowNotifications?: boolean;
       instagramHandle?: string;
       tiktokHandle?: string;
     }) => {
       if (!data?.uid || !data?.name) return;
-      const userId  = String(data.uid).slice(0, 128);
+      const userId   = String(data.uid).slice(0, 128);
       const existing = activeUsers.get(userId);
 
-      // If this user was previously disconnected, remove from GC queue
       disconnectedAt.delete(userId);
 
       const user: ActiveUser = {
@@ -294,7 +454,11 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
                   .map(([k, v]) => [String(k).slice(0, 32), Math.max(0, Math.min(9999, Number(v) || 0))]),
               )
             : {},
-        // Preserve cooldown / session status across reconnects
+        // Toggle Independence Law — preserve existing preference, default to true (opted-in)
+        allowNotifications:
+          typeof data.allowNotifications === "boolean"
+            ? data.allowNotifications
+            : (existing?.allowNotifications ?? true),
         cooldownUntil: existing?.cooldownUntil ?? null,
         currentStatus:
           existing?.currentStatus === "busy_helping" || existing?.currentStatus === "in_sos_popup"
@@ -304,7 +468,6 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
         tiktokHandle:    typeof data.tiktokHandle    === "string" ? data.tiktokHandle.slice(0, 64)    : undefined,
       };
 
-      // If the old socketId was different, clean up the old entry in socketToUid
       if (existing?.socketId && existing.socketId !== socket.id) {
         socketToUid.delete(existing.socketId);
       }
@@ -312,15 +475,27 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
       activeUsers.set(userId, user);
       socketToUid.set(socket.id, userId);
 
-      // Push current online count back to this socket
       socket.emit("sos_online_count", { count: getOnlineCount() });
+      logger.debug(
+        { uid: userId, grade: user.grade, allowNotifications: user.allowNotifications, onlineCount: getOnlineCount() },
+        "[SOS] user registered",
+      );
 
-      logger.debug({ uid: userId, grade: user.grade, onlineCount: getOnlineCount() }, "[SOS] user registered");
-
-      // Check if any waiting request can now be served by this new user
       tryFlushWaitingQueue(io, userId);
     },
   );
+
+  // ── Toggle Help Notifications (Toggle Independence Law) ───────────────────
+  socket.on("sos_update_notifications", (data: { allowNotifications?: boolean }) => {
+    const userId = uid();
+    if (!userId) return;
+    const user = activeUsers.get(userId);
+    if (!user) return;
+    if (typeof data?.allowNotifications !== "boolean") return;
+
+    user.allowNotifications = data.allowNotifications;
+    logger.debug({ uid: userId, allowNotifications: data.allowNotifications }, "[SOS] notifications toggled");
+  });
 
   // ── Update live study status ──────────────────────────────────────────────
   socket.on(
@@ -365,7 +540,6 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
         return;
       }
 
-      // Block if requester already has a pending or waiting request
       for (const req of pendingSosRequests.values()) {
         if (req.requesterUid === userId) {
           socket.emit("sos_error", { message: "You already have an active request." });
@@ -388,69 +562,34 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
         return;
       }
 
-      const requestId  = newId();
-      const candidates = findCandidates(userId, helpGrade, subject, []);
+      const requestId = newId();
+      const req: SosRequest = {
+        requestId,
+        requesterUid:      userId,
+        requesterSocketId: socket.id,
+        requesterName:     requester.name,
+        helpGrade,
+        topicTitle,
+        subject,
+        notifiedUids:    [],
+        allNotifiedUids: [],
+        round:           1,
+        cascadeTimer:    null,
+        createdAt:       Date.now(),
+      };
 
-      if (candidates.length > 0) {
-        // Immediate dispatch
-        const req: SosRequest = {
-          requestId,
-          requesterUid:       userId,
-          requesterSocketId:  socket.id,
-          requesterName:      requester.name,
-          helpGrade,
-          topicTitle,
-          subject,
-          notifiedUids:       [],
-          cascadeTimer:       null,
-          createdAt:          Date.now(),
-        };
-        dispatchToHelpers(io, req, candidates);
-      } else {
-        // Nobody available right now — enter waiting queue
-        logger.info({ requestId, helpGrade, onlineCount: getOnlineCount() }, "[SOS] no candidates, entering waiting queue");
-
-        const expiryTimer = setTimeout(() => {
-          waitingQueue.delete(requestId);
-          const requesterSocket = io.sockets.sockets.get(socket.id);
-          if (requesterSocket) {
-            requesterSocket.emit("sos_no_helpers", {
-              message: "No helpers found after waiting. Please try again later.",
-            });
-          }
-          logger.info({ requestId }, "[SOS] waiting request expired");
-        }, WAITING_QUEUE_TTL_MS);
-
-        const wReq: WaitingRequest = {
-          requestId,
-          requesterUid:       userId,
-          requesterSocketId:  socket.id,
-          requesterName:      requester.name,
-          helpGrade,
-          topicTitle,
-          subject,
-          expiresAt:   Date.now() + WAITING_QUEUE_TTL_MS,
-          expiryTimer,
-        };
-        waitingQueue.set(requestId, wReq);
-
-        // Tell the requester they're in the queue, with remaining wait time
-        socket.emit("sos_waiting", {
-          requestId,
-          message: "No helpers are online right now. We'll notify you the moment someone comes online!",
-          expiresInMs: WAITING_QUEUE_TTL_MS,
-        });
-      }
+      // Register in pendingSosRequests before dispatching
+      pendingSosRequests.set(requestId, req);
+      tryDispatchNextRound(io, req);
     },
   );
 
-  // ── Cancel request (works for both pending and waiting) ──────────────────
+  // ── Cancel request ────────────────────────────────────────────────────────
   socket.on("sos_cancel_request", (data: { requestId?: string }) => {
     const userId    = uid();
     if (!userId) return;
     const requestId = String(data?.requestId ?? "");
 
-    // Waiting queue
     const wReq = waitingQueue.get(requestId);
     if (wReq && wReq.requesterUid === userId) {
       clearTimeout(wReq.expiryTimer);
@@ -459,14 +598,13 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
       return;
     }
 
-    // Pending request
     const req = pendingSosRequests.get(requestId);
     if (req && req.requesterUid === userId) {
       if (req.cascadeTimer) clearTimeout(req.cascadeTimer);
       for (const nUid of req.notifiedUids) {
         const u = activeUsers.get(nUid);
         if (u) {
-          io.to(u.socketId).emit("sos_popup_clear", { requestId });
+          if (u.socketId) io.to(u.socketId).emit("sos_popup_clear", { requestId });
           u.currentStatus = "idle";
         }
       }
@@ -489,6 +627,7 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
       return;
     }
 
+    // Kill the cascade countdown instantly
     if (req.cascadeTimer) clearTimeout(req.cascadeTimer);
 
     // Clear popup from other notified users
@@ -502,18 +641,19 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
 
     pendingSosRequests.delete(requestId);
     helper.currentStatus = "busy_helping";
+
     const requester = activeUsers.get(req.requesterUid);
     if (requester) requester.currentStatus = "busy_helping";
 
     const sessionId = newId();
     const session: SosSession = {
       sessionId,
-      requesterUid: req.requesterUid,
+      requesterUid:   req.requesterUid,
       helperUid,
-      topicTitle:   req.topicTitle,
-      subject:      req.subject,
+      topicTitle:     req.topicTitle,
+      subject:        req.subject,
       endRequestedBy: null,
-      createdAt: Date.now(),
+      createdAt:      Date.now(),
     };
     activeSessions.set(sessionId, session);
     userToSession.set(req.requesterUid, sessionId);
@@ -536,7 +676,11 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
       requesterSocket.emit("sos_session_start", { ...sessionPayload, role: "requester", partner: helperPayload });
     }
     socket.emit("sos_session_start", { ...sessionPayload, role: "helper", partner: requesterPayload });
-    logger.info({ sessionId, requesterUid: req.requesterUid, helperUid }, "[SOS] session started");
+
+    // Pause the helper's Pomodoro timer immediately on acceptance
+    socket.emit("sos_timer_pause", {});
+
+    logger.info({ sessionId, requesterUid: req.requesterUid, helperUid, round: req.round }, "[SOS] session started");
   });
 
   // ── Helper rejects ───────────────────────────────────────────────────────
@@ -550,10 +694,15 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
     const req = pendingSosRequests.get(requestId);
     if (!req) return;
 
+    // 3-minute cooldown penalty
     helper.cooldownUntil = Date.now() + REJECT_COOLDOWN_MS;
     helper.currentStatus = "idle";
     req.notifiedUids = req.notifiedUids.filter(u => u !== helperUid);
 
+    // Force-clear the modal on this helper's browser
+    socket.emit("sos_popup_clear", { requestId });
+
+    // If all current-batch users rejected, cascade immediately (don't wait 30s)
     if (req.notifiedUids.length === 0) {
       if (req.cascadeTimer) clearTimeout(req.cascadeTimer);
       cascadeSos(io, requestId);
@@ -588,7 +737,14 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
   // ── Canvas draw ──────────────────────────────────────────────────────────
   socket.on(
     "sos_canvas_draw",
-    (data: { points?: { x: number; y: number }[]; tool?: string; color?: string; size?: number; canvasWidth?: number; canvasHeight?: number }) => {
+    (data: {
+      points?: { x: number; y: number }[];
+      tool?: string;
+      color?: string;
+      size?: number;
+      canvasWidth?: number;
+      canvasHeight?: number;
+    }) => {
       const userId = uid();
       if (!userId) return;
       const sessionId = userToSession.get(userId);
@@ -596,7 +752,9 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
       if (!Array.isArray(data?.points) || data.points.length === 0) return;
 
       socket.to(sessionId).emit("sos_canvas_draw", {
-        points:      data.points.slice(0, 2000).map(p => ({ x: Math.max(0, Number(p.x) || 0), y: Math.max(0, Number(p.y) || 0) })),
+        points: data.points
+          .slice(0, 2000)
+          .map(p => ({ x: Math.max(0, Number(p.x) || 0), y: Math.max(0, Number(p.y) || 0) })),
         tool:        String(data.tool  ?? "pen").slice(0, 20),
         color:       String(data.color ?? "#000000").slice(0, 20),
         size:        Math.max(1, Math.min(100, Number(data.size) || 3)),
@@ -607,18 +765,21 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
   );
 
   // ── Canvas image ─────────────────────────────────────────────────────────
-  socket.on("sos_canvas_image", (data: { dataUrl?: string; canvasWidth?: number; canvasHeight?: number }) => {
-    const userId = uid();
-    if (!userId) return;
-    const sessionId = userToSession.get(userId);
-    if (!sessionId) return;
-    if (!data?.dataUrl) return;
-    socket.to(sessionId).emit("sos_canvas_image", {
-      dataUrl:     data.dataUrl,
-      canvasWidth: Math.max(1, Number(data.canvasWidth)  || 800),
-      canvasHeight:Math.max(1, Number(data.canvasHeight) || 600),
-    });
-  });
+  socket.on(
+    "sos_canvas_image",
+    (data: { dataUrl?: string; canvasWidth?: number; canvasHeight?: number }) => {
+      const userId = uid();
+      if (!userId) return;
+      const sessionId = userToSession.get(userId);
+      if (!sessionId) return;
+      if (!data?.dataUrl) return;
+      socket.to(sessionId).emit("sos_canvas_image", {
+        dataUrl:      data.dataUrl,
+        canvasWidth:  Math.max(1, Number(data.canvasWidth)  || 800),
+        canvasHeight: Math.max(1, Number(data.canvasHeight) || 600),
+      });
+    },
+  );
 
   // ── Canvas clear ─────────────────────────────────────────────────────────
   socket.on("sos_canvas_clear", () => {
@@ -654,8 +815,11 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
 
     const helper    = activeUsers.get(session.helperUid);
     const requester = activeUsers.get(session.requesterUid);
-    if (helper)    { helper.currentStatus    = "idle"; helper.cooldownUntil = Date.now() + GOOD_SAMARITAN_MS; }
-    if (requester)   requester.currentStatus = "idle";
+    if (helper) {
+      helper.currentStatus = "idle";
+      helper.cooldownUntil = Date.now() + GOOD_SAMARITAN_MS;
+    }
+    if (requester) requester.currentStatus = "idle";
 
     activeSessions.delete(sessionId);
     userToSession.delete(session.requesterUid);
@@ -690,91 +854,7 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
   });
 }
 
-// ── Cascade to next batch ──────────────────────────────────────────────────────
-
-function cascadeSos(io: SocketServer, requestId: string): void {
-  const req = pendingSosRequests.get(requestId);
-  if (!req) return;
-
-  // Revert still-showing popups
-  for (const nUid of req.notifiedUids) {
-    const user = activeUsers.get(nUid);
-    if (user) {
-      if (user.currentStatus === "in_sos_popup") {
-        user.currentStatus = "idle";
-        user.cooldownUntil = Date.now() + REJECT_COOLDOWN_MS;
-      }
-      if (user.socketId) io.to(user.socketId).emit("sos_popup_clear", { requestId });
-    }
-  }
-
-  const allNotified    = [...req.notifiedUids];
-  const nextCandidates = findCandidates(req.requesterUid, req.helpGrade, req.subject, allNotified);
-
-  if (nextCandidates.length === 0) {
-    // Move to waiting queue instead of giving up entirely
-    logger.info({ requestId }, "[SOS] cascade exhausted — moving to waiting queue");
-    pendingSosRequests.delete(requestId);
-
-    const requesterSocket = io.sockets.sockets.get(req.requesterSocketId);
-
-    const expiryTimer = setTimeout(() => {
-      waitingQueue.delete(requestId);
-      if (requesterSocket) {
-        requesterSocket.emit("sos_no_helpers", {
-          message: "No helpers found. Please try again later.",
-        });
-      }
-    }, WAITING_QUEUE_TTL_MS);
-
-    const wReq: WaitingRequest = {
-      requestId:          req.requestId,
-      requesterUid:       req.requesterUid,
-      requesterSocketId:  req.requesterSocketId,
-      requesterName:      req.requesterName,
-      helpGrade:          req.helpGrade,
-      topicTitle:         req.topicTitle,
-      subject:            req.subject,
-      expiresAt:          Date.now() + WAITING_QUEUE_TTL_MS,
-      expiryTimer,
-    };
-    waitingQueue.set(requestId, wReq);
-
-    if (requesterSocket) {
-      requesterSocket.emit("sos_waiting", {
-        requestId,
-        message: "All helpers are busy. You're in the queue — we'll connect you the moment someone is free!",
-        expiresInMs: WAITING_QUEUE_TTL_MS,
-      });
-    }
-    return;
-  }
-
-  // Dispatch next batch
-  for (const c of nextCandidates) c.currentStatus = "in_sos_popup";
-  req.notifiedUids  = nextCandidates.map(c => c.uid);
-  req.cascadeTimer  = setTimeout(() => cascadeSos(io, requestId), POPUP_TIMEOUT_MS);
-
-  const popupPayload = {
-    requestId:      req.requestId,
-    topicTitle:     req.topicTitle,
-    subject:        req.subject,
-    requesterName:  req.requesterName,
-    requesterGrade: req.helpGrade,
-    timeoutMs:      POPUP_TIMEOUT_MS,
-  };
-  for (const c of nextCandidates) {
-    io.to(c.socketId).emit("sos_popup", popupPayload);
-  }
-
-  const requesterSocket = io.sockets.sockets.get(req.requesterSocketId);
-  if (requesterSocket) {
-    requesterSocket.emit("sos_searching", { requestId, helperCount: nextCandidates.length });
-  }
-  logger.info({ requestId, nextCount: nextCandidates.length }, "[SOS] cascade round");
-}
-
-// ── Graceful disconnect (don't delete — mark offline, let GC handle it) ────────
+// ── Graceful disconnect ────────────────────────────────────────────────────────
 
 function cleanupOnDisconnect(io: SocketServer, socketId: string): void {
   const userId = socketToUid.get(socketId);
@@ -783,17 +863,14 @@ function cleanupOnDisconnect(io: SocketServer, socketId: string): void {
 
   const user = activeUsers.get(userId);
   if (user) {
-    // Blank the socket ID — user is now "offline" but still in activeUsers for 2 min
     user.socketId = "";
     disconnectedAt.set(userId, Date.now());
-
-    // If they were showing a popup, revert
     if (user.currentStatus === "in_sos_popup") {
       user.currentStatus = "idle";
     }
   }
 
-  // Cancel any waiting requests from this user
+  // Cancel waiting requests from this user
   for (const [requestId, wReq] of waitingQueue) {
     if (wReq.requesterSocketId === socketId) {
       clearTimeout(wReq.expiryTimer);
