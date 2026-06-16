@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "grlzCsBC8b3BzjcHPt9eD"
+uri = "file://SOS_MATCHMAKING_EXPLAINED.md"
+type = "text"
+title = "SOS Matchmaking Algorithm — Simple Explanation"
