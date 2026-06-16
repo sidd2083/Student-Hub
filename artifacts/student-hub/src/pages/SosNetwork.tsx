@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useSos } from "@/context/SosContext";
+import { Clock, Wifi } from "lucide-react";
 
 function TikTokIcon({ className }: { className?: string }) {
   return (
@@ -39,7 +40,7 @@ const SOCIAL_HANDLES_KEY  = "sh_social_handles";
 
 export default function SosNetwork() {
   const { profile } = useAuth();
-  const { requestStatus, sendSosRequest, cancelSosRequest } = useSos();
+  const { requestStatus, sendSosRequest, cancelSosRequest, onlineCount } = useSos();
 
   const [topicTitle,    setTopicTitle]    = useState("");
   const [subject,       setSubject]       = useState("Math");
@@ -94,7 +95,9 @@ export default function SosNetwork() {
   };
 
   const isSearching = requestStatus === "searching";
+  const isWaiting   = requestStatus === "waiting";
   const noHelpers   = requestStatus === "no_helpers";
+  const isBusy      = isSearching || isWaiting;
 
   if (!profile) {
     return (
@@ -143,9 +146,19 @@ export default function SosNetwork() {
 
         {/* Request form */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <BookOpen className="w-5 h-5 text-red-500" />
-            <h2 className="font-bold text-gray-900 dark:text-white">Request Help</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-red-500" />
+              <h2 className="font-bold text-gray-900 dark:text-white">Request Help</h2>
+            </div>
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+              onlineCount > 1
+                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+            }`}>
+              <Wifi className="w-3 h-3" />
+              {onlineCount > 1 ? `${onlineCount - 1} helper${onlineCount - 1 === 1 ? "" : "s"} online` : "No helpers online now"}
+            </div>
           </div>
 
           <form onSubmit={handleSendSos} className="space-y-4">
@@ -161,7 +174,7 @@ export default function SosNetwork() {
                 placeholder="e.g. Optics – Lens Formula Help"
                 maxLength={120}
                 required
-                disabled={isSearching}
+                disabled={isBusy}
                 className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent disabled:opacity-50 transition"
               />
             </div>
@@ -179,7 +192,7 @@ export default function SosNetwork() {
                       key={g.value}
                       type="button"
                       onClick={() => setHelpGrade(g.value)}
-                      disabled={isSearching}
+                      disabled={isBusy}
                       title={g.desc}
                       className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all active:scale-95 select-none border-2 ${
                         selected
@@ -208,7 +221,7 @@ export default function SosNetwork() {
                     key={s}
                     type="button"
                     onClick={() => setSubject(s)}
-                    disabled={isSearching}
+                    disabled={isBusy}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors select-none ${
                       subject === s
                         ? "bg-blue-500 text-white shadow-sm"
@@ -229,11 +242,38 @@ export default function SosNetwork() {
               </div>
             )}
 
-            {isSearching ? (
+            {isWaiting ? (
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
+                      <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 animate-pulse" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-amber-800 dark:text-amber-300">Waiting for a helper…</p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                        No one is online right now. You'll get a popup the moment someone comes online!
+                      </p>
+                    </div>
+                  </div>
+                  <div className="w-full h-1 bg-amber-200 dark:bg-amber-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-amber-500 rounded-full" style={{ animation: "sosWaitingBar 2s ease-in-out infinite alternate" }} />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={cancelSosRequest}
+                  className="w-full py-2 rounded-xl text-sm text-gray-500 dark:text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                >
+                  Cancel
+                </button>
+                <style>{`@keyframes sosWaitingBar { from { width: 30% } to { width: 90% } }`}</style>
+              </div>
+            ) : isSearching ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400">
                   <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                  <span className="text-sm font-medium">Searching for helpers…</span>
+                  <span className="text-sm font-medium">Contacting helpers…</span>
                 </div>
                 <button
                   type="button"

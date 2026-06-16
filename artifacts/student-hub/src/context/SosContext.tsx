@@ -51,6 +51,7 @@ export interface SosSession {
 export type SosRequestStatus =
   | "idle"
   | "searching"
+  | "waiting"
   | "no_helpers";
 
 interface SosContextType {
@@ -63,6 +64,8 @@ interface SosContextType {
   session: SosSession | null;
   /** Show the end-confirm prompt */
   showRatingModal: boolean;
+  /** Number of users currently online in Get Help system */
+  onlineCount: number;
 
   sendSosRequest: (topicTitle: string, subject: string, helpGrade?: string) => void;
   cancelSosRequest: () => void;
@@ -128,6 +131,7 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
   const [incomingRequest, setIncomingRequest] = useState<SosIncomingRequest | null>(null);
   const [session, setSession] = useState<SosSession | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [onlineCount, setOnlineCount] = useState(0);
 
   // Track mount to avoid state updates after unmount
   const mountedRef = useRef(true);
@@ -243,18 +247,31 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
       });
     };
 
-    // Server couldn't find helpers
+    // Server couldn't find helpers even after waiting
     const onNoHelpers = () => {
       if (!mountedRef.current) return;
       setRequestStatus("no_helpers");
       setOutgoingRequestId(null);
     };
 
-    // SOS searching acknowledgement
+    // SOS searching acknowledgement (helpers found immediately)
     const onSearching = (data: { requestId: string }) => {
       if (!mountedRef.current) return;
       setRequestStatus("searching");
       setOutgoingRequestId(data.requestId);
+    };
+
+    // Entered waiting queue — no helpers right now, will notify when someone comes online
+    const onWaiting = (data: { requestId: string }) => {
+      if (!mountedRef.current) return;
+      setRequestStatus("waiting");
+      setOutgoingRequestId(data.requestId);
+    };
+
+    // Online count update from server
+    const onOnlineCount = (data: { count: number }) => {
+      if (!mountedRef.current) return;
+      setOnlineCount(data.count);
     };
 
     // Partner wants to end — show confirm prompt on both screens
@@ -293,6 +310,8 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
     socket.on("sos_session_start",       onSessionStart);
     socket.on("sos_no_helpers",          onNoHelpers);
     socket.on("sos_searching",           onSearching);
+    socket.on("sos_waiting",             onWaiting);
+    socket.on("sos_online_count",        onOnlineCount);
     socket.on("sos_end_confirm_prompt",  onEndConfirmPrompt);
     socket.on("sos_end_cancelled",       onEndCancelled);
     socket.on("sos_session_ended",       onSessionEnded);
@@ -305,6 +324,8 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
       socket.off("sos_session_start",       onSessionStart);
       socket.off("sos_no_helpers",          onNoHelpers);
       socket.off("sos_searching",           onSearching);
+      socket.off("sos_waiting",             onWaiting);
+      socket.off("sos_online_count",        onOnlineCount);
       socket.off("sos_end_confirm_prompt",  onEndConfirmPrompt);
       socket.off("sos_end_cancelled",       onEndCancelled);
       socket.off("sos_session_ended",       onSessionEnded);
@@ -332,9 +353,11 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
   );
 
   const cancelSosRequest = useCallback(() => {
+    const rid = outgoingRequestId;
     setRequestStatus("idle");
     setOutgoingRequestId(null);
-  }, []);
+    if (rid) getSocket().emit("sos_cancel_request", { requestId: rid });
+  }, [outgoingRequestId]);
 
   const acceptSos = useCallback((requestId: string) => {
     setIncomingRequest(null);
@@ -406,6 +429,7 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
     incomingRequest,
     session,
     showRatingModal,
+    onlineCount,
     sendSosRequest,
     cancelSosRequest,
     acceptSos,
