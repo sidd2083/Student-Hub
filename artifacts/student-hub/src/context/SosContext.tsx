@@ -64,7 +64,7 @@ interface SosContextType {
   /** Show the end-confirm prompt */
   showRatingModal: boolean;
 
-  sendSosRequest: (topicTitle: string, subject: string) => void;
+  sendSosRequest: (topicTitle: string, subject: string, helpGrade?: string) => void;
   cancelSosRequest: () => void;
   acceptSos: (requestId: string) => void;
   rejectSos: (requestId: string) => void;
@@ -315,13 +315,17 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
   // ── Actions ───────────────────────────────────────────────────────────────
 
   const sendSosRequest = useCallback(
-    (topicTitle: string, subject: string) => {
+    (topicTitle: string, subject: string, helpGrade?: string) => {
       if (!profile) return;
       setRequestStatus("searching");
+      const validGrades = new Set(["9","10","11","12","cee","ioe"]);
+      const resolvedGrade = helpGrade && validGrades.has(helpGrade.toLowerCase())
+        ? helpGrade.toLowerCase()
+        : String(profile.grade ?? "10").toLowerCase();
       getSocket().emit("client_sos_request", {
         topicTitle,
         subject,
-        grade: profile.grade,
+        helpGrade: resolvedGrade,
       });
     },
     [profile],

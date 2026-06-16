@@ -1,6 +1,5 @@
 /**
- * SOS Network page — students request live peer help here.
- * Also contains social handle configuration.
+ * Get Help page — students request live peer help here.
  */
 
 import { useEffect, useState } from "react";
@@ -26,6 +25,15 @@ const SUBJECTS = [
   "Accounts", "Economics", "General",
 ];
 
+const GRADES: { value: string; label: string; desc: string }[] = [
+  { value: "9",   label: "Grade 9",  desc: "SEE prep / lower secondary" },
+  { value: "10",  label: "Grade 10", desc: "SEE year"                    },
+  { value: "11",  label: "Grade 11", desc: "+2 first year"               },
+  { value: "12",  label: "Grade 12", desc: "+2 final year"               },
+  { value: "cee", label: "CEE",      desc: "Medical entrance (MBBS)"     },
+  { value: "ioe", label: "IOE",      desc: "Engineering entrance"        },
+];
+
 const SUBJECT_MASTERY_KEY = "sh_subject_mastery";
 const SOCIAL_HANDLES_KEY  = "sh_social_handles";
 
@@ -33,31 +41,34 @@ export default function SosNetwork() {
   const { profile } = useAuth();
   const { requestStatus, sendSosRequest, cancelSosRequest } = useSos();
 
-  // Form state
-  const [topicTitle, setTopicTitle] = useState("");
-  const [subject, setSubject] = useState("Math");
+  const [topicTitle,    setTopicTitle]    = useState("");
+  const [subject,       setSubject]       = useState("Math");
+  const [helpGrade,     setHelpGrade]     = useState<string>("11");
 
-  // Social handles (persisted locally)
-  const [instagram, setInstagram] = useState("");
-  const [tiktok, setTiktok]       = useState("");
-  const [handlesSaved, setHandlesSaved] = useState(false);
+  const [instagram,     setInstagram]     = useState("");
+  const [tiktok,        setTiktok]        = useState("");
+  const [handlesSaved,  setHandlesSaved]  = useState(false);
 
-  // Subject mastery config (simple slider per subject)
-  const [mastery, setMastery] = useState<Record<string, number>>({});
+  const [mastery,       setMastery]       = useState<Record<string, number>>({});
 
-  // Load persisted data
   useEffect(() => {
     try {
       const handles = localStorage.getItem(SOCIAL_HANDLES_KEY);
       if (handles) {
-        const parsed = JSON.parse(handles) as { instagramHandle?: string; tiktokHandle?: string };
-        setInstagram(parsed.instagramHandle ?? "");
-        setTiktok(parsed.tiktokHandle ?? "");
+        const p = JSON.parse(handles) as { instagramHandle?: string; tiktokHandle?: string };
+        setInstagram(p.instagramHandle ?? "");
+        setTiktok(p.tiktokHandle ?? "");
       }
       const m = localStorage.getItem(SUBJECT_MASTERY_KEY);
       if (m) setMastery(JSON.parse(m) as Record<string, number>);
     } catch {}
-  }, []);
+    // Pre-select grade from profile
+    if (profile?.grade) {
+      const g = String(profile.grade).toLowerCase();
+      const valid = new Set(["9","10","11","12","cee","ioe"]);
+      if (valid.has(g)) setHelpGrade(g);
+    }
+  }, [profile?.grade]);
 
   const saveHandles = () => {
     try {
@@ -79,7 +90,7 @@ export default function SosNetwork() {
   const handleSendSos = (e: React.FormEvent) => {
     e.preventDefault();
     if (!topicTitle.trim()) return;
-    sendSosRequest(topicTitle.trim(), subject.toLowerCase());
+    sendSosRequest(topicTitle.trim(), subject.toLowerCase(), helpGrade);
   };
 
   const isSearching = requestStatus === "searching";
@@ -88,7 +99,7 @@ export default function SosNetwork() {
   if (!profile) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-gray-400 text-sm">Please log in to use SOS Network.</p>
+        <p className="text-gray-400 text-sm">Please log in to use Get Help.</p>
       </div>
     );
   }
@@ -116,9 +127,9 @@ export default function SosNetwork() {
         {/* How it works */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { icon: <Send className="w-5 h-5" />, title: "Send SOS", desc: "Describe your topic", color: "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400" },
-            { icon: <Zap className="w-5 h-5" />,  title: "Get Matched", desc: "Top 3 peers are alerted", color: "bg-yellow-50 text-yellow-600 dark:bg-yellow-950/30 dark:text-yellow-400" },
-            { icon: <Users className="w-5 h-5" />, title: "Collaborate", desc: "Chat + whiteboard live", color: "bg-green-50 text-green-600 dark:bg-green-950/30 dark:text-green-400" },
+            { icon: <Send className="w-5 h-5" />,   title: "Send SOS",    desc: "Describe your topic",       color: "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400"   },
+            { icon: <Zap className="w-5 h-5" />,    title: "Get Matched", desc: "Top peers are alerted",     color: "bg-yellow-50 text-yellow-600 dark:bg-yellow-950/30 dark:text-yellow-400" },
+            { icon: <Users className="w-5 h-5" />,  title: "Collaborate", desc: "Chat + whiteboard live",    color: "bg-green-50 text-green-600 dark:bg-green-950/30 dark:text-green-400" },
           ].map(step => (
             <div key={step.title} className="flex flex-col items-center text-center p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
               <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-2 ${step.color}`}>
@@ -130,7 +141,7 @@ export default function SosNetwork() {
           ))}
         </div>
 
-        {/* SOS Request form */}
+        {/* Request form */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <BookOpen className="w-5 h-5 text-red-500" />
@@ -138,6 +149,8 @@ export default function SosNetwork() {
           </div>
 
           <form onSubmit={handleSendSos} className="space-y-4">
+
+            {/* Topic */}
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
                 What are you stuck on? *
@@ -149,10 +162,42 @@ export default function SosNetwork() {
                 maxLength={120}
                 required
                 disabled={isSearching}
-                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 transition"
+                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent disabled:opacity-50 transition"
               />
             </div>
 
+            {/* Grade selector */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                Which grade is this question from?
+              </label>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                {GRADES.map(g => {
+                  const selected = helpGrade === g.value;
+                  return (
+                    <button
+                      key={g.value}
+                      type="button"
+                      onClick={() => setHelpGrade(g.value)}
+                      disabled={isSearching}
+                      title={g.desc}
+                      className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all active:scale-95 select-none border-2 ${
+                        selected
+                          ? "bg-red-500 text-white border-red-500 shadow-lg shadow-red-500/25"
+                          : "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-red-300 hover:text-red-600"
+                      }`}
+                    >
+                      {g.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1.5">
+                {GRADES.find(g => g.value === helpGrade)?.desc}
+              </p>
+            </div>
+
+            {/* Subject */}
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
                 Subject
@@ -164,7 +209,7 @@ export default function SosNetwork() {
                     type="button"
                     onClick={() => setSubject(s)}
                     disabled={isSearching}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors select-none ${
                       subject === s
                         ? "bg-blue-500 text-white shadow-sm"
                         : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
@@ -176,7 +221,7 @@ export default function SosNetwork() {
               </div>
             </div>
 
-            {/* Status feedback */}
+            {/* No helpers banner */}
             {noHelpers && (
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 text-sm">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -202,7 +247,7 @@ export default function SosNetwork() {
               <button
                 type="submit"
                 disabled={!topicTitle.trim()}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500 hover:bg-red-600 disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 text-white font-bold text-sm transition-colors active:scale-[0.99] shadow-lg shadow-red-500/20"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500 hover:bg-red-600 disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 text-white font-bold text-sm transition-all active:scale-[0.99] shadow-lg shadow-red-500/20 select-none"
               >
                 <AlertTriangle className="w-4 h-4" />
                 Send SOS
@@ -211,7 +256,7 @@ export default function SosNetwork() {
           </form>
         </div>
 
-        {/* Social Handles Card */}
+        {/* Social Handles */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-1">
             <Instagram className="w-5 h-5 text-pink-500" />
@@ -220,7 +265,6 @@ export default function SosNetwork() {
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
             When you help others, they'll see buttons to follow you — a great way to grow your audience.
           </p>
-
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shrink-0">
@@ -233,7 +277,6 @@ export default function SosNetwork() {
                 className="flex-1 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
               />
             </div>
-
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center shrink-0">
                 <TikTokIcon className="w-4 h-4 text-white" />
@@ -245,7 +288,6 @@ export default function SosNetwork() {
                 className="flex-1 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
               />
             </div>
-
             <button
               onClick={saveHandles}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gray-900 dark:bg-white hover:opacity-90 text-white dark:text-gray-900 font-semibold text-sm transition-all active:scale-[0.99]"

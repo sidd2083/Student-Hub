@@ -3,6 +3,19 @@ name: SOS Network feature
 description: Architecture and key decisions for the zero-Firestore real-time peer-help feature
 ---
 
+## Grade System
+
+Grades: "9" | "10" | "11" | "12" | "cee" | "ioe" (stored as strings)
+Ranks:   0      1      2      3      4       4
+- `parseGrade(raw)` — validates and normalises input to one of the 6 strings
+- `gradeRank(g)` — returns numeric rank for comparison
+- Matchmaking uses rank: helpers with rank >= request rank can assist
+- Tier 1: helpers with rank > requestRank (seniors who've been through the material), sorted by score
+- Tier 2: same rank peers, sorted by score
+- Tier 3: any non-locked user, random order (last resort)
+
+`client_sos_request` now takes `helpGrade` (not `grade`) — this is the grade of the *content* being asked about, not the requester's own grade.
+
 ## Architecture
 
 All SOS state lives in server RAM via Socket.io — zero Firestore reads/writes ever.
