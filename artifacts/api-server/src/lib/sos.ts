@@ -60,6 +60,11 @@ export interface ActiveUser {
   allowNotifications: boolean;
   instagramHandle?: string;
   tiktokHandle?: string;
+  /**
+   * When this user first registered (or re-registered after a long absence).
+   * Used for newcomer grace period — don't show popups for NEWCOMER_GRACE_MS.
+   */
+  registeredAt: number;
 }
 
 interface SosRequest {
@@ -124,6 +129,7 @@ const GOOD_SAMARITAN_MS     = 7 * 60_000;      // Helper accepted → 7 min grac
 const WAITING_QUEUE_TTL_MS  = 5 * 60_000;      // 5 min (was 90 s — far too short)
 const DISCONNECT_GC_MS      = 2 * 60_000;
 const MAX_ROUNDS            = 5;               // R1–R3 same-grade, R4–R5 adjacent
+const NEWCOMER_GRACE_MS     = 2 * 60_000;      // New user: invisible to popups for 2 min after joining
 
 // Round 1 performance thresholds (defines "Top Performer")
 const R1_MIN_STUDY_MINS = 10;   // at least 10 min studied today
@@ -260,6 +266,8 @@ function findRoundCandidates(
     if (excluded.has(user.uid))                             continue;
     if (!user.socketId)                                     continue; // offline
     if (!targetGrades.has(user.grade.toLowerCase()))        continue; // grade filter
+    // Newcomer grace period — skip users who just joined (give them 2 min to settle)
+    if (Date.now() - user.registeredAt < NEWCOMER_GRACE_MS) continue;
 
     // Per-round filter logic
     if (round === 1 || round === 2 || round === 4) {
@@ -511,7 +519,15 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
       const userId   = String(data.uid).slice(0, 128);
       const existing = activeUsers.get(userId);
 
+      // Read disconnect timestamp BEFORE deleting it
+      const disconnectedTs = disconnectedAt.get(userId);
       disconnectedAt.delete(userId);
+
+      // Newcomer grace: reset registeredAt only for brand-new users or long absences.
+      // Quick reconnects (e.g. page refresh within 5 min) preserve the existing timer
+      // so the grace period is not unfairly extended.
+      const isQuickReconnect = disconnectedTs !== undefined && (Date.now() - disconnectedTs < 5 * 60_000);
+      const newRegisteredAt   = isQuickReconnect ? (existing?.registeredAt ?? Date.now()) : Date.now();
 
       const user: ActiveUser = {
         uid: userId,
@@ -541,6 +557,7 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
             : "idle",
         instagramHandle: typeof data.instagramHandle === "string" ? data.instagramHandle.slice(0, 64) : undefined,
         tiktokHandle:    typeof data.tiktokHandle    === "string" ? data.tiktokHandle.slice(0, 64)    : undefined,
+        registeredAt: newRegisteredAt,
       };
 
       if (existing?.socketId && existing.socketId !== socket.id) {
