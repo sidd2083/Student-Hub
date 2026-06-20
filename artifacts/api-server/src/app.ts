@@ -28,11 +28,27 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc:     ["'self'"],
-      scriptSrc:      ["'self'", "'unsafe-inline'", "https://apis.google.com", "https://www.gstatic.com"],
-      styleSrc:       ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      scriptSrc:      [
+        "'self'", "'unsafe-inline'",
+        "https://www.googletagmanager.com", "https://www.google-analytics.com",
+        "https://tagmanager.google.com",
+        "https://apis.google.com", "https://www.gstatic.com",
+      ],
+      styleSrc:       ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://tagmanager.google.com"],
       fontSrc:        ["'self'", "https://fonts.gstatic.com", "data:"],
-      imgSrc:         ["'self'", "data:", "blob:", "https:", "https://lh3.googleusercontent.com", "https://firebasestorage.googleapis.com"],
-      connectSrc:     ["'self'", "https://*.googleapis.com", "https://*.firebaseio.com", "wss://*.firebaseio.com", "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com"],
+      imgSrc:         [
+        "'self'", "data:", "blob:", "https:",
+        "https://lh3.googleusercontent.com", "https://firebasestorage.googleapis.com",
+        "https://www.googletagmanager.com",
+      ],
+      connectSrc:     [
+        "'self'",
+        "https://*.googleapis.com", "https://*.firebaseio.com", "wss://*.firebaseio.com",
+        "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com",
+        "https://securetoken.googleapis.com",
+        "https://www.google-analytics.com", "https://analytics.google.com",
+        "https://region1.google-analytics.com",
+      ],
       frameSrc:       ["'none'"],
       objectSrc:      ["'none'"],
       baseUri:        ["'self'"],
