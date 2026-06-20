@@ -1,14 +1,14 @@
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
-import { Calculator, CalendarCheck, ArrowRight } from "lucide-react";
+import { Calculator, CalendarCheck, ArrowRight, Keyboard } from "lucide-react";
 
 const TOOLS_ITEMLIST_SCHEMA = {
   "@context": "https://schema.org",
   "@type": "ItemList",
-  name: "Free Student Tools — NEB GPA Calculator & Attendance Calculator",
-  description: "Free online calculators for students: NEB GPA Calculator for Nepal Class 12 (2082/2083) and Attendance Calculator for any college requirement worldwide.",
+  name: "Free Student Tools — NEB GPA Calculator, Attendance Calculator & Nepali Typing Practice",
+  description: "Free online tools for students: NEB GPA Calculator for Nepal Class 12 (2082/2083), Attendance Calculator, and Nepali/Hindi Typing Practice with virtual keyboard and hand guide.",
   url: "https://www.studenthubnp.com/tools",
-  numberOfItems: 2,
+  numberOfItems: 3,
   itemListElement: [
     {
       "@type": "ListItem", position: 1,
@@ -21,6 +21,12 @@ const TOOLS_ITEMLIST_SCHEMA = {
       name: "Attendance Calculator — How Many Classes Can I Miss?",
       url: "https://www.studenthubnp.com/tools/attendance-calculator",
       description: "Free attendance percentage calculator. Find how many classes you can miss or bunk, or how many you need to reach 75%, 80%, or any required percentage.",
+    },
+    {
+      "@type": "ListItem", position: 3,
+      name: "नेपाली टाइपिंग अभ्यास | Nepali Hindi Typing Practice",
+      url: "https://www.studenthubnp.com/tools/nepali-typing",
+      description: "Free Nepali and Hindi typing practice with virtual keyboard, hand position guide, Easy/Medium/Hard levels, and real-time WPM and accuracy tracking.",
     },
   ],
 };
@@ -55,17 +61,27 @@ const tools = [
     desc: "Find out how many classes you can miss, or how many you need to reach your required attendance percentage.",
     cta: "Check Attendance",
   },
+  {
+    href: "/tools/nepali-typing",
+    icon: Keyboard,
+    color: "bg-orange-50 text-orange-600",
+    badge: "Nepal · India",
+    badgeColor: "bg-orange-100 text-orange-700",
+    title: "नेपाली टाइपिंग अभ्यास",
+    desc: "Free Nepali & Hindi typing practice — virtual keyboard with hand guide, Easy/Medium/Hard levels, live WPM and accuracy tracking.",
+    cta: "Start Typing",
+  },
 ];
 
 export default function Tools() {
   return (
     <>
       <Helmet>
-        <title>Free Student Tools — NEB GPA Calculator Nepal &amp; Attendance Calculator | Student Hub</title>
-        <meta name="description" content="Free student tools: NEB GPA Calculator for Nepal Class 12 (2082/2083) with official theory + practical formula, and a universal Attendance Calculator for 75%, 80%, or any required percentage. Instant, accurate, no sign-up." />
-        <meta name="keywords" content="NEB GPA calculator Nepal, attendance calculator, class 12 GPA calculator Nepal, how many classes can I miss, NEB grading 2082, student tools Nepal, free calculator for students" />
-        <meta property="og:title" content="Free Student Tools — NEB GPA Calculator &amp; Attendance Calculator | Student Hub" />
-        <meta property="og:description" content="Free NEB GPA Calculator for Nepal Class 12 (2082/2083) and Attendance Calculator. Instant results, no sign-up required." />
+        <title>Free Student Tools — NEB GPA Calculator, Attendance Calculator &amp; नेपाली Typing Practice | Student Hub</title>
+        <meta name="description" content="Free student tools: NEB GPA Calculator for Nepal Class 12 (2082/2083), Attendance Calculator, and Nepali & Hindi Typing Practice with virtual keyboard. नेपाली टाइपिंग अभ्यास, हिंदी टाइपिंग — all instant, free, no sign-up." />
+        <meta name="keywords" content="NEB GPA calculator Nepal, attendance calculator, nepali typing practice, hindi typing practice, नेपाली टाइपिंग, class 12 GPA calculator Nepal, how many classes can I miss, student tools Nepal, free calculator for students, devanagari typing" />
+        <meta property="og:title" content="Free Student Tools — NEB GPA Calculator, Attendance &amp; Nepali Typing | Student Hub" />
+        <meta property="og:description" content="Free NEB GPA Calculator, Attendance Calculator, and Nepali/Hindi Typing Practice. Instant results, no sign-up required." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.studenthubnp.com/tools" />
         <meta property="og:image" content="https://www.studenthubnp.com/opengraph.jpg" />
