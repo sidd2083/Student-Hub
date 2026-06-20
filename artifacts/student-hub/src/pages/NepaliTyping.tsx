@@ -1070,7 +1070,8 @@ export default function NepaliTyping() {
         <meta name="keywords" content={language === "nepali"
           ? "nepali typing practice, nepali typing online, nepali typing test, नेपाली टाइपिंग, नेपाली टाइपिंग अभ्यास, lok sewa typing test, lokshewa typing practice, लोकसेवा टाइपिंग, government job typing test nepal, sarkari jagir typing, nepali typing speed test, nepali wpm test, nepali typing tutor, online nepali keyboard, type in nepali online, nepali unicode typing, devanagari typing practice, nepali typing for beginners, how to type in nepali, nepali keyboard layout, free nepali typing, learn nepali typing fast"
           : "hindi typing practice, hindi typing online, hindi typing test, हिंदी टाइपिंग, हिंदी टाइपिंग अभ्यास, devanagari typing, hindi typing tutor, hindi typing wpm, free hindi typing, government job typing hindi"} />
-        <meta name="robots" content="index, follow, max-image-preview:large" />
+        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+        <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
         <meta name="author" content="Student Hub Nepal" />
         <meta property="og:title" content={language === "nepali"
           ? "Nepali Typing Practice Online Free — नेपाली टाइपिंग | Lok Sewa Exam | Student Hub"

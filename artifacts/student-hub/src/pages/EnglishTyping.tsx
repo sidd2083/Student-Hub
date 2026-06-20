@@ -975,7 +975,8 @@ export default function EnglishTyping() {
         <title>English Typing Practice Online Free — Typing Speed Test for Nepal Government Jobs | Lok Sewa | Student Hub</title>
         <meta name="description" content="Best free English typing practice for Nepal. Real-time WPM speed test with unlimited words until timer ends. Perfect for Lok Sewa Aayog exam, government job typing test, banking recruitment. Animated QWERTY hand guide shows exact finger placement. Easy, Medium, Hard levels. No sign-up." />
         <meta name="keywords" content="english typing practice, english typing test, english typing speed test, free english typing practice, typing practice online, lok sewa english typing test, government job typing test nepal, english typing for government job, wpm test online, online typing test, typing test 35 wpm, typing tutor online, how to improve typing speed, english typing course free, typing test nepal, civil service typing test, banking typing test nepal, english keyboard practice, qwerty typing practice, touch typing online, free wpm typing test, english typing practice for beginners" />
-        <meta name="robots" content="index, follow, max-image-preview:large" />
+        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+        <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
         <meta name="author" content="Student Hub Nepal" />
         <meta property="og:title" content="Free English Typing Practice — Government Job & Lok Sewa Typing Test | Student Hub Nepal" />
         <meta property="og:description" content="Best free English typing speed test for Nepal. Unlimited words, animated hand guide, WPM tracking. Lok Sewa exam ready. No sign-up required." />

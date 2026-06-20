@@ -354,6 +354,8 @@ router.get("/robots.txt", (_req: Request, res: Response) => {
     "Allow: /tools",
     "Allow: /tools/gpa-calculator",
     "Allow: /tools/attendance-calculator",
+    "Allow: /tools/nepali-typing",
+    "Allow: /tools/english-typing",
     "Allow: /creators",
     "Allow: /creators/",
     "Allow: /about",

@@ -4,7 +4,7 @@ import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/context/AuthContext";
 import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { BookOpen, FileText, BarChart2, MessageCircle, Timer, CheckSquare, Trophy, ArrowRight, LogIn, Calculator, CalendarCheck } from "lucide-react";
+import { BookOpen, FileText, BarChart2, MessageCircle, Timer, CheckSquare, Trophy, ArrowRight, LogIn, Calculator, CalendarCheck, Keyboard } from "lucide-react";
 import { noteUrl, pyqUrl } from "@/lib/slugs";
 
 // ── Home preview cache (sessionStorage, 30-min TTL) ──────────────────────────
@@ -169,13 +169,13 @@ export default function Home() {
     <>
       <Helmet>
         <title>Student Hub — Free Study Platform for Grade 9–12 Students in Nepal</title>
-        <meta name="description" content="Free study platform for Grade 9–12 Nepal students. Notes, PYQs, NEB GPA Calculator, Bunk Calculator, MCQ practice and AI tutor — all free, no sign-up needed." />
-        <meta name="keywords" content="student hub nepal, siddhant lamichhane, siddhant lamichhane founder student hub, aarogya sapkota co-founder student hub nepal, grade 10 notes, SEE preparation, NEB notes, PYQ nepal, study tracker nepal, free notes nepal, SEE 2080, NEB GPA calculator, bunk calculator nepal, attendance calculator, gpa calculator nepal" />
+        <meta name="description" content="Free study platform for Nepal students: Nepali typing practice, English typing test, NEB GPA Calculator, Bunk Calculator, Notes, PYQs, MCQ practice and AI tutor — all free, no sign-up needed." />
+        <meta name="keywords" content="student hub nepal, nepali typing practice, nepali typing test, hindi typing practice, english typing practice, english typing test, nepali typing speed test, lok sewa typing test, siddhant lamichhane, grade 10 notes, SEE preparation, NEB notes, PYQ nepal, study tracker nepal, free notes nepal, NEB GPA calculator, bunk calculator nepal, attendance calculator, gpa calculator nepal, nepali typing online, free typing test nepal" />
         <link rel="canonical" href={SITE_URL} />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={SITE_URL} />
-        <meta property="og:title" content="Student Hub — Free Study Platform for Nepal Students" />
-        <meta property="og:description" content="Notes, PYQs, Nep AI and study tracking for Grade 9–12 students in Nepal. Free forever." />
+        <meta property="og:title" content="Student Hub Nepal — Free Nepali Typing Practice, NEB Notes, GPA Calculator" />
+        <meta property="og:description" content="Free Nepali typing practice, English typing test, Hindi typing, NEB notes, GPA calculator and AI tutor for Nepal students. No sign-up needed." />
         <meta property="og:image" content={OG_IMAGE} />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
@@ -299,6 +299,54 @@ export default function Home() {
                   </div>
                 </div>
                 <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-emerald-400 transition-colors flex-shrink-0 mt-0.5" aria-hidden="true" />
+              </div>
+            </article>
+          </Link>
+
+          {/* Nepali Typing Practice */}
+          <Link href="/tools/nepali-typing" aria-label="Free Nepali Typing Practice — नेपाली टाइपिंग अभ्यास — Lok Sewa Typing Test">
+            <article className="group bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md hover:border-violet-100 hover:-translate-y-0.5 transition-all cursor-pointer h-full">
+              <div className="flex items-start gap-4">
+                <div className="w-11 h-11 bg-violet-50 rounded-xl flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                  <Keyboard className="w-5 h-5 text-violet-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-gray-900 text-sm">Nepali Typing Practice</h3>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-violet-50 text-violet-600 rounded-full border border-violet-100">Free</span>
+                  </div>
+                  <p className="text-xs text-gray-500 leading-snug mb-3">नेपाली टाइपिंग अभ्यास — free Nepali &amp; Hindi typing speed test. Virtual Devanagari keyboard, WPM tracker, animated hand guide. Lok Sewa Aayog exam ready.</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {["Nepali","Hindi","Lok Sewa","WPM Test"].map(tag => (
+                      <span key={tag} className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">{tag}</span>
+                    ))}
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-violet-400 transition-colors flex-shrink-0 mt-0.5" aria-hidden="true" />
+              </div>
+            </article>
+          </Link>
+
+          {/* English Typing Practice */}
+          <Link href="/tools/english-typing" aria-label="Free English Typing Practice and Speed Test — Lok Sewa Government Job">
+            <article className="group bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md hover:border-blue-100 hover:-translate-y-0.5 transition-all cursor-pointer h-full">
+              <div className="flex items-start gap-4">
+                <div className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                  <Keyboard className="w-5 h-5 text-blue-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-gray-900 text-sm">English Typing Practice</h3>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded-full border border-blue-100">Free</span>
+                  </div>
+                  <p className="text-xs text-gray-500 leading-snug mb-3">Free English typing speed test with unlimited words. Animated QWERTY hand guide, real-time WPM &amp; accuracy. Government job, Lok Sewa, banking exam typing test.</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {["English","WPM Test","Lok Sewa","QWERTY"].map(tag => (
+                      <span key={tag} className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">{tag}</span>
+                    ))}
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-blue-400 transition-colors flex-shrink-0 mt-0.5" aria-hidden="true" />
               </div>
             </article>
           </Link>
