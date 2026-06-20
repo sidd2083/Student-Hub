@@ -46,6 +46,7 @@ const Tools               = lazy(() => import("@/pages/Tools"));
 const GpaCalculator       = lazy(() => import("@/pages/GpaCalculator"));
 const AttendanceCalculator = lazy(() => import("@/pages/AttendanceCalculator"));
 const NepaliTyping        = lazy(() => import("@/pages/NepaliTyping"));
+const EnglishTyping       = lazy(() => import("@/pages/NepaliTyping"));
 const Badges              = lazy(() => import("@/pages/Badges"));
 const PartnerCreators     = lazy(() => import("@/pages/PartnerCreators"));
 const SiddhantProfile     = lazy(() => import("@/pages/SiddhantProfile"));
@@ -169,6 +170,7 @@ function AppRoutes() {
         <Route path="/tools/gpa-calculator"        component={GpaCalculator} />
         <Route path="/tools/attendance-calculator" component={AttendanceCalculator} />
         <Route path="/tools/nepali-typing"         component={NepaliTyping} />
+        <Route path="/tools/english-typing"        component={EnglishTyping} />
         <Route path="/tools"     component={Tools} />
         <Route path="/about"     component={About} />
         <Route path="/contact"   component={Contact} />

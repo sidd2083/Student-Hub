@@ -65,6 +65,8 @@ const STATIC_URLS = [
   { loc: `${SITE_URL}/tools`,                       priority: "0.90", changefreq: "monthly" },
   { loc: `${SITE_URL}/tools/gpa-calculator`,        priority: "1.0",  changefreq: "weekly"  },
   { loc: `${SITE_URL}/tools/attendance-calculator`, priority: "1.0",  changefreq: "weekly"  },
+  { loc: `${SITE_URL}/tools/nepali-typing`,         priority: "1.0",  changefreq: "weekly"  },
+  { loc: `${SITE_URL}/tools/english-typing`,        priority: "1.0",  changefreq: "weekly"  },
   { loc: `${SITE_URL}/creators`,                    priority: "0.85", changefreq: "weekly"  },
   { loc: `${SITE_URL}/about`,                       priority: "0.60", changefreq: "monthly" },
   { loc: `${SITE_URL}/contact`,                     priority: "0.50", changefreq: "monthly" },
