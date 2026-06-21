@@ -650,6 +650,9 @@ export function PukuPartner({
   const [selectedURI,     setSelectedURI]     = useState<string | null>(() => {
     try { return localStorage.getItem("puku-voice-uri"); } catch { return null; }
   });
+  const [showVoiceHint, setShowVoiceHint] = useState(() => {
+    try { return !localStorage.getItem("puku-voice-hint-seen"); } catch { return false; }
+  });
   const previewUtterRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const fn = firstName.split(" ")[0];
@@ -832,13 +835,25 @@ export function PukuPartner({
     window.speechSynthesis.speak(utt);
   }, [fn]);
 
+  // ── Dismiss voice hint (one-time) ────────────────────────────────────────
+  const dismissVoiceHint = useCallback(() => {
+    setShowVoiceHint(false);
+    try { localStorage.setItem("puku-voice-hint-seen", "1"); } catch {}
+  }, []);
+
+  // Auto-dismiss hint after 7 seconds
+  useEffect(() => {
+    if (!showVoiceHint) return;
+    const t = setTimeout(dismissVoiceHint, 7000);
+    return () => clearTimeout(t);
+  }, [showVoiceHint, dismissVoiceHint]);
+
   // ── Select voice — saves to localStorage and updates cachedVoiceRef ──────
   const selectVoice = useCallback((voice: SpeechSynthesisVoice) => {
     cachedVoiceRef.current = voice;
     setSelectedURI(voice.voiceURI);
     setVoiceName(voice.name);
     try { localStorage.setItem("puku-voice-uri", voice.voiceURI); } catch {}
-    // Preview immediately with the greeting
     previewVoice(voice);
   }, [previewVoice]);
 
@@ -1620,13 +1635,63 @@ export function PukuPartner({
             </span>
           )}
 
-          {/* Voice picker button */}
-          <button
-            onClick={() => setShowVoicePanel(v => !v)}
-            className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${showVoicePanel ? "bg-purple-100" : "hover:bg-purple-50"}`}
-            title="Choose Puku's voice">
-            <Mic className={`w-3 h-3 ${showVoicePanel ? "text-purple-600" : "text-purple-400"}`} />
-          </button>
+          {/* Voice picker button + one-time hint */}
+          <div className="relative">
+            {/* Hint bubble — shows once, auto-dismisses after 7s */}
+            <AnimatePresence>
+              {showVoiceHint && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 4, scale: 0.9 }}
+                  className="absolute bottom-full right-0 mb-2 z-50 pointer-events-none"
+                  style={{ width: "max-content" }}
+                >
+                  <div className="relative rounded-xl px-3 py-2 shadow-lg"
+                    style={{
+                      background: "linear-gradient(135deg,#8b5cf6,#ec4899)",
+                      boxShadow: "0 8px 24px rgba(139,92,246,0.35)",
+                    }}>
+                    <p className="text-white text-[10px] font-bold whitespace-nowrap">🎙️ Tap to pick my voice!</p>
+                    {/* Arrow pointing down */}
+                    <div className="absolute top-full right-2 w-0 h-0"
+                      style={{
+                        borderLeft: "5px solid transparent",
+                        borderRight: "5px solid transparent",
+                        borderTop: "5px solid #ec4899",
+                      }} />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Pulsing ring when hint is visible */}
+            {showVoiceHint && (
+              <motion.div
+                className="absolute inset-[-3px] rounded-full border-2 border-purple-400 pointer-events-none"
+                animate={{ scale: [1, 1.4], opacity: [0.8, 0] }}
+                transition={{ repeat: Infinity, duration: 0.9 }}
+              />
+            )}
+
+            <button
+              onClick={() => { setShowVoicePanel(v => !v); dismissVoiceHint(); }}
+              className={`relative w-6 h-6 rounded-full flex items-center justify-center gap-0.5 transition-all px-1 ${
+                showVoicePanel
+                  ? "bg-purple-500 shadow-md"
+                  : showVoiceHint
+                  ? "bg-purple-100"
+                  : "hover:bg-purple-50"
+              }`}
+              title="Choose Puku's voice"
+              style={{ width: "auto", minWidth: "1.5rem" }}
+            >
+              <Mic className={`w-3 h-3 flex-shrink-0 ${showVoicePanel ? "text-white" : "text-purple-500"}`} />
+              <span className={`text-[8px] font-black tracking-wider leading-none hidden sm:inline ${showVoicePanel ? "text-white" : "text-purple-500"}`}>
+                VOICE
+              </span>
+            </button>
+          </div>
 
           <button onClick={() => setMuted(m => !m)}
             className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
