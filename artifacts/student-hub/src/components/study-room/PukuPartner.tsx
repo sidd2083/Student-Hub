@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Volume2, VolumeX, Minus, X, CheckCircle, XCircle, Droplets, Zap, BookOpen } from "lucide-react";
+import { Volume2, VolumeX, Minus, X, CheckCircle, XCircle, Droplets, Zap, BookOpen, Settings, Play, Mic } from "lucide-react";
 
 export type PukuEmotion = "happy" | "relaxed" | "focused" | "concerned" | "frustrated" | "proud" | "excited";
 
@@ -643,8 +643,14 @@ export function PukuPartner({
   const [popupMsg,      setPopupMsg]      = useState("Still with me?");
   const [funCard,       setFunCard]       = useState<FunCard | null>(null);
   const [whatStudying,  setWhatStudying]  = useState("");
-  const [isSpeaking,    setIsSpeaking]    = useState(false);
-  const [voiceName,     setVoiceName]     = useState<string | null>(null);
+  const [isSpeaking,      setIsSpeaking]      = useState(false);
+  const [voiceName,       setVoiceName]       = useState<string | null>(null);
+  const [showVoicePanel,  setShowVoicePanel]  = useState(false);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedURI,     setSelectedURI]     = useState<string | null>(() => {
+    try { return localStorage.getItem("puku-voice-uri"); } catch { return null; }
+  });
+  const previewUtterRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const fn = firstName.split(" ")[0];
 
@@ -707,15 +713,33 @@ export function PukuPartner({
     emotionCbRef.current?.(e);
   }, []);
 
-  // ── Pre-warm TTS voices ───────────────────────────────────────────────────
+  // ── Pre-warm TTS voices + restore saved preference ───────────────────────
   useEffect(() => {
     if (!window.speechSynthesis) return;
     const load = () => {
       const voices = window.speechSynthesis.getVoices();
-      if (voices.length > 0) {
-        cachedVoiceRef.current = pickVoice(voices);
-        voicesReadyRef.current = true;
+      if (!voices.length) return;
+      // Only show English voices in the picker (filters noise)
+      const enVoices = voices
+        .filter(v => v.lang.startsWith("en"))
+        .sort((a, b) => scoreVoice(b) - scoreVoice(a));
+      setAvailableVoices(enVoices);
+      voicesReadyRef.current = true;
+
+      // Restore saved voice or auto-pick best
+      const saved = localStorage.getItem("puku-voice-uri");
+      if (saved) {
+        const match = voices.find(v => v.voiceURI === saved);
+        if (match) {
+          cachedVoiceRef.current = match;
+          setVoiceName(match.name);
+          setSelectedURI(saved);
+          return;
+        }
       }
+      const best = pickVoice(voices);
+      cachedVoiceRef.current = best;
+      if (best) setVoiceName(best.name);
     };
     load();
     window.speechSynthesis.addEventListener("voiceschanged", load);
@@ -788,6 +812,35 @@ export function PukuPartner({
       }, { once: true });
     }
   }, []);
+
+  // ── Voice preview — speaks "Hey [name]!" in any given voice ─────────────
+  const previewVoice = useCallback((voice: SpeechSynthesisVoice) => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const text = pick([
+      `Hey ${fn}! I'm ${voice.name.split(" ")[0]}. How do I sound?`,
+      `Hi ${fn}! This is my voice. Like it?`,
+      `Hey ${fn}!! Ready to study together?`,
+      `${fn}! This is me. Pretty nice, right?`,
+    ]);
+    const utt = new SpeechSynthesisUtterance(stripForSpeech(text));
+    utt.voice  = voice;
+    utt.rate   = 0.84;
+    utt.pitch  = 1.10;
+    utt.volume = 1.0;
+    previewUtterRef.current = utt;
+    window.speechSynthesis.speak(utt);
+  }, [fn]);
+
+  // ── Select voice — saves to localStorage and updates cachedVoiceRef ──────
+  const selectVoice = useCallback((voice: SpeechSynthesisVoice) => {
+    cachedVoiceRef.current = voice;
+    setSelectedURI(voice.voiceURI);
+    setVoiceName(voice.name);
+    try { localStorage.setItem("puku-voice-uri", voice.voiceURI); } catch {}
+    // Preview immediately with the greeting
+    previewVoice(voice);
+  }, [previewVoice]);
 
   // ── Activity tracking (on-page idle) ─────────────────────────────────────
   useEffect(() => {
@@ -1567,16 +1620,12 @@ export function PukuPartner({
             </span>
           )}
 
-          {/* Try voice button */}
+          {/* Voice picker button */}
           <button
-            onClick={() => speak(pick([
-              `Hey! I'm Puku, your study buddy. Nice to meet you!`,
-              `Hi there! I'm here to keep you focused. Let's study!`,
-              `Hello! Ready to have the most productive session ever?`,
-            ]))}
-            className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-purple-50 transition-colors"
-            title="Try Puku's voice">
-            <Volume2 className="w-3 h-3 text-purple-400" />
+            onClick={() => setShowVoicePanel(v => !v)}
+            className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${showVoicePanel ? "bg-purple-100" : "hover:bg-purple-50"}`}
+            title="Choose Puku's voice">
+            <Mic className={`w-3 h-3 ${showVoicePanel ? "text-purple-600" : "text-purple-400"}`} />
           </button>
 
           <button onClick={() => setMuted(m => !m)}
@@ -1600,6 +1649,133 @@ export function PukuPartner({
             </button>
           )}
         </div>
+
+        {/* ── Voice picker panel ─────────────────────────────────────────── */}
+        <AnimatePresence>
+          {showVoicePanel && (
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0,  scale: 1 }}
+              exit={{    opacity: 0, y: 8,  scale: 0.97 }}
+              transition={{ type: "spring", damping: 22, stiffness: 340 }}
+              className="absolute bottom-full right-0 mb-2 w-72 z-50"
+            >
+              <div className="rounded-2xl shadow-2xl overflow-hidden"
+                style={{
+                  background: "rgba(255,255,255,0.98)",
+                  backdropFilter: "blur(20px)",
+                  border: "1.5px solid rgba(139,92,246,0.18)",
+                  boxShadow: "0 16px 48px rgba(139,92,246,0.18), 0 4px 16px rgba(0,0,0,0.1)",
+                }}>
+
+                {/* Header */}
+                <div className="flex items-center gap-2 px-4 pt-3.5 pb-2.5 border-b border-purple-50">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center"
+                    style={{ background: "linear-gradient(135deg,#8b5cf6,#ec4899)" }}>
+                    <Mic className="w-3 h-3 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-black text-gray-800">Choose Puku's Voice</p>
+                    <p className="text-[9px] text-gray-400">Click ▶ to preview each one</p>
+                  </div>
+                  <button onClick={() => setShowVoicePanel(false)}
+                    className="w-5 h-5 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+                    <X className="w-3 h-3 text-gray-400" />
+                  </button>
+                </div>
+
+                {/* Current voice indicator */}
+                {voiceName && (
+                  <div className="flex items-center gap-1.5 px-4 py-2 bg-purple-50/60">
+                    <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                    <span className="text-[9px] text-purple-600 font-semibold truncate">
+                      Now: {voiceName.replace(/ Online \(Natural\)/i, " ✨ Neural").replace(/ \(.*\)/, "")}
+                    </span>
+                  </div>
+                )}
+
+                {/* Voice list */}
+                <div className="max-h-64 overflow-y-auto overscroll-contain py-1">
+                  {availableVoices.length === 0 ? (
+                    <p className="text-[11px] text-gray-400 text-center py-6">No voices found on this device</p>
+                  ) : (
+                    availableVoices.map(v => {
+                      const isSelected = selectedURI === v.voiceURI ||
+                        (!selectedURI && cachedVoiceRef.current?.voiceURI === v.voiceURI);
+                      const score      = scoreVoice(v);
+                      const isNeural   = score >= 18;
+                      const isPremium  = score >= 14;
+                      const cleanName  = v.name
+                        .replace(/ Online \(Natural\)/i, "")
+                        .replace(/ \(.*\)/, "")
+                        .replace(/Microsoft /, "")
+                        .replace(/Google /, "")
+                        .trim();
+                      const langBadge  = v.lang === "en-US" ? "US" : v.lang === "en-GB" ? "UK" : v.lang === "en-AU" ? "AU" : v.lang.replace("en-","").toUpperCase();
+
+                      return (
+                        <div
+                          key={v.voiceURI}
+                          onClick={() => selectVoice(v)}
+                          className={`flex items-center gap-2.5 px-4 py-2.5 cursor-pointer transition-all ${
+                            isSelected
+                              ? "bg-gradient-to-r from-purple-50 to-pink-50"
+                              : "hover:bg-gray-50"
+                          }`}
+                        >
+                          {/* Selected checkmark */}
+                          <div className={`w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center transition-all ${
+                            isSelected
+                              ? "bg-purple-500"
+                              : "border-2 border-gray-200"
+                          }`}>
+                            {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                          </div>
+
+                          {/* Voice info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`text-[11px] font-bold truncate ${isSelected ? "text-purple-700" : "text-gray-700"}`}>
+                                {cleanName}
+                              </span>
+                              {isNeural && (
+                                <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[8px] font-black bg-gradient-to-r from-purple-500 to-pink-500 text-white leading-none">
+                                  ✨ NEURAL
+                                </span>
+                              )}
+                              {isPremium && !isNeural && (
+                                <span className="inline-flex px-1 py-0.5 rounded-full text-[8px] font-black bg-amber-100 text-amber-700 leading-none">
+                                  PREMIUM
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[9px] text-gray-400 mt-0.5">{langBadge} · {v.lang}</p>
+                          </div>
+
+                          {/* Preview play button */}
+                          <button
+                            onClick={e => { e.stopPropagation(); previewVoice(v); }}
+                            className="w-6 h-6 rounded-full flex items-center justify-center bg-purple-100 hover:bg-purple-200 transition-colors flex-shrink-0"
+                            title={`Preview ${cleanName}`}
+                          >
+                            <Play className="w-3 h-3 text-purple-600" />
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Footer tip */}
+                <div className="px-4 py-2.5 border-t border-gray-50 bg-gray-50/50">
+                  <p className="text-[9px] text-gray-400 text-center">
+                    ✨ Neural voices (Edge/Windows) sound most natural · Click a voice to select it
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </>
   );
