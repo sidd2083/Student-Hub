@@ -323,30 +323,46 @@ const PukuSeat = memo(function PukuSeat({
           {speech && (
             <motion.div
               key="puku-bubble"
-              initial={{ opacity: 0, scale: 0.85, y: 4 }}
+              initial={{ opacity: 0, scale: 0.82, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 2 }}
-              transition={{ type: "spring", damping: 20, stiffness: 280 }}
+              exit={{ opacity: 0, scale: 0.9, y: 4 }}
+              transition={{ type: "spring", damping: 16, stiffness: 300 }}
               className="absolute z-30"
-              style={{ bottom: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", width: compact ? 130 : 160 }}
+              style={{ bottom: "calc(100% + 10px)", left: "50%", transform: "translateX(-50%)", width: compact ? 155 : 200 }}
             >
               <div
-                className="relative px-2.5 py-1.5 rounded-xl shadow-lg"
+                className="relative px-3 py-2 rounded-2xl shadow-xl"
                 style={{
-                  background: "rgba(255,255,255,0.97)",
-                  border: "1.5px solid rgba(139,92,246,0.22)",
-                  boxShadow: "0 6px 20px rgba(0,0,0,0.12), 0 2px 8px rgba(139,92,246,0.15)",
+                  background: "linear-gradient(135deg, rgba(255,255,255,0.99) 0%, rgba(245,243,255,0.99) 100%)",
+                  border: isSpeaking ? "1.5px solid rgba(139,92,246,0.5)" : "1.5px solid rgba(139,92,246,0.18)",
+                  boxShadow: isSpeaking
+                    ? "0 8px 28px rgba(139,92,246,0.25), 0 2px 8px rgba(0,0,0,0.08)"
+                    : "0 6px 20px rgba(0,0,0,0.10), 0 2px 6px rgba(139,92,246,0.10)",
+                  transition: "border 0.3s, box-shadow 0.3s",
                 }}
               >
-                <p className="text-[9px] leading-snug font-medium text-gray-700 text-center">{speech}</p>
+                {/* Sound-wave bars when speaking */}
+                {isSpeaking && (
+                  <div className="flex items-center justify-center gap-[2px] mb-1.5">
+                    {[0,1,2,3,4].map(i => (
+                      <motion.div
+                        key={i}
+                        className="w-[2px] rounded-full bg-purple-400"
+                        animate={{ height: ["3px","10px","3px"] }}
+                        transition={{ repeat: Infinity, duration: 0.55, delay: i * 0.09, ease: "easeInOut" }}
+                      />
+                    ))}
+                  </div>
+                )}
+                <p className={`${compact ? "text-[10px]" : "text-[11px]"} leading-snug font-semibold text-gray-700 text-center`}>{speech}</p>
                 <div
                   className="absolute left-1/2 bottom-0 translate-y-full -translate-x-1/2"
                   style={{
                     width: 0, height: 0,
-                    borderLeft: "6px solid transparent",
-                    borderRight: "6px solid transparent",
-                    borderTop: "6px solid rgba(255,255,255,0.97)",
-                    filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.06))",
+                    borderLeft: "7px solid transparent",
+                    borderRight: "7px solid transparent",
+                    borderTop: "7px solid rgba(245,243,255,0.99)",
+                    filter: "drop-shadow(0 2px 2px rgba(139,92,246,0.08))",
                   }}
                 />
               </div>

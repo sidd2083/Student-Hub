@@ -34,16 +34,33 @@ function stripForSpeech(text: string): string {
     .trim();
 }
 
+// ── Score-based voice picker — finds the nicest available voice ───────────────
+// Neural/Natural voices on Edge/Windows sound remarkably human. Score heavily.
+function scoreVoice(v: SpeechSynthesisVoice): number {
+  const n = v.name;
+  let s = 0;
+  // Neural / Natural voices (Microsoft Edge, Google Neural)
+  if (/online \(natural\)/i.test(n)) s += 20;
+  if (/natural/i.test(n) && !/online/i.test(n)) s += 10;
+  if (/premium/i.test(n)) s += 8;
+  if (/enhanced/i.test(n)) s += 6;
+  // Specific great-sounding names
+  if (/\b(Aria|Jenny|Emma|Ava|Ana|Michelle|Sonia|Libby|Mia)\b/i.test(n)) s += 5;
+  if (/\b(Samantha|Karen|Moira|Tessa|Serena|Victoria|Allison|Ava)\b/i.test(n)) s += 4;
+  if (/\b(Guy|Brian|Eric|Ryan|Liam|Connor)\b/i.test(n)) s += 2;
+  // Language preference — en-US first, then en-*
+  if (v.lang === "en-US") s += 3;
+  else if (v.lang === "en-AU" || v.lang === "en-GB") s += 2;
+  else if (v.lang.startsWith("en")) s += 1;
+  else s -= 5; // non-English voices strongly penalised
+  // Robotic legacy voices to avoid
+  if (/\b(Fred|Trinoids|Bahh|Bubbles|Cellos|Deranged|Good|Hysterical|Junior|Kathy|Organ|Princess|Ralph|Wobble|Zarvox|Alex|Daniel)\b/i.test(n)) s -= 8;
+  return s;
+}
+
 function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
   if (!voices.length) return null;
-  for (const name of [
-    "Microsoft Aria Online (Natural)", "Microsoft Jenny Online (Natural)",
-    "Google US English", "Samantha", "Karen", "Moira", "Tessa",
-  ]) {
-    const v = voices.find(v => v.name === name);
-    if (v) return v;
-  }
-  return voices.find(v => v.lang === "en-US") ?? voices.find(v => v.lang.startsWith("en")) ?? voices[0] ?? null;
+  return voices.slice().sort((a, b) => scoreVoice(b) - scoreVoice(a))[0] ?? null;
 }
 
 function timePart() {
@@ -626,6 +643,8 @@ export function PukuPartner({
   const [popupMsg,      setPopupMsg]      = useState("Still with me?");
   const [funCard,       setFunCard]       = useState<FunCard | null>(null);
   const [whatStudying,  setWhatStudying]  = useState("");
+  const [isSpeaking,    setIsSpeaking]    = useState(false);
+  const [voiceName,     setVoiceName]     = useState<string | null>(null);
 
   const fn = firstName.split(" ")[0];
 
@@ -707,6 +726,7 @@ export function PukuPartner({
   const speak = useCallback((text: string) => {
     if (bubbleClearTimer.current) clearTimeout(bubbleClearTimer.current);
     speechCbRef.current(text, false);
+    setIsSpeaking(false);
 
     const hasTTS = !muteRef.current && !!window.speechSynthesis;
     if (!hasTTS) {
@@ -722,32 +742,41 @@ export function PukuPartner({
     }
 
     const utt = new SpeechSynthesisUtterance(clean);
-    utt.rate   = 0.88 + Math.random() * 0.08;
-    utt.pitch  = 1.0  + Math.random() * 0.10;
-    utt.volume = 0.92;
+    // Warmer, friendlier parameters — slightly slower + higher pitch = more human
+    utt.rate   = 0.82 + Math.random() * 0.06;  // 0.82–0.88 (natural pace)
+    utt.pitch  = 1.08 + Math.random() * 0.08;  // 1.08–1.16 (warm, bright)
+    utt.volume = 1.0;
 
     const doSpeak = () => {
       const v = cachedVoiceRef.current ?? pickVoice(window.speechSynthesis.getVoices());
-      if (v) utt.voice = v;
+      if (v) {
+        utt.voice = v;
+        setVoiceName(v.name);
+      }
+      utt.onstart = () => {
+        setIsSpeaking(true);
+        speechCbRef.current(text, true);
+      };
       utt.onend = () => {
+        setIsSpeaking(false);
         if (bubbleClearTimer.current) clearTimeout(bubbleClearTimer.current);
-        speechCbRef.current("", false);
+        // Keep the bubble visible for 3 s after speaking finishes so user can read it
+        bubbleClearTimer.current = setTimeout(() => speechCbRef.current("", false), 3_000);
       };
       utt.onerror = () => {
+        setIsSpeaking(false);
         if (bubbleClearTimer.current) clearTimeout(bubbleClearTimer.current);
         speechCbRef.current(text, false);
         bubbleClearTimer.current = setTimeout(() => speechCbRef.current("", false), 6_000);
       };
-      setTimeout(() => {
-        speechCbRef.current(text, true);
-        window.speechSynthesis.speak(utt);
-      }, 350);
+      setTimeout(() => window.speechSynthesis.speak(utt), 200);
     };
 
     bubbleClearTimer.current = setTimeout(() => {
       window.speechSynthesis.cancel();
+      setIsSpeaking(false);
       speechCbRef.current("", false);
-    }, 24_000);
+    }, 30_000);
 
     if (voicesReadyRef.current || window.speechSynthesis.getVoices().length > 0) {
       doSpeak();
@@ -1505,21 +1534,55 @@ export function PukuPartner({
       >
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full shadow-lg"
           style={{
-            background: "rgba(255,255,255,0.92)",
-            backdropFilter: "blur(12px)",
-            border: "1px solid rgba(139,92,246,0.2)",
-            boxShadow: "0 4px 20px rgba(139,92,246,0.15), 0 2px 8px rgba(0,0,0,0.1)",
+            background: "rgba(255,255,255,0.96)",
+            backdropFilter: "blur(16px)",
+            border: isSpeaking ? "1.5px solid rgba(139,92,246,0.55)" : "1px solid rgba(139,92,246,0.2)",
+            boxShadow: isSpeaking
+              ? "0 4px 24px rgba(139,92,246,0.35), 0 2px 8px rgba(0,0,0,0.1)"
+              : "0 4px 20px rgba(139,92,246,0.15), 0 2px 8px rgba(0,0,0,0.1)",
+            transition: "border 0.3s, box-shadow 0.3s",
           }}>
-          <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0"
-            style={{ background: "linear-gradient(135deg,#8b5cf6,#ec4899)" }}>
-            <PukuFace emotion={emotion} size={24} speaking={false} />
+
+          {/* Avatar — pulses while speaking */}
+          <div className="relative w-6 h-6 flex-shrink-0">
+            <div className="w-6 h-6 rounded-full overflow-hidden"
+              style={{ background: "linear-gradient(135deg,#8b5cf6,#ec4899)" }}>
+              <PukuFace emotion={emotion} size={24} speaking={isSpeaking} />
+            </div>
+            {isSpeaking && (
+              <motion.div
+                className="absolute inset-0 rounded-full border-2 border-purple-400 pointer-events-none"
+                animate={{ scale: [1, 1.55], opacity: [0.7, 0] }}
+                transition={{ repeat: Infinity, duration: 0.75 }}
+              />
+            )}
           </div>
+
           <span className="text-[9px] font-black tracking-wider text-purple-600">PUKU</span>
+
+          {/* Voice name tooltip — subtle, shown while speaking */}
+          {isSpeaking && voiceName && (
+            <span className="text-[8px] text-purple-400/80 font-medium max-w-[60px] truncate hidden sm:inline">
+              {voiceName.replace(/ Online \(Natural\)/i, "✨").replace(/ \(.*\)/, "")}
+            </span>
+          )}
+
+          {/* Try voice button */}
+          <button
+            onClick={() => speak(pick([
+              `Hey! I'm Puku, your study buddy. Nice to meet you!`,
+              `Hi there! I'm here to keep you focused. Let's study!`,
+              `Hello! Ready to have the most productive session ever?`,
+            ]))}
+            className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-purple-50 transition-colors"
+            title="Try Puku's voice">
+            <Volume2 className="w-3 h-3 text-purple-400" />
+          </button>
 
           <button onClick={() => setMuted(m => !m)}
             className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
-            title={muted ? "Unmute" : "Mute"}>
-            {muted ? <VolumeX className="w-3 h-3 text-gray-400" /> : <Volume2 className="w-3 h-3 text-purple-500" />}
+            title={muted ? "Unmute Puku" : "Mute Puku"}>
+            {muted ? <VolumeX className="w-3 h-3 text-red-400" /> : <Volume2 className="w-3 h-3 text-gray-400" />}
           </button>
 
           <button onClick={() => handleMinimize(true)}
@@ -1530,7 +1593,7 @@ export function PukuPartner({
 
           {onLeave && (
             <button
-              onClick={() => { window.speechSynthesis?.cancel(); speechCbRef.current("", false); onLeave(); }}
+              onClick={() => { window.speechSynthesis?.cancel(); setIsSpeaking(false); speechCbRef.current("", false); onLeave(); }}
               className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-red-50 transition-colors"
               title="Dismiss Puku">
               <X className="w-3 h-3 text-gray-400" />
