@@ -22,7 +22,8 @@ import {
 import { getSocket, isSocketConnected, type WsChatMessage } from "@/lib/socket";
 import { useActiveRoom, useRoomTimer, useTimerDisplay } from "@/context/ActiveRoomContext";
 import { useAuth } from "@/context/AuthContext";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { collection, query, where, getCountFromServer } from "firebase/firestore";
 import { ClassroomView } from "@/components/study-room/ClassroomView";
 import { VotingPanel } from "@/components/study-room/VotingPanel";
 import { StudentProfileModal } from "@/components/study-room/StudentProfileModal";
@@ -203,12 +204,30 @@ export default function StudyRoomLive() {
   const [buddyInvite, setBuddyInvite] = useState<BuddyInvite | null>(null);
 
   // ── PUKU AI partner state ─────────────────────────────────────────────────────
-  const [showPuku,      setShowPuku]      = useState(false);
-  const [pukuSpeech,    setPukuSpeech]    = useState("");
-  const [pukuSpeaking,  setPukuSpeaking]  = useState(false);
-  const [pukuMinimized, setPukuMinimized] = useState(false);
-  const [pukuEmotion,   setPukuEmotion]   = useState<import("@/components/study-room/PukuPartner").PukuEmotion>("happy");
-  const prevParticipantCount              = useRef<number>(0);
+  const [showPuku,        setShowPuku]      = useState(false);
+  const [pukuSpeech,      setPukuSpeech]    = useState("");
+  const [pukuSpeaking,    setPukuSpeaking]  = useState(false);
+  const [pukuMinimized,   setPukuMinimized] = useState(false);
+  const [pukuEmotion,     setPukuEmotion]   = useState<import("@/components/study-room/PukuPartner").PukuEmotion>("happy");
+  const [leaderboardRank, setLeaderboardRank] = useState<number | undefined>(undefined);
+  const prevParticipantCount                = useRef<number>(0);
+
+  // ── Leaderboard rank — count users with more today study time than current user ──
+  useEffect(() => {
+    if (!profile?.uid || profile.todayStudyTime === undefined) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const q = query(
+          collection(db, "users"),
+          where("todayStudyTime", ">", profile.todayStudyTime ?? 0),
+        );
+        const snap = await getCountFromServer(q);
+        if (!cancelled) setLeaderboardRank(snap.data().count + 1);
+      } catch { /* non-critical */ }
+    })();
+    return () => { cancelled = true; };
+  }, [profile?.uid, profile?.todayStudyTime]);
 
   // Stable callbacks — never recreate so PukuPartner never re-renders due to prop churn
   const pukuSpeechUpdate = useCallback((speech: string, speaking: boolean) => {
@@ -1830,9 +1849,8 @@ export default function StudyRoomLive() {
       </AnimatePresence>
 
       <StudentProfileModal participant={selectedStudent} onClose={() => setSel(null)} />
-      </div>  {/* ← closes containerRef — ALL modals above must be inside for fullscreen */}
 
-      {/* ── PUKU AI Study Partner — sits in classroom bench, logic+controls here ─── */}
+      {/* ── PUKU AI Study Partner — INSIDE containerRef so popups show in fullscreen ── */}
       <PukuPartner
         firstName={profile?.name ?? "Student"}
         grade={profile?.grade}
@@ -1841,12 +1859,14 @@ export default function StudyRoomLive() {
         studyMins={studyMinsInSession}
         todayMins={profile?.todayStudyTime}
         streak={profile?.streak}
+        leaderboardRank={leaderboardRank}
         visible={showPuku && joined}
         onLeave={pukuLeave}
         onSpeechUpdate={pukuSpeechUpdate}
         onMinimizeChange={setPukuMinimized}
         onEmotionChange={setPukuEmotion}
       />
+      </div>  {/* ← closes containerRef — ALL content above visible in fullscreen */}
     </>
   );
 }
