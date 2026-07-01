@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import {
   User as FirebaseUser,
   onAuthStateChanged,
+  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   getAdditionalUserInfo,
@@ -359,15 +360,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!isConfigured) throw new Error("Firebase not configured.");
     setLoading(true);
     try {
-      // Use redirect-based sign-in — more reliable in proxied/iframe environments
-      // (popup-based auth can silently fail when the popup can't communicate back
-      // to a parent window across cross-origin iframe boundaries).
-      await signInWithRedirect(auth, googleProvider);
-      return { outcome: "redirect", isNewUser: false };
+      const cred = await signInWithPopup(auth, googleProvider);
+      const isNewUser = getAdditionalUserInfo(cred)?.isNewUser ?? false;
+
+      if (isNewUser) {
+        window.location.replace("/setup-profile");
+        return { outcome: "success", isNewUser: true };
+      }
+
+      const pr = await fetchProfile(cred.user.uid);
+      if (pr.status === "found") {
+        const patched = await patchProfileFromFirebase(cred.user.uid, cred.user, pr.profile);
+        applyProfile(patched);
+        window.location.replace("/dashboard");
+      } else {
+        window.location.replace("/setup-profile");
+      }
+
+      return { outcome: "success", isNewUser };
     } catch (err: unknown) {
-      setLoading(false);
       const code = (err as { code?: string })?.code ?? "unknown";
-      if (code === "auth/cancelled-popup-request" || code === "auth/popup-closed-by-user") {
+      if (code === "auth/popup-blocked") {
+        await signInWithRedirect(auth, googleProvider);
+        return { outcome: "redirect", isNewUser: false };
+      }
+      setLoading(false);
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
         return { outcome: "cancelled", isNewUser: false };
       }
       throw err;
