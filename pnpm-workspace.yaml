@@ -72,6 +72,8 @@ onlyBuiltDependencies:
   - unrs-resolver
 
 overrides:
+  # websocket-driver 0.7.4 has a Critical CVE; force the patched version
+  websocket-driver: "0.7.5"
   # replit uses linux-x64 only, we can exclude all other platforms
   "esbuild>@esbuild/darwin-arm64": "-"
   "esbuild>@esbuild/darwin-x64": "-"
