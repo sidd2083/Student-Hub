@@ -61,7 +61,7 @@ export default function Contact() {
             "name": "Student Hub Nepal",
             "url": "https://www.studenthubnp.com",
             "founder": { "@type": "Person", "name": "Siddhant Lamichhane" },
-            "sameAs": ["https://www.instagram.com/lmc_siddhant.7/"],
+            "sameAs": ["https://www.instagram.com/lmc_siddhant/"],
             "contactPoint": {
               "@type": "ContactPoint",
               "contactType": "customer support",
@@ -94,7 +94,7 @@ export default function Contact() {
             {[
               { icon: Mail,      label: "Email",     value: "contact@studenthubnp.com", color: "bg-blue-50 text-blue-600",  href: "mailto:contact@studenthubnp.com" },
               { icon: MessageCircle, label: "Phone", value: "9744875783",               color: "bg-green-50 text-green-600", href: "tel:9744875783" },
-              { icon: Instagram, label: "Instagram", value: "@lmc_siddhant.7",          color: "bg-pink-50 text-pink-600",  href: "https://www.instagram.com/lmc_siddhant.7/" },
+              { icon: Instagram, label: "Instagram", value: "@lmc_siddhant",          color: "bg-pink-50 text-pink-600",  href: "https://www.instagram.com/lmc_siddhant/" },
             ].map(({ icon: Icon, label, value, color, href }) => (
               <a
                 key={label}

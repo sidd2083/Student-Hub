@@ -471,7 +471,7 @@ export default function Dashboard() {
 
         {/* ── Instagram CTA ─────────────────────────────────────────────────── */}
         <a
-          href="https://www.instagram.com/lmc_siddhant.7/"
+          href="https://www.instagram.com/lmc_siddhant/"
           target="_blank"
           rel="noopener noreferrer"
           className="mt-4 flex items-center gap-3 bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm hover:shadow-md transition-all group"
@@ -481,7 +481,7 @@ export default function Dashboard() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 leading-tight">Got a suggestion or issue?</p>
-            <p className="text-xs text-gray-400 leading-tight">DM us on Instagram — @lmc_siddhant.7</p>
+            <p className="text-xs text-gray-400 leading-tight">DM us on Instagram — @lmc_siddhant</p>
           </div>
           <span className="text-xs text-pink-500 font-medium group-hover:text-pink-600 flex-shrink-0">Follow →</span>
         </a>

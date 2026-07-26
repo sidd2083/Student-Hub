@@ -39,7 +39,7 @@ export default function SiddhantProfile() {
           "description": "Siddhant Lamichhane is the Founder and CEO of Student Hub Nepal — a free study platform for Grade 9–12 students in Nepal. He is a Grade 11 student from Hetauda, Makwanpur, Bagmati Pradesh, Nepal, passionate about building products, freelancing, and learning AI/ML.",
           "url": `${SITE_URL}/siddhant-lamichhane`,
           "sameAs": [
-            "https://www.instagram.com/lmc_siddhant.7/",
+            "https://www.instagram.com/lmc_siddhant/",
             `${SITE_URL}/about`
           ],
           "worksFor": {
@@ -181,7 +181,7 @@ export default function SiddhantProfile() {
             <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Contact</h2>
             <div className="flex flex-wrap gap-3">
               <a
-                href="https://www.instagram.com/lmc_siddhant.7/"
+                href="https://www.instagram.com/lmc_siddhant/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 rounded-xl text-sm text-gray-700 font-medium shadow-sm hover:border-pink-200 hover:text-pink-600 transition-colors"

@@ -42,7 +42,7 @@ export default function About() {
               "name": "Siddhant Lamichhane",
               "jobTitle": "Founder & CEO",
               "url": "https://www.studenthubnp.com/siddhant-lamichhane",
-              "sameAs": ["https://www.instagram.com/lmc_siddhant.7/", "https://www.studenthubnp.com/siddhant-lamichhane"]
+              "sameAs": ["https://www.instagram.com/lmc_siddhant/", "https://www.studenthubnp.com/siddhant-lamichhane"]
             },
             {
               "@type": "Person",
@@ -53,7 +53,7 @@ export default function About() {
               "sameAs": ["https://www.instagram.com/sapkota_aarogya/", "https://www.studenthubnp.com/aarogya-sapkota"]
             }
           ],
-          "sameAs": ["https://www.instagram.com/lmc_siddhant.7/"],
+          "sameAs": ["https://www.instagram.com/lmc_siddhant/"],
           "contactPoint": {
             "@type": "ContactPoint",
             "contactType": "customer support",
@@ -69,7 +69,7 @@ export default function About() {
           "jobTitle": "Founder & CEO",
           "description": "Siddhant Lamichhane is the Founder and CEO of Student Hub Nepal — Nepal's leading free study platform for Grade 9–12 students preparing for SEE and NEB exams. He built the platform from the ground up from Hetauda, Nepal.",
           "url": "https://www.studenthubnp.com/siddhant-lamichhane",
-          "sameAs": ["https://www.instagram.com/lmc_siddhant.7/", "https://www.studenthubnp.com/siddhant-lamichhane"],
+          "sameAs": ["https://www.instagram.com/lmc_siddhant/", "https://www.studenthubnp.com/siddhant-lamichhane"],
           "worksFor": { "@type": "Organization", "name": "Student Hub Nepal", "url": "https://www.studenthubnp.com" },
           "address": { "@type": "PostalAddress", "addressLocality": "Hetauda", "addressRegion": "Bagmati Pradesh", "addressCountry": "NP" },
           "nationality": { "@type": "Country", "name": "Nepal" },
@@ -242,7 +242,7 @@ export default function About() {
                     Go to Siddhant Portfolio →
                   </a>
                   <a
-                    href="https://www.instagram.com/lmc_siddhant.7/"
+                    href="https://www.instagram.com/lmc_siddhant/"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs font-semibold rounded-xl hover:opacity-90 transition-opacity"

@@ -83,7 +83,7 @@ const jsonLd = {
           "name": "Siddhant Lamichhane",
           "jobTitle": "Founder & CEO",
           "url": `${SITE_URL}/about`,
-          "sameAs": ["https://www.instagram.com/lmc_siddhant.7/"]
+          "sameAs": ["https://www.instagram.com/lmc_siddhant/"]
         },
         {
           "@type": "Person",
@@ -94,7 +94,7 @@ const jsonLd = {
           "sameAs": ["https://www.instagram.com/sapkota_aarogya/"]
         }
       ],
-      "sameAs": ["https://www.instagram.com/lmc_siddhant.7/"]
+      "sameAs": ["https://www.instagram.com/lmc_siddhant/"]
     },
     {
       "@type": "WebPage",
