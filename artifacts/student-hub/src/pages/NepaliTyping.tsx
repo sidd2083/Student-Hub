@@ -517,6 +517,26 @@ const SCHEMA_FAQ = {
       name: "Does the text run out during practice?",
       acceptedAnswer: { "@type": "Answer", text: "No — words are generated automatically and never run out. The session continues until your chosen time (30s, 1 min, 2 min, 3 min, or 5 min) is complete. This matches real Lok Sewa exam conditions where you type continuously until time is up." },
     },
+    {
+      "@type": "Question",
+      name: "नेपाली टाइपिंग कसरी सिक्ने — शुरुवात कहाँबाट गर्ने?",
+      acceptedAnswer: { "@type": "Answer", text: "पहिले Home Row सिक्नुहोस्: A=ा, S=स, D=द, F=् (हलन्त), G=ग, H=ह, J=ज, K=क, L=ल। यी ९ Key हरू नदेखी थिच्न सकेपछि Easy Level बाट सुरु गर्नुहोस्। प्रत्येक दिन १५–२० मिनेट अभ्यास गर्नुहोस्। Student Hub को Virtual Keyboard र Animated Hand Guide ले कुन औंलाले कुन Key थिच्ने भनेर देखाउँछ। Sign-up नचाहिने।" },
+    },
+    {
+      "@type": "Question",
+      name: "लोकसेवा टाइपिंग परीक्षामा कति WPM चाहिन्छ?",
+      acceptedAnswer: { "@type": "Answer", text: "लोक सेवा आयोगको टाइपिंग परीक्षामा सामान्यतया ३५ WPM (Words Per Minute) र ९०% वा सोभन्दा बढी Accuracy चाहिन्छ। Student Hub ले प्रत्येक Session पछि Lok Sewa Pass/Fail Result देखाउँछ। Hard Level का Paragraphs सरकारी कार्यालयको भाषामा छन् जुन वास्तविक परीक्षासँग मिल्दोजुल्दो छ।" },
+    },
+    {
+      "@type": "Question",
+      name: "नेपाली Unicode र Romanized टाइपिंगमा के फरक छ?",
+      acceptedAnswer: { "@type": "Answer", text: "Student Hub ले Standard Nepali Unicode Keyboard Layout प्रयोग गर्छ जसमा Devanagari अक्षरहरू सिधै Key मा म्याप गरिएका छन् (जस्तै: K=क, L=ल)। Romanized टाइपिंगमा English Key थिच्दा Nepali अक्षर आउँछ। Lok Sewa परीक्षामा Standard Unicode Layout नै प्रयोग हुन्छ, त्यसैले Student Hub को यो Tool परीक्षाको लागि सही छ।" },
+    },
+    {
+      "@type": "Question",
+      name: "के यो Nepali Typing Tool Mobile मा काम गर्छ?",
+      acceptedAnswer: { "@type": "Answer", text: "हो — Student Hub को Nepali Typing Tool Mobile र Tablet मा पनि काम गर्छ। On-screen Virtual Keyboard दिइएको छ र Screen Horizontal Scroll गर्न मिल्छ। तर राम्रो अभ्यासको लागि Physical Keyboard भएको Computer वा Laptop प्रयोग गर्न सिफारिस गरिन्छ, किनकि Lok Sewa परीक्षा Computer मा नै हुन्छ।" },
+    },
   ],
 };
 
@@ -1051,7 +1071,7 @@ export default function NepaliTyping() {
     hiddenInputRef.current?.focus();
   }, [phase]);
 
-  const langLabel  = language === "nepali" ? "Nepali Typing Practice — नेपाली टाइपिंग" : "Hindi Typing Practice — हिंदी टाइपिंग";
+  const langLabel  = language === "nepali" ? "नेपाली टाइपिंग अभ्यास — Nepali Typing Practice" : "हिंदी टाइपिंग अभ्यास — Hindi Typing Practice";
   const langSubtitle = language === "nepali"
     ? "नेपाली · लोकसेवा परीक्षा · Virtual Keyboard · Unlimited WPM Test · Free"
     : "हिन्दी · Devanagari · Virtual Keyboard · Unlimited WPM Test · Free";
@@ -1061,29 +1081,36 @@ export default function NepaliTyping() {
       <Helmet>
         <title>
           {language === "nepali"
-            ? "Nepali Typing Practice Online Free — नेपाली टाइपिंग अभ्यास | Lok Sewa Typing Test | Student Hub Nepal"
-            : "Hindi Typing Practice Online Free — हिंदी टाइपिंग अभ्यास | WPM Test | Student Hub"}
+            ? "नेपाली टाइपिंग अभ्यास | Free Nepali Typing Practice Online — Lok Sewa Exam | Student Hub Nepal"
+            : "हिंदी टाइपिंग अभ्यास | Free Hindi Typing Practice Online — Government Job Exam | Student Hub"}
         </title>
         <meta name="description" content={language === "nepali"
-          ? "Best free Nepali typing practice online. नेपाली टाइपिंग अभ्यास — unlimited words, virtual Devanagari keyboard, animated hand guide, real-time WPM & accuracy. Lok Sewa Aayog exam, government job typing test, lokshewa typing. No sign-up."
-          : "Best free Hindi typing practice. हिंदी टाइपिंग अभ्यास — unlimited words, Devanagari keyboard, hand guide, WPM test. Government job exam prep. No sign-up."} />
+          ? "नेपाली टाइपिंग अभ्यास — लोकसेवा आयोग र सरकारी जागिर टाइपिंग परीक्षाको लागि निःशुल्क नेपाली टाइपिंग अभ्यास। Free Nepali typing practice online: unlimited words, virtual Devanagari keyboard, animated hand guide, real-time WPM & accuracy. No sign-up."
+          : "हिंदी टाइपिंग अभ्यास — सरकारी नौकरी टाइपिंग परीक्षा के लिए मुफ्त हिंदी टाइपिंग अभ्यास। Free Hindi typing practice: unlimited words, Devanagari keyboard, hand guide, WPM test. No sign-up."} />
         <meta name="keywords" content={language === "nepali"
-          ? "nepali typing practice, nepali typing online, nepali typing test, नेपाली टाइपिंग, नेपाली टाइपिंग अभ्यास, lok sewa typing test, lokshewa typing practice, लोकसेवा टाइपिंग, government job typing test nepal, sarkari jagir typing, nepali typing speed test, nepali wpm test, nepali typing tutor, online nepali keyboard, type in nepali online, nepali unicode typing, devanagari typing practice, nepali typing for beginners, how to type in nepali, nepali keyboard layout, free nepali typing, learn nepali typing fast"
-          : "hindi typing practice, hindi typing online, hindi typing test, हिंदी टाइपिंग, हिंदी टाइपिंग अभ्यास, devanagari typing, hindi typing tutor, hindi typing wpm, free hindi typing, government job typing hindi"} />
+          ? "नेपाली टाइपिंग अभ्यास, नेपाली टाइपिंग, लोकसेवा टाइपिंग, लोक सेवा आयोग टाइपिंग, सरकारी जागिर टाइपिंग, टाइपिंग परीक्षा नेपाल, नेपाली टाइपिंग ऑनलाइन, WPM टाइपिंग परीक्षा, नेपाली कीबोर्ड टाइपिंग, मुफ्त नेपाली टाइपिंग, nepali typing practice, nepali typing online, nepali typing test, nepali typing speed test, lok sewa typing test, lokshewa typing practice, loksewa typing exam, government job typing test nepal, nepal government typing, nepali unicode typing, devanagari typing practice, nepali typing for lok sewa aayog, nepali wpm test, nepali typing tutor, nepali keyboard layout, free nepali typing, learn nepali typing fast, nepali typing 35 wpm, nepali typing accuracy, how to type in nepali, type nepali online free, nepali typing practice for beginners"
+          : "हिंदी टाइपिंग अभ्यास, हिंदी टाइपिंग, हिंदी टाइपिंग परीक्षा, सरकारी नौकरी टाइपिंग, मुफ्त हिंदी टाइपिंग, hindi typing practice, hindi typing online, hindi typing test, hindi typing speed test, devanagari typing, hindi typing tutor, hindi typing wpm, free hindi typing, government job typing hindi, hindi unicode typing"} />
         <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
         <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
         <meta name="author" content="Student Hub Nepal" />
         <meta property="og:title" content={language === "nepali"
-          ? "Nepali Typing Practice Online Free — नेपाली टाइपिंग | Lok Sewa Exam | Student Hub"
-          : "Hindi Typing Practice Online Free — हिंदी टाइपिंग | Student Hub"} />
-        <meta property="og:description" content="Free Nepali & Hindi typing practice. Unlimited words, animated hand guide, WPM tracker. Perfect for Lok Sewa exam. No sign-up." />
+          ? "नेपाली टाइपिंग अभ्यास | Free Nepali Typing Practice — Lok Sewa Exam | Student Hub Nepal"
+          : "हिंदी टाइपिंग अभ्यास | Free Hindi Typing Practice Online | Student Hub"} />
+        <meta property="og:description" content={language === "nepali"
+          ? "नेपाली टाइपिंग अभ्यास — लोकसेवा आयोग परीक्षाको लागि निःशुल्क। Unlimited words, virtual keyboard, animated hand guide, WPM & accuracy tracker. No sign-up."
+          : "हिंदी टाइपिंग अभ्यास — सरकारी परीक्षाको लागि निःशुल्क। Unlimited words, Devanagari keyboard, hand guide, WPM test. No sign-up."} />
+        <meta property="og:site_name" content="Student Hub Nepal" />
+        <meta property="og:image:alt" content="नेपाली टाइपिंग अभ्यास — Free Nepali Typing Practice for Lok Sewa Exam | Student Hub Nepal" />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.studenthubnp.com/tools/nepali-typing" />
         <meta property="og:image" content="https://www.studenthubnp.com/opengraph.jpg" />
         <meta property="og:locale" content="ne_NP" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Free Nepali Typing Practice — Lok Sewa Exam | Student Hub" />
-        <meta name="twitter:description" content="Best free Nepali typing tutor. Unlimited words, virtual keyboard, hand guide, WPM test. No sign-up." />
+        <meta name="twitter:title" content={language === "nepali" ? "नेपाली टाइपिंग अभ्यास — Free Nepali Typing Practice | Lok Sewa Exam | Student Hub" : "हिंदी टाइपिंग अभ्यास — Free Hindi Typing Practice | Student Hub"} />
+        <meta name="twitter:description" content={language === "nepali" ? "नेपाली टाइपिंग अभ्यास — लोकसेवा परीक्षाको लागि निःशुल्क। Unlimited words, virtual Devanagari keyboard, WPM & accuracy. No sign-up." : "हिंदी टाइपिंग अभ्यास — Free Hindi typing practice. Unlimited words, Devanagari keyboard, WPM test. No sign-up."} />
+        <meta name="twitter:image" content="https://www.studenthubnp.com/opengraph.jpg" />
+        <meta name="geo.region" content="NP" />
+        <meta name="geo.placename" content="Nepal" />
         <link rel="canonical" href="https://www.studenthubnp.com/tools/nepali-typing" />
         <link rel="alternate" hrefLang="ne" href="https://www.studenthubnp.com/tools/nepali-typing" />
         <link rel="alternate" hrefLang="hi" href="https://www.studenthubnp.com/tools/nepali-typing" />

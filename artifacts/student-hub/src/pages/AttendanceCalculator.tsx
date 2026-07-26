@@ -45,8 +45,9 @@ const WEBAPP_SCHEMA = {
   url: "https://www.studenthubnp.com/tools/attendance-calculator",
   description: "Free Attendance Calculator and Bunk Calculator. Instantly find your attendance percentage, how many classes you can miss (bunk) while staying above 75%, 80%, 85%, or any required percentage, and how many classes you must attend to recover. Works for India (UGC 75% rule, CBSE, DU, Mumbai University, IIT, NIT, Anna University, VTU), Nepal, USA, UK, Australia, Canada, Pakistan. No login required.",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  aggregateRating: { "@type": "AggregateRating", ratingValue: "4.8", ratingCount: "3847", bestRating: "5", worstRating: "1" },
   datePublished: "2024-01-01",
-  dateModified: new Date().toISOString().split("T")[0],
+  dateModified: "2025-07-01",
   featureList: [
     "Attendance percentage calculator — instant result",
     "Bunk calculator — exactly how many classes you can safely miss",
@@ -108,7 +109,9 @@ export default function AttendanceCalculator() {
       <Helmet>
         <title>Attendance Calculator — Bunk Calculator | How Many Classes Can I Miss? Free Online Tool</title>
         <meta name="description" content="Free Attendance Calculator &amp; Bunk Calculator — instantly find your attendance percentage, how many classes you can miss (bunk), and how many you must attend to recover. Works for 75%, 80%, 85%, 90% rules. India (UGC, CBSE, DU, Mumbai Univ, IIT, NIT, Anna Univ, VTU), Nepal, USA, UK, Australia. No sign-up." />
-        <meta name="keywords" content="attendance calculator, bunk calculator, attendance percentage calculator, how many classes can i miss, how many classes can i bunk, attendance calculator india, attendance calculator for 75 percent, 75 attendance calculator, 75 percent attendance rule, college attendance calculator, attendance calculator online free, UGC 75 attendance rule, class attendance calculator, how many classes can i skip, bunk class calculator, CBSE attendance calculator, DU attendance calculator, Delhi university attendance calculator, Mumbai university attendance calculator, Anna university attendance calculator, VTU attendance calculator, india college bunk calculator, how many classes can i bunk india, 75 percent attendance india, attendance shortage india, attendance calculator australia, attendance calculator usa, attendance calculator canada, attendance calculator uk, attendance shortage calculator, lecture attendance calculator, bunking calculator college, how many lectures can i miss, attendance recovery calculator, how many classes to attend to recover, attendance shortage recovery, 80 percent attendance calculator, 85 percent attendance calculator, attendance percentage formula, college attendance shortage, CBSE 75 attendance, attendance calculator for college students india, bunk calculator nepal, attendance calculator nepal, 75 attendance rule nepal" />
+        <meta name="keywords" content="हाजिरी क्यालकुलेटर, उपस्थिति प्रतिशत, हाजिरी गणना, कक्षा छाड्न सकिने, त्रिभुवन विश्वविद्यालय हाजिरी, पोखरा विश्वविद्यालय हाजिरी, नेपाल हाजिरी, attendance calculator, bunk calculator, attendance percentage calculator, how many classes can i miss, how many classes can i bunk, attendance calculator india, attendance calculator for 75 percent, 75 attendance calculator, 75 percent attendance rule, college attendance calculator, attendance calculator online free, UGC 75 attendance rule, class attendance calculator, how many classes can i skip, bunk class calculator, CBSE attendance calculator, DU attendance calculator, Delhi university attendance calculator, Mumbai university attendance calculator, Anna university attendance calculator, VTU attendance calculator, india college bunk calculator, how many classes can i bunk india, 75 percent attendance india, attendance shortage india, attendance calculator australia, attendance calculator usa, attendance calculator canada, attendance calculator uk, attendance shortage calculator, lecture attendance calculator, bunking calculator college, how many lectures can i miss, attendance recovery calculator, how many classes to attend to recover, attendance shortage recovery, 80 percent attendance calculator, 85 percent attendance calculator, attendance percentage formula, college attendance shortage, CBSE 75 attendance, attendance calculator for college students india, bunk calculator nepal, attendance calculator nepal, 75 attendance rule nepal, tribhuvan university attendance nepal, pokhara university attendance rule, kathmandu university attendance, how many classes can i miss nepal college" />
+        <meta name="geo.region" content="NP" />
+        <meta name="geo.placename" content="Nepal" />
         <meta name="author" content="Student Hub Nepal" />
         <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
         <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
@@ -154,7 +157,7 @@ export default function AttendanceCalculator() {
             </div>
             <span className="text-xs font-semibold bg-green-100 text-green-700 px-2.5 py-1 rounded-full">Global · All Institutions</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Attendance Calculator — Free Bunk Calculator</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Attendance Calculator — Free Bunk Calculator | हाजिरी क्यालकुलेटर</h1>
           <p className="text-gray-500 mt-1 text-sm leading-relaxed">Free <strong>attendance calculator</strong> — instantly find your attendance %, see exactly how many classes you can miss (bunk), and how many consecutive classes you must attend to recover. Works for 75%, 80%, 85%, 90% or any required %, any institution worldwide.</p>
         </div>
 

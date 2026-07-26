@@ -983,10 +983,17 @@ export default function EnglishTyping() {
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.studenthubnp.com/tools/english-typing" />
         <meta property="og:image" content="https://www.studenthubnp.com/opengraph.jpg" />
-        <meta property="og:locale" content="en_US" />
+        <meta property="og:image:alt" content="Free English Typing Practice — Lok Sewa Government Job Typing Test Nepal | Student Hub" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:site_name" content="Student Hub Nepal" />
+        <meta property="og:locale" content="en_NP" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Free English Typing Test — Nepal Government Job Exam | Student Hub" />
         <meta name="twitter:description" content="Practice English typing for Lok Sewa and government job exams. Unlimited words, WPM test, animated hand guide. Free, no sign-up." />
+        <meta name="twitter:image" content="https://www.studenthubnp.com/opengraph.jpg" />
+        <meta name="geo.region" content="NP" />
+        <meta name="geo.placename" content="Nepal" />
         <link rel="canonical" href="https://www.studenthubnp.com/tools/english-typing" />
         <link rel="alternate" hrefLang="en" href="https://www.studenthubnp.com/tools/english-typing" />
         <link rel="alternate" hrefLang="ne" href="https://www.studenthubnp.com/tools/nepali-typing" />
