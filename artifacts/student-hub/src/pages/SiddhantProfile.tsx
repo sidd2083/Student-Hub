@@ -192,6 +192,15 @@ export default function SiddhantProfile() {
                 Instagram
               </a>
               <a
+                href="https://siddhantlmc.xyz"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 rounded-xl text-sm text-gray-700 font-medium shadow-sm hover:border-gray-400 hover:text-gray-900 transition-colors"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                siddhantlmc.xyz
+              </a>
+              <a
                 href={`${SITE_URL}/about`}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 rounded-xl text-sm text-gray-700 font-medium shadow-sm hover:border-blue-200 hover:text-blue-600 transition-colors"
               >
