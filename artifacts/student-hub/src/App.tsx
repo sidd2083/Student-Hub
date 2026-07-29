@@ -38,6 +38,7 @@ const About        = lazy(() => import("@/pages/About"));
 const Contact      = lazy(() => import("@/pages/Contact"));
 const Saved        = lazy(() => import("@/pages/Saved"));
 const McqPractice  = lazy(() => import("@/pages/McqPractice"));
+const Feedback     = lazy(() => import("@/pages/Feedback"));
 const AdminLogin   = lazy(() => import("@/pages/AdminLogin"));
 const Admin        = lazy(() => import("@/pages/Admin"));
 const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
@@ -195,6 +196,9 @@ function AppRoutes() {
         <Route path="/study-rooms"        component={StudyRooms} />
         <Route path="/sos">
           <PrivateRoute><SosNetwork /></PrivateRoute>
+        </Route>
+        <Route path="/feedback">
+          <PrivateRoute><Feedback /></PrivateRoute>
         </Route>
         <Route path="/dashboard">
           <PrivateRoute><Dashboard /></PrivateRoute>

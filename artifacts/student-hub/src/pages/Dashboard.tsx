@@ -16,6 +16,7 @@ import { SiteGuide } from "@/components/SiteGuide";
 import { DailyMissionWidget } from "@/components/DailyMissionWidget";
 import { StudyRoomWidget } from "@/components/study-room/StudyRoomWidget";
 import { ExamCountdown } from "@/components/ExamCountdown";
+import { FeedbackWidget } from "@/components/FeedbackWidget";
 
 const sections = [
   { href: "/sos",        icon: AlertTriangle, label: "Get Help",           desc: "Live peer help when you're stuck", color: "bg-red-50 text-red-600"       },
@@ -471,6 +472,8 @@ export default function Dashboard() {
             </Link>
           ))}
         </div>
+
+        <FeedbackWidget />
 
         {/* ── Instagram CTA ─────────────────────────────────────────────────── */}
         <a

@@ -16,9 +16,10 @@ import {
   CheckCircle, AlertCircle, Award, Search, Type, Pencil, Globe,
   RefreshCw, Clock, Link2, School, Square, Lock, Unlock, Star,
   Eye, EyeOff, ArrowUp, ArrowDown, Instagram, Youtube,
+  MessageSquarePlus, Send, ChevronDown, ChevronUp,
 } from "lucide-react";
 
-type Section = "dashboard" | "notes" | "pyqs" | "announcements" | "users" | "reports" | "seo" | "sitemap" | "rooms" | "creators";
+type Section = "dashboard" | "notes" | "pyqs" | "announcements" | "users" | "reports" | "seo" | "sitemap" | "rooms" | "creators" | "feedback";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -2731,6 +2732,186 @@ function ManageCreators() {
   );
 }
 
+// ─── Manage Feedback ─────────────────────────────────────────────────────────
+
+interface FeedbackItem {
+  id: string;
+  uid: string;
+  name: string;
+  grade: number | null;
+  type: "feature" | "bug" | "other";
+  text: string;
+  status: "new" | "seen" | "replied";
+  createdAt: string;
+  reply?: string;
+  repliedAt?: string;
+}
+
+const FB_TYPE_LABEL: Record<string, string> = { feature: "✨ Feature", bug: "🐛 Bug", other: "💬 Other" };
+const FB_STATUS_STYLE: Record<string, string> = {
+  new:     "bg-blue-50 text-blue-600",
+  seen:    "bg-amber-50 text-amber-600",
+  replied: "bg-green-50 text-green-700",
+};
+
+function ManageFeedback() {
+  const [items, setItems] = useState<FeedbackItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "new" | "replied">("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    getDocs(query(collection(db, "feedback"), orderBy("createdAt", "desc")))
+      .then(snap => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as FeedbackItem))))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Mark as "seen" when expanded
+  const expand = async (item: FeedbackItem) => {
+    const next = expandedId === item.id ? null : item.id;
+    setExpandedId(next);
+    if (next && item.status === "new") {
+      await updateDoc(doc(db, "feedback", item.id), { status: "seen" }).catch(console.error);
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: "seen" } : i));
+    }
+  };
+
+  const sendReply = async (item: FeedbackItem) => {
+    const reply = (replyText[item.id] ?? "").trim();
+    if (!reply) return;
+    setSaving(item.id);
+    try {
+      await updateDoc(doc(db, "feedback", item.id), {
+        reply,
+        repliedAt: new Date().toISOString(),
+        status: "replied",
+      });
+      setItems(prev => prev.map(i =>
+        i.id === item.id
+          ? { ...i, reply, repliedAt: new Date().toISOString(), status: "replied" }
+          : i,
+      ));
+      setReplyText(prev => ({ ...prev, [item.id]: "" }));
+    } catch (e) { console.error(e); }
+    finally { setSaving(null); }
+  };
+
+  const filtered = items.filter(i =>
+    filter === "all" ? true : filter === "new" ? i.status !== "replied" : i.status === "replied"
+  );
+  const newCount = items.filter(i => i.status === "new").length;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <MessageSquarePlus className="w-5 h-5 text-indigo-500" /> User Feedback
+          </h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {items.length} total · {newCount} new
+          </p>
+        </div>
+        <button onClick={load} className="p-2 rounded-xl text-gray-400 hover:bg-gray-100 transition-colors">
+          <RefreshCw className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex gap-2 mb-5">
+        {(["all", "new", "replied"] as const).map(f => (
+          <button key={f} onClick={() => setFilter(f)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all ${
+              filter === f ? "bg-indigo-50 text-indigo-600 border border-indigo-200" : "text-gray-500 hover:bg-gray-100"
+            }`}>
+            {f === "all" ? `All (${items.length})` : f === "new" ? `Pending (${items.filter(i => i.status !== "replied").length})` : `Replied (${items.filter(i => i.status === "replied").length})`}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="text-center py-12 text-gray-400 text-sm">Loading…</div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center text-gray-400 text-sm">
+          No feedback yet.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(item => {
+            const isOpen = expandedId === item.id;
+            return (
+              <div key={item.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden transition-all ${item.status === "new" ? "border-indigo-200" : "border-gray-100"}`}>
+                {/* Row */}
+                <button onClick={() => expand(item)} className="w-full flex items-start gap-3 px-5 py-4 text-left hover:bg-gray-50 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="text-xs font-medium text-gray-500">{FB_TYPE_LABEL[item.type]}</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${FB_STATUS_STYLE[item.status]}`}>
+                        {item.status === "new" ? "New ●" : item.status === "seen" ? "Seen ✓" : "Replied ✓"}
+                      </span>
+                      <span className="text-xs text-gray-400 ml-auto flex-shrink-0">
+                        {item.name}{item.grade ? ` · Grade ${item.grade}` : ""} · {new Date(item.createdAt).toLocaleDateString("en-US", { day: "numeric", month: "short" })}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-800 leading-relaxed line-clamp-2">{item.text}</p>
+                    {item.reply && !isOpen && (
+                      <p className="text-xs text-indigo-600 mt-1">↳ Replied</p>
+                    )}
+                  </div>
+                  {isOpen ? <ChevronUp className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" /> : <ChevronDown className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" />}
+                </button>
+
+                {/* Expanded detail + reply */}
+                {isOpen && (
+                  <div className="px-5 pb-5 border-t border-gray-50">
+                    <p className="text-sm text-gray-700 leading-relaxed mt-3 mb-4 whitespace-pre-wrap">{item.text}</p>
+
+                    {item.reply && (
+                      <div className="mb-4 bg-indigo-50 rounded-xl px-4 py-3 border border-indigo-100">
+                        <p className="text-xs font-semibold text-indigo-700 mb-1">Your previous reply</p>
+                        <p className="text-sm text-gray-700">{item.reply}</p>
+                        {item.repliedAt && (
+                          <p className="text-[10px] text-gray-400 mt-1">
+                            {new Date(item.repliedAt).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <textarea
+                        value={replyText[item.id] ?? ""}
+                        onChange={e => setReplyText(prev => ({ ...prev, [item.id]: e.target.value }))}
+                        placeholder={item.reply ? "Update your reply…" : "Write a reply to this user…"}
+                        rows={2}
+                        className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+                      />
+                      <button
+                        onClick={() => sendReply(item)}
+                        disabled={!(replyText[item.id] ?? "").trim() || saving === item.id}
+                        className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 text-white text-xs font-semibold rounded-xl transition-colors self-end"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        {saving === item.id ? "…" : item.reply ? "Update" : "Reply"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Admin Shell ─────────────────────────────────────────────────────────────
 
 export default function Admin() {
@@ -2753,6 +2934,7 @@ export default function Admin() {
     { key: "announcements", icon: Megaphone,       label: "Announcements"    },
     { key: "users",         icon: Users,           label: "Manage Users"     },
     { key: "reports",       icon: Award,           label: "Badges"           },
+    { key: "feedback",      icon: MessageSquarePlus, label: "Feedback"        },
     { key: "seo",           icon: Shield,          label: "SEO Panel"        },
     { key: "sitemap",       icon: Globe,           label: "Sitemap"          },
   ];
@@ -2801,6 +2983,7 @@ export default function Admin() {
         {section === "announcements" && <ManageAnnouncements />}
         {section === "users"         && <ManageUsers />}
         {section === "reports"       && <BadgeManager />}
+        {section === "feedback"      && <ManageFeedback />}
         {section === "seo"           && <SeoPanel />}
         {section === "sitemap"       && <SitemapPanel />}
       </main>
