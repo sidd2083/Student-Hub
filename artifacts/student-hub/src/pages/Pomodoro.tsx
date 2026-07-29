@@ -155,7 +155,7 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
 }
 
 function PomodoroContent() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const {
     phase, seconds, running, sessionsCompleted,
     settings, savedMinutesToday,
