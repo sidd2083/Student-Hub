@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { Phase } from "@/context/TimerContext";
 import { focusTracker } from "@/components/StudyGuardian";
+import { ExamCountdown } from "@/components/ExamCountdown";
 
 function fmtTime(mins: number) {
   return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
@@ -367,6 +368,8 @@ function PomodoroContent() {
       </div>
 
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+
+      <ExamCountdown grade={profile?.grade} />
 
       {savedMinutesToday > 0 && (
         <div className="flex gap-3 mb-4 px-4 py-2.5 bg-blue-50 border border-blue-100 rounded-2xl">
