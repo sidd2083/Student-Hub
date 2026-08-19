@@ -195,6 +195,11 @@ router.get("/notes/:slug", async (req: Request, res: Response, next: NextFunctio
   const slug      = `${id}-grade-${grade}-${toSlug(subject)}-${toSlug(title)}`;
   const canonical = `${SITE_URL}/notes/${slug}`;
 
+  if (req.path !== `/notes/${slug}`) {
+    res.redirect(301, canonical);
+    return;
+  }
+
   const pageTitle = chapter
     ? `${title} (${chapter}) | Grade ${grade} ${subject} Notes — Student Hub Nepal`
     : `${title} | Grade ${grade} ${subject} Notes — Student Hub Nepal`;
