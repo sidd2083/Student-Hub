@@ -1,4 +1,4 @@
-import express, { type Express, type Request, type Response, type NextFunction } from "express";
+import express, { type Express, type Request, type Response, type NextFunction, type RequestHandler } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
@@ -8,6 +8,10 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import sitemapRouter from "./routes/sitemap";
 import ssrRouter, { BUILD_EXISTS } from "./routes/ssr";
+
+type MiddlewareFactory = (options?: Record<string, unknown>) => RequestHandler;
+const helmetMiddleware = helmet as unknown as MiddlewareFactory;
+const pinoHttpMiddleware = pinoHttp as unknown as MiddlewareFactory;
 
 const app: Express = express();
 
@@ -23,7 +27,7 @@ app.use(compression({
   },
 }));
 
-app.use(helmet({
+app.use(helmetMiddleware({
   crossOriginResourcePolicy: { policy: "same-site" },
   contentSecurityPolicy: {
     directives: {
@@ -67,7 +71,7 @@ app.use(helmet({
 }));
 
 const serverLogger = pino({ level: process.env.LOG_LEVEL ?? "info" });
-app.use(pinoHttp({
+app.use(pinoHttpMiddleware({
   logger: serverLogger,
   // Never log Authorization headers — they contain Firebase ID tokens
   redact: ["req.headers.authorization", "req.headers.cookie"],
