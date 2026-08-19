@@ -180,6 +180,7 @@ router.post("/creators", requireAdminKey, async (req: Request, res: Response) =>
 router.put("/creators/:id", requireAdminKey, async (req: Request, res: Response) => {
   try {
     const db = getAdminDb();
+    const creatorId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     // Build a partial update with only known, typed fields — no mass assignment
     const body = req.body as Partial<Creator>;
     const safe = safeCreatorFields(body);
@@ -195,11 +196,11 @@ router.put("/creators/:id", requireAdminKey, async (req: Request, res: Response)
     if (body.visible    !== undefined) update.visible     = safe.visible;
     if (body.order      !== undefined) update.order       = safe.order;
     if (db) {
-      await db.collection("creators").doc(req.params.id).update(update);
+      await db.collection("creators").doc(creatorId).update(update);
       return res.json({ ok: true });
     }
     const list = fileRead();
-    const idx  = list.findIndex(c => c.id === req.params.id);
+    const idx  = list.findIndex(c => c.id === creatorId);
     if (idx < 0) return res.status(404).json({ error: "Creator not found." });
     list[idx] = { ...list[idx], ...update };
     fileWrite(list);
@@ -214,11 +215,12 @@ router.put("/creators/:id", requireAdminKey, async (req: Request, res: Response)
 router.delete("/creators/:id", requireAdminKey, async (req: Request, res: Response) => {
   try {
     const db = getAdminDb();
+    const creatorId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     if (db) {
-      await db.collection("creators").doc(req.params.id).delete();
+      await db.collection("creators").doc(creatorId).delete();
       return res.json({ ok: true });
     }
-    const list = fileRead().filter(c => c.id !== req.params.id);
+    const list = fileRead().filter(c => c.id !== creatorId);
     fileWrite(list);
     return res.json({ ok: true });
   } catch (err) {

@@ -26,7 +26,7 @@ function toSlug(str: string): string {
     .replace(/^-|-$/g, "");
 }
 
-type FSFields = Record<string, { stringValue?: string; integerValue?: string; doubleValue?: number }>;
+type FSFields = Record<string, { stringValue?: string; integerValue?: string; doubleValue?: number; booleanValue?: boolean }>;
 interface FSDoc { name: string; fields: FSFields; }
 
 const docId = (n: string) => n.split("/").pop() ?? n;
@@ -43,9 +43,9 @@ async function fetchAll(collection: string): Promise<FSDoc[]> {
       (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "") +
       (API_KEY   ? `&key=${API_KEY}` : "");
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-      if (!res.ok) { log.error({ collection, status: res.status }, "Firestore error"); break; }
-      const data = await res.json() as { documents?: FSDoc[]; nextPageToken?: string };
+      const fetchResponse = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+      if (!fetchResponse.ok) { log.error({ collection, status: fetchResponse.status }, "Firestore error"); break; }
+      const data = await fetchResponse.json() as { documents?: FSDoc[]; nextPageToken?: string };
       docs.push(...(data.documents ?? []));
       if (!data.nextPageToken) break;
       pageToken = data.nextPageToken;
@@ -142,8 +142,8 @@ async function pingSearchEngines(): Promise<void> {
   ];
   await Promise.allSettled(engines.map(async ({ name, url }) => {
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
-      log.info({ engine: name, status: res.status }, "Sitemap ping sent");
+      const fetchResponse = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+      log.info({ engine: name, status: fetchResponse.status }, "Sitemap ping sent");
     } catch (err) {
       log.warn({ engine: name, err }, "Sitemap ping failed (non-fatal)");
     }
@@ -314,8 +314,8 @@ async function triggerVercelDeploy(reason: string): Promise<void> {
     return;
   }
   try {
-    const res = await fetch(hookUrl, { method: "POST", signal: AbortSignal.timeout(10_000) });
-    log.info({ status: res.status, reason }, "[Sitemap] Vercel deploy hook triggered");
+    const fetchResponse = await fetch(hookUrl, { method: "POST", signal: AbortSignal.timeout(10_000) });
+    log.info({ status: fetchResponse.status, reason }, "[Sitemap] Vercel deploy hook triggered");
   } catch (err) {
     log.warn({ err, reason }, "[Sitemap] Vercel deploy hook failed (non-fatal)");
   }

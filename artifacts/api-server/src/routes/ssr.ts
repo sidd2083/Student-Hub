@@ -183,7 +183,8 @@ router.get("/notes/:slug", async (req: Request, res: Response, next: NextFunctio
   const tpl = getTemplate();
   if (!tpl) return next();
 
-  const id = (req.params.slug ?? "").split("-")[0];
+  const slugParam = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug ?? "";
+  const id = slugParam.split("-")[0];
   const fields = await fetchFirestoreDoc("notes", id);
   if (!fields) return next();
 
@@ -253,7 +254,8 @@ router.get("/pyq/:slug", async (req: Request, res: Response, next: NextFunction)
   const tpl = getTemplate();
   if (!tpl) return next();
 
-  const id = (req.params.slug ?? "").split("-")[0];
+  const slugParam = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug ?? "";
+  const id = slugParam.split("-")[0];
   const fields = await fetchFirestoreDoc("pyqs", id);
   if (!fields) return next();
 
