@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from "express";
+import { Router, type Request, type Response as ExpressResponse } from "express";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import pino from "pino";
@@ -43,7 +43,7 @@ async function fetchAll(collection: string): Promise<FSDoc[]> {
       (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "") +
       (API_KEY   ? `&key=${API_KEY}` : "");
     try {
-      const fetchResponse = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+      const fetchResponse: globalThis.Response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
       if (!fetchResponse.ok) { log.error({ collection, status: fetchResponse.status }, "Firestore error"); break; }
       const data = await fetchResponse.json() as { documents?: FSDoc[]; nextPageToken?: string };
       docs.push(...(data.documents ?? []));
@@ -142,7 +142,7 @@ async function pingSearchEngines(): Promise<void> {
   ];
   await Promise.allSettled(engines.map(async ({ name, url }) => {
     try {
-      const fetchResponse = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+      const fetchResponse: globalThis.Response = await fetch(url, { signal: AbortSignal.timeout(8_000) });
       log.info({ engine: name, status: fetchResponse.status }, "Sitemap ping sent");
     } catch (err) {
       log.warn({ engine: name, err }, "Sitemap ping failed (non-fatal)");
@@ -245,7 +245,7 @@ setInterval(() => {
 
 // ── Routes ─────────────────────────────────────────────────────────────────────
 
-router.get("/sitemap.xml", async (_req: Request, res: Response) => {
+router.get("/sitemap.xml", async (_req: Request, res: ExpressResponse) => {
   // On serverless (Vercel) cold starts, the background generation may not
   // have completed yet. Wait for it so we always return full data.
   if (!sitemapCache.isFullData) {
@@ -277,7 +277,7 @@ router.get("/sitemap.xml", async (_req: Request, res: Response) => {
   res.send(xml);
 });
 
-router.get("/sitemap-index.xml", (_req: Request, res: Response) => {
+router.get("/sitemap-index.xml", (_req: Request, res: ExpressResponse) => {
   const today = new Date().toISOString().split("T")[0];
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
   res.setHeader("Cache-Control", "no-store");
@@ -286,7 +286,7 @@ router.get("/sitemap-index.xml", (_req: Request, res: Response) => {
   );
 });
 
-router.post("/api/sitemap/refresh", async (_req: Request, res: Response) => {
+router.post("/api/sitemap/refresh", async (_req: Request, res: ExpressResponse) => {
   res.json({ ok: true, message: "Sitemap refresh started. Google and Bing will be pinged once done." });
   await generateAndCache(true);
   log.info({ notes: sitemapCache.noteCount, pyqs: sitemapCache.pyqCount }, "Sitemap: manual refresh complete");
@@ -314,19 +314,19 @@ async function triggerVercelDeploy(reason: string): Promise<void> {
     return;
   }
   try {
-    const fetchResponse = await fetch(hookUrl, { method: "POST", signal: AbortSignal.timeout(10_000) });
+    const fetchResponse: globalThis.Response = await fetch(hookUrl, { method: "POST", signal: AbortSignal.timeout(10_000) });
     log.info({ status: fetchResponse.status, reason }, "[Sitemap] Vercel deploy hook triggered");
   } catch (err) {
     log.warn({ err, reason }, "[Sitemap] Vercel deploy hook failed (non-fatal)");
   }
 }
 
-router.post("/api/sitemap/redeploy", async (_req: Request, res: Response) => {
+router.post("/api/sitemap/redeploy", async (_req: Request, res: ExpressResponse) => {
   res.json({ ok: true, message: "Redeploy triggered — sitemap will update in ~1-2 minutes." });
   await triggerVercelDeploy("admin-content-change");
 });
 
-router.get("/api/sitemap/status", (_req: Request, res: Response) => {
+router.get("/api/sitemap/status", (_req: Request, res: ExpressResponse) => {
   const { noteCount, pyqCount, creatorCount, generatedAt, isFullData } = sitemapCache;
   res.json({
     ready:        true,
@@ -340,7 +340,7 @@ router.get("/api/sitemap/status", (_req: Request, res: Response) => {
   });
 });
 
-router.get("/robots.txt", (_req: Request, res: Response) => {
+router.get("/robots.txt", (_req: Request, res: ExpressResponse) => {
   const txt = [
     "User-agent: *",
     "",
