@@ -68,7 +68,12 @@ async function fetchFirestoreDoc(col: string, id: string): Promise<FirestoreFiel
     const url =
       `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${col}/${id}` +
       (API_KEY ? `?key=${API_KEY}` : "");
-    const res = await fetch(url, { signal: AbortSignal.timeout(5_000) });
+    // Explicitly reference the web Response type here. This file also imports
+    // Express's Response type, and Vercel's TypeScript pass can otherwise
+    // resolve `res` as the Express response shape (which has no `ok`/`json`).
+    const res: globalThis.Response = await globalThis.fetch(url, {
+      signal: AbortSignal.timeout(5_000),
+    });
     if (!res.ok) return null;
     const data = await res.json() as { fields?: FirestoreFields };
     return data.fields ?? null;
@@ -183,7 +188,8 @@ router.get("/notes/:slug", async (req: Request, res: Response, next: NextFunctio
   const tpl = getTemplate();
   if (!tpl) return next();
 
-  const id = (req.params.slug ?? "").split("-")[0];
+  const requestedSlug = typeof req.params.slug === "string" ? req.params.slug : "";
+  const id = requestedSlug.split("-")[0];
   const fields = await fetchFirestoreDoc("notes", id);
   if (!fields) return next();
 
@@ -248,7 +254,8 @@ router.get("/pyq/:slug", async (req: Request, res: Response, next: NextFunction)
   const tpl = getTemplate();
   if (!tpl) return next();
 
-  const id = (req.params.slug ?? "").split("-")[0];
+  const requestedSlug = typeof req.params.slug === "string" ? req.params.slug : "";
+  const id = requestedSlug.split("-")[0];
   const fields = await fetchFirestoreDoc("pyqs", id);
   if (!fields) return next();
 
