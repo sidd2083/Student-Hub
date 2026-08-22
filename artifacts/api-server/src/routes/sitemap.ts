@@ -26,7 +26,12 @@ function toSlug(str: string): string {
     .replace(/^-|-$/g, "");
 }
 
-type FSFields = Record<string, { stringValue?: string; integerValue?: string; doubleValue?: number }>;
+type FSFields = Record<string, {
+  stringValue?: string;
+  integerValue?: string;
+  doubleValue?: number;
+  booleanValue?: boolean;
+}>;
 interface FSDoc { name: string; fields: FSFields; }
 
 const docId = (n: string) => n.split("/").pop() ?? n;

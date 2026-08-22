@@ -57,8 +57,9 @@ router.get("/users/stats/summary", (_req: Request, res: Response) =>
 router.get("/users/:uid/profile", async (req: Request, res: Response) => {
   try {
     const db = getAdminDb();
+    const uid = typeof req.params.uid === "string" ? req.params.uid : "";
     if (!db) return res.status(503).json({ error: "Database unavailable." });
-    const doc = await db.collection("users").doc(req.params.uid).get();
+    const doc = await db.collection("users").doc(uid).get();
     if (!doc.exists) return res.status(404).json({ error: "User not found." });
     const d = doc.data()!;
     return res.json({

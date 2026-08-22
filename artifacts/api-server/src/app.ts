@@ -11,6 +11,17 @@ import ssrRouter, { BUILD_EXISTS } from "./routes/ssr";
 
 const app: Express = express();
 
+// Vercel's TypeScript resolver can expose these CommonJS-compatible packages
+// as module objects even though their runtime default exports are callable.
+// Keep the runtime imports unchanged and give the middleware factories the
+// callable shape Express expects.
+const helmetMiddleware = helmet as unknown as (
+  options?: Record<string, unknown>,
+) => import("express").RequestHandler;
+const pinoHttpMiddleware = pinoHttp as unknown as (
+  options?: Record<string, unknown>,
+) => import("express").RequestHandler;
+
 app.set("trust proxy", 1);
 
 // Gzip/deflate all responses — reduces payload 40-60%, speeds crawling + LCP
@@ -23,7 +34,7 @@ app.use(compression({
   },
 }));
 
-app.use(helmet({
+app.use(helmetMiddleware({
   crossOriginResourcePolicy: { policy: "same-site" },
   contentSecurityPolicy: {
     directives: {
@@ -67,7 +78,7 @@ app.use(helmet({
 }));
 
 const serverLogger = pino({ level: process.env.LOG_LEVEL ?? "info" });
-app.use(pinoHttp({
+app.use(pinoHttpMiddleware({
   logger: serverLogger,
   // Never log Authorization headers — they contain Firebase ID tokens
   redact: ["req.headers.authorization", "req.headers.cookie"],
