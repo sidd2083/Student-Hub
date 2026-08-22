@@ -10,6 +10,14 @@ const SITE_URL   = "https://www.studenthubnp.com";
 const PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID ?? "studenthub-6bcc5";
 const API_KEY    = process.env.VITE_FIREBASE_API_KEY    ?? "";
 
+// This module imports Express's `Response` type for route handlers. Use the
+// global web fetch explicitly so Vercel cannot confuse fetch responses with
+// Express responses during its TypeScript check.
+const fetchResponse = (
+  input: string,
+  init?: RequestInit,
+): Promise<globalThis.Response> => globalThis.fetch(input, init);
+
 // Disk cache path — survives server restarts so Google never gets stale/missing URLs
 const DISK_CACHE_PATH = resolve(process.cwd(), "sitemap_cache.json");
 const CACHE_TTL_MS    = 60 * 60 * 1000; // 1 hour
@@ -48,7 +56,7 @@ async function fetchAll(collection: string): Promise<FSDoc[]> {
       (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "") +
       (API_KEY   ? `&key=${API_KEY}` : "");
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+      const res = await fetchResponse(url, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) { log.error({ collection, status: res.status }, "Firestore error"); break; }
       const data = await res.json() as { documents?: FSDoc[]; nextPageToken?: string };
       docs.push(...(data.documents ?? []));
@@ -147,7 +155,7 @@ async function pingSearchEngines(): Promise<void> {
   ];
   await Promise.allSettled(engines.map(async ({ name, url }) => {
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+      const res = await fetchResponse(url, { signal: AbortSignal.timeout(8_000) });
       log.info({ engine: name, status: res.status }, "Sitemap ping sent");
     } catch (err) {
       log.warn({ engine: name, err }, "Sitemap ping failed (non-fatal)");
@@ -319,7 +327,7 @@ async function triggerVercelDeploy(reason: string): Promise<void> {
     return;
   }
   try {
-    const res = await fetch(hookUrl, { method: "POST", signal: AbortSignal.timeout(10_000) });
+    const res = await fetchResponse(hookUrl, { method: "POST", signal: AbortSignal.timeout(10_000) });
     log.info({ status: res.status, reason }, "[Sitemap] Vercel deploy hook triggered");
   } catch (err) {
     log.warn({ err, reason }, "[Sitemap] Vercel deploy hook failed (non-fatal)");
