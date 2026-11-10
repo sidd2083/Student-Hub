@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StudyGuardian } from "@/components/StudyGuardian";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { TimerProvider } from "@/context/TimerContext";
 import { ActiveRoomProvider } from "@/context/ActiveRoomContext";
 import { SosProvider } from "@/context/SosContext";
