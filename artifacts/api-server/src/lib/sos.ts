@@ -130,7 +130,7 @@ const TIMEOUT_COOLDOWN_MS   = 60_000;          // Ignored (distracted) → 60 s 
 const GOOD_SAMARITAN_MS     = 7 * 60_000;      // Helper accepted → 7 min grace
 const WAITING_QUEUE_TTL_MS  = 5 * 60_000;      // 5 min (was 90 s — far too short)
 const DISCONNECT_GC_MS      = 2 * 60_000;
-const MAX_ROUNDS            = 5;               // R1–R3 same-grade, R4–R5 adjacent
+const MAX_ROUNDS            = 6;               // R1-R3 same grade, R4 adjacent, R5 senior, R6 all online
 // NEWCOMER_GRACE_MS removed so new users can receive and offer help immediately
 
 // Round 1 performance thresholds (defines "Top Performer")
@@ -205,6 +205,41 @@ function getGradeAvailableCount(grade: string): number {
   return n;
 }
 
+
+
+// ── Broadcast online counts to ALL connected users ─────────────────────────────
+/**
+ * Sends personalized sos_online_count to every connected user.
+ * Each user gets their own grade-specific counts (excluding themselves).
+ */
+function broadcastOnlineCounts(io: SocketServer): void {
+  const totalOnline = getOnlineCount();
+  for (const [sid, uId] of socketToUid) {
+    const u = activeUsers.get(uId);
+    if (!u || !u.socketId) continue;
+    const s = io.sockets.sockets.get(sid);
+    if (!s) continue;
+    const userGrade = parseGrade(u.grade);
+    let gc = 0;
+    let ga = 0;
+    for (const other of activeUsers.values()) {
+      if (!other.socketId || other.uid === uId) continue;
+      if (parseGrade(other.grade) === userGrade) {
+        gc++;
+        if (other.currentStatus !== "busy_helping" && other.currentStatus !== "in_sos_popup") {
+          ga++;
+        }
+      }
+    }
+    s.emit("sos_online_count", {
+      count: totalOnline,
+      otherCount: Math.max(0, totalOnline - 1),
+      gradeCount: gc,
+      gradeAvailable: ga,
+    });
+  }
+}
+
 // ── Scoring ────────────────────────────────────────────────────────────────────
 
 function computeScore(user: ActiveUser, subject: string): number {
@@ -252,51 +287,55 @@ function findRoundCandidates(
   round: number,
 ): ActiveUser[] {
   const excluded = new Set([requesterUid, ...allNotifiedUids]);
-  const grade    = helpGrade.toLowerCase();
-
-  // Which grades to search depends on the round
-  const targetGrades: Set<string> =
-    round <= 3
-      ? new Set([grade])                          // R1–R3: strict same grade
-      : new Set(getAdjacentGrades(grade));        // R4–R5: adjacent grades only
-
-  if (targetGrades.size === 0) return [];         // no adjacent grades mapped
+  const grade = parseGrade(helpGrade);
+  const gradeNum = Number(grade);
 
   const pool: ActiveUser[] = [];
 
   for (const user of activeUsers.values()) {
-    if (excluded.has(user.uid))                             continue;
-    if (!user.socketId)                                     continue; // offline
-    if (!targetGrades.has(user.grade.toLowerCase()))        continue; // grade filter
+    if (excluded.has(user.uid)) continue;
+    if (!user.socketId) continue; // offline
 
-    // Per-round filter logic
-    if (round === 1 || round === 2 || round === 4) {
-      // Standard availability — respect opt-out, cooldown, and status lock
-      if (!user.allowNotifications)                         continue;
-      if (user.currentStatus === "busy_helping")            continue;
-      if (user.currentStatus === "in_sos_popup")            continue;
+    const userGrade = parseGrade(user.grade);
+    const userGradeNum = Number(userGrade);
+
+    // Round-specific grade matching
+    if (round <= 3) {
+      // Strict same grade
+      if (userGrade !== grade) continue;
+    } else if (round === 4) {
+      // Adjacent grades
+      const adj = getAdjacentGrades(grade);
+      if (!adj.includes(userGrade)) continue;
+    } else if (round === 5) {
+      // Higher / senior grades
+      if (userGradeNum <= gradeNum) continue;
+    }
+    // Round 6: any active user on the platform!
+
+    // Per-round availability filters
+    if (round === 1 || round === 2 || round === 4 || round === 5) {
+      if (!user.allowNotifications) continue;
+      if (user.currentStatus === "busy_helping" || user.currentStatus === "in_sos_popup") continue;
       if (user.cooldownUntil !== null && Date.now() < user.cooldownUntil) continue;
     } else {
-      // Round 3 / Round 5 — broadest fallback; only exclude truly occupied
-      if (user.currentStatus === "busy_helping")            continue;
-      if (user.currentStatus === "in_sos_popup")            continue;
+      // Round 3 (same grade fallback) and Round 6 (global fallback)
+      if (user.currentStatus === "busy_helping" || user.currentStatus === "in_sos_popup") continue;
     }
 
     pool.push(user);
   }
 
   if (round === 1) {
-    // Performance filter: top performers only
     const highPerformers = pool.filter(
       u => u.todayStudyMinutes >= R1_MIN_STUDY_MINS || u.streakDays >= R1_MIN_STREAK,
     );
-    if (highPerformers.length === 0) return []; // signal: fall through to Round 2
+    if (highPerformers.length === 0) return [];
     return highPerformers
       .sort((a, b) => computeScore(b, subject) - computeScore(a, subject))
       .slice(0, 3);
   }
 
-  // Rounds 2–5: random selection
   return pool.sort(() => Math.random() - 0.5).slice(0, 3);
 }
 
@@ -428,15 +467,8 @@ function tryFlushWaitingQueue(io: SocketServer, newUid: string): void {
   const newUser = activeUsers.get(newUid);
   if (!newUser || !newUser.socketId) return;
 
-  const newGrade = newUser.grade.toLowerCase();
-
   for (const [requestId, wReq] of waitingQueue) {
     if (wReq.requesterUid === newUid) continue;
-
-    const helpGrade = wReq.helpGrade.toLowerCase();
-    const isSameGrade     = newGrade === helpGrade;
-    const isAdjacentGrade = getAdjacentGrades(helpGrade).includes(newGrade);
-    if (!isSameGrade && !isAdjacentGrade) continue;
 
     clearTimeout(wReq.expiryTimer);
     waitingQueue.delete(requestId);
@@ -457,8 +489,7 @@ function tryFlushWaitingQueue(io: SocketServer, newUid: string): void {
     };
     pendingSosRequests.set(requestId, req);
     tryDispatchNextRound(io, req);
-    logger.info({ requestId, newUid, isSameGrade, isAdjacentGrade }, "[SOS] waiting queue flushed");
-    // No break — flush every matching waiting request, not just the first
+    logger.info({ requestId, newUid }, "[SOS] waiting queue flushed for available helper");
   }
 }
 
@@ -566,11 +597,8 @@ export function initSosHandlers(io: SocketServer, socket: Socket): void {
       activeUsers.set(userId, user);
       socketToUid.set(socket.id, userId);
 
-      socket.emit("sos_online_count", {
-        count:          getOnlineCount(),
-        gradeCount:     getGradeOnlineCount(user.grade),
-        gradeAvailable: getGradeAvailableCount(user.grade),
-      });
+      // Broadcast updated online counts to ALL connected users (not just the registrant)
+      broadcastOnlineCounts(io);
       logger.debug(
         { uid: userId, grade: user.grade, allowNotifications: user.allowNotifications, onlineCount: getOnlineCount() },
         "[SOS] user registered",
@@ -1023,5 +1051,7 @@ function cleanupOnDisconnect(io: SocketServer, socketId: string): void {
     }
   }
 
-  logger.debug({ userId, onlineCount: getOnlineCount() }, "[SOS] user disconnected (not deleted yet)");
+  // Broadcast updated counts to remaining users
+  broadcastOnlineCounts(io);
+    logger.debug({ userId, onlineCount: getOnlineCount() }, "[SOS] user disconnected (not deleted yet)");
 }

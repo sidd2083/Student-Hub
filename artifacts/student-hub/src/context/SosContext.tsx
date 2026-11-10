@@ -71,6 +71,7 @@ interface SosContextType {
   gradeCount: number;
   /** Available (not busy/in-popup) users in the same grade */
   gradeAvailable: number;
+  isConnected: boolean;
 
   sendSosRequest: (topicTitle: string, subject: string, helpGrade?: string) => void;
   cancelSosRequest: () => void;
@@ -150,6 +151,7 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
   const [onlineCount, setOnlineCount]       = useState(0);
   const [gradeCount, setGradeCount]         = useState(0);
   const [gradeAvailable, setGradeAvailable] = useState(0);
+  const [isConnected, setIsConnected]       = useState(false);
 
   // Track mount to avoid state updates after unmount
   const mountedRef = useRef(true);
@@ -299,9 +301,10 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
     };
 
     // Online count update from server
-    const onOnlineCount = (data: { count: number; gradeCount?: number; gradeAvailable?: number }) => {
+    const onOnlineCount = (data: { count: number; otherCount?: number; gradeCount?: number; gradeAvailable?: number }) => {
       if (!mountedRef.current) return;
-      setOnlineCount(data.count);
+      const others = data.otherCount !== undefined ? data.otherCount : Math.max(0, data.count - 1);
+      setOnlineCount(others);
       if (data.gradeCount     !== undefined) setGradeCount(data.gradeCount);
       if (data.gradeAvailable !== undefined) setGradeAvailable(data.gradeAvailable);
     };
@@ -355,6 +358,12 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
     socket.on("sos_partner_disconnected",onPartnerDisconnected);
     socket.on("sos_timer_pause",         onTimerPause);
 
+    const onConn = () => { if (mountedRef.current) setIsConnected(true); };
+    const onDisconn = () => { if (mountedRef.current) setIsConnected(false); };
+    if (socket.connected) setIsConnected(true);
+    socket.on("connect", onConn);
+    socket.on("disconnect", onDisconn);
+
     return () => {
       socket.off("sos_popup",               onPopup);
       socket.off("sos_popup_clear",         onPopupClear);
@@ -369,6 +378,8 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
       socket.off("sos_session_ended",       onSessionEnded);
       socket.off("sos_partner_disconnected",onPartnerDisconnected);
       socket.off("sos_timer_pause",         onTimerPause);
+      socket.off("connect",                 onConn);
+      socket.off("disconnect",              onDisconn);
     };
   }, [user]);
 
@@ -378,7 +389,7 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
     (topicTitle: string, subject: string, helpGrade?: string) => {
       if (!profile) return;
       setRequestStatus("searching");
-      const validGrades = new Set(["9","10","11","12","cee","ioe"]);
+      const validGrades = new Set(["9","10","11","12","13","14","15","cee","ioe","bachelor"]);
       const resolvedGrade = helpGrade && validGrades.has(helpGrade.toLowerCase())
         ? helpGrade.toLowerCase()
         : String(profile.grade ?? "10").toLowerCase();
@@ -471,6 +482,7 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
     onlineCount,
     gradeCount,
     gradeAvailable,
+    isConnected,
     sendSosRequest,
     cancelSosRequest,
     acceptSos,

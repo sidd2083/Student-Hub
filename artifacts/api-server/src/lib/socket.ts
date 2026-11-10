@@ -38,7 +38,22 @@ function pushLiveStats() {
 
 export function initSocketServer(httpServer: HTTPServer): SocketServer {
   const io = new SocketServer(httpServer, {
-    cors: { origin: process.env.CORS_ORIGIN ?? true, credentials: true },
+    cors: {
+      origin: (origin: string | undefined, callback: (err: Error | null, origin?: any) => void) => {
+        if (!origin) return callback(null, true);
+        if (
+          origin.endsWith(".replit.dev") ||
+          origin.endsWith(".replit.app") ||
+          origin.endsWith(".vercel.app") ||
+          origin.endsWith(".onrender.com") ||
+          /^https?:\/\/localhost(:\d+)?$/.test(origin)
+        ) {
+          return callback(null, true);
+        }
+        callback(null, true);
+      },
+      credentials: true,
+    },
     transports: ["websocket", "polling"],
     pingTimeout: 30_000,
     pingInterval: 10_000,

@@ -43,7 +43,7 @@ const ALLOW_NOTIFICATIONS_KEY  = "sh_allow_notifications";
 
 export default function SosNetwork() {
   const { profile } = useAuth();
-  const { requestStatus, sendSosRequest, cancelSosRequest, onlineCount, gradeCount, gradeAvailable } = useSos();
+  const { requestStatus, sendSosRequest, cancelSosRequest, onlineCount, gradeCount, gradeAvailable, isConnected } = useSos();
 
   const [topicTitle,          setTopicTitle]          = useState("");
   const [subject,             setSubject]             = useState("Math");
@@ -218,20 +218,22 @@ export default function SosNetwork() {
               <h2 className="font-bold text-gray-900 dark:text-white">Request Help</h2>
             </div>
             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-              gradeAvailable > 0
+              !isConnected
+                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                : gradeAvailable > 0
                 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                : gradeCount > 0
-                ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                : onlineCount > 0
+                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                 : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
             }`}>
               <Wifi className="w-3 h-3" />
-              {gradeAvailable > 0
+              {!isConnected
+                ? "Connecting to SOS network..."
+                : gradeAvailable > 0
                 ? `${gradeAvailable} in your grade available`
-                : gradeCount > 0
-                ? `${gradeCount} in your grade (all busy)`
-                : onlineCount > 1
-                ? `${onlineCount - 1} online (other grades)`
-                : "No helpers online now"}
+                : onlineCount > 0
+                ? `${onlineCount} peer${onlineCount > 1 ? "s" : ""} online (all grades)`
+                : "You're the only one online right now"}
             </div>
           </div>
 

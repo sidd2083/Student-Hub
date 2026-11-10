@@ -105,8 +105,8 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow server-to-server / curl / Postman (no Origin header)
     if (!origin) return callback(null, true);
-    // Allow all Replit dev and deployment domains
-    if (origin.endsWith(".replit.dev") || origin.endsWith(".replit.app")) return callback(null, true);
+    // Allow all Replit, Vercel, and Render deployment domains
+    if (origin.endsWith(".replit.dev") || origin.endsWith(".replit.app") || origin.endsWith(".vercel.app") || origin.endsWith(".onrender.com")) return callback(null, true);
     // Allow explicit override (e.g. custom production domain)
     const configured = process.env.CORS_ORIGIN;
     if (configured) {
