@@ -4,15 +4,20 @@
   "license": "MIT",
   "packageManager": "pnpm@10.26.1",
   "scripts": {
-    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "build": "pnpm  -r --if-present run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm -w run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
-    "build:vercel": "PORT=3000 BASE_PATH=/ pnpm --filter @workspace/student-hub run build"
+    "build:vercel": "PORT=3000 BASE_PATH=/ pnpm --filter @workspace/student-hub run build",
+    "preinstall": "node -e \"if (!process.env.npm_config_user_agent || !process.env.npm_config_user_agent.includes('pnpm')) { console.error('Use pnpm instead'); process.exit(1); }\""
   },
   "private": true,
   "devDependencies": {
-    "typescript": "~5.9.2",
-    "prettier": "^3.8.1"
+    "prettier": "^3.8.1",
+    "typescript": "~5.9.2"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.68.1",
+    "@tailwindcss/oxide-win32-x64-msvc": "^4.3.5",
+    "lightningcss-win32-x64-msvc": "^1.33.0"
   }
 }

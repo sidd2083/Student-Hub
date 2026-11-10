@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -6,12 +6,47 @@ import { useAuth, UserProfile } from "@/context/AuthContext";
 
 export default function Onboarding() {
   const { user, setProfile } = useAuth();
+  const [checkingExisting, setCheckingExisting] = useState(true);
   const [, setLocation] = useLocation();
   const [name, setName] = useState(user?.displayName || "");
   const [grade, setGrade] = useState<number | "">("");
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    let active = true;
+    if (!user) {
+      setCheckingExisting(false);
+      return;
+    }
+    const checkUser = async () => {
+      try {
+        const { doc, getDoc } = await import("firebase/firestore");
+        const snap = await getDoc(doc(db, "users", user.uid));
+        if (snap.exists() && active) {
+          const d = snap.data();
+          const existingProf: UserProfile = {
+            uid: d.uid || user.uid,
+            name: d.name || "",
+            email: d.email || user.email || "",
+            grade: d.grade || 10,
+            role: d.role === "admin" ? "admin" : "user",
+            createdAt: d.createdAt || new Date().toISOString(),
+            photoURL: d.photoURL,
+          };
+          setProfile(existingProf);
+          setLocation("/dashboard");
+          return;
+        }
+      } catch (err) {
+        console.warn("[Onboarding] checkUser error:", err);
+      }
+      if (active) setCheckingExisting(false);
+    };
+    checkUser();
+    return () => { active = false; };
+  }, [user, setLocation, setProfile]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

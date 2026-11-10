@@ -1,5 +1,5 @@
 import { initializeApp, getApps, FirebaseApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, Auth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, Auth, browserLocalPersistence, setPersistence } from "firebase/auth";
 import {
   initializeFirestore,
   persistentLocalCache,
@@ -33,6 +33,7 @@ let storage: FirebaseStorage;
 if (isConfigured) {
   app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
   auth = getAuth(app);
+  setPersistence(auth, browserLocalPersistence).catch(() => {});
   googleProvider = new GoogleAuthProvider();
   googleProvider.addScope("email");
   googleProvider.addScope("profile");

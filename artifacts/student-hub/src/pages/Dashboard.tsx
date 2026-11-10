@@ -15,7 +15,6 @@ import {
 import { SiteGuide } from "@/components/SiteGuide";
 import { DailyMissionWidget } from "@/components/DailyMissionWidget";
 import { StudyRoomWidget } from "@/components/study-room/StudyRoomWidget";
-import { ExamCountdown } from "@/components/ExamCountdown";
 import { FeedbackWidget } from "@/components/FeedbackWidget";
 
 const sections = [
@@ -357,8 +356,6 @@ export default function Dashboard() {
           </div>
           <p className="text-gray-500 text-sm">Ready to learn something new today?</p>
         </div>
-
-        <ExamCountdown grade={profile?.grade} />
 
         {uid && <DailyMissionWidget />}
 

@@ -71,27 +71,13 @@ const queryClient = new QueryClient({
 // ── Idle-time route prefetching ────────────────────────────────────────────────
 // Preloads the JS chunks for the most-visited pages while the browser is idle,
 // so navigation feels instant rather than waiting for a chunk download.
-if (typeof requestIdleCallback !== "undefined") {
-  // Priority 1: SEO-critical tool pages + most-visited logged-out pages
-  requestIdleCallback(() => {
-    void import("@/pages/GpaCalculator");
-    void import("@/pages/AttendanceCalculator");
-    void import("@/pages/Notes");
-  }, { timeout: 2000 });
-  // Priority 2: Common navigation targets after login
-  requestIdleCallback(() => {
-    void import("@/pages/Dashboard");
-    void import("@/pages/DailyMissions");
-    void import("@/pages/Pyqs");
+// Lightweight, staggered route prefetching on idle — keeps initial render silky smooth
+if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+  window.requestIdleCallback(() => {
+    // Stagger downloads so main thread and network remain free
+    setTimeout(() => { void import("@/pages/Dashboard"); }, 3000);
+    setTimeout(() => { void import("@/pages/Notes"); }, 6000);
   }, { timeout: 4000 });
-  // Priority 3: Secondary pages + study rooms (heavy but commonly visited)
-  requestIdleCallback(() => {
-    void import("@/pages/Pomodoro");
-    void import("@/pages/NepAi");
-    void import("@/pages/Tools");
-    void import("@/pages/StudyRooms");
-    void import("@/pages/StudyRoomLive");
-  }, { timeout: 7000 });
 }
 
 function scrollToTop() {
@@ -150,11 +136,10 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
 }
 
 // ── PWA / returning-user flash fix ────────────────────────────────────────────
-const AUTH_HINT_ACTIVE =
-  typeof localStorage !== "undefined" && localStorage.getItem("sh_authed") === "1";
-
 function SmartHome() {
-  if (AUTH_HINT_ACTIVE) return <Redirect to="/dashboard" replace />;
+  const { user, profile } = useAuth();
+  const isAuthed = !!(user || profile) || (typeof localStorage !== "undefined" && localStorage.getItem("sh_authed") === "1");
+  if (isAuthed) return <Redirect to="/dashboard" replace />;
   return <Home />;
 }
 

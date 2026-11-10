@@ -28,12 +28,13 @@ const SUBJECTS = [
 ];
 
 const GRADES: { value: string; label: string; desc: string }[] = [
-  { value: "9",   label: "Grade 9",  desc: "SEE prep / lower secondary" },
-  { value: "10",  label: "Grade 10", desc: "SEE year"                    },
-  { value: "11",  label: "Grade 11", desc: "+2 first year"               },
-  { value: "12",  label: "Grade 12", desc: "+2 final year"               },
-  { value: "cee", label: "CEE",      desc: "Medical entrance (MBBS)"     },
-  { value: "ioe", label: "IOE",      desc: "Engineering entrance"        },
+  { value: "9",  label: "Grade 9",    desc: "SEE prep / lower secondary" },
+  { value: "10", label: "Grade 10",   desc: "SEE year"                    },
+  { value: "11", label: "Grade 11",   desc: "+2 first year"               },
+  { value: "12", label: "Grade 12",   desc: "+2 final year"               },
+  { value: "13", label: "CEE",        desc: "Medical entrance (MBBS)"     },
+  { value: "14", label: "IOE",        desc: "Engineering entrance"        },
+  { value: "15", label: "Bachelor's", desc: "University degree"           },
 ];
 
 const SUBJECT_MASTERY_KEY      = "sh_subject_mastery";
@@ -73,8 +74,9 @@ export default function SosNetwork() {
     // Pre-select grade from profile
     if (profile?.grade) {
       const g = String(profile.grade).toLowerCase();
-      const valid = new Set(["9","10","11","12","cee","ioe"]);
-      if (valid.has(g)) setHelpGrade(g);
+      const norm = g === "cee" ? "13" : g === "ioe" ? "14" : g === "bachelor" ? "15" : g;
+      const valid = new Set(["9", "10", "11", "12", "13", "14", "15"]);
+      if (valid.has(norm)) setHelpGrade(norm);
     }
   }, [profile?.grade]);
 

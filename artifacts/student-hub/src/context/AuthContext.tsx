@@ -103,7 +103,8 @@ function isProfileCacheFresh(uid: string): boolean {
     const raw = localStorage.getItem(PROFILE_CACHE_KEY);
     if (!raw) return false;
     const data = JSON.parse(raw) as { uid: string; ts?: number };
-    return data.uid === uid && !!data.ts && Date.now() - data.ts < 5 * 60 * 1000;
+    // Cache remains valid across sessions (24 hours fresh window before background refresh)
+    return data.uid === uid && !!data.ts && Date.now() - data.ts < 24 * 60 * 60 * 1000;
   } catch { return false; }
 }
 
