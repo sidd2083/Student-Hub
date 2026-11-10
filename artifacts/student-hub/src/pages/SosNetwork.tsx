@@ -143,6 +143,26 @@ export default function SosNetwork() {
           </p>
         </div>
 
+        {/* WebSocket connection status banner */}
+        {!isConnected && (
+          <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs shadow-sm">
+            <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+            <div className="space-y-1.5 flex-1">
+              <p className="font-bold text-sm text-amber-950 dark:text-amber-100">
+                Live Help Network Offline (Backend Disconnected)
+              </p>
+              <p className="text-amber-800 dark:text-amber-300 leading-relaxed">
+                Vercel is a static serverless host and does not run WebSocket servers. To enable live Get Help matchmaking across all students:
+              </p>
+              <ol className="list-decimal list-inside space-y-1 mt-1 text-amber-800 dark:text-amber-300 ml-1">
+                <li>Deploy this repo to <span className="font-semibold text-blue-600 dark:text-blue-400">Render.com</span> using the included <code className="bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded font-mono">render.yaml</code></li>
+                <li>In Vercel Settings &rarr; Environment Variables, add <code className="bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded font-mono font-bold">VITE_WS_URL</code> = your Render URL</li>
+                <li>Redeploy your Vercel project</li>
+              </ol>
+            </div>
+          </div>
+        )}
+
         {/* How it works */}
         <div className="grid grid-cols-3 gap-3">
           {[

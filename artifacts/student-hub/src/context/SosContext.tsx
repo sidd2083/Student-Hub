@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 /**
  * SOS Network — Global Context
  *
@@ -358,6 +359,20 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
     socket.on("sos_partner_disconnected",onPartnerDisconnected);
     socket.on("sos_timer_pause",         onTimerPause);
 
+    const onError = (data: { message?: string }) => {
+      if (!mountedRef.current) return;
+      setRequestStatus("idle");
+      setOutgoingRequestId(null);
+      if (data?.message) {
+        toast({
+          title: "Get Help",
+          description: data.message,
+          variant: "destructive",
+        });
+      }
+    };
+    socket.on("sos_error", onError);
+
     const onConn = () => { if (mountedRef.current) setIsConnected(true); };
     const onDisconn = () => { if (mountedRef.current) setIsConnected(false); };
     if (socket.connected) setIsConnected(true);
@@ -378,6 +393,7 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
       socket.off("sos_session_ended",       onSessionEnded);
       socket.off("sos_partner_disconnected",onPartnerDisconnected);
       socket.off("sos_timer_pause",         onTimerPause);
+      socket.off("sos_error",               onError);
       socket.off("connect",                 onConn);
       socket.off("disconnect",              onDisconn);
     };
@@ -388,6 +404,15 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
   const sendSosRequest = useCallback(
     (topicTitle: string, subject: string, helpGrade?: string) => {
       if (!profile) return;
+      if (!getSocket().connected) {
+        toast({
+          title: "Live Help Disconnected",
+          description: "Cannot reach the live help server. Please check your backend deployment.",
+          variant: "destructive",
+        });
+        setRequestStatus("idle");
+        return;
+      }
       setRequestStatus("searching");
       const validGrades = new Set(["9","10","11","12","13","14","15","cee","ioe","bachelor"]);
       const resolvedGrade = helpGrade && validGrades.has(helpGrade.toLowerCase())
