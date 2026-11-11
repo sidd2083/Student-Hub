@@ -402,16 +402,25 @@ export function SosProvider({ children }: { children: React.ReactNode }) {
   // ── Actions ───────────────────────────────────────────────────────────────
 
   const sendSosRequest = useCallback(
-    (topicTitle: string, subject: string, helpGrade?: string) => {
+    async (topicTitle: string, subject: string, helpGrade?: string) => {
       if (!profile) return;
-      if (!getSocket().connected) {
-        toast({
-          title: "Live Help Disconnected",
-          description: "Cannot reach the live help server. Please check your backend deployment.",
-          variant: "destructive",
-        });
-        setRequestStatus("idle");
-        return;
+      const socket = getSocket();
+      if (!socket.connected) {
+        setRequestStatus("searching");
+        let isConn = false;
+        for (let i = 0; i < 6; i++) {
+          if (socket.connected) { isConn = true; break; }
+          await new Promise(r => setTimeout(r, 500));
+        }
+        if (!isConn && !socket.connected) {
+          toast({
+            title: "Backend Connecting...",
+            description: "Backend server is still connecting or waking up from sleep. Please check server settings below.",
+            variant: "destructive",
+          });
+          setRequestStatus("idle");
+          return;
+        }
       }
       setRequestStatus("searching");
       const validGrades = new Set(["9","10","11","12","13","14","15","cee","ioe","bachelor"]);

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useSos } from "@/context/SosContext";
-import { getSocket } from "@/lib/socket";
+import { getSocket, getConfiguredWsUrl, setWsUrlOverride } from "@/lib/socket";
 import { Clock, Wifi } from "lucide-react";
 
 function TikTokIcon({ className }: { className?: string }) {
@@ -55,6 +55,39 @@ export default function SosNetwork() {
 
   const [mastery,             setMastery]             = useState<Record<string, number>>({});
   const [allowNotifications,  setAllowNotifications]  = useState<boolean>(true);
+  const [customWsUrl,         setCustomWsUrl]         = useState(() => getConfiguredWsUrl());
+  const [pingStatus,          setPingStatus]          = useState<string | null>(null);
+  const [isPinging,           setIsPinging]           = useState(false);
+
+  const testServerConnection = async (urlToTest: string) => {
+    setIsPinging(true);
+    setPingStatus("Pinging backend server...");
+    const base = urlToTest.trim().replace(/\/+$/, "").replace(/^ws:\/\//i, "http://").replace(/^wss:\/\//i, "https://");
+    if (!base) {
+      setPingStatus("No URL specified.");
+      setIsPinging(false);
+      return;
+    }
+    try {
+      const start = Date.now();
+      const res = await fetch(`${base}/health`, { method: "GET", mode: "cors" });
+      const elapsed = Date.now() - start;
+      if (res.ok) {
+        setPingStatus(`Connected! ${elapsed}ms response time`);
+      } else {
+        setPingStatus(`Server responded with HTTP ${res.status}`);
+      }
+    } catch (e: any) {
+      setPingStatus(`Unreachable: ${e.message || "Failed to fetch"}. If on Render free tier, server may be waking up from sleep (~40s).`);
+    } finally {
+      setIsPinging(false);
+    }
+  };
+
+  const handleSaveCustomWsUrl = () => {
+    setWsUrlOverride(customWsUrl);
+    testServerConnection(customWsUrl);
+  };
 
   useEffect(() => {
     try {
@@ -145,20 +178,52 @@ export default function SosNetwork() {
 
         {/* WebSocket connection status banner */}
         {!isConnected && (
-          <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs shadow-sm">
-            <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-            <div className="space-y-1.5 flex-1">
-              <p className="font-bold text-sm text-amber-950 dark:text-amber-100">
-                Live Help Network Offline (Backend Disconnected)
-              </p>
-              <p className="text-amber-800 dark:text-amber-300 leading-relaxed">
-                Vercel is a static serverless host and does not run WebSocket servers. To enable live Get Help matchmaking across all students:
-              </p>
-              <ol className="list-decimal list-inside space-y-1 mt-1 text-amber-800 dark:text-amber-300 ml-1">
-                <li>Deploy this repo to <span className="font-semibold text-blue-600 dark:text-blue-400">Render.com</span> using the included <code className="bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded font-mono">render.yaml</code></li>
-                <li>In Vercel Settings &rarr; Environment Variables, add <code className="bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded font-mono font-bold">VITE_WS_URL</code> = your Render URL</li>
-                <li>Redeploy your Vercel project</li>
-              </ol>
+          <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs shadow-sm space-y-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <div className="space-y-1 flex-1">
+                <p className="font-bold text-sm text-amber-950 dark:text-amber-100">
+                  Live Help Backend Disconnected
+                </p>
+                <p className="text-amber-800 dark:text-amber-300 leading-relaxed">
+                  Vercel only hosts static pages and cannot run live WebSocket servers. Your backend (<code className="font-mono bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded">artifacts/api-server</code>) must run on a live host like Render.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white/80 dark:bg-gray-900/80 p-3 rounded-xl border border-amber-200/60 dark:border-amber-800/60 space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-gray-700 dark:text-gray-300">
+                <span>Configured Backend Server URL:</span>
+                <span className="font-mono text-gray-500">{customWsUrl || "None (Attempting same-origin fallback)"}</span>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={customWsUrl}
+                  onChange={e => setCustomWsUrl(e.target.value)}
+                  placeholder="https://your-backend.onrender.com"
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveCustomWsUrl}
+                  className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs transition-colors shrink-0"
+                >
+                  Save & Connect
+                </button>
+                <button
+                  type="button"
+                  disabled={isPinging}
+                  onClick={() => testServerConnection(customWsUrl)}
+                  className="px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold text-xs transition-colors shrink-0 disabled:opacity-50"
+                >
+                  {isPinging ? "Pinging..." : "Test Ping"}
+                </button>
+              </div>
+              {pingStatus && (
+                <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300 mt-1">
+                  {pingStatus}
+                </p>
+              )}
             </div>
           </div>
         )}

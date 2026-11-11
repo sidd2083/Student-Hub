@@ -8,7 +8,13 @@ const rawPort = process.env.PORT ?? "5000";
 const port = Number(rawPort);
 const basePath = process.env.BASE_PATH ?? "/";
 
+const wsUrl = process.env.VITE_WS_URL || process.env.WS_URL || process.env.VITE_BACKEND_URL || process.env.BACKEND_URL || "";
+
 export default defineConfig({
+  define: {
+    "import.meta.env.VITE_WS_URL": JSON.stringify(wsUrl),
+    "import.meta.env.WS_URL": JSON.stringify(wsUrl),
+  },
   base: basePath,
   plugins: [
     react(),
